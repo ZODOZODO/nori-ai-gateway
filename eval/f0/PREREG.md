@@ -1,8 +1,9 @@
 # F0 사전등록(PREREG) — TC 골든셋 (A) LLM 계획 vs (B) 고정 workflow + 분류·인자 추출
 
-## 0. 등록 상태 — **미커밋(UNCOMMITTED), 측정 불가**
+## 0. 등록 상태 — **등록(REGISTERED), 등록 commit C1 = `ca3b266f8eb8c529ed6bf358712d6060a77b21c5`**
 
-- 2026-10-29 P02 작성 시점 `nori-ai-gateway` 레포에는 git commit 이 하나도 없다. 따라서 아래 `registeredCommit` 은 `null` 이고, 분석 코드 등록 commit SHA·PREREG 기록 commit SHA 는 **둘 다 아직 없다**(가짜 SHA 를 적지 않는다).
+- 2026-10-30 로컬 `nori-ai-gateway` git 에 등록 commit C1(골든셋·fixture·프롬프트·arg-limits·경계 케이스·메시지 입력·렌더러 등록·tokenizer pin·분석 코드, 이 문서는 `registeredCommit=null` 상태로 포함)을 만들고, 이 문서의 `registeredCommit` 에 C1 SHA 를 적어 이 문서만 별도 PREREG commit C2 로 올렸다. C2 SHA 는 자기 해시 고리 0 원칙에 따라 이 문서에 적지 않는다(`git log -1 -- eval/f0/PREREG.md` 로 확인). 외부 push 0.
+- 이력: 2026-10-29 P02 작성 시점에는 레포에 git commit 이 없어 `registeredCommit=null`·`UNCOMMITTED` 였다(가짜 SHA 를 적지 않음).
 - 측정 명령(`f0 run`·`boundary-gen`·`gguf-count`·`usage-probe`·`token-golden`·`chat-template`)은 시작 시 이 문서를 검사하며, `registeredCommit` 이 없거나 아래 커밋 조건이 하나라도 성립하지 않으면 endpoint 호출 없이 `PREREG_NOT_COMMITTED` 등(exit 2)으로 거부한다.
 - 현재 기계 판독 블록의 `inputs[].sha256`·`harnessDigest` 는 2026-10-30 작업 트리 바이트로 계산한 값이다(`f0 prereg-check` 출력 — 2026-10-29 값에서 렌더러 등록으로 `chat-renderers-v1.json` 이, tokenizer 원본·pin 추가로 `harnessDigest` 가 바뀌었다). 등록 전에 대상 파일이 바뀌면 이 값도 다시 계산해 갱신해야 한다.
 
@@ -59,8 +60,8 @@
 ```json
 {
   "schema": "f0-prereg-v1",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "ca3b266f8eb8c529ed6bf358712d6060a77b21c5",
   "inputs": [
     {"path": "eval/golden/tc-f0-v1.jsonl", "sha256": "211a029489962873030c1a09cb2b1ee6b9b23ce313e2c981109f3ca19400b952"},
     {"path": "eval/golden/tc-registry-fixture-v1.json", "sha256": "9bed27d03d10d37896af1cf6068ea76540aa69d5af25abf5c6d45a69f24955c9"},
