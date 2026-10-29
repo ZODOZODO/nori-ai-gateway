@@ -1,0 +1,348 @@
+### 12.1 상위 ID(AC-01~AC-46, ISO-01~ISO-15)
+
+| ID | 구성 | §27.2 게이트 | 구현 phase | 이번 판정 phase | Source·LLM | 범위 |
+|---|---|---|---|---|---|---|
+| AC-01 | 원자 | F4, F5b | P13, P26 | P29 | M+RL+RT, LL | 이번(F4) / 후속(F5b) |
+| AC-02 | 부모: LINK, MISSING | F4, F5b | — | P29 집계 | — | 이번(F4) / 후속(F5b) |
+| AC-03 | 부모: RES, TIME (+공유 ISO-05-MESSAGE) | F4, F5b | — | P29 집계 | — | 이번(F4) / 후속(F5b) |
+| AC-04 | 원자 | F4, F5a | P11, P13, P26 | P29 | M(모델 READ), LL | 이번(F4) / 후속(F5a) |
+| AC-05 | 원자 | F4, F5b | P13, P26 | P29 | M+RS, LL | 이번(F4) / 후속(F5b) |
+| AC-06 | 원자 | 후속 기능 게이트(2차) | — | — | — | 후속 |
+| AC-07 | 원자 | 후속 기능 게이트(2차) | — | — | — | 후속 |
+| AC-08 | 원자 | 후속 기능 게이트(2차) | — | — | — | 후속 |
+| AC-09 | 원자 | 후속 기능 게이트(3차) | — | — | — | 후속 |
+| AC-10 | 부모: P, I | 후속 기능 게이트(3차) | — | — | — | 후속 |
+| AC-11 | 원자 | 후속 기능 게이트(3차) | — | — | — | 후속 |
+| AC-12 | 원자 | 후속 기능 게이트(3차) | — | — | — | 후속 |
+| AC-13 | 원자 | 후속 기능 게이트(3차) | — | — | — | 후속 |
+| AC-14 | 원자 | 후속 기능 게이트(2차) | — | — | — | 후속 |
+| AC-15 | 부모: TC-WM, WM-TC | F4·F5b(TC-WM), R1(WM-TC) | — | P29 집계(TC-WM) | — | 일부 이번 |
+| AC-16 | 부모: LOG, DOC | F4, F5b | — | P29 집계 | — | 이번(F4) / 후속(F5b) |
+| AC-17 | 부모: P, U, D, PHASE, VERSION | F1, F4 | — | P16, P29 집계 | — | 이번 |
+| AC-18 | 부모: 8 leaf (+공유 ISO-08-RECONNECT) | F4(1차 7 leaf), F5a(RESUME·ACTOR), 3차(TEST) | — | P29 집계 | — | 일부 이번 |
+| AC-19 | 부모: P1, P2, P3 | F4·F5b(P1), 2차(P2), 3차(P3) | — | P29 집계(P1) | — | 일부 이번 |
+| AC-20 | 부모: INC, REPLAY | F4·F5b(INC), 3차(REPLAY) | — | P29 집계(INC) | — | 일부 이번 |
+| AC-21 | 부모: TOOL, SOURCE | F1 | — | P16 집계 | — | 이번 |
+| AC-22 | 부모: 6 leaf | F2 | — | P21 집계 | — | 이번 |
+| AC-23 | 부모: 25 leaf | F3(LOAD 제외), F4(LOAD) | — | P25, P29 집계 | — | 이번 |
+| AC-24 | 부모: 24 leaf (+공유 AC-03-RES·AC-03-TIME) | F4 | — | P29 집계 | — | 이번 |
+| AC-25 | 부모: 11 leaf (+공유 AC-40) | F5a | — | — | TC_LIVE | 후속 |
+| AC-26 | 부모: 9 leaf | F5b | — | — | TC_LIVE | 후속 |
+| AC-27 | 부모: 6 leaf | R1, R2 | — | — | WM_LIVE/HRM_LIVE | 후속 |
+| AC-28 | 부모: 14 leaf | F4(F 하위), F5a·F5b(F 하위 TC_LIVE), R1·R2(FAIR), 용량 확장(SCALE) | — | P29 집계(F4) | — | 일부 이번 |
+| AC-29 | 원자 | F2, F4, F5a | P20 | P21, P29 | M, LL | 이번(F2·F4) / 후속(F5a) |
+| AC-30 | 부모: EQ, WM, ABSENT | F2, F4 | — | P21, P29 집계 | — | 이번 |
+| AC-31 | 원자 | F2 | P18, P19, P20 | P21 | M, LL(Composer usage), G-USAGE 의존 | 이번 |
+| AC-32 | 부모: SCHEMA, LENGTH, RETRYOK | F2 | — | P21 집계 | — | 이번 |
+| AC-33 | 부모: LOADING, PERSIST, CTX | F2, F4 | — | P21, P29 집계 | — | 이번 |
+| AC-34 | 원자 | F5b | — | — | TC_LIVE | 후속 |
+| AC-35 | 부모: TOKEN, FW, LOCAL, EGRESS | F2 | — | P21 집계 | — | 이번 |
+| AC-36 | 원자 | F1, F4, F5a | P11, P12, P13, P14(보존 탐침 저장·스케줄·소비, N13) | P16, P29 | M(설정 확정 Source)+RL(verifiedOldestAt) | 이번(F1·F4) / 후속(F5a) |
+| AC-37 | 부모: CMP, OUT-NORMAL, OUT-MAX, OUT-ESCAPE | F0 | — | P03 집계 | — | 이번 |
+| AC-38 | 부모: F0, F2, F4 | F0, F2, F4 | — | P03, P21, P29 | — | 이번 |
+| AC-39 | 부모: 299, 300, 301 | F5a | — | — | TC_LIVE | 후속 |
+| AC-40 | 원자(AC-25 공유 하위) | F5a | — | — | TC_LIVE | 후속 |
+| AC-41 | 원자 | F1, F5a | P07, P09, P14 | P16 | M, L0(`delegation_id` terminal NULL·백업 표현 제외 포함) | 이번(F1) / 후속(F5a) |
+| AC-42 | 부모: READ, AUTHZ | F5a | — | — | TC_LIVE | 후속 |
+| AC-43 | 부모: CLS, COMP | F2 | — | P21 집계 | — | 이번 |
+| AC-44 | 원자 | F2, F4 | P19 | P21, P29 | 실제 Ollama 중지(사용자 실행), M | 이번 |
+| AC-45 | 원자 | F1, F4, F5a | P11, P12 | P16, P29 | M+RL | 이번(F1·F4) / 후속(F5a) |
+| AC-46 | 부모: EMPTY, HIT, TRIM | F1, F4, F5a | — | P16, P29 집계 | — | 이번(F1·F4) / 후속(F5a) |
+| ISO-01 | 원자 | F4 | P20, P26 | P29 | M+FX(WM 음성), LL | 이번 |
+| ISO-02 | 원자 | F4 | P26 | P29 | FX(TC·WM 양쪽 권한 actor), LL | 이번 |
+| ISO-03 | 원자 | F4 | P05, P20 | P29 | LS 또는 Plan seam(WM capability) | 이번 |
+| ISO-04 | 부모: 20 leaf | F1, F4, F5a | — | P16, P29 집계 | — | 이번(F1·F4) / 후속(F5a) |
+| ISO-05 | 부모: READ, MESSAGE | F4 | — | P29 집계 | — | 이번 |
+| ISO-06 | 부모: V/K 4 + H 2 | F3·F4(V/K), 후속 Hybrid(H) | — | P25, P29 집계(V/K) | — | V/K 이번, H 후속. 상위 ISO-06 전체 PASS 주장 금지 |
+| ISO-07 | 부모: CITE, RAW, CHART, DOWNLOAD | F4 | — | P29 집계 | — | 이번 |
+| ISO-08 | 부모: JOB, CONNECT, RECONNECT, EVENT | F4, F5b | — | P29 집계 | — | 이번(F4) / 후속(F5b) |
+| ISO-09 | 원자 | F4 | P13 | P29 | FX(WM 캐시 키 충돌) | 이번 |
+| ISO-10 | 부모: LOG, CODE, RAG | F4 | — | P29 집계 | — | 이번 |
+| ISO-11 | 부모: 10 leaf | F4·F5a(TOOL·RESULT 4), F5b(STREAM 6) | — | P29 집계(4) | — | 일부 이번 |
+| ISO-12 | 부모: FAIL, UNSUP | F4 | — | P29 집계 | — | 이번 |
+| ISO-13 | 부모: EQP, LOT, DOC | F4 | — | P29 집계 | — | 이번 |
+| ISO-14 | 부모: USER, STREAM, SUMMARY, CACHE | F4, F5b(STREAM) | — | P29 집계 | — | 이번(F4) / 후속(F5b STREAM) |
+| ISO-15 | 부모: QUERY, INJECT, WINDOW | F1(QUERY·WINDOW), F4 | — | P16, P29 집계 | — | 이번 |
+
+### 12.2 leaf 216개
+
+| leaf | 부모 | §27.2 게이트·라벨 | 구현 | 이번 판정 | Source·LLM | 범위 |
+|---|---|---|---|---|---|---|
+| AC-02-LINK | AC-02 | F4[MOCK_API]; F5b[TC_LIVE] | P12, P13, P26 | P29 | M+RL+RT+RG+RS 양성 제어, LL, 당시 commit = 검증된 계보(VERIFIED)만(없으면 NOT_RUN) | 이번 F4 / 후속 F5b |
+| AC-02-MISSING | AC-02 | F4; F5b | P13, P26 | P29 | 같은 Fixture·Trace 제거 seam, LL, rubric | 이번 F4 / 후속 F5b |
+| AC-03-RES | AC-03(공유 AC-24) | F4; F5b | P13, P20, P26 | P29 | M, LL | 이번 F4 / 후속 F5b |
+| AC-03-TIME | AC-03(공유 AC-24) | F4; F5b | P13, P20 | P29 | M, LL | 이번 F4 / 후속 F5b |
+| AC-10-P | AC-10 | 후속 기능(3차) | — | — | — | 후속 |
+| AC-10-I | AC-10 | 후속 기능(3차) | — | — | — | 후속 |
+| AC-15-TC-WM | AC-15 | F4; F5b | P20, P26 | P29 | M+FX(WM 음성), LL | 이번 F4 / 후속 F5b |
+| AC-15-WM-TC | AC-15 | R1[WM_LIVE] | — | — | — | 후속 |
+| AC-16-LOG | AC-16 | F4; F5b | P20, P26 | P29 | RL 결과 1건 seam, LL, rubric | 이번 F4 / 후속 F5b |
+| AC-16-DOC | AC-16 | F4; F5b | P23, P26 | P29 | RS fixture chunk, LL, rubric | 이번 F4 / 후속 F5b |
+| AC-17-P | AC-17 | F1, F4[MOCK_API] | P05 | P16, P29 | FX Plan seam, L0 | 이번 |
+| AC-17-U | AC-17 | F1, F4 | P05 | P16, P29 | FX Plan seam, L0 | 이번 |
+| AC-17-D | AC-17 | F1, F4 | P05 | P16, P29 | FX Plan seam, L0 | 이번 |
+| AC-17-PHASE | AC-17 | F1, F4 | P05 | P16, P29 | FX Plan seam(PHASE_2 synthetic Manifest), L0 | 이번 |
+| AC-17-VERSION | AC-17 | F1, F4 | P05, P11 | P16, P29 | M(`2.0` 응답) | 이번 |
+| AC-18-RESUME | AC-18 | F4; F5a[TC_LIVE] | P09, P10 | P29 | M, LS/LL | 이번 F4 / 후속 F5a |
+| AC-18-ACTOR | AC-18 | F4; F5a | P10 | P29 | M | 이번 F4 / 후속 F5a |
+| AC-18-WORKER-RUN | AC-18 | F4 | P09 | P29 | M, halt hook | 이번 |
+| AC-18-WORKER-QUEUED-VALID | AC-18 | F4 | P09 | P29 | M, halt hook, 제어 시계 | 이번 |
+| AC-18-WORKER-QUEUED-EXPIRED | AC-18 | F4 | P09 | P29 | M, halt hook, 제어 시계 | 이번 |
+| AC-18-WORKER-RACE-PRECOMMIT | AC-18 | F4 | P09 | P29 | M, halt hook | 이번 |
+| AC-18-WORKER-RACE-POSTCOMMIT | AC-18 | F4 | P09 | P29 | M, halt hook | 이번 |
+| AC-18-TEST | AC-18 | 후속 기능(3차) | — | — | — | 후속 |
+| AC-19-P1 | AC-19 | F4; F5b | P13 | P29 | M+RL, LL | 이번 F4 / 후속 F5b |
+| AC-19-P2 | AC-19 | 후속 기능(2차) | — | — | — | 후속 |
+| AC-19-P3 | AC-19 | 후속 기능(3차) | — | — | — | 후속 |
+| AC-20-INC | AC-20 | F4; F5b | P12, P13, P26 | P29 | M+RL+RT+RG, LL, 계보 UNKNOWN·현재 버전 대체 0 | 이번 F4 / 후속 F5b |
+| AC-20-REPLAY | AC-20 | 후속 기능(3차) | — | — | — | 후속 |
+| AC-21-TOOL | AC-21 | F1[MOCK_API] | P04, P05 | P16 | FX Dispatcher seam, L0 | 이번 |
+| AC-21-SOURCE | AC-21 | F1 | P04, P12 | P16 | FX(WM Source 강제), L0 | 이번 |
+| AC-22-LIVE | AC-22 | F2[LLM_LIVE] | P20 | P21 | M+RL+RT+RG, LL, rubric | 이번 |
+| AC-22-STUB-TOOL | AC-22 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
+| AC-22-STUB-SYSTEM | AC-22 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
+| AC-22-GQ-HELP | AC-22 | F2[LLM_STUB] | P13, P20 | P21 | LS | 이번 |
+| AC-22-GQ-BYPASS-DATA | AC-22 | F2[LLM_STUB] | P20 | P21 | LS, rubric | 이번 |
+| AC-22-GQ-BYPASS-XSYS | AC-22 | F2[LLM_STUB] | P20 | P21 | LS, rubric | 이번 |
+| AC-23-NW | AC-23 | F3[MOCK_API] | P23 | P25 | RP+FX(WM 검색 공간) | 이번 |
+| AC-23-NH | AC-23 | F3 | P23 | P25 | RP+FX(HRM 검색 공간) | 이번 |
+| AC-23-SW | AC-23 | F3 | P23 | P25 | RP+FX(WM Source) | 이번 |
+| AC-23-SH | AC-23 | F3 | P23 | P25 | RP+FX(HRM Source) | 이번 |
+| AC-23-FILTER | AC-23 | F3 | P23 | P25 | RP+FX seam | 이번 |
+| AC-23-REVOKE | AC-23 | F3 | P23 | P25 | RP+M(인가 폐기) | 이번 |
+| AC-23-VEC-EXACT | AC-23 | F3 | P23 | P25 | RP+RS fixture, SearchOracle | 이번 |
+| AC-23-VEC-FILTERK | AC-23 | F3 | P23 | P25 | RP fixture, SearchOracle | 이번 |
+| AC-23-KW-SUBSTR | AC-23 | F3 | P23 | P25 | RP fixture | 이번 |
+| AC-23-KW-ID | AC-23 | F3 | P23 | P25 | RP fixture | 이번 |
+| AC-23-KW-SHORT | AC-23 | F3 | P23 | P25 | RP fixture | 이번 |
+| AC-23-KW-META | AC-23 | F3 | P23 | P25 | RP fixture | 이번 |
+| AC-23-KW-ZERO | AC-23 | F3 | P23 | P25 | RP fixture | 이번 |
+| AC-23-KW-DENY | AC-23 | F3 | P23 | P25 | RP fixture+M | 이번 |
+| AC-23-ING-IDEM | AC-23 | F3 | P24 | P25 | RS+RK+RP | 이번 |
+| AC-23-ING-PRECOMMIT | AC-23 | F3 | P24 | P25 | RS+RK+RP, halt hook | 이번 |
+| AC-23-ING-POSTCOMMIT | AC-23 | F3 | P24 | P25 | RS+RK+RP, halt hook | 이번 |
+| AC-23-ING-DELETE | AC-23 | F3 | P23, P24 | P25 | RS+RK+RP, 관측 fence·HEAD 부재 확인 | 이번 |
+| AC-23-ING-ACL | AC-23 | F3 | P23, P24 | P25 | RS+RK+RP+M, 같은 바이트·catalog ACL 변경(reconciler + ingest ACL 경로) | 이번 |
+| AC-23-REBUILD | AC-23 | F3 | P24 | P25 | RS+RP | 이번 |
+| AC-23-ING-SANITIZE | AC-23 | F3 | P24 | P25 | RS fixture sentinel+RP | 이번 |
+| AC-23-ING-RULEVER | AC-23 | F3 | P24 | P25 | RS fixture sentinel+RP | 이번 |
+| AC-23-QUERYFAIL | AC-23 | F3 | P23 | P25 | RP timeout hook | 이번 |
+| AC-23-PERF | AC-23 | F3 | P23, P24 | P25 | RS 승인 corpus+RP | 이번(G-PERF-F3 미확정이면 NOT_RUN·F3 차단) |
+| AC-23-LOAD | AC-23 | F4 | P24, P28 | P28→P29 | RS+RK+RP+M, LL | 이번(G-LOAD-F4 미확정이면 NOT_RUN·F4 차단) |
+| AC-24-AUTHZ | AC-24 | F4[MOCK_API] | P11 | P29 | M(재인가 DENY) | 이번 |
+| AC-24-LOGFAIL | AC-24 | F4 | P12, P26 | P29 | RL 차단 hook, LL, rubric | 이번 |
+| AC-24-LOT-ACTIVE | AC-24 | F4 | P11, P13 | P29 | M | 이번 |
+| AC-24-LOT-MULTI | AC-24 | F4 | P11, P13 | P29 | M | 이번 |
+| AC-24-LOT-ENDED | AC-24 | F4 | P11, P13 | P29 | M | 이번 |
+| AC-24-LOT-UNKNOWN | AC-24 | F4 | P11, P13 | P29 | M | 이번 |
+| AC-24-JOB | AC-24 | F4 | P09, P10 | P29 | M+RL+RT+RG, LL | 이번 |
+| AC-24-PERF | AC-24 | F4 | P26, P28 | P28, P29 | M+실제 Source, LL | 이번 |
+| AC-24-SRCDENY | AC-24 | F4 | P11 | P29 | M(인가 denied)+RL 호출 0 | 이번 |
+| AC-24-SRCUNMAPPED | AC-24 | F4 | P11 | P29 | M(매핑 제거)+RT 호출 0 | 이번 |
+| AC-24-AUTHZDOWN | AC-24 | F4 | P11 | P29 | M(인가 503), rubric | 이번 |
+| AC-24-CACHEPERM | AC-24 | F4 | P13 | P29 | M(`pdg` 변경) | 이번 |
+| AC-24-RESULTSCOPE | AC-24 | F4 | P10, P13 | P29 | M | 이번 |
+| AC-24-RESULTSCOPE-TURN | AC-24 | F4 | P13, P26 | P29 | M, LL(Prompt 관찰 hook) | 이번 |
+| AC-24-RESULT-NODLG | AC-24 | F4 | P10 | P29 | M | 이번 |
+| AC-24-DLQ-PART | AC-24 | F4 | P11 | P29 | M | 이번 |
+| AC-24-DLQ-DOWN | AC-24 | F4 | P11 | P29 | M, rubric | 이번 |
+| AC-24-RETAIN-EXPIRY | AC-24 | F4 | P10, P13, P14, P20 | P29 | M, 제어 시계(동기 만료 guard 경쟁 시험 포함) | 이번 |
+| AC-24-RETAIN-JOBEDGE | AC-24 | F4 | P14 | P29 | M, 제어 시계 | 이번 |
+| AC-24-RETAIN-PURGE | AC-24 | F4 | P14 | P29 | M, 제어 시계 | 이번 |
+| AC-24-AUDIT-ALLOW | AC-24 | F4 | P14 | P29 | M+FX sentinel, OTLP 읽기(G-OBS-READBACK) | 이번 |
+| AC-24-AUDIT-EXPIRY | AC-24 | F4 | P14 | P29 | 제어 시계 | 이번 |
+| AC-24-RESTORE | AC-24 | F4 | P06, P15, P23, P27 | P29 | RP 격리 복원 DB·앱(G-RESTORE-ENV) + RS 현재 원천 대조·catalog 정합(fixture 삭제·fixture 목록 변형 권한 회수 음성/양성) | 이번(원천 확인 불가·fixture 쓰기 identity 부재면 NOT_RUN) |
+| AC-24-BACKUP-ALERT | AC-24 | F4 | P15, P27 | P29 | 저장 공간 접근 실패 주입(G-ALERT) | 이번 |
+| AC-25-DELEG | AC-25 | F5a[TC_LIVE] | — | — | — | 후속 |
+| AC-25-OBS | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-LOT-ACTIVE | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-LOT-MULTI | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-LOT-ENDED | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-LOT-UNKNOWN | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-COMMLOG | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-DLQ-PART | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-DLQ-DOWN | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-SRCAUTHZ-ALLOW | AC-25 | F5a | — | — | — | 후속 |
+| AC-25-SRCAUTHZ-DENY | AC-25 | F5a | — | — | — | 후속 |
+| AC-26-ROUTE | AC-26 | F5b[TC_LIVE] | — | — | — | 후속 |
+| AC-26-PERM | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-I18N | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-CHAT | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-RECONNECT | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-LOGOUT | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-CANCEL | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-REGRESS | AC-26 | F5b | — | — | — | 후속 |
+| AC-26-STREAMDOWN | AC-26 | F5b | — | — | — | 후속 |
+| AC-27-R1-CORE | AC-27 | R1 | — | — | — | 후속 |
+| AC-27-R1-REGRESS | AC-27 | R1 | — | — | — | 후속 |
+| AC-27-R1-ISO | AC-27 | R1 | — | — | — | 후속 |
+| AC-27-R2-CORE | AC-27 | R2 | — | — | — | 후속 |
+| AC-27-R2-REGRESS | AC-27 | R2 | — | — | — | 후속 |
+| AC-27-R2-ISO | AC-27 | R2 | — | — | — | 후속 |
+| AC-28-FIFO | AC-28 | F4[MOCK_API]; F5a·F5b[TC_LIVE] | P09 | P28, P29 | M, LS/LL | 이번 F4 / 후속 F5a·F5b |
+| AC-28-DEPTH | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M | 이번 F4 / 후속 F5a·F5b |
+| AC-28-FULL | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M | 이번 F4 / 후속 F5a·F5b |
+| AC-28-QTIMEOUT | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M, 제어 시계 | 이번 F4 / 후속 F5a·F5b |
+| AC-28-JOBLIMIT | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M, 제어 시계 | 이번 F4 / 후속 F5a·F5b |
+| AC-28-JOBLIMIT-Q | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M, 제어 시계 | 이번 F4 / 후속 F5a·F5b |
+| AC-28-SLOT | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M, pause hook | 이번 F4 / 후속 F5a·F5b |
+| AC-28-CANCEL | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M, 지연 stub | 이번 F4 / 후속 F5a·F5b |
+| AC-28-ATOMIC | AC-28 | F4; F5a·F5b | P09 | P28, P29 | M | 이번 F4 / 후속 F5a·F5b |
+| AC-28-FAIR-R1-TC | AC-28 | R1 | — | — | — | 후속 |
+| AC-28-FAIR-R1-WM | AC-28 | R1 | — | — | — | 후속 |
+| AC-28-FAIR-R2-HRM | AC-28 | R2 | — | — | — | 후속 |
+| AC-28-SCALE-PARALLEL | AC-28 | 용량 확장 전(트리거) | — | — | — | 후속(트리거 전 NOT_RUN, 다중 RUNNING 구현 금지) |
+| AC-28-SCALE-LOAD | AC-28 | 용량 확장 전(트리거) | — | — | — | 후속(트리거 전 NOT_RUN) |
+| AC-30-EQ | AC-30 | F2, F4[LLM_STUB] | P05, P20 | P21, P29 | M, LS | 이번 |
+| AC-30-WM | AC-30 | F2, F4[LLM_STUB] | P05, P20 | P21, P29 | M, LS | 이번 |
+| AC-30-ABSENT | AC-30 | F2, F4[LLM_STUB] | P05, P20 | P21, P29 | M, LS | 이번 |
+| AC-32-SCHEMA | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
+| AC-32-LENGTH | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
+| AC-32-RETRYOK | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
+| AC-33-LOADING | AC-33 | F2, F4 | P19 | P21, P29 | 실제 재시작(사용자) 또는 readiness stub — 사용 수단 라벨 기록 | 이번 |
+| AC-33-PERSIST | AC-33 | F2, F4 | P19 | P21, P29 | readiness stub + 제어 시계 | 이번 |
+| AC-33-CTX | AC-33 | F2, F4 | P19 | P21, P29 | readiness stub(모델 재로드 금지) | 이번 |
+| AC-35-TOKEN | AC-35 | F2 | P15, P17 | P21 | 실제 proxy·노드 SNAT 하네스 Pod | 이번(G-JETSON-NET 선행) |
+| AC-35-FW | AC-35 | F2 | P17 | P21 | 실제 방화벽, LAN 호스트(사용자) | 이번 |
+| AC-35-LOCAL | AC-35 | F2 | P17 | P21 | Jetson listen 관찰(사용자) | 이번 |
+| AC-35-EGRESS | AC-35 | F2 | P15 | P21 | 실제 NetworkPolicy, Gateway Pod 내 `EgressProbeHook`(고정 대상 id·양성 제어) | 이번 |
+| AC-37-CMP | AC-37 | F0[LLM_LIVE, Gateway 없음] | P02 | P03 | 실제 Ollama, LL, 정확도 = 문항당 회차 1 표본(분모 = 문항 수)·지연 = R=5 전 회차 | 이번 |
+| AC-37-OUT-NORMAL | AC-37 | F0 | P02 | P03 | 실제 Ollama·공식/GGUF tokenizer 계수 + `f0 boundary-gen` 실제 생성(완결 JSON·인자 정확 일치), LL | 이번 |
+| AC-37-OUT-MAX | AC-37 | F0 | P02 | P03 | 같음 + G-ARG-LIMITS 등록 최대 길이 | 이번(UNRESOLVED 있으면 NOT_RUN) |
+| AC-37-OUT-ESCAPE | AC-37 | F0 | P02 | P03 | 같음 + G-ARG-LIMITS | 이번(UNRESOLVED 있으면 NOT_RUN) |
+| AC-38-F0 | AC-38 | F0 | P02 | P03 | 실제 Ollama, LL, Tool 없음 | 이번 |
+| AC-38-F2 | AC-38 | F2 | P20 | P21 | M+RL 양성 제어, LL | 이번 |
+| AC-38-F4 | AC-38 | F4 | P26 | P29 | M+RL 양성 제어, LL | 이번 |
+| AC-39-299 | AC-39 | F5a | — | — | — | 후속 |
+| AC-39-300 | AC-39 | F5a | — | — | — | 후속 |
+| AC-39-301 | AC-39 | F5a | — | — | — | 후속 |
+| AC-42-READ | AC-42 | F5a | — | — | — | 후속 |
+| AC-42-AUTHZ | AC-42 | F5a | — | — | — | 후속 |
+| AC-43-CLS | AC-43 | F2 | P18, P19, P20 | P21 | M, 분류 LLM 호출 0 판정 | 이번 |
+| AC-43-COMP | AC-43 | F2 | P18, P19, P20 | P21 | M, LS(분류 고정) | 이번 |
+| AC-46-EMPTY | AC-46 | F1, F4; F5a | P11, P12 | P16, P29 | UNVERIFIED Source(RT 또는 M), rubric | 이번 F1·F4 / 후속 F5a |
+| AC-46-HIT | AC-46 | F1, F4; F5a | P11, P12 | P16, P29 | 같음, rubric | 이번 F1·F4 / 후속 F5a |
+| AC-46-TRIM | AC-46 | F1, F4; F5a | P11 | P16, P29 | M(통신 로그 trim) | 이번 F1·F4 / 후속 F5a |
+| ISO-04-SYSTEM | ISO-04 | F1, F4[MOCK_API]; F5a[TC_LIVE] | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-TARGET | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-TOKEN-MISSING | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-TOKEN-INVALID | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-ABSENT | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-SIG | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-KID | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키(신뢰 밖 시험 키) | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-ALG | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-ISS | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-AUD | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-EXP | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키, 제어 시계 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-LIFE | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키, 제어 시계 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-SYS | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-SUB | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-SCOPE | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-PERM | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-PDG | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-PDG-MISSING | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-DLG | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-04-JWS-DLG-EXTRA | ISO-04 | F1, F4; F5a | P08 | P16, P29 | Stub 키 | 이번 F1·F4 / 후속 F5a |
+| ISO-05-READ | ISO-05 | F4 | P07, P10 | P29 | FX(WM 대화) | 이번 |
+| ISO-05-MESSAGE | ISO-05(공유 AC-03) | F4 | P07, P10 | P29 | FX(WM 대화) | 이번 |
+| ISO-06-V-MISSING | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
+| ISO-06-V-TAMPER | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
+| ISO-06-K-MISSING | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
+| ISO-06-K-TAMPER | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
+| ISO-06-H-MISSING | ISO-06 | 후속 기능(Hybrid 활성) | — | — | — | 후속(미구현 전략, NOT_RUN 별도 보고) |
+| ISO-06-H-TAMPER | ISO-06 | 후속 기능(Hybrid 활성) | — | — | — | 후속(미구현 전략, NOT_RUN 별도 보고) |
+| ISO-07-CITE | ISO-07 | F4 | P10, P13 | P29 | FX(WM evidenceRef) | 이번 |
+| ISO-07-RAW | ISO-07 | F4 | P10, P23 | P29 | FX(WM sourceRef) | 이번 |
+| ISO-07-CHART | ISO-07 | F4 | P10, P13 | P29 | FX(WM dataRef) | 이번 |
+| ISO-07-DOWNLOAD | ISO-07 | F4 | P10 | P29 | FX(WM dataRef) | 이번 |
+| ISO-08-JOB | ISO-08 | F4; F5b[TC_LIVE] | P10 | P29 | FX(WM Job) | 이번 F4 / 후속 F5b |
+| ISO-08-CONNECT | ISO-08 | F4; F5b | P10 | P29 | FX(WM Job) | 이번 F4 / 후속 F5b |
+| ISO-08-RECONNECT | ISO-08(공유 AC-18) | F4; F5b | P10 | P29 | FX(WM Job) | 이번 F4 / 후속 F5b |
+| ISO-08-EVENT | ISO-08 | F4; F5b | P10 | P29 | FX(WM 이벤트 ID) | 이번 F4 / 후속 F5b |
+| ISO-10-LOG | ISO-10 | F4 | P26 | P29 | RL seam, LL, rubric | 이번 |
+| ISO-10-CODE | ISO-10 | F4 | P26 | P29 | RG seam, LL, rubric | 이번 |
+| ISO-10-RAG | ISO-10 | F4 | P26 | P29 | RS fixture chunk, LL, rubric | 이번 |
+| ISO-11-LOGOUT-TOOL | ISO-11 | F4[MOCK_API]; F5a[TC_LIVE] | P11 | P29 | M(dlg 폐기) | 이번 F4 / 후속 F5a |
+| ISO-11-LOGOUT-RESULT | ISO-11 | F4; F5a | P10, P11 | P29 | M·TC Backend Stub 경로(§14 R-03) | 이번 F4 / 후속 F5a |
+| ISO-11-PERM-TOOL | ISO-11 | F4; F5a | P11 | P29 | M(permCode 회수, 지연 기록) | 이번 F4 / 후속 F5a |
+| ISO-11-PERM-RESULT | ISO-11 | F4; F5a | P10, P11 | P29 | M·TC Backend Stub 경로(§14 R-03) | 이번 F4 / 후속 F5a |
+| ISO-11-LOGOUT-STREAM | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-11-LOGOUT-STREAM-RACE | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-11-LOGOUT-STREAM-LEASE | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-11-PERM-STREAM | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-11-PERM-STREAM-RACE | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-11-STREAM-GATELOSS | ISO-11 | F5b | — | — | — | 후속 |
+| ISO-12-FAIL | ISO-12 | F4 | P20, P26 | P29 | RL 차단 hook, LS(분류 고정) | 이번 |
+| ISO-12-UNSUP | ISO-12 | F4 | P20 | P29 | M, LL | 이번 |
+| ISO-13-EQP | ISO-13 | F4 | P26 | P29 | M+FX(WM 동일 EQP ID) | 이번 |
+| ISO-13-LOT | ISO-13 | F4 | P26 | P29 | M+FX(WM 동일 LOT ID) | 이번 |
+| ISO-13-DOC | ISO-13 | F4 | P23, P26 | P29 | RP+FX(WM 동일 sourceRef) | 이번 |
+| ISO-14-USER | ISO-14 | F4 | P26 | P29 | M+FX, LL, Prompt 관찰 hook | 이번 |
+| ISO-14-STREAM | ISO-14 | F4; F5b[TC_LIVE] | P10 | P29 | M+FX | 이번 F4 / 후속 F5b |
+| ISO-14-SUMMARY | ISO-14 | F4 | P13, P26 | P29 | M+FX, LL | 이번 |
+| ISO-14-CACHE | ISO-14 | F4 | P13 | P29 | M+FX | 이번 |
+| ISO-15-QUERY | ISO-15 | F1, F4 | P12 | P16, P29 | RL 양성 제어(WM·TC 실재 건수) | 이번 |
+| ISO-15-INJECT | ISO-15 | F4 | P12, P26 | P29 | RL, LL | 이번 |
+| ISO-15-WINDOW | ISO-15 | F1, F4 | P12, P14 | P16, P29 | RL 양성 제어, 최대 창 fixture(§P12 L-2, 미정의면 NOT_RUN — `verifiedOldestAt` 은 P14 스케줄러 저장값)·하위 창 분할 | 이번 |
+
+### 12.3 leaf 수 대조
+
+| 부모 | leaf 수 | 부모 | leaf 수 |
+|---|---:|---|---:|
+| AC-02 | 2 | AC-28 | 14 |
+| AC-03 | 2 | AC-30 | 3 |
+| AC-10 | 2 | AC-32 | 3 |
+| AC-15 | 2 | AC-33 | 3 |
+| AC-16 | 2 | AC-35 | 4 |
+| AC-17 | 5 | AC-37 | 4 |
+| AC-18 | 8 | AC-38 | 3 |
+| AC-19 | 3 | AC-39 | 3 |
+| AC-20 | 2 | AC-42 | 2 |
+| AC-21 | 2 | AC-43 | 2 |
+| AC-22 | 6 | AC-46 | 3 |
+| AC-23 | 25 | ISO-04 | 20 |
+| AC-24 | 24 | ISO-05 | 2 |
+| AC-25 | 11 | ISO-06 | 6 |
+| AC-26 | 9 | ISO-07 | 4 |
+| AC-27 | 6 | ISO-08 | 4 |
+| | | ISO-10 | 3 |
+| | | ISO-11 | 10 |
+| | | ISO-12 | 2 |
+| | | ISO-13 | 3 |
+| | | ISO-14 | 4 |
+| | | ISO-15 | 3 |
+
+AC 하위 합 155 + ISO 하위 합 61 = **216**. 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
+
+### 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력, leaf·원자 ID 추가·삭제 0)
+
+표기: `ACC:<suite>` = 배포 수용(§11.9 suite), `IT` = `:gateway-app:integrationTest` 정제 결과(같은 commit 의 CI 통합 증거로 수용 — 실제 PG·`AppProcessHarness` 재시작 경쟁이 권위인 leaf 만), `F0R` = `f0 report` 판정(측정·재판정), `SPR` = `f0 report --spec-record-check`, `RB:<suite>` = §4.4 viewer 수동 rubric, `UR` = `record user-run`, `PF` = `perf report`(원시 `MEASUREMENT` → nearest-rank), `OP:<id>` = 운영자 스크립트 측정. 한 칸의 `+` 는 component AND(§4.4 집계 ③)이며, 모든 component 는 판정하는 부모 회차 p 안의 마지막 시도만 쓴다(§4.4 집계 ② — `IT` 는 p 에 묶은 원시 실행 불변 참조, 다른 부모 회차 혼합 0). 아래에 없는 단계·leaf 조합(후속 단계 F5a·F5b·R1·R2·용량 확장·후속 기능 게이트의 leaf 와 원자 AC-06·AC-07·AC-08·AC-09·AC-11·AC-12·AC-13·AC-14·AC-34·AC-40)은 이 Plan 에서 component 0 이며 NOT_RUN 으로 handoff 한다. 같은 leaf 의 다른 producer 레코드(예: AC-23 하위의 Testcontainers IT, AC-18-WORKER-* 의 배포 halt, AC-28-FULL 의 P28 장애 주입)는 정보용이다.
+
+| 단계 | leaf·원자 | 권위 component |
+|---|---|---|
+| F0 | AC-37-CMP, AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE | `F0R` + `SPR` |
+| F0 | AC-38-F0 | `F0R` |
+| F1 | AC-17-P, AC-17-U, AC-17-D, AC-17-PHASE, AC-17-VERSION, AC-21-TOOL, AC-21-SOURCE, AC-36, AC-41, AC-45, AC-46-TRIM, ISO-04 하위 20개, ISO-15-QUERY, ISO-15-WINDOW | `ACC:F1` |
+| F1 | AC-46-EMPTY, AC-46-HIT | `ACC:F1` + `RB:F1-RUBRIC` |
+| F2 | AC-22-STUB-TOOL, AC-22-STUB-SYSTEM, AC-22-GQ-HELP, AC-29, AC-30-EQ, AC-30-WM, AC-30-ABSENT, AC-31, AC-32-SCHEMA, AC-32-LENGTH, AC-32-RETRYOK, AC-33-PERSIST, AC-33-CTX, AC-35-EGRESS, AC-38-F2, AC-43-CLS, AC-43-COMP | `ACC:F2` |
+| F2 | AC-22-LIVE, AC-22-GQ-BYPASS-DATA, AC-22-GQ-BYPASS-XSYS | `ACC:F2` + `RB:F2-RUBRIC` |
+| F2 | AC-33-LOADING, AC-44 | `ACC:F2-OUTAGE`(각각 `LOADING`·`STOPPED` 회차) |
+| F2 | AC-35-TOKEN | `ACC:F2` + `UR` |
+| F2 | AC-35-FW, AC-35-LOCAL | `UR` |
+| F3 | AC-23-NW, AC-23-NH, AC-23-SW, AC-23-SH, AC-23-FILTER, AC-23-REVOKE, AC-23-VEC-EXACT, AC-23-VEC-FILTERK, AC-23-KW-SUBSTR, AC-23-KW-ID, AC-23-KW-SHORT, AC-23-KW-META, AC-23-KW-ZERO, AC-23-KW-DENY, AC-23-ING-IDEM, AC-23-ING-PRECOMMIT, AC-23-ING-POSTCOMMIT, AC-23-ING-DELETE, AC-23-REBUILD, AC-23-ING-SANITIZE, AC-23-QUERYFAIL, ISO-06-V-MISSING, ISO-06-V-TAMPER, ISO-06-K-MISSING, ISO-06-K-TAMPER | `ACC:F3`(실제 SeaweedFS·Kafka·전용 PG) |
+| F3 | AC-23-ING-ACL | `ACC:F3-ACL` |
+| F3 | AC-23-ING-RULEVER | `ACC:F3-RULEVER` |
+| F3 | AC-23-PERF | `PF`(`f3:search-latency-samples`·색인 측정) |
+| F4 | AC-01, AC-04, AC-05, AC-02-LINK, AC-03-RES, AC-03-TIME, AC-15-TC-WM, AC-17-P, AC-17-U, AC-17-D, AC-17-PHASE, AC-17-VERSION, AC-18-RESUME, AC-18-ACTOR, AC-19-P1, AC-20-INC, AC-24-AUTHZ, AC-24-LOT-ACTIVE, AC-24-LOT-MULTI, AC-24-LOT-ENDED, AC-24-LOT-UNKNOWN, AC-24-JOB, AC-24-SRCDENY, AC-24-SRCUNMAPPED, AC-24-CACHEPERM, AC-24-RESULTSCOPE, AC-24-RESULTSCOPE-TURN, AC-24-RESULT-NODLG, AC-24-DLQ-PART, AC-24-AUDIT-ALLOW, AC-28-FIFO, AC-28-DEPTH, AC-28-FULL, AC-28-SLOT, AC-28-CANCEL, AC-28-ATOMIC, AC-29, AC-30-EQ, AC-30-WM, AC-30-ABSENT, AC-33-CTX, AC-36, AC-38-F4, AC-45, AC-46-TRIM, ISO-01, ISO-02, ISO-03, ISO-04 하위 20개, ISO-05-READ, ISO-05-MESSAGE, ISO-06-V-MISSING, ISO-06-V-TAMPER, ISO-06-K-MISSING, ISO-06-K-TAMPER, ISO-07-CITE, ISO-07-RAW, ISO-07-CHART, ISO-07-DOWNLOAD, ISO-08-JOB, ISO-08-CONNECT, ISO-08-RECONNECT, ISO-08-EVENT, ISO-09, ISO-11-LOGOUT-TOOL, ISO-11-LOGOUT-RESULT, ISO-11-PERM-TOOL, ISO-11-PERM-RESULT, ISO-12-FAIL, ISO-12-UNSUP, ISO-13-EQP, ISO-13-LOT, ISO-13-DOC, ISO-14-USER, ISO-14-STREAM, ISO-14-SUMMARY, ISO-14-CACHE, ISO-15-QUERY, ISO-15-INJECT, ISO-15-WINDOW | `ACC:F4` |
+| F4 | AC-02-MISSING, AC-16-LOG, AC-16-DOC, AC-24-LOGFAIL, AC-24-AUTHZDOWN, AC-24-DLQ-DOWN, AC-46-EMPTY, AC-46-HIT, ISO-10-LOG, ISO-10-CODE, ISO-10-RAG | `ACC:F4` + `RB:F4-RUBRIC` |
+| F4 | AC-24-RETAIN-EXPIRY, AC-24-RETAIN-JOBEDGE, AC-24-RETAIN-PURGE, AC-24-AUDIT-EXPIRY, AC-28-QTIMEOUT, AC-28-JOBLIMIT, AC-28-JOBLIMIT-Q, AC-33-PERSIST | `ACC:F4-CLOCK` |
+| F4 | AC-33-LOADING, AC-44 | `ACC:F4-OUTAGE`(각각 `LOADING`·`STOPPED` 회차) |
+| F4 | AC-18-WORKER-RUN, AC-18-WORKER-QUEUED-VALID, AC-18-WORKER-QUEUED-EXPIRED, AC-18-WORKER-RACE-PRECOMMIT, AC-18-WORKER-RACE-POSTCOMMIT | `IT`(P09 `AppProcessHarness` — 현재 `integrationTest` 컴파일 classpath 자식 JVM, bootJar 아님, 같은 commit·빌드 신원) |
+| F4 | AC-23-LOAD, AC-24-PERF | `PF`(`f4:job-latency-samples` — AC-23-LOAD 는 백필 중 회차) |
+| F4 | AC-24-RESTORE | `ACC:F4-RESTORE` + `OP:restore-rto` |
+| F4 | AC-24-BACKUP-ALERT | `OP:backup-alert` |
+
+- 대조(LeafCatalogTest 가 기계 검사): 이 표의 F0~F4 행 leaf 집합 = §6·P03·P16·P21·P25·P29 필수 leaf 목록(SPEC §27.2 매핑)과 단계별로 정확히 같고, 이번 범위 원자 13개(AC-01·04·05·29·31·36·41·44·45, ISO-01·02·03·09) 모두 그 원자가 속한 단계 행에 있다. leaf 216·원자 23·상위 61 수는 그대로다(새 leaf·원자 0, 새 시험 클래스는 기존 leaf 의 component·실패 경계 보강용이며 ID 를 늘리지 않음).
+
+---
+

@@ -1,0 +1,2 @@
+org.junit.platform:junit-platform-reporting:6.0.3
+org.junit.platform:junit-platform-launcher:6.0.3

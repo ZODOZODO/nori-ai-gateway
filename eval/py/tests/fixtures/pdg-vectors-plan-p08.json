@@ -1,0 +1,14 @@
+{
+  "source": "Plan P08 pdg 고정 벡터 표(V1~V4 기대값·음성 N1~N3) 사본 — P02 교차도구 시험 입력, 정본 파일은 P08 의 gateway-tc-mock/src/test/resources/pdg-vectors-v1.json",
+  "vectors": [
+    {"id": "V1", "catalogRevision": "rev-1", "perms": [], "expectedPdg": "d2e38e7d4d6ab86e03d2d30956f086b12aef8145fb16a35d9af10b2c76056079"},
+    {"id": "V2", "catalogRevision": "rev-1", "perms": ["EQP_READ"], "expectedPdg": "4839075a4b4c092e3d9f1e89f9c7f79146786f4de5f876bc35a77c26e4b049ec"},
+    {"id": "V3", "catalogRevision": "rev-1", "perms": ["MODEL_READ", "EQP_READ", "DLQ_READ", "EQP_READ"], "expectedPdg": "f96cd6e028e476f3d1340af9e51a71e615469a91ea9265d842850bade0f61c31"},
+    {"id": "V4", "catalogRevision": "2026-10-26T00:00:00Z#42", "perms": ["COMM_LOG_READ", "AI_TRACE_READ", "AI_LOG_READ"], "expectedPdg": "1297c29b3f5ed789a2e6741c642c6f76756e08092d557230992c04e478e47335"}
+  ],
+  "negatives": [
+    {"id": "N1", "catalogRevision": "", "perms": ["EQP_READ"]},
+    {"id": "N2", "catalogRevision": "rev-1\nrev-2", "perms": ["EQP_READ"]},
+    {"id": "N3", "catalogRevision": "rev-1", "perms": ["EQP READ"]}
+  ]
+}

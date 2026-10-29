@@ -1,0 +1,11 @@
+{
+  "schema": "f0-chat-renderers-v1",
+  "notice": "usage-probe 의 /api/generate raw 렌더 문자열 근거. 캡처한 qwen3:4b-instruct template SHA-256 과 ChatML 렌더 형식의 일치를 검토 기록(reviewRef)과 함께 등록한 항목만 쓰며, 측정 시점 template SHA 와 맞는 항목이 없으면 usage-probe 는 추론 호출 전에 TEMPLATE_RENDERER_UNVERIFIED(exit 2)로 거부한다. 2026-10-30 P03 준비: Ollama 0.31.1 native llama-server Jinja 경로 기준 system+user(tools·assistant 이력 없음) 범위로 검토·등록.",
+  "renderers": [
+    {
+      "templateSha256": "40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541",
+      "renderer": "CHATML_NO_SYSTEM_DEFAULT",
+      "reviewRef": "docs/gates/f0/template-review.md"
+    }
+  ]
+}

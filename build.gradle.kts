@@ -1,0 +1,171 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.util.UUID
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestResult
+import org.gradle.process.CommandLineArgumentProvider
+
+plugins { base }
+
+fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+fun fileSha(file: File): String = if (file.isFile) sha(file.readBytes()) else "MISSING"
+fun ordered(value: Any?): Any? = when (value) {
+    is Map<*, *> -> value.entries.associate { it.key.toString() to ordered(it.value) }.toSortedMap()
+    is Iterable<*> -> value.map { ordered(it) }
+    else -> value
+}
+fun json(value: Any?): String = JsonOutput.toJson(ordered(value))
+var aigwExplicitSpec: File? = null
+fun specFile(): File? = aigwExplicitSpec ?: providers.gradleProperty("aigw.specPath").orNull
+    ?.let { rootProject.file(it) }
+    ?: providers.environmentVariable("AIGW_SPEC_FILE").orNull?.let { rootProject.file(it) }
+fun catalogFile(): File = rootProject.file("gateway-eval/src/main/resources/com/nori/ai/gateway/eval/leaf-catalog-v2.json")
+fun classpathItem(file: File): Any = if (file.isDirectory) file.walkTopDown().filter { it.isFile }
+    .map { file.toPath().relativize(it.toPath()).toString().replace('\\', '/') to fileSha(it) }
+    .sortedBy { it.first }.map { listOf(it.first, it.second) }.toList() else fileSha(file)
+fun aigwInputComponents(test: Test): Map<String, Any?> {
+    val properties = test.systemProperties.filterKeys { it.startsWith("aigw.") }
+        .filterKeys { it !in setOf("aigw.rootDir", "aigw.specPath", "aigw.evalClasspath", "aigw.harness.classpath", "aigw.harness.javaExe") }
+        .mapValues { (key, value) -> if (key == "aigw.runtimeClasspathFile") fileSha(rootProject.file(value.toString())) else value.toString() }
+    return mapOf(
+        "classpath" to test.classpath.files.map { classpathItem(it) },
+        "specSha" to (specFile()?.let { fileSha(it) } ?: "MISSING"),
+        "baselineSha256" to fileSha(rootProject.file("docs/gates/spec-baseline.md")),
+        "catalogSha256" to fileSha(catalogFile()),
+        "includeTags" to (providers.gradleProperty("includeTags").orNull ?: "").split(',').filter { it.isNotBlank() }.sorted(),
+        "testFilters" to (test.filter.includePatterns + (test.filter as org.gradle.api.internal.tasks.testing.filter.DefaultTestFilter).commandLineIncludePatterns).sorted(),
+        "systemProperties" to properties
+    )
+}
+fun aigwInputFingerprint(test: Test): String = sha(json(aigwInputComponents(test)).toByteArray(Charsets.UTF_8))
+val requiredTests = mutableSetOf<String>()
+
+subprojects {
+    apply(plugin = "java")
+    repositories { mavenCentral() }
+    extensions.configure<JavaPluginExtension> { toolchain.languageVersion = JavaLanguageVersion.of(21) }
+    dependencies {
+        add("implementation", platform("org.springframework.boot:spring-boot-dependencies:4.0.7"))
+        add("testRuntimeOnly", "org.junit.platform:junit-platform-reporting")
+    }
+    tasks.withType<JavaCompile>().configureEach {
+        options.encoding = "UTF-8"
+        options.compilerArgs.add("-parameters")
+    }
+    tasks.withType<JavaExec>().configureEach { workingDir = rootDir }
+    afterEvaluate { tasks.withType<Test>().toList().forEach { configuredTest -> configuredTest.apply {
+        val testTask = this
+        useJUnitPlatform {
+            providers.gradleProperty("includeTags").orNull?.split(',')?.filter { it.isNotBlank() }?.let { includeTags(*it.toTypedArray()) }
+        }
+        filter.isFailOnNoMatchingTests = true
+        systemProperty("junit.platform.reporting.open.xml.enabled", "true")
+        systemProperty("aigw.rootDir", rootDir.absolutePath)
+        if (project.path == ":gateway-eval") systemProperty("aigw.evalClasspath", project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath.asPath)
+        val otr = layout.buildDirectory.dir("aigw-otr/$name")
+        val evidence = layout.buildDirectory.file("aigw-evidence/$name/leaf-results.json")
+        jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Djunit.platform.reporting.output.dir=${otr.get().asFile.absolutePath}") })
+        outputs.dir(otr)
+        // 파일 경로가 같아도 내용 변경은 반드시 새 측정으로 이어져야 합니다.
+        inputs.property("aigw.specSha", provider { specFile()?.let { fileSha(it) } ?: "MISSING" })
+        inputs.property("aigw.baselineSha", provider { fileSha(rootProject.file("docs/gates/spec-baseline.md")) })
+        inputs.property("aigw.catalogSha", provider { fileSha(catalogFile()) })
+        inputs.property("aigw.policyInputs", provider { json(aigwInputComponents(testTask).filterKeys { it != "classpath" }) })
+        doFirst {
+            val output = otr.get().asFile
+            delete(output)
+            output.mkdirs()
+            val components = aigwInputComponents(testTask)
+            File(output, "run-binding.json").writeText(json(mapOf(
+                "runId" to UUID.randomUUID().toString(), "inputFingerprint" to aigwInputFingerprint(testTask),
+                "recordedAt" to java.time.Instant.now().toString(),
+                "specSha" to components["specSha"], "baselineSha256" to components["baselineSha256"],
+                "catalogSha256" to components["catalogSha256"], "components" to components
+            )), Charsets.UTF_8)
+        }
+        addTestListener(object : TestListener {
+            override fun beforeSuite(suite: TestDescriptor) = Unit
+            override fun beforeTest(testDescriptor: TestDescriptor) = Unit
+            override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) = Unit
+            override fun afterSuite(suite: TestDescriptor, result: TestResult) {
+                if (suite.parent == null && result.testCount == 0L) throw GradleException("NO_TESTS_EXECUTED")
+            }
+        })
+        val extraction = tasks.register<JavaExec>("${name}LeafEvidence") {
+            workingDir = rootDir
+            mainClass = "com.nori.ai.gateway.eval.EvalCli"
+            val eval = rootProject.findProject(":gateway-eval")
+            if (eval != null) {
+                classpath = eval.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
+            } else {
+                classpath = files(providers.gradleProperty("aigw.evalClasspath").get().split(File.pathSeparator))
+            }
+            doFirst {
+                val arguments = mutableListOf("leaf-extract", "--otr-dir", otr.get().asFile.absolutePath,
+                    "--task", testTask.path, "--module", project.path,
+                    "--baseline", rootProject.file("docs/gates/spec-baseline.md").absolutePath,
+                    "--catalog", catalogFile().absolutePath,
+                    "--out", evidence.get().asFile.absolutePath,
+                    "--current-fingerprint", aigwInputFingerprint(testTask))
+                specFile()?.let { arguments.addAll(listOf("--spec", it.absolutePath)) }
+                if (testTask.path in requiredTests) arguments.add("--require-executed")
+                setArgs(arguments)
+            }
+        }
+        finalizedBy(extraction)
+    } } }
+}
+
+gradle.taskGraph.whenReady {
+    val requiredFile = rootProject.file("ci/integration-required.txt")
+    val registeredModules = if (requiredFile.isFile) requiredFile.readLines().filter { !it.startsWith("#") && it.isNotBlank() }.map { it.substringBefore(' ').substringBefore('|') }.toSet() else emptySet()
+    // 직접 경로와 루트 비한정 selector는 서로 다른 필수 대상 규칙을 가집니다.
+    gradle.startParameter.taskRequests.flatMap { it.args }.filter { !it.startsWith("-") }.forEach { selector ->
+        if (selector.startsWith(":")) {
+            rootProject.allprojects.flatMap { it.tasks.withType<Test>().toList() }.filter { it.path == selector }.forEach { requiredTests.add(it.path) }
+        } else {
+            rootProject.allprojects.flatMap { it.tasks.withType<Test>().toList() }.filter { it.name == selector && (it.project.path in registeredModules || it.project.name in registeredModules) }.forEach { requiredTests.add(it.path) }
+        }
+    }
+}
+
+project(":gateway-eval") {
+    pluginManager.withPlugin("application") {
+    tasks.named<JavaExec>("run") {
+        dependsOn(provider {
+            val arguments = args ?: emptyList()
+            if (arguments.take(2) != listOf("test-evidence", "verify")) emptyList<Any>() else {
+                val index = arguments.indexOf("--tasks")
+                val paths = if (index >= 0) arguments[index + 1].split(',') else {
+                    val selector = arguments.indexOf("--selector")
+                    if (selector < 0) emptyList() else rootProject.allprojects.flatMap { it.tasks.withType<Test>().toList() }.filter { it.name == arguments[selector + 1] }.map { it.path }
+                }
+                paths.mapNotNull { rootProject.tasks.findByPath(it) as? Test }.flatMap { listOf(it.classpath, it.testClassesDirs) }
+            }
+        })
+        doFirst {
+            val arguments = args ?: emptyList()
+            if (arguments.take(2) == listOf("test-evidence", "verify")) {
+                val specIndex = arguments.indexOf("--spec")
+                if (specIndex >= 0) aigwExplicitSpec = rootProject.file(arguments[specIndex + 1])
+                val tasksIndex = arguments.indexOf("--tasks")
+                val selectorIndex = arguments.indexOf("--selector")
+                val selected = if (tasksIndex >= 0) arguments[tasksIndex + 1].split(',') else {
+                    val requiredIndex = arguments.indexOf("--required")
+                    if (selectorIndex < 0 || requiredIndex < 0) throw GradleException("INVALID_ARGUMENTS")
+                    val required = rootProject.file(arguments[requiredIndex + 1]).readLines().filter { it.isNotBlank() && !it.startsWith('#') }.map { it.substringBefore(' ').substringBefore('|') }.toSet()
+                    rootProject.allprojects.flatMap { it.tasks.withType<Test>().toList() }.filter { it.name == arguments[selectorIndex + 1] && (it.project.path in required || it.project.name in required) }.map { it.path }
+                }
+                selected.forEach { path ->
+                    val test = rootProject.tasks.findByPath(path) as? Test ?: throw GradleException("UNKNOWN_TEST_TASK")
+                    val out = rootProject.file("build/aigw-fingerprint/${path.replace(':', '_')}.json")
+                    out.parentFile.mkdirs()
+                    out.writeText(json(mapOf("taskPath" to path, "inputFingerprint" to aigwInputFingerprint(test))), Charsets.UTF_8)
+                }
+            }
+        }
+    }
+    }
+}

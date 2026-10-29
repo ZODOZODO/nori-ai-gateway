@@ -1,0 +1,7113 @@
+{
+  "version": 2,
+  "sourcePlanSha256": "28cfae26d6574d65d68a2597449f3f2395c72060a6ac4a73a185a8b8acf24506",
+  "parents": [
+    {
+      "id": "AC-01",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-02",
+      "atomic": false,
+      "children": [
+        "AC-02-LINK",
+        "AC-02-MISSING"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-03",
+      "atomic": false,
+      "children": [
+        "AC-03-RES",
+        "AC-03-TIME",
+        "ISO-05-MESSAGE"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-04",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-05",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-06",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-07",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-08",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-09",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-10",
+      "atomic": false,
+      "children": [
+        "AC-10-P",
+        "AC-10-I"
+      ],
+      "gates": []
+    },
+    {
+      "id": "AC-11",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-12",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-13",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-14",
+      "atomic": true,
+      "children": [],
+      "gates": []
+    },
+    {
+      "id": "AC-15",
+      "atomic": false,
+      "children": [
+        "AC-15-TC-WM",
+        "AC-15-WM-TC"
+      ],
+      "gates": [
+        "F4",
+        "F5b",
+        "R1"
+      ]
+    },
+    {
+      "id": "AC-16",
+      "atomic": false,
+      "children": [
+        "AC-16-LOG",
+        "AC-16-DOC"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-17",
+      "atomic": false,
+      "children": [
+        "AC-17-P",
+        "AC-17-U",
+        "AC-17-D",
+        "AC-17-PHASE",
+        "AC-17-VERSION"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-18",
+      "atomic": false,
+      "children": [
+        "AC-18-RESUME",
+        "AC-18-ACTOR",
+        "AC-18-WORKER-RUN",
+        "AC-18-WORKER-QUEUED-VALID",
+        "AC-18-WORKER-QUEUED-EXPIRED",
+        "AC-18-WORKER-RACE-PRECOMMIT",
+        "AC-18-WORKER-RACE-POSTCOMMIT",
+        "AC-18-TEST",
+        "ISO-08-RECONNECT"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-19",
+      "atomic": false,
+      "children": [
+        "AC-19-P1",
+        "AC-19-P2",
+        "AC-19-P3"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-20",
+      "atomic": false,
+      "children": [
+        "AC-20-INC",
+        "AC-20-REPLAY"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-21",
+      "atomic": false,
+      "children": [
+        "AC-21-TOOL",
+        "AC-21-SOURCE"
+      ],
+      "gates": [
+        "F1"
+      ]
+    },
+    {
+      "id": "AC-22",
+      "atomic": false,
+      "children": [
+        "AC-22-LIVE",
+        "AC-22-STUB-TOOL",
+        "AC-22-STUB-SYSTEM",
+        "AC-22-GQ-HELP",
+        "AC-22-GQ-BYPASS-DATA",
+        "AC-22-GQ-BYPASS-XSYS"
+      ],
+      "gates": [
+        "F2"
+      ]
+    },
+    {
+      "id": "AC-23",
+      "atomic": false,
+      "children": [
+        "AC-23-NW",
+        "AC-23-NH",
+        "AC-23-SW",
+        "AC-23-SH",
+        "AC-23-FILTER",
+        "AC-23-REVOKE",
+        "AC-23-VEC-EXACT",
+        "AC-23-VEC-FILTERK",
+        "AC-23-KW-SUBSTR",
+        "AC-23-KW-ID",
+        "AC-23-KW-SHORT",
+        "AC-23-KW-META",
+        "AC-23-KW-ZERO",
+        "AC-23-KW-DENY",
+        "AC-23-ING-IDEM",
+        "AC-23-ING-PRECOMMIT",
+        "AC-23-ING-POSTCOMMIT",
+        "AC-23-ING-DELETE",
+        "AC-23-ING-ACL",
+        "AC-23-REBUILD",
+        "AC-23-ING-SANITIZE",
+        "AC-23-ING-RULEVER",
+        "AC-23-QUERYFAIL",
+        "AC-23-PERF",
+        "AC-23-LOAD"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-24",
+      "atomic": false,
+      "children": [
+        "AC-03-RES",
+        "AC-03-TIME",
+        "AC-24-AUTHZ",
+        "AC-24-LOGFAIL",
+        "AC-24-LOT-ACTIVE",
+        "AC-24-LOT-MULTI",
+        "AC-24-LOT-ENDED",
+        "AC-24-LOT-UNKNOWN",
+        "AC-24-JOB",
+        "AC-24-PERF",
+        "AC-24-SRCDENY",
+        "AC-24-SRCUNMAPPED",
+        "AC-24-AUTHZDOWN",
+        "AC-24-CACHEPERM",
+        "AC-24-RESULTSCOPE",
+        "AC-24-RESULTSCOPE-TURN",
+        "AC-24-RESULT-NODLG",
+        "AC-24-DLQ-PART",
+        "AC-24-DLQ-DOWN",
+        "AC-24-RETAIN-EXPIRY",
+        "AC-24-RETAIN-JOBEDGE",
+        "AC-24-RETAIN-PURGE",
+        "AC-24-AUDIT-ALLOW",
+        "AC-24-AUDIT-EXPIRY",
+        "AC-24-RESTORE",
+        "AC-24-BACKUP-ALERT"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-25",
+      "atomic": false,
+      "children": [
+        "AC-25-DELEG",
+        "AC-25-OBS",
+        "AC-25-LOT-ACTIVE",
+        "AC-25-LOT-MULTI",
+        "AC-25-LOT-ENDED",
+        "AC-25-LOT-UNKNOWN",
+        "AC-25-COMMLOG",
+        "AC-25-DLQ-PART",
+        "AC-25-DLQ-DOWN",
+        "AC-25-SRCAUTHZ-ALLOW",
+        "AC-25-SRCAUTHZ-DENY",
+        "AC-40"
+      ],
+      "gates": [
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-26",
+      "atomic": false,
+      "children": [
+        "AC-26-ROUTE",
+        "AC-26-PERM",
+        "AC-26-I18N",
+        "AC-26-CHAT",
+        "AC-26-RECONNECT",
+        "AC-26-LOGOUT",
+        "AC-26-CANCEL",
+        "AC-26-REGRESS",
+        "AC-26-STREAMDOWN"
+      ],
+      "gates": [
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-27",
+      "atomic": false,
+      "children": [
+        "AC-27-R1-CORE",
+        "AC-27-R1-REGRESS",
+        "AC-27-R1-ISO",
+        "AC-27-R2-CORE",
+        "AC-27-R2-REGRESS",
+        "AC-27-R2-ISO"
+      ],
+      "gates": [
+        "R1",
+        "R2"
+      ]
+    },
+    {
+      "id": "AC-28",
+      "atomic": false,
+      "children": [
+        "AC-28-FIFO",
+        "AC-28-DEPTH",
+        "AC-28-FULL",
+        "AC-28-QTIMEOUT",
+        "AC-28-JOBLIMIT",
+        "AC-28-JOBLIMIT-Q",
+        "AC-28-SLOT",
+        "AC-28-CANCEL",
+        "AC-28-ATOMIC",
+        "AC-28-FAIR-R1-TC",
+        "AC-28-FAIR-R1-WM",
+        "AC-28-FAIR-R2-HRM",
+        "AC-28-SCALE-PARALLEL",
+        "AC-28-SCALE-LOAD"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b",
+        "R1",
+        "R2"
+      ]
+    },
+    {
+      "id": "AC-29",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F2",
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-30",
+      "atomic": false,
+      "children": [
+        "AC-30-EQ",
+        "AC-30-WM",
+        "AC-30-ABSENT"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-31",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F2"
+      ]
+    },
+    {
+      "id": "AC-32",
+      "atomic": false,
+      "children": [
+        "AC-32-SCHEMA",
+        "AC-32-LENGTH",
+        "AC-32-RETRYOK"
+      ],
+      "gates": [
+        "F2"
+      ]
+    },
+    {
+      "id": "AC-33",
+      "atomic": false,
+      "children": [
+        "AC-33-LOADING",
+        "AC-33-PERSIST",
+        "AC-33-CTX"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-34",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F5b"
+      ]
+    },
+    {
+      "id": "AC-35",
+      "atomic": false,
+      "children": [
+        "AC-35-TOKEN",
+        "AC-35-FW",
+        "AC-35-LOCAL",
+        "AC-35-EGRESS"
+      ],
+      "gates": [
+        "F2"
+      ]
+    },
+    {
+      "id": "AC-36",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-37",
+      "atomic": false,
+      "children": [
+        "AC-37-CMP",
+        "AC-37-OUT-NORMAL",
+        "AC-37-OUT-MAX",
+        "AC-37-OUT-ESCAPE"
+      ],
+      "gates": [
+        "F0"
+      ]
+    },
+    {
+      "id": "AC-38",
+      "atomic": false,
+      "children": [
+        "AC-38-F0",
+        "AC-38-F2",
+        "AC-38-F4"
+      ],
+      "gates": [
+        "F0",
+        "F2",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-39",
+      "atomic": false,
+      "children": [
+        "AC-39-299",
+        "AC-39-300",
+        "AC-39-301"
+      ],
+      "gates": [
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-40",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-41",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F1",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-42",
+      "atomic": false,
+      "children": [
+        "AC-42-READ",
+        "AC-42-AUTHZ"
+      ],
+      "gates": [
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-43",
+      "atomic": false,
+      "children": [
+        "AC-43-CLS",
+        "AC-43-COMP"
+      ],
+      "gates": [
+        "F2"
+      ]
+    },
+    {
+      "id": "AC-44",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F2",
+        "F4"
+      ]
+    },
+    {
+      "id": "AC-45",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "AC-46",
+      "atomic": false,
+      "children": [
+        "AC-46-EMPTY",
+        "AC-46-HIT",
+        "AC-46-TRIM"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "ISO-01",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-02",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-03",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-04",
+      "atomic": false,
+      "children": [
+        "ISO-04-SYSTEM",
+        "ISO-04-TARGET",
+        "ISO-04-TOKEN-MISSING",
+        "ISO-04-TOKEN-INVALID",
+        "ISO-04-JWS-ABSENT",
+        "ISO-04-JWS-SIG",
+        "ISO-04-JWS-KID",
+        "ISO-04-JWS-ALG",
+        "ISO-04-JWS-ISS",
+        "ISO-04-JWS-AUD",
+        "ISO-04-JWS-EXP",
+        "ISO-04-JWS-LIFE",
+        "ISO-04-JWS-SYS",
+        "ISO-04-JWS-SUB",
+        "ISO-04-JWS-SCOPE",
+        "ISO-04-JWS-PERM",
+        "ISO-04-JWS-PDG",
+        "ISO-04-JWS-PDG-MISSING",
+        "ISO-04-JWS-DLG",
+        "ISO-04-JWS-DLG-EXTRA"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ]
+    },
+    {
+      "id": "ISO-05",
+      "atomic": false,
+      "children": [
+        "ISO-05-READ",
+        "ISO-05-MESSAGE"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-06",
+      "atomic": false,
+      "children": [
+        "ISO-06-V-MISSING",
+        "ISO-06-V-TAMPER",
+        "ISO-06-K-MISSING",
+        "ISO-06-K-TAMPER",
+        "ISO-06-H-MISSING",
+        "ISO-06-H-TAMPER"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-07",
+      "atomic": false,
+      "children": [
+        "ISO-07-CITE",
+        "ISO-07-RAW",
+        "ISO-07-CHART",
+        "ISO-07-DOWNLOAD"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-08",
+      "atomic": false,
+      "children": [
+        "ISO-08-JOB",
+        "ISO-08-CONNECT",
+        "ISO-08-RECONNECT",
+        "ISO-08-EVENT"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "ISO-09",
+      "atomic": true,
+      "children": [],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-10",
+      "atomic": false,
+      "children": [
+        "ISO-10-LOG",
+        "ISO-10-CODE",
+        "ISO-10-RAG"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-11",
+      "atomic": false,
+      "children": [
+        "ISO-11-LOGOUT-TOOL",
+        "ISO-11-LOGOUT-RESULT",
+        "ISO-11-PERM-TOOL",
+        "ISO-11-PERM-RESULT",
+        "ISO-11-LOGOUT-STREAM",
+        "ISO-11-LOGOUT-STREAM-RACE",
+        "ISO-11-LOGOUT-STREAM-LEASE",
+        "ISO-11-PERM-STREAM",
+        "ISO-11-PERM-STREAM-RACE",
+        "ISO-11-STREAM-GATELOSS"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ]
+    },
+    {
+      "id": "ISO-12",
+      "atomic": false,
+      "children": [
+        "ISO-12-FAIL",
+        "ISO-12-UNSUP"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-13",
+      "atomic": false,
+      "children": [
+        "ISO-13-EQP",
+        "ISO-13-LOT",
+        "ISO-13-DOC"
+      ],
+      "gates": [
+        "F4"
+      ]
+    },
+    {
+      "id": "ISO-14",
+      "atomic": false,
+      "children": [
+        "ISO-14-USER",
+        "ISO-14-STREAM",
+        "ISO-14-SUMMARY",
+        "ISO-14-CACHE"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ]
+    },
+    {
+      "id": "ISO-15",
+      "atomic": false,
+      "children": [
+        "ISO-15-QUERY",
+        "ISO-15-INJECT",
+        "ISO-15-WINDOW"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ]
+    }
+  ],
+  "leaves": [
+    {
+      "id": "AC-02-LINK",
+      "parentIds": [
+        "AC-02"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4[MOCK_API]; F5b[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-02-MISSING",
+      "parentIds": [
+        "AC-02"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-03-RES",
+      "parentIds": [
+        "AC-03",
+        "AC-24"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-03-TIME",
+      "parentIds": [
+        "AC-03",
+        "AC-24"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-10-P",
+      "parentIds": [
+        "AC-10"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-10-I",
+      "parentIds": [
+        "AC-10"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-15-TC-WM",
+      "parentIds": [
+        "AC-15"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-15-WM-TC",
+      "parentIds": [
+        "AC-15"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1[WM_LIVE]",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-16-LOG",
+      "parentIds": [
+        "AC-16"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-16-DOC",
+      "parentIds": [
+        "AC-16"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-17-P",
+      "parentIds": [
+        "AC-17"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4[MOCK_API]",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-17-U",
+      "parentIds": [
+        "AC-17"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-17-D",
+      "parentIds": [
+        "AC-17"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-17-PHASE",
+      "parentIds": [
+        "AC-17"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-17-VERSION",
+      "parentIds": [
+        "AC-17"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-RESUME",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-ACTOR",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-WORKER-RUN",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":gateway-app:integrationTest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-WORKER-QUEUED-VALID",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":gateway-app:integrationTest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-WORKER-QUEUED-EXPIRED",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":gateway-app:integrationTest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-WORKER-RACE-PRECOMMIT",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":gateway-app:integrationTest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-WORKER-RACE-POSTCOMMIT",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":gateway-app:integrationTest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-18-TEST",
+      "parentIds": [
+        "AC-18"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-19-P1",
+      "parentIds": [
+        "AC-19"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-19-P2",
+      "parentIds": [
+        "AC-19"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(2차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-19-P3",
+      "parentIds": [
+        "AC-19"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-20-INC",
+      "parentIds": [
+        "AC-20"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-20-REPLAY",
+      "parentIds": [
+        "AC-20"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-21-TOOL",
+      "parentIds": [
+        "AC-21"
+      ],
+      "gates": [
+        "F1"
+      ],
+      "gateText": "F1[MOCK_API]",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-21-SOURCE",
+      "parentIds": [
+        "AC-21"
+      ],
+      "gates": [
+        "F1"
+      ],
+      "gateText": "F1",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-LIVE",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_LIVE]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          },
+          {
+            "componentId": "RB:F2-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F2-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-STUB-TOOL",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-STUB-SYSTEM",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-GQ-HELP",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-GQ-BYPASS-DATA",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          },
+          {
+            "componentId": "RB:F2-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F2-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-22-GQ-BYPASS-XSYS",
+      "parentIds": [
+        "AC-22"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          },
+          {
+            "componentId": "RB:F2-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F2-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-NW",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3[MOCK_API]",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-NH",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-SW",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-SH",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-FILTER",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-REVOKE",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-VEC-EXACT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-VEC-FILTERK",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-SUBSTR",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-ID",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-SHORT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-META",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-ZERO",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-KW-DENY",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-IDEM",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-PRECOMMIT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-POSTCOMMIT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-DELETE",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-ACL",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3-ACL",
+            "producer": "ACCEPTANCE",
+            "suite": "F3-ACL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-REBUILD",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-SANITIZE",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-ING-RULEVER",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3-RULEVER",
+            "producer": "ACCEPTANCE",
+            "suite": "F3-RULEVER"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-QUERYFAIL",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-PERF",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "PF",
+            "producer": "PERF",
+            "measurementId": "f3:search-latency-samples",
+            "measurementIds": [
+              "f3:search-latency-samples",
+              "f3:index-resources"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-LOAD",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "PF",
+            "producer": "PERF",
+            "measurementId": "f4:job-latency-samples",
+            "measurementIds": [
+              "f4:job-latency-samples"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-AUTHZ",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4[MOCK_API]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-LOGFAIL",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-LOT-ACTIVE",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-LOT-MULTI",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-LOT-ENDED",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-LOT-UNKNOWN",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-JOB",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-PERF",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "PF",
+            "producer": "PERF",
+            "measurementId": "f4:job-latency-samples",
+            "measurementIds": [
+              "f4:job-latency-samples"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-SRCDENY",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-SRCUNMAPPED",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-AUTHZDOWN",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-CACHEPERM",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RESULTSCOPE",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RESULTSCOPE-TURN",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RESULT-NODLG",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-DLQ-PART",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-DLQ-DOWN",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RETAIN-EXPIRY",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RETAIN-JOBEDGE",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RETAIN-PURGE",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-AUDIT-ALLOW",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-AUDIT-EXPIRY",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-RESTORE",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-RESTORE",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-RESTORE"
+          },
+          {
+            "componentId": "OP:restore-rto",
+            "producer": "OPS",
+            "measurementId": "ops:restore-rto"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-BACKUP-ALERT",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "OP:backup-alert",
+            "producer": "OPS",
+            "measurementId": "ops:backup-alert"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-25-DELEG",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a[TC_LIVE]",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-OBS",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-LOT-ACTIVE",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-LOT-MULTI",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-LOT-ENDED",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-LOT-UNKNOWN",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-COMMLOG",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-DLQ-PART",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-DLQ-DOWN",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-SRCAUTHZ-ALLOW",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-25-SRCAUTHZ-DENY",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-ROUTE",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b[TC_LIVE]",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-PERM",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-I18N",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-CHAT",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-RECONNECT",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-LOGOUT",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-CANCEL",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-REGRESS",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-26-STREAMDOWN",
+      "parentIds": [
+        "AC-26"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R1-CORE",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R1-REGRESS",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R1-ISO",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R2-CORE",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R2"
+      ],
+      "gateText": "R2",
+      "labelsByStage": {
+        "R2": [
+          "HRM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R2-REGRESS",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R2"
+      ],
+      "gateText": "R2",
+      "labelsByStage": {
+        "R2": [
+          "HRM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-27-R2-ISO",
+      "parentIds": [
+        "AC-27"
+      ],
+      "gates": [
+        "R2"
+      ],
+      "gateText": "R2",
+      "labelsByStage": {
+        "R2": [
+          "HRM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-28-FIFO",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4[MOCK_API]; F5a·F5b[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-DEPTH",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-FULL",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-QTIMEOUT",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-JOBLIMIT",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-JOBLIMIT-Q",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-SLOT",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-CANCEL",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-ATOMIC",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "F4",
+        "F5a",
+        "F5b"
+      ],
+      "gateText": "F4; F5a·F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28-FAIR-R1-TC",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-28-FAIR-R1-WM",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "R1"
+      ],
+      "gateText": "R1",
+      "labelsByStage": {
+        "R1": [
+          "WM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-28-FAIR-R2-HRM",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [
+        "R2"
+      ],
+      "gateText": "R2",
+      "labelsByStage": {
+        "R2": [
+          "HRM_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-28-SCALE-PARALLEL",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [],
+      "gateText": "용량 확장 전(트리거)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-28-SCALE-LOAD",
+      "parentIds": [
+        "AC-28"
+      ],
+      "gates": [],
+      "gateText": "용량 확장 전(트리거)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-30-EQ",
+      "parentIds": [
+        "AC-30"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-30-WM",
+      "parentIds": [
+        "AC-30"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-30-ABSENT",
+      "parentIds": [
+        "AC-30"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-32-SCHEMA",
+      "parentIds": [
+        "AC-32"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-32-LENGTH",
+      "parentIds": [
+        "AC-32"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-32-RETRYOK",
+      "parentIds": [
+        "AC-32"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2[LLM_STUB]",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-33-LOADING",
+      "parentIds": [
+        "AC-33"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2-OUTAGE",
+            "producer": "ACCEPTANCE",
+            "suite": "F2-OUTAGE",
+            "outagePhase": "LOADING"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4-OUTAGE",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-OUTAGE",
+            "outagePhase": "LOADING"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-33-PERSIST",
+      "parentIds": [
+        "AC-33"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4-CLOCK",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-CLOCK"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-33-CTX",
+      "parentIds": [
+        "AC-33"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-35-TOKEN",
+      "parentIds": [
+        "AC-35"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          },
+          {
+            "componentId": "UR",
+            "producer": "USER_RUN",
+            "task": "record user-run"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-35-FW",
+      "parentIds": [
+        "AC-35"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "UR",
+            "producer": "USER_RUN",
+            "task": "record user-run"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-35-LOCAL",
+      "parentIds": [
+        "AC-35"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "UR",
+            "producer": "USER_RUN",
+            "task": "record user-run"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-35-EGRESS",
+      "parentIds": [
+        "AC-35"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-37-CMP",
+      "parentIds": [
+        "AC-37"
+      ],
+      "gates": [
+        "F0"
+      ],
+      "gateText": "F0[LLM_LIVE, Gateway 없음]",
+      "labelsByStage": {
+        "F0": [
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F0": [
+          {
+            "componentId": "F0R",
+            "producer": "F0_REPORT",
+            "task": "f0 report"
+          },
+          {
+            "componentId": "SPR",
+            "producer": "SPEC_RECORD",
+            "task": "f0 report --spec-record-check"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-37-OUT-NORMAL",
+      "parentIds": [
+        "AC-37"
+      ],
+      "gates": [
+        "F0"
+      ],
+      "gateText": "F0",
+      "labelsByStage": {
+        "F0": [
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F0": [
+          {
+            "componentId": "F0R",
+            "producer": "F0_REPORT",
+            "task": "f0 report"
+          },
+          {
+            "componentId": "SPR",
+            "producer": "SPEC_RECORD",
+            "task": "f0 report --spec-record-check"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-37-OUT-MAX",
+      "parentIds": [
+        "AC-37"
+      ],
+      "gates": [
+        "F0"
+      ],
+      "gateText": "F0",
+      "labelsByStage": {
+        "F0": [
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F0": [
+          {
+            "componentId": "F0R",
+            "producer": "F0_REPORT",
+            "task": "f0 report"
+          },
+          {
+            "componentId": "SPR",
+            "producer": "SPEC_RECORD",
+            "task": "f0 report --spec-record-check"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-37-OUT-ESCAPE",
+      "parentIds": [
+        "AC-37"
+      ],
+      "gates": [
+        "F0"
+      ],
+      "gateText": "F0",
+      "labelsByStage": {
+        "F0": [
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F0": [
+          {
+            "componentId": "F0R",
+            "producer": "F0_REPORT",
+            "task": "f0 report"
+          },
+          {
+            "componentId": "SPR",
+            "producer": "SPEC_RECORD",
+            "task": "f0 report --spec-record-check"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-38-F0",
+      "parentIds": [
+        "AC-38"
+      ],
+      "gates": [
+        "F0"
+      ],
+      "gateText": "F0",
+      "labelsByStage": {
+        "F0": [
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F0": [
+          {
+            "componentId": "F0R",
+            "producer": "F0_REPORT",
+            "task": "f0 report"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-38-F2",
+      "parentIds": [
+        "AC-38"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-38-F4",
+      "parentIds": [
+        "AC-38"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-39-299",
+      "parentIds": [
+        "AC-39"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-39-300",
+      "parentIds": [
+        "AC-39"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-39-301",
+      "parentIds": [
+        "AC-39"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-42-READ",
+      "parentIds": [
+        "AC-42"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-42-AUTHZ",
+      "parentIds": [
+        "AC-42"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-43-CLS",
+      "parentIds": [
+        "AC-43"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-43-COMP",
+      "parentIds": [
+        "AC-43"
+      ],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-46-EMPTY",
+      "parentIds": [
+        "AC-46"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          },
+          {
+            "componentId": "RB:F1-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F1-RUBRIC"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-46-HIT",
+      "parentIds": [
+        "AC-46"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          },
+          {
+            "componentId": "RB:F1-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F1-RUBRIC"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-46-TRIM",
+      "parentIds": [
+        "AC-46"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-SYSTEM",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4[MOCK_API]; F5a[TC_LIVE]",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-TARGET",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-TOKEN-MISSING",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-TOKEN-INVALID",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-ABSENT",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-SIG",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-KID",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-ALG",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-ISS",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-AUD",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-EXP",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-LIFE",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-SYS",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-SUB",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-SCOPE",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-PERM",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-PDG",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-PDG-MISSING",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-DLG",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-04-JWS-DLG-EXTRA",
+      "parentIds": [
+        "ISO-04"
+      ],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4; F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-05-READ",
+      "parentIds": [
+        "ISO-05"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-05-MESSAGE",
+      "parentIds": [
+        "ISO-05",
+        "AC-03"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-06-V-MISSING",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-06-V-TAMPER",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-06-K-MISSING",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-06-K-TAMPER",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-06-H-MISSING",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(Hybrid 활성)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "ISO-06-H-TAMPER",
+      "parentIds": [
+        "ISO-06"
+      ],
+      "gates": [],
+      "gateText": "후속 기능(Hybrid 활성)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "ISO-07-CITE",
+      "parentIds": [
+        "ISO-07"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-07-RAW",
+      "parentIds": [
+        "ISO-07"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-07-CHART",
+      "parentIds": [
+        "ISO-07"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-07-DOWNLOAD",
+      "parentIds": [
+        "ISO-07"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-08-JOB",
+      "parentIds": [
+        "ISO-08"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-08-CONNECT",
+      "parentIds": [
+        "ISO-08"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-08-RECONNECT",
+      "parentIds": [
+        "ISO-08",
+        "AC-18"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-08-EVENT",
+      "parentIds": [
+        "ISO-08"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-10-LOG",
+      "parentIds": [
+        "ISO-10"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-10-CODE",
+      "parentIds": [
+        "ISO-10"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-10-RAG",
+      "parentIds": [
+        "ISO-10"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-11-LOGOUT-TOOL",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4[MOCK_API]; F5a[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-11-LOGOUT-RESULT",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-11-PERM-TOOL",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-11-PERM-RESULT",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-11-LOGOUT-STREAM",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-11-LOGOUT-STREAM-RACE",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-11-LOGOUT-STREAM-LEASE",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-11-PERM-STREAM",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-11-PERM-STREAM-RACE",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-11-STREAM-GATELOSS",
+      "parentIds": [
+        "ISO-11"
+      ],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "ISO-12-FAIL",
+      "parentIds": [
+        "ISO-12"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-12-UNSUP",
+      "parentIds": [
+        "ISO-12"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-13-EQP",
+      "parentIds": [
+        "ISO-13"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-13-LOT",
+      "parentIds": [
+        "ISO-13"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-13-DOC",
+      "parentIds": [
+        "ISO-13"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-14-USER",
+      "parentIds": [
+        "ISO-14"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-14-STREAM",
+      "parentIds": [
+        "ISO-14"
+      ],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4; F5b[TC_LIVE]",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-14-SUMMARY",
+      "parentIds": [
+        "ISO-14"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-14-CACHE",
+      "parentIds": [
+        "ISO-14"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-15-QUERY",
+      "parentIds": [
+        "ISO-15"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-15-INJECT",
+      "parentIds": [
+        "ISO-15"
+      ],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-15-WINDOW",
+      "parentIds": [
+        "ISO-15"
+      ],
+      "gates": [
+        "F1",
+        "F4"
+      ],
+      "gateText": "F1, F4",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    }
+  ],
+  "atoms": [
+    {
+      "id": "AC-01",
+      "parentIds": [],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4, F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-04",
+      "parentIds": [],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4, F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-05",
+      "parentIds": [],
+      "gates": [
+        "F4",
+        "F5b"
+      ],
+      "gateText": "F4, F5b",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-06",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(2차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-07",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(2차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-08",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(2차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-09",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-11",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-12",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-13",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(3차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-14",
+      "parentIds": [],
+      "gates": [],
+      "gateText": "후속 기능 게이트(2차)",
+      "labelsByStage": {},
+      "components": {}
+    },
+    {
+      "id": "AC-29",
+      "parentIds": [],
+      "gates": [
+        "F2",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F2, F4, F5a",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-31",
+      "parentIds": [],
+      "gates": [
+        "F2"
+      ],
+      "gateText": "F2",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-34",
+      "parentIds": [],
+      "gates": [
+        "F5b"
+      ],
+      "gateText": "F5b",
+      "labelsByStage": {
+        "F5b": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-36",
+      "parentIds": [],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4, F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-40",
+      "parentIds": [
+        "AC-25"
+      ],
+      "gates": [
+        "F5a"
+      ],
+      "gateText": "F5a",
+      "labelsByStage": {
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {}
+    },
+    {
+      "id": "AC-41",
+      "parentIds": [],
+      "gates": [
+        "F1",
+        "F5a"
+      ],
+      "gateText": "F1, F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-44",
+      "parentIds": [],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2-OUTAGE",
+            "producer": "ACCEPTANCE",
+            "suite": "F2-OUTAGE",
+            "outagePhase": "STOPPED"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4-OUTAGE",
+            "producer": "ACCEPTANCE",
+            "suite": "F4-OUTAGE",
+            "outagePhase": "STOPPED"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-45",
+      "parentIds": [],
+      "gates": [
+        "F1",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F1, F4, F5a",
+      "labelsByStage": {
+        "F1": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ],
+        "F5a": [
+          "TC_LIVE"
+        ]
+      },
+      "components": {
+        "F1": [
+          {
+            "componentId": "ACC:F1",
+            "producer": "ACCEPTANCE",
+            "suite": "F1"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-01",
+      "parentIds": [],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-02",
+      "parentIds": [],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-03",
+      "parentIds": [],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ISO-09",
+      "parentIds": [],
+      "gates": [
+        "F4"
+      ],
+      "gateText": "F4",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    }
+  ],
+  "producerIndex": {
+    "f0 report": [
+      "AC-37-CMP",
+      "AC-37-OUT-NORMAL",
+      "AC-37-OUT-MAX",
+      "AC-37-OUT-ESCAPE",
+      "AC-38-F0"
+    ],
+    "f0 report --spec-record-check": [
+      "AC-37-CMP",
+      "AC-37-OUT-NORMAL",
+      "AC-37-OUT-MAX",
+      "AC-37-OUT-ESCAPE"
+    ],
+    "F1": [
+      "AC-17-P",
+      "AC-17-U",
+      "AC-17-D",
+      "AC-17-PHASE",
+      "AC-17-VERSION",
+      "AC-21-TOOL",
+      "AC-21-SOURCE",
+      "AC-36",
+      "AC-41",
+      "AC-45",
+      "AC-46-TRIM",
+      "ISO-04-SYSTEM",
+      "ISO-04-TARGET",
+      "ISO-04-TOKEN-MISSING",
+      "ISO-04-TOKEN-INVALID",
+      "ISO-04-JWS-ABSENT",
+      "ISO-04-JWS-SIG",
+      "ISO-04-JWS-KID",
+      "ISO-04-JWS-ALG",
+      "ISO-04-JWS-ISS",
+      "ISO-04-JWS-AUD",
+      "ISO-04-JWS-EXP",
+      "ISO-04-JWS-LIFE",
+      "ISO-04-JWS-SYS",
+      "ISO-04-JWS-SUB",
+      "ISO-04-JWS-SCOPE",
+      "ISO-04-JWS-PERM",
+      "ISO-04-JWS-PDG",
+      "ISO-04-JWS-PDG-MISSING",
+      "ISO-04-JWS-DLG",
+      "ISO-04-JWS-DLG-EXTRA",
+      "ISO-15-QUERY",
+      "ISO-15-WINDOW",
+      "AC-46-EMPTY",
+      "AC-46-HIT"
+    ],
+    "F1-RUBRIC": [
+      "AC-46-EMPTY",
+      "AC-46-HIT"
+    ],
+    "F2": [
+      "AC-22-STUB-TOOL",
+      "AC-22-STUB-SYSTEM",
+      "AC-22-GQ-HELP",
+      "AC-29",
+      "AC-30-EQ",
+      "AC-30-WM",
+      "AC-30-ABSENT",
+      "AC-31",
+      "AC-32-SCHEMA",
+      "AC-32-LENGTH",
+      "AC-32-RETRYOK",
+      "AC-33-PERSIST",
+      "AC-33-CTX",
+      "AC-35-EGRESS",
+      "AC-38-F2",
+      "AC-43-CLS",
+      "AC-43-COMP",
+      "AC-22-LIVE",
+      "AC-22-GQ-BYPASS-DATA",
+      "AC-22-GQ-BYPASS-XSYS",
+      "AC-35-TOKEN"
+    ],
+    "F2-RUBRIC": [
+      "AC-22-LIVE",
+      "AC-22-GQ-BYPASS-DATA",
+      "AC-22-GQ-BYPASS-XSYS"
+    ],
+    "F2-OUTAGE": [
+      "AC-33-LOADING",
+      "AC-44"
+    ],
+    "record user-run": [
+      "AC-35-TOKEN",
+      "AC-35-FW",
+      "AC-35-LOCAL"
+    ],
+    "F3": [
+      "AC-23-NW",
+      "AC-23-NH",
+      "AC-23-SW",
+      "AC-23-SH",
+      "AC-23-FILTER",
+      "AC-23-REVOKE",
+      "AC-23-VEC-EXACT",
+      "AC-23-VEC-FILTERK",
+      "AC-23-KW-SUBSTR",
+      "AC-23-KW-ID",
+      "AC-23-KW-SHORT",
+      "AC-23-KW-META",
+      "AC-23-KW-ZERO",
+      "AC-23-KW-DENY",
+      "AC-23-ING-IDEM",
+      "AC-23-ING-PRECOMMIT",
+      "AC-23-ING-POSTCOMMIT",
+      "AC-23-ING-DELETE",
+      "AC-23-REBUILD",
+      "AC-23-ING-SANITIZE",
+      "AC-23-QUERYFAIL",
+      "ISO-06-V-MISSING",
+      "ISO-06-V-TAMPER",
+      "ISO-06-K-MISSING",
+      "ISO-06-K-TAMPER"
+    ],
+    "F3-ACL": [
+      "AC-23-ING-ACL"
+    ],
+    "F3-RULEVER": [
+      "AC-23-ING-RULEVER"
+    ],
+    "f3:search-latency-samples": [
+      "AC-23-PERF"
+    ],
+    "F4": [
+      "AC-01",
+      "AC-04",
+      "AC-05",
+      "AC-02-LINK",
+      "AC-03-RES",
+      "AC-03-TIME",
+      "AC-15-TC-WM",
+      "AC-17-P",
+      "AC-17-U",
+      "AC-17-D",
+      "AC-17-PHASE",
+      "AC-17-VERSION",
+      "AC-18-RESUME",
+      "AC-18-ACTOR",
+      "AC-19-P1",
+      "AC-20-INC",
+      "AC-24-AUTHZ",
+      "AC-24-LOT-ACTIVE",
+      "AC-24-LOT-MULTI",
+      "AC-24-LOT-ENDED",
+      "AC-24-LOT-UNKNOWN",
+      "AC-24-JOB",
+      "AC-24-SRCDENY",
+      "AC-24-SRCUNMAPPED",
+      "AC-24-CACHEPERM",
+      "AC-24-RESULTSCOPE",
+      "AC-24-RESULTSCOPE-TURN",
+      "AC-24-RESULT-NODLG",
+      "AC-24-DLQ-PART",
+      "AC-24-AUDIT-ALLOW",
+      "AC-28-FIFO",
+      "AC-28-DEPTH",
+      "AC-28-FULL",
+      "AC-28-SLOT",
+      "AC-28-CANCEL",
+      "AC-28-ATOMIC",
+      "AC-29",
+      "AC-30-EQ",
+      "AC-30-WM",
+      "AC-30-ABSENT",
+      "AC-33-CTX",
+      "AC-36",
+      "AC-38-F4",
+      "AC-45",
+      "AC-46-TRIM",
+      "ISO-01",
+      "ISO-02",
+      "ISO-03",
+      "ISO-04-SYSTEM",
+      "ISO-04-TARGET",
+      "ISO-04-TOKEN-MISSING",
+      "ISO-04-TOKEN-INVALID",
+      "ISO-04-JWS-ABSENT",
+      "ISO-04-JWS-SIG",
+      "ISO-04-JWS-KID",
+      "ISO-04-JWS-ALG",
+      "ISO-04-JWS-ISS",
+      "ISO-04-JWS-AUD",
+      "ISO-04-JWS-EXP",
+      "ISO-04-JWS-LIFE",
+      "ISO-04-JWS-SYS",
+      "ISO-04-JWS-SUB",
+      "ISO-04-JWS-SCOPE",
+      "ISO-04-JWS-PERM",
+      "ISO-04-JWS-PDG",
+      "ISO-04-JWS-PDG-MISSING",
+      "ISO-04-JWS-DLG",
+      "ISO-04-JWS-DLG-EXTRA",
+      "ISO-05-READ",
+      "ISO-05-MESSAGE",
+      "ISO-06-V-MISSING",
+      "ISO-06-V-TAMPER",
+      "ISO-06-K-MISSING",
+      "ISO-06-K-TAMPER",
+      "ISO-07-CITE",
+      "ISO-07-RAW",
+      "ISO-07-CHART",
+      "ISO-07-DOWNLOAD",
+      "ISO-08-JOB",
+      "ISO-08-CONNECT",
+      "ISO-08-RECONNECT",
+      "ISO-08-EVENT",
+      "ISO-09",
+      "ISO-11-LOGOUT-TOOL",
+      "ISO-11-LOGOUT-RESULT",
+      "ISO-11-PERM-TOOL",
+      "ISO-11-PERM-RESULT",
+      "ISO-12-FAIL",
+      "ISO-12-UNSUP",
+      "ISO-13-EQP",
+      "ISO-13-LOT",
+      "ISO-13-DOC",
+      "ISO-14-USER",
+      "ISO-14-STREAM",
+      "ISO-14-SUMMARY",
+      "ISO-14-CACHE",
+      "ISO-15-QUERY",
+      "ISO-15-INJECT",
+      "ISO-15-WINDOW",
+      "AC-02-MISSING",
+      "AC-16-LOG",
+      "AC-16-DOC",
+      "AC-24-LOGFAIL",
+      "AC-24-AUTHZDOWN",
+      "AC-24-DLQ-DOWN",
+      "AC-46-EMPTY",
+      "AC-46-HIT",
+      "ISO-10-LOG",
+      "ISO-10-CODE",
+      "ISO-10-RAG"
+    ],
+    "F4-RUBRIC": [
+      "AC-02-MISSING",
+      "AC-16-LOG",
+      "AC-16-DOC",
+      "AC-24-LOGFAIL",
+      "AC-24-AUTHZDOWN",
+      "AC-24-DLQ-DOWN",
+      "AC-46-EMPTY",
+      "AC-46-HIT",
+      "ISO-10-LOG",
+      "ISO-10-CODE",
+      "ISO-10-RAG"
+    ],
+    "F4-CLOCK": [
+      "AC-24-RETAIN-EXPIRY",
+      "AC-24-RETAIN-JOBEDGE",
+      "AC-24-RETAIN-PURGE",
+      "AC-24-AUDIT-EXPIRY",
+      "AC-28-QTIMEOUT",
+      "AC-28-JOBLIMIT",
+      "AC-28-JOBLIMIT-Q",
+      "AC-33-PERSIST"
+    ],
+    "F4-OUTAGE": [
+      "AC-33-LOADING",
+      "AC-44"
+    ],
+    ":gateway-app:integrationTest": [
+      "AC-18-WORKER-RUN",
+      "AC-18-WORKER-QUEUED-VALID",
+      "AC-18-WORKER-QUEUED-EXPIRED",
+      "AC-18-WORKER-RACE-PRECOMMIT",
+      "AC-18-WORKER-RACE-POSTCOMMIT"
+    ],
+    "f4:job-latency-samples": [
+      "AC-23-LOAD",
+      "AC-24-PERF"
+    ],
+    "F4-RESTORE": [
+      "AC-24-RESTORE"
+    ],
+    "ops:restore-rto": [
+      "AC-24-RESTORE"
+    ],
+    "ops:backup-alert": [
+      "AC-24-BACKUP-ALERT"
+    ],
+    "f3:index-resources": [
+      "AC-23-PERF"
+    ]
+  },
+  "measurementIds": [
+    "f3-probe:embedding-profile",
+    "f2:llm-latency-samples",
+    "f3:search-latency-samples",
+    "f3:index-resources",
+    "f4:job-latency-samples",
+    "ops:restore-rto",
+    "restore-prep-manifest"
+  ]
+}

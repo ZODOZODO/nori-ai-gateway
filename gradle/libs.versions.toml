@@ -1,0 +1,5 @@
+[libraries]
+junit-bom = { module = "org.junit:junit-bom" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+assertj = { module = "org.assertj:assertj-core" }
+jackson = { module = "com.fasterxml.jackson.core:jackson-databind" }
