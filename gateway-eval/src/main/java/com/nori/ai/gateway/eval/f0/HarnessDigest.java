@@ -19,6 +19,17 @@ public final class HarnessDigest {
         for (String root : ROOTS) if (path.equals(root) || path.startsWith(root + "/")) return true;
         return false;
     }
+    private static final String SOURCES = "gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0";
+    public static String compute(Path root, Prereg.Document document) {
+        if (!document.versioned()) return compute(root);
+        SortedMap<String,String> selected = new TreeMap<>();
+        document.inputs().keySet().forEach(file -> {
+            Path path = root.resolve(file);
+            if (Files.isRegularFile(path)) selected.put(file, Json.sha(Json.bytes(path)));
+        });
+        files(root).forEach((file, sha) -> { if (file.startsWith(SOURCES + "/")) selected.put(file, sha); });
+        return digest(selected);
+    }
     public static String compute(Path repositoryRoot) { return digest(files(repositoryRoot)); }
     public static SortedMap<String,String> files(Path repositoryRoot) {
         SortedMap<String,String> files = new TreeMap<>();
@@ -40,13 +51,14 @@ public final class HarnessDigest {
         return Json.sha(Json.canonical(Json.MAPPER.valueToTree(pairs)));
     }
     /** 등록 commit 트리에서 같은 정의로 다시 계산합니다(git 읽기 전용 명령만). */
-    public static String computeAtCommit(GitReader git, Path repositoryRoot, String commit) {
-        List<String> args = new ArrayList<>(List.of("ls-tree", "-r", "-z", "--name-only", commit, "--")); args.addAll(ROOTS);
+    public static String computeAtCommit(GitReader git, Path repositoryRoot, String commit) { return computeAtCommit(git, repositoryRoot, commit, null); }
+    public static String computeAtCommit(GitReader git, Path repositoryRoot, String commit, Prereg.Document document) {
+        List<String> args = new ArrayList<>(List.of("ls-tree", "-r", "-z", "--name-only", commit, "--")); args.addAll(document != null && document.versioned() ? java.util.stream.Stream.concat(document.inputs().keySet().stream(), java.util.stream.Stream.of(SOURCES)).toList() : ROOTS);
         GitReader.Result listing = git.run(repositoryRoot, args);
         if (listing.exit() != 0) throw new EvalException(2, "PREREG_REGISTERED_COMMIT_MISMATCH");
         SortedMap<String,String> files = new TreeMap<>();
         for (String path : new String(listing.stdout(), StandardCharsets.UTF_8).split("\0")) {
-            if (path.isEmpty() || !included(path)) continue;
+            if (path.isEmpty() || (document != null && document.versioned() ? !document.inputs().containsKey(path) && !path.startsWith(SOURCES + "/") : !included(path))) continue;
             GitReader.Result blob = git.run(repositoryRoot, List.of("cat-file", "blob", commit + ":" + path));
             if (blob.exit() != 0) throw new EvalException(2, "PREREG_REGISTERED_COMMIT_MISMATCH");
             files.put(path, Json.sha(blob.stdout()));

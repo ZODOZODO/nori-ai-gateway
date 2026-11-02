@@ -30,12 +30,18 @@ public final class MeasurementSession {
     private final Runtime runtime;
     private final ObjectNode binding;
     private final String template;
+    private final InputAudit audit;
+    /** 응답과 그 호출의 사전 입력 계수(v1 은 audit 없음 = null). 실제 usage.prompt_tokens 와 따로 기록합니다. */
+    public record Sent(OllamaChatClient.ChatResult result, Integer auditInputTokens) {}
 
-    private MeasurementSession(OllamaChatClient client, Preflight.Verified verified, Prereg.State prereg, Runtime runtime, ObjectNode binding, String template) {
-        this.client = client; this.verified = verified; this.prereg = prereg; this.runtime = runtime; this.binding = binding; this.template = template;
+    private MeasurementSession(OllamaChatClient client, Preflight.Verified verified, Prereg.State prereg, Runtime runtime, ObjectNode binding, String template, InputAudit audit) {
+        this.client = client; this.verified = verified; this.prereg = prereg; this.runtime = runtime; this.binding = binding; this.template = template; this.audit = audit;
     }
     public static MeasurementSession start(Context context, String command, String endpoint, String runId, Path bindingPath, Consumer<Runtime> beforeBinding) {
-        Prereg.State prereg = Prereg.verify(context.root(), context.root().resolve(Prereg.DEFAULT_PATH), context.git());
+        return start(context, context.root().resolve(Prereg.DEFAULT_PATH), command, endpoint, runId, bindingPath, beforeBinding);
+    }
+    public static MeasurementSession start(Context context, Path preregPath, String command, String endpoint, String runId, Path bindingPath, Consumer<Runtime> beforeBinding) {
+        Prereg.State prereg = Prereg.verify(context.root(), preregPath, context.git());
         SpecBinding spec = new SpecGuard(context.env()).check(null, null, context.root().resolve("docs/gates/spec-baseline.md"));
         if (Files.exists(bindingPath)) throw new EvalException(2, "RUN_BINDING_EXISTS");
         OllamaChatClient client = new OllamaChatClient(endpoint, prereg.document().requestTimeout());
@@ -43,16 +49,19 @@ public final class MeasurementSession {
         if (!preflight.summary().ok()) throw new EvalException(preflight.summary().reason().equals("MODEL_DIGEST_MISMATCH") ? 6 : 4, preflight.summary().reason());
         String template = client.showTemplate(prereg.document().generationModel());
         Runtime runtime = new Runtime(preflight.verified().generationDigest(), Json.sha(template.getBytes(StandardCharsets.UTF_8)), tokenizerSha(context.root()));
+        InputAudit audit = null;
+        if (prereg.document().versioned()) { audit = InputAudit.load(context.root().resolve(prereg.document().input("inputAudit"))); audit.requireRuntime(runtime); }
         if (beforeBinding != null) beforeBinding.accept(runtime);
         ObjectNode binding = Json.MAPPER.createObjectNode();
         binding.put("schema", "f0-run-binding-v1"); binding.put("runId", runId); binding.put("command", command); binding.put("startedAt", context.clock().instant().toString());
         binding.put("specSha", spec.specSha()); binding.put("specShaSource", spec.specShaSource()); binding.put("specInputOrigin", spec.specInputOrigin());
+        binding.put("preregPath", Prereg.relativePath(context.root(), preregPath)); binding.put("preregSha256", Json.sha(Json.bytes(preregPath)));
         binding.put("harnessDigest", prereg.document().harnessDigest());
         binding.set("runtimeManifest", Json.MAPPER.valueToTree(runtime.manifest())); binding.put("runtimeManifestSha256", runtime.sha256());
         binding.set("parameterManifest", prereg.document().parameters()); binding.put("parameterManifestSha256", prereg.document().parameterManifestSha256());
         binding.put("registeredCommit", prereg.document().registeredCommit()); binding.put("preregCommit", prereg.preregCommit()); binding.put("preregCommitTime", prereg.preregCommitTime().toString());
         writeNew(bindingPath, Json.canonical(binding));
-        return new MeasurementSession(client, preflight.verified(), prereg, runtime, binding, template);
+        return new MeasurementSession(client, preflight.verified(), prereg, runtime, binding, template, audit);
     }
     /** pin 파일의 SHA 와 실제 tokenizer.json 바이트가 같을 때만 런타임 manifest 에 넣습니다(대체 tokenizer 경로 0). */
     static String tokenizerSha(Path root) {
@@ -77,5 +86,11 @@ public final class MeasurementSession {
     public ObjectNode binding() { return binding.deepCopy(); }
     /** chat-template 캡처 전용 — 같은 세션이 읽은 template 필드. 다른 명령은 SHA 만 씁니다. */
     String template() { return template; }
+    /** v2 는 사전 계수 표에 있고 예산 안인 메시지만 보냅니다(재시도 포함, 매 호출 직전). */
+    public Integer audited(List<Map<String,String>> messages, int inputLimit, int maxTokens) { return audit == null ? null : audit.require(messages, inputLimit, maxTokens); }
+    public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens) {
+        Integer counted = audited(messages, inputLimit, maxTokens);
+        return new Sent(client.chat(verified, prereg.document().generationModel(), messages, maxTokens), counted);
+    }
     public void ensureResident() { Preflight.ensureResident(client, prereg.document().generationModel(), prereg.document().embeddingModel(), verified); }
 }

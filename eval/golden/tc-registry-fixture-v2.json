@@ -1,0 +1,40 @@
+{
+  "fixtureId": "tc-registry-fixture-v2",
+  "boundSystem": "TC",
+  "notice": "F0 하네스 전용 고정 fixture. 실제 TC 리소스·Registry 의 사본이 아니며 시스템 이름·소유 영역·Capability 는 SPEC 에 적힌 것만 옮겼다.",
+  "systems": [
+    {"system": "TC", "aliases": ["TC"], "ownedAreas": ["EQP 연결·런타임·상태·최근 통신 오류", "TC 송수신·실패 로그(상대 시스템 이름과 무관)", "TC 자체 정본의 현재 LOT 요약(WM 조회 보충 금지)", "Event·DLQ·Trace", "과거 장애 시점의 Code·배포·설정·문서", "공정·Socket 모델의 읽기 전용 설명", "Capability 도움말"], "specRef": "SPEC §5.3·§6.2·§16 1차 TC"},
+    {"system": "WM", "aliases": ["WM"], "ownedAreas": ["LOT·Workorder 진행 상태·현재 공정·HOLD·이력", "재고(Inventory 정본)", "주문·약속 납기"], "specRef": "SPEC §16 1차 WM"},
+    {"system": "HRM", "aliases": ["HRM"], "ownedAreas": ["근태", "잔여 연차", "결재 진행·대기 상태"], "specRef": "SPEC §16 1차 HRM"}
+  ],
+  "capabilities": [
+    {"capabilityId": "tc.eqp.getOperationalSnapshot", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["eqp"], "specRef": "SPEC §5.3·§6.3"},
+    {"capabilityId": "tc.event.getRecent", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["eqp", "from", "to"], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.dlq.list", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["eqp", "from", "to"], "specRef": "SPEC §5.3·§6.3"},
+    {"capabilityId": "tc.logs.search", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["eqp", "from", "to", "q"], "specRef": "SPEC §5.3·§6.3"},
+    {"capabilityId": "tc.git.searchCode", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["q"], "specRef": "SPEC §5.3·§6.1·§6.3"},
+    {"capabilityId": "tc.knowledge.search", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": ["q"], "specRef": "SPEC §5.3·§6.1"},
+    {"capabilityId": "tc.model.read", "status": "IMPLEMENTED", "phase": "PHASE_1", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.model.draft", "status": "DISABLED", "phase": "PHASE_2", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.model.checkout", "status": "DISABLED", "phase": "PHASE_2", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.model.checkin", "status": "DISABLED", "phase": "PHASE_2", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.model.validate", "status": "DISABLED", "phase": "PHASE_2", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.model.compare", "status": "DISABLED", "phase": "PHASE_2", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.test.replay", "status": "DISABLED", "phase": "PHASE_3", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.test.synthetic", "status": "DISABLED", "phase": "PHASE_3", "args": [], "specRef": "SPEC §5.3"},
+    {"capabilityId": "tc.test.batch", "status": "DISABLED", "phase": "PHASE_3", "args": [], "specRef": "SPEC §5.3"}
+  ],
+  "workflows": [
+    {"taskType": "KNOWLEDGE_QUERY", "t": "KQ", "steps": ["tc.knowledge.search", "tc.git.searchCode"], "specRef": "SPEC §6.1"},
+    {"taskType": "LIVE_QUERY", "t": "LQ", "steps": ["tc.eqp.getOperationalSnapshot", "tc.event.getRecent"], "specRef": "SPEC §5.3·§6.2(TC 자체 정본만, 타 시스템 보완 금지)"},
+    {"taskType": "INCIDENT_ANALYSIS", "t": "INC", "steps": ["tc.eqp.getOperationalSnapshot", "tc.logs.search", "tc.dlq.list", "tc.git.searchCode", "tc.knowledge.search"], "specRef": "SPEC §6.3"},
+    {"taskType": "GENERAL_QUERY", "t": "GQ", "steps": [], "answerSource": "REGISTRY_VIEW", "specRef": "SPEC §5.3 GENERAL_QUERY workflow"}
+  ],
+  "resources": [
+    {"type": "EQP", "id": "PHOTO_001"},
+    {"type": "EQP", "id": "EQP_001"},
+    {"type": "EQP", "id": "ETCH_002"},
+    {"type": "EQP", "id": "CVD_003"},
+    {"type": "EQP", "id": "포토설비A동1라인EQP0001경계최대길이검증용식별자abcdefghij0123456789KLMN가나다라마바사아자차카타"}
+  ]
+}

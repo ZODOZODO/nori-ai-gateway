@@ -36,7 +36,7 @@ class BoundaryGenJudgeTest {
             assertThat(result.path("cases")).hasSize(6);
             for (JsonNode c : result.path("cases")) {
                 assertThat(c.path("passRounds").asInt()).isEqualTo(2); assertThat(c.path("totalRounds").asInt()).isEqualTo(2);
-                for (JsonNode a : c.path("attempts")) assertThat(GoldenSet.keys(a)).isEqualTo(Set.of("round", "status", "retried", "finishReason", "completionTokens", "schemaValid", "argsExact", "latencyMs", "outputSha256"));
+                for (JsonNode a : c.path("attempts")) assertThat(GoldenSet.keys(a)).isEqualTo(Set.of("round", "status", "retried", "finishReason", "completionTokens", "schemaValid", "argsExact", "latencyMs", "outputSha256", "diagnostics", "promptTokens"));
             }
             String stored = f.allOutput("eval/f0/results/R1");
             for (JsonNode c : BoundaryCases.load(f.root.resolve("eval/f0/output-boundary-cases.jsonl"))) {

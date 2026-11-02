@@ -89,13 +89,14 @@ class PreregCommitGuardTest {
         }
     }
     /**
-     * 레포 PREREG 는 등록 SHA 가 현재 바이트와 같고, 등록 상태 표기가 실제 등록 수명주기와 맞아야 합니다.
-     * 미등록(registeredCommit=null)이면 UNCOMMITTED 이고 실제 검사가 PREREG_NOT_COMMITTED, 등록 후면 REGISTERED 이고 실제 git 으로 C1/C2 검사가 통과해야 합니다.
+     * 과거 레포 PREREG 의 상태와 C1 입력·하네스, C2 문서 바이트를 실제 git으로 독립 확인합니다.
+     * 새 하네스 작업 중에도 과거 등록은 검증하되 현재 바이트가 다르면 신규 측정은 거부되어야 합니다.
      */
-    @Test void repositoryPreregRegistrationStateMatchesLifecycleAndCurrentBytes() throws Exception {
+    @Test void repositoryPreregRegistrationStateMatchesHistoricalCommitsAndRejectsChangedWorktree() throws Exception {
         Path preregPath = ROOT.resolve(Prereg.DEFAULT_PATH);
         Prereg.Document document = Prereg.parse(preregPath);
-        assertThat(Prereg.localMismatches(ROOT, document)).isEmpty();
+        // 다음 버전의 승인된 작업 트리 변경과 과거 등록 바이트의 보존 검증을 분리합니다.
+        GitReader git = GitReader.process();
         assertThat(document.repeats()).isEqualTo(5); assertThat(document.inputs().keySet()).containsAll(Prereg.REQUIRED_INPUTS).contains("eval/py/count_tokens.py", "eval/py/requirements.txt");
         String text = Files.readString(preregPath, StandardCharsets.UTF_8);
         assertThat(text).doesNotContain(Json.sha(Files.readAllBytes(preregPath)));
@@ -105,7 +106,15 @@ class PreregCommitGuardTest {
             assertThatThrownBy(() -> Prereg.verify(ROOT, preregPath, GitReader.process())).isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("PREREG_NOT_COMMITTED"));
         } else {
             assertThat(status).isEqualTo("REGISTERED");
-            Prereg.State state = Prereg.verify(ROOT, preregPath, GitReader.process());
+            Prereg.State state = Prereg.verifyHistorical(ROOT, preregPath, git, document);
+            GitReader.Result archived = git.run(ROOT, List.of("cat-file", "blob", state.preregCommit() + ":" + Prereg.DEFAULT_PATH));
+            assertThat(archived.exit()).isZero();
+            assertThat(archived.stdout()).isEqualTo(Files.readAllBytes(preregPath));
+            if (!Prereg.localMismatches(ROOT, document).isEmpty()) {
+                assertThatThrownBy(() -> Prereg.verify(ROOT, preregPath, git)).isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("PREREG_INPUT_CHANGED"));
+            } else {
+                assertThat(Prereg.verify(ROOT, preregPath, git).preregCommit()).isEqualTo(state.preregCommit());
+            }
             assertThat(state.document().registeredCommit()).isEqualTo(document.registeredCommit());
             assertThat(state.preregCommit()).matches("[0-9a-f]{40}").isNotEqualTo(document.registeredCommit());
         }

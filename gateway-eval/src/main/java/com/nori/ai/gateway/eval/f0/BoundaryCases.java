@@ -36,16 +36,35 @@ public final class BoundaryCases {
         int eqpMax = limits.get("eqp").maxChars(), qMax = limits.get("q").maxChars();
         if (!limits.get("t").format().equals("ENUM:KQ|LQ|INC|GQ|UNS") || limits.get("t").maxChars() < 3) throw new EvalException(2, "ARG_LIMITS_INVALID");
         String maxEqp = fixture.resources().eqpIds().stream().filter(id -> id.codePointCount(0, id.length()) == eqpMax).findFirst().orElseThrow(() -> new EvalException(2, "FIXTURE_MAX_EQP_MISSING"));
-        String from = ArgLimits.formatTime(limits.get("from").format(), LocalDateTime.of(2026, 10, 3, 0, 0));
-        String to = ArgLimits.formatTime(limits.get("to").format(), LocalDateTime.of(2026, 10, 4, 0, 0));
+        int nanos = limits.versioned() ? 123456789 : 0;
+        String from = ArgLimits.formatTime(limits.get("from").format(), LocalDateTime.of(2026, 10, 3, 0, 0, 0, nanos));
+        String to = ArgLimits.formatTime(limits.get("to").format(), LocalDateTime.of(2026, 10, 4, 0, 0, 0, nanos));
         if (from.length() != limits.get("from").maxChars() || to.length() != limits.get("to").maxChars()) throw new EvalException(2, "ARG_LIMITS_FORMAT_MISMATCH");
+        if (limits.versioned()) rows.add(row("NORMAL-PRECISE", "NORMAL", "PHOTO_001", from, to, null, from, to));
         // 문자 종류별 토큰 수가 다르므로 최대 길이 표본을 여러 문자 종류로 둡니다(최대 토큰 수는 계수 결과에서 고름).
         for (var variant : Q_VARIANTS.entrySet()) rows.add(row("MAX-" + variant.getKey(), "MAX", maxEqp, from, to, fill(variant.getValue(), qMax), from, to));
+        if (limits.versioned()) rows.add(row("MAX-SUPPLEMENTARY", "MAX", maxEqp, from, to, fill("😀𠮷가A", qMax), from, to));
         String core = "\"\\\u0001";
         if (qMax < core.length()) throw new EvalException(2, "ARG_LIMITS_TOO_SMALL_FOR_ESCAPE");
         String tail = "경로C:\\tc\\log오류\"E-17\"끝";
-        String escape = core + tail.substring(0, Math.min(tail.length(), qMax - core.length()));
-        rows.add(row("ESCAPE-01", "ESCAPE", "PHOTO_001", from, to, escape, from, to));
+        String escape = limits.versioned() ? fill(core + tail, qMax) : core + tail.substring(0, Math.min(tail.length(), qMax - core.length()));
+        rows.add(row("ESCAPE-01", "ESCAPE", limits.versioned() ? maxEqp : "PHOTO_001", from, to, escape, from, to));
+        // 제어문자는 JSON에서 여섯 글자로 늘어나므로 혼합 문자열과 별도로 최장 표본을 둡니다.
+        if (limits.versioned()) rows.add(row("ESCAPE-CONTROL", "ESCAPE", maxEqp, from, to, fill("\u0001", qMax), from, to));
+        if (limits.versioned()) {
+            for (ObjectNode row : rows) {
+                JsonNode resolved = row.path("expectedOutput");
+                String q = resolved.path("q").isNull() ? null : resolved.path("q").asText();
+                if (q != null) {
+                    String eqp = resolved.path("eqp").asText(), fromLocal = resolved.path("from").asText(), toLocal = resolved.path("to").asText();
+                    // JSON 문자열 문법으로 인용하여 내부 따옴표·역슬래시·제어문자도 손실 없이 한 후보로 추출합니다.
+                    row.put("question", eqp + " 설비에서 " + fromLocal + "부터 " + toLocal + "까지 json:" + Json.canonicalString(Json.MAPPER.valueToTree(q)) + " 오류 로그 원인 찾아줘");
+                }
+                QRefContext references = QRefContext.extract(row.path("question").asText());
+                ObjectNode wire = references.wireExpected(resolved);
+                row.set("expectedResolvedOutput", resolved); row.set("expectedOutput", wire); row.put("expectedJson", Json.canonicalString(wire));
+            }
+        }
         return new Result(List.copyOf(rows), List.of());
     }
     static String fill(String pattern, int length) {
@@ -88,8 +107,22 @@ public final class BoundaryCases {
         for (String line : new String(Json.bytes(path), StandardCharsets.UTF_8).split("\n")) {
             if (line.isBlank()) continue;
             JsonNode row = Json.parse(line.getBytes(StandardCharsets.UTF_8));
-            if (!GoldenSet.keys(row).equals(Set.of("caseId", "kind", "expectedOutput", "expectedJson", "question", "context")) || !ids.add(row.path("caseId").asText()) || !Set.of("NORMAL", "MAX", "ESCAPE").contains(row.path("kind").asText())
-                || !GoldenSet.keys(row.path("expectedOutput")).equals(new HashSet<>(ArgLimits.FIELDS)) || !Json.canonicalString(row.path("expectedOutput")).equals(row.path("expectedJson").asText())) throw new EvalException(2, "CASES_INVALID");
+            Set<String> fields = new HashSet<>(Set.of("caseId", "kind", "expectedOutput", "expectedJson", "question", "context"));
+            boolean versioned = row.has("expectedResolvedOutput");
+            if (versioned) fields.add("expectedResolvedOutput");
+            Set<String> outputFields = new HashSet<>(ArgLimits.FIELDS);
+            if (versioned) { outputFields.remove("q"); outputFields.add("qRef"); }
+            if (!GoldenSet.keys(row).equals(fields) || !ids.add(row.path("caseId").asText()) || !Set.of("NORMAL", "MAX", "ESCAPE").contains(row.path("kind").asText())
+                || !GoldenSet.keys(row.path("expectedOutput")).equals(outputFields) || !Json.canonicalString(row.path("expectedOutput")).equals(row.path("expectedJson").asText())) throw new EvalException(2, "CASES_INVALID");
+            if (versioned) {
+                JsonNode resolved = row.path("expectedResolvedOutput");
+                QRefContext references = QRefContext.extract(row.path("question").asText());
+                JsonNode wire = row.path("expectedOutput");
+                if (!GoldenSet.keys(resolved).equals(new HashSet<>(ArgLimits.FIELDS)) || !references.accepts(wire.path("qRef"))
+                    || !(resolved.path("q").isNull() || resolved.path("q").isTextual())
+                    || !Objects.equals(references.resolve(wire.path("qRef")), resolved.path("q").isNull() ? null : resolved.path("q").asText())) throw new EvalException(2, "CASES_INVALID");
+                for (String field : List.of("t", "eqp", "from", "to")) if (!wire.path(field).equals(resolved.path(field))) throw new EvalException(2, "CASES_INVALID");
+            }
             rows.add(row);
         }
         if (rows.isEmpty()) throw new EvalException(2, "CASES_INVALID");

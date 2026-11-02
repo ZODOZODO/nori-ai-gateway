@@ -27,12 +27,17 @@ public final class MessageAssembler {
     }
     public static MessageAssembler load(Path prompt, RegistryFixture fixture) { return new MessageAssembler(Json.bytes(prompt), fixture); }
     public Kind kind() { return kind; }
-    public int maxTokens() { return kind == Kind.PLAN ? 160 : 128; }
     public byte[] promptBytes() { return promptBytes.clone(); }
     public String systemPrefixSha256() { return Json.sha(system.getBytes(StandardCharsets.UTF_8)); }
     public List<Map<String,String>> messages(String question, JsonNode context) {
         ObjectNode user = Json.MAPPER.createObjectNode();
         user.set("context", context); user.put("question", question);
+        return List.of(Map.of("role", "system", "content", system), Map.of("role", "user", "content", Json.canonicalString(user)));
+    }
+    public List<Map<String,String>> messages(String question, JsonNode context, QRefContext references) {
+        references.requireQuestionMatch(question);
+        ObjectNode user = Json.MAPPER.createObjectNode();
+        user.set("context", context); user.put("question", question); user.set("qRefCatalog", references.catalog());
         return List.of(Map.of("role", "system", "content", system), Map.of("role", "user", "content", Json.canonicalString(user)));
     }
     /** 1회 재시도 메시지: 원 메시지에 오류 요지(고정 코드)만 덧붙입니다. 직전 출력 원문은 다시 싣지 않습니다. */

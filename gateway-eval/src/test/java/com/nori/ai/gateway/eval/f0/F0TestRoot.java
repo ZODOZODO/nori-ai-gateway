@@ -87,7 +87,10 @@ final class F0TestRoot {
                     Path file = root.resolve(path);
                     try { yield Files.isRegularFile(file) ? new Result(0, Files.readAllBytes(file)) : new Result(128, new byte[0]); } catch (IOException e) { throw new UncheckedIOException(e); }
                 }
-                case "ls-tree" -> ok(String.join("\0", HarnessDigest.files(root).keySet()) + "\0");
+                case "ls-tree" -> {
+                    try (var walk = Files.walk(root)) { yield ok(String.join("\0", walk.filter(Files::isRegularFile).map(p -> root.relativize(p).toString().replace('\\', '/')).toList()) + "\0"); }
+                    catch (IOException e) { throw new UncheckedIOException(e); }
+                }
                 default -> new Result(1, new byte[0]);
             };
         }

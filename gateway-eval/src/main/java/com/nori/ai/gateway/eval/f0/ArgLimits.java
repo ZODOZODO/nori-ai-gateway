@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.DateTimeException;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -15,12 +16,14 @@ import java.util.*;
  * 근거가 없는 필드는 UNRESOLVED(maxChars=null)로만 둘 수 있다. 임의 상한으로 채우는 경로는 없다.
  */
 public final class ArgLimits {
+    public static final int V2_EQP_MAX_CODEPOINTS = 64, V2_QUERY_MAX_CODEPOINTS = 256;
     public static final List<String> FIELDS = List.of("t", "eqp", "from", "to", "q");
     public record Limit(String field, String format, Integer maxChars, String charUnit, String status, List<JsonNode> evidence) {
         public boolean confirmed() { return status.equals("CONFIRMED"); }
     }
     private final Map<String,Limit> limits;
-    private ArgLimits(Map<String,Limit> limits) { this.limits = limits; }
+    private final boolean versioned;
+    private ArgLimits(Map<String,Limit> limits, boolean versioned) { this.limits = limits; this.versioned = versioned; }
     public static ArgLimits load(Path path) { return parse(Json.read(path)); }
     public static ArgLimits parse(JsonNode root) {
         JsonNode fields = root.path("fields");
@@ -46,7 +49,12 @@ public final class ArgLimits {
             limits.put(field, limit);
         }
         if (!limits.keySet().equals(new HashSet<>(FIELDS))) throw new EvalException(2, "ARG_LIMITS_INVALID");
-        return new ArgLimits(Collections.unmodifiableMap(limits));
+        boolean versioned = root.path("schema").asText().equals("f0-arg-limits-v2");
+        if (versioned) {
+            Map<String,Integer> approved = Map.of("t", 3, "eqp", V2_EQP_MAX_CODEPOINTS, "from", 35, "to", 35, "q", V2_QUERY_MAX_CODEPOINTS);
+            for (Limit limit : limits.values()) if (limit.confirmed() && !Objects.equals(limit.maxChars(), approved.get(limit.field()))) throw new EvalException(2, "ARG_LIMITS_FORMAT_MISMATCH");
+        }
+        return new ArgLimits(Collections.unmodifiableMap(limits), versioned);
     }
     private static void validateEvidence(JsonNode e) {
         String kind = e.path("kind").asText(""), ref = e.path("ref").asText("");
@@ -74,6 +82,26 @@ public final class ArgLimits {
             return formatter.format(OffsetDateTime.of(time, ZoneOffset.ofHours(9)));
         } catch (RuntimeException e) { throw new EvalException(2, "ARG_LIMITS_INVALID"); }
     }
+    /** offset이 없으면 Context 현지 시각, 있으면 같은 instant를 Context로 옮깁니다. 원문의 초·소수 자릿수는 보존합니다. */
+    static String normalizeTime(String value, String timezone) {
+        if (value == null || !value.matches(ClassificationJudge.TIME) || timezone == null || !timezone.matches("[+-]\\d{2}:\\d{2}")) throw new EvalException(2, "DATETIME_INVALID");
+        try {
+            ZoneOffset contextOffset = ZoneOffset.of(timezone);
+            int suffix = value.endsWith("Z") ? value.length() - 1 : value.length() >= 6 && (value.charAt(value.length() - 6) == '+' || value.charAt(value.length() - 6) == '-') ? value.length() - 6 : value.length();
+            boolean hasOffset = suffix < value.length();
+            String localText = value.substring(0, suffix);
+            LocalDateTime local = LocalDateTime.parse(localText, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            ZoneOffset inputOffset = hasOffset ? ZoneOffset.of(value.substring(suffix)) : contextOffset;
+            OffsetDateTime normalized = local.atOffset(inputOffset).withOffsetSameInstant(contextOffset);
+            int dot = localText.indexOf('.'), fractionalDigits = dot < 0 ? 0 : localText.length() - dot - 1;
+            String pattern = "uuuu-MM-dd'T'HH:mm" + (localText.length() > 16 ? ":ss" : "")
+                + (fractionalDigits > 0 ? "." + "S".repeat(fractionalDigits) : "") + (hasOffset ? "xxx" : "");
+            String rendered = DateTimeFormatter.ofPattern(pattern, Locale.ROOT).format(normalized);
+            if (!rendered.matches(ClassificationJudge.TIME)) throw new EvalException(2, "DATETIME_INVALID");
+            return rendered;
+        } catch (DateTimeException e) { throw new EvalException(2, "DATETIME_INVALID"); }
+    }
+    public boolean versioned() { return versioned; }
     public Limit get(String field) { return limits.get(field); }
     public List<String> unresolved() { return limits.values().stream().filter(l -> !l.confirmed()).map(Limit::field).toList(); }
 }

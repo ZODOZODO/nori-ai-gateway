@@ -1,0 +1,51 @@
+{
+  "schema": "f0-arg-limits-v2",
+  "investigatedAt": "2026-10-30",
+  "document": "docs/gates/f0/arg-limits.md",
+  "fields": [
+    {
+      "field": "t",
+      "format": "ENUM:KQ|LQ|INC|GQ|UNS",
+      "maxChars": 3,
+      "charUnit": "CODEPOINT",
+      "evidence": [{"kind": "SCHEMA", "ref": "nori-tc-exec/docs/task/ai-rag-gateway-architecture.md:1203"}],
+      "status": "CONFIRMED"
+    },
+    {
+      "field": "eqp",
+      "format": "TC_EQP_ID",
+      "maxChars": 64,
+      "charUnit": "CODEPOINT",
+      "evidence": [
+        {"kind": "CODE", "ref": "nori-tc-common/db/jpa/tc-db-jpa-common-schema/src/main/java/com/nori/tc/db/jpa/common/entity/eqp/TcEqpEntity.java:56"},
+        {"kind": "SCHEMA", "ref": "nori-tc-exec/db/migration/V1__baseline.sql:420"},
+        {"kind": "CODE", "ref": "nori-tc-ui-backend/ui/adapter/tc-ui-web-adapter/src/main/java/com/nori/tc/ui/adapters/web/dto/request/EqpCreateRequest.java:33"}
+      ],
+      "status": "CONFIRMED"
+    },
+    {
+      "field": "from",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "evidence": [{"kind": "SCHEMA", "ref": "nori-tc-exec/docs/task/ai-rag-gateway-architecture.md:1207"}],
+      "status": "CONFIRMED"
+    },
+    {
+      "field": "to",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "evidence": [{"kind": "SCHEMA", "ref": "nori-tc-exec/docs/task/ai-rag-gateway-architecture.md:1207"}],
+      "status": "CONFIRMED"
+    },
+    {
+      "field": "q",
+      "format": "TEXT",
+      "maxChars": 256,
+      "charUnit": "CODEPOINT",
+      "evidence": [{"kind": "SCHEMA", "ref": "nori-tc-exec/docs/task/ai-rag-gateway-architecture.md:1208"}],
+      "status": "CONFIRMED"
+    }
+  ]
+}

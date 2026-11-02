@@ -21,7 +21,8 @@ final class OllamaStub implements AutoCloseable {
     final HttpServer server;
     volatile JsonNode ps = models(4096, 8192, GEN_DIGEST);
     volatile JsonNode tags = tagModels(GEN_DIGEST);
-    volatile String template = "{{- range .Messages }}<|im_start|>{{ .Role }}\n{{ .Content }}<|im_end|>\n{{ end }}<|im_start|>assistant\n";
+    static final String DEFAULT_TEMPLATE = "{{- range .Messages }}<|im_start|>{{ .Role }}\n{{ .Content }}<|im_end|>\n{{ end }}<|im_start|>assistant\n";
+    volatile String template = DEFAULT_TEMPLATE;
     volatile Function<JsonNode,JsonNode> chat = body -> chatResponse("{\"t\":\"INC\",\"eqp\":null,\"from\":null,\"to\":null,\"q\":null}", "stop", 50, 20);
     volatile Function<JsonNode,JsonNode> generate = body -> generateResponse(7);
     volatile int failChatAfter = -1;

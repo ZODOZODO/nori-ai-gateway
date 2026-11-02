@@ -57,8 +57,8 @@ class GoldenSetSchemaTest {
     @Test void classifyMessagesPutStaticRegistryPrefixFirstAndQuestionContextLast() throws Exception {
         GoldenSet golden = GoldenSet.load(ROOT.resolve("eval/golden/tc-f0-v1.jsonl"), fixture);
         MessageAssembler classify = MessageAssembler.load(ROOT.resolve("eval/f0/prompts/classify-v1.txt"), fixture), plan = MessageAssembler.load(ROOT.resolve("eval/f0/prompts/plan-v1.txt"), fixture);
-        assertThat(classify.kind()).isEqualTo(MessageAssembler.Kind.CLASSIFY); assertThat(classify.maxTokens()).isEqualTo(128);
-        assertThat(plan.kind()).isEqualTo(MessageAssembler.Kind.PLAN); assertThat(plan.maxTokens()).isEqualTo(160);
+        assertThat(classify.kind()).isEqualTo(MessageAssembler.Kind.CLASSIFY); assertThat(Prereg.Budget.V1.output(classify.kind())).isEqualTo(128);
+        assertThat(plan.kind()).isEqualTo(MessageAssembler.Kind.PLAN); assertThat(Prereg.Budget.V1.output(plan.kind())).isEqualTo(160);
         var a = classify.messages(golden.questions().get(0).question(), golden.questions().get(0).context());
         var b = classify.messages(golden.questions().get(1).question(), golden.questions().get(1).context());
         assertThat(a.get(0)).isEqualTo(b.get(0));

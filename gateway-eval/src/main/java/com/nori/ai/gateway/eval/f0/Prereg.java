@@ -17,7 +17,29 @@ public final class Prereg {
     public static final String DEFAULT_PATH = "eval/f0/PREREG.md";
     public static final List<String> REQUIRED_INPUTS = List.of("eval/golden/tc-f0-v1.jsonl", "eval/golden/tc-registry-fixture-v1.json", "eval/f0/prompts/classify-v1.txt", "eval/f0/prompts/plan-v1.txt",
         "eval/f0/arg-limits-v1.json", "eval/f0/output-boundary-cases.jsonl", "eval/f0/usage-probe-input-v1.jsonl", "eval/f0/token-golden-input-v1.jsonl", "eval/f0/chat-renderers-v1.json");
+    public static final Map<String,String> LEGACY_ROLES = Map.ofEntries(
+        Map.entry("golden", REQUIRED_INPUTS.get(0)), Map.entry("fixture", REQUIRED_INPUTS.get(1)),
+        Map.entry("classifyPrompt", REQUIRED_INPUTS.get(2)), Map.entry("planPrompt", REQUIRED_INPUTS.get(3)),
+        Map.entry("argLimits", REQUIRED_INPUTS.get(4)), Map.entry("boundaryCases", REQUIRED_INPUTS.get(5)),
+        Map.entry("usageMessages", REQUIRED_INPUTS.get(6)), Map.entry("tokenMessages", REQUIRED_INPUTS.get(7)), Map.entry("chatRenderers", REQUIRED_INPUTS.get(8)));
+    public static final List<String> SUPPORT_INPUTS = List.of(MeasurementSession.TOKENIZER_FILE, MeasurementSession.TOKENIZER_PIN, "eval/py/count_tokens_qref_v2.py", "eval/py/count_input_audit_v2.py", "eval/py/requirements.txt");
+    /** v2는 v1 역할에 호출 전 입력 계수 audit 역할을 더합니다. */
+    public static final Set<String> V2_ROLES = Collections.unmodifiableSet(new TreeSet<>(Set.of("golden", "fixture", "classifyPrompt", "planPrompt", "argLimits", "boundaryCases", "usageMessages", "tokenMessages", "chatRenderers", "inputAudit")));
+    public static final int CONTEXT_TOKENS = 4096;
+    /**
+     * 사전등록 하나가 쓰는 유일한 토큰 예산. 요청 max_tokens·판정 상한·경계 판정·보고가 모두 이 값을 씁니다.
+     * v1은 원 SPEC 값(입력 1024/2048·출력 128/160)을 보존하고 호출 전 입력 audit 없이 동작합니다.
+     */
+    public record Budget(int classifyInput, int planInput, int classifyOutput, int planOutput, int outputLimit) {
+        public static final Budget V1 = new Budget(1024, 2048, 128, 160, 128), V2 = new Budget(3072, 3072, 192, 256, 192);
+        public int output(MessageAssembler.Kind kind) { return kind == MessageAssembler.Kind.PLAN ? planOutput : classifyOutput; }
+        public int input(MessageAssembler.Kind kind) { return kind == MessageAssembler.Kind.PLAN ? planInput : classifyInput; }
+    }
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
+        public boolean versioned() { return block.path("schema").asText().equals("f0-prereg-v2"); }
+        public Budget budget() { return versioned() ? Budget.V2 : Budget.V1; }
+        public String input(String role) { return versioned() ? block.path("inputRoles").path(role).asText() : LEGACY_ROLES.get(role); }
+        public String runtimeCaptureDir() { return versioned() ? block.path("runtimeCaptureDir").asText() : "eval/f0/chat-template"; }
         public int repeats() { return parameters.path("repeats").asInt(); }
         public String generationModel() { return parameters.path("generationModel").asText(); }
         public String embeddingModel() { return parameters.path("embeddingModel").asText(); }
@@ -28,31 +50,56 @@ public final class Prereg {
     private Prereg() {}
 
     public static Document parse(Path path) {
-        String text = new String(Json.bytes(path), StandardCharsets.UTF_8);
+        return parseBytes(Json.bytes(path));
+    }
+    public static Document parseBytes(byte[] bytes) {
+        String text = new String(bytes, StandardCharsets.UTF_8);
         int start = text.indexOf("```json\n"), end = start < 0 ? -1 : text.indexOf("\n```", start + 8);
         if (start < 0 || end < 0 || text.indexOf("```json\n", end) >= 0) throw new EvalException(2, "PREREG_INVALID");
         JsonNode block = Json.parse(text.substring(start + 8, end + 1).getBytes(StandardCharsets.UTF_8));
-        if (!block.path("schema").asText().equals("f0-prereg-v1")) throw new EvalException(2, "PREREG_INVALID");
+        if (!Set.of("f0-prereg-v1", "f0-prereg-v2").contains(block.path("schema").asText())) throw new EvalException(2, "PREREG_INVALID");
         Map<String,String> inputs = new LinkedHashMap<>();
         for (JsonNode input : block.path("inputs")) {
             String file = input.path("path").asText(""), sha = input.path("sha256").asText("");
-            if (!sha.matches("[0-9a-f]{64}") || !file.matches("[A-Za-z0-9_./-]+") || file.contains("..") || inputs.put(file, sha) != null) throw new EvalException(2, "PREREG_INVALID");
+            if (!sha.matches("[0-9a-f]{64}") || !file.matches("[A-Za-z0-9_./-]+") || file.contains("..") || file.startsWith("/") || !Path.of(file).normalize().toString().replace('\\', '/').equals(file) || inputs.put(file, sha) != null) throw new EvalException(2, "PREREG_INVALID");
         }
-        if (!inputs.keySet().containsAll(REQUIRED_INPUTS) || !block.path("harnessDigest").asText("").matches("[0-9a-f]{64}")) throw new EvalException(2, "PREREG_INVALID");
+        boolean versioned = block.path("schema").asText().equals("f0-prereg-v2");
+        Map<String,String> roles = new LinkedHashMap<>(LEGACY_ROLES);
+        if (versioned) {
+            JsonNode mapping = block.path("inputRoles");
+            if (!block.path("runtimeCaptureDir").asText().matches("eval/f0/chat-template/[A-Za-z0-9][A-Za-z0-9_-]{0,63}")) throw new EvalException(2, "PREREG_INVALID");
+            if (!GoldenSet.keys(mapping).equals(V2_ROLES) || !inputs.keySet().containsAll(SUPPORT_INPUTS)) throw new EvalException(2, "PREREG_INVALID");
+            if (inputs.keySet().stream().anyMatch(file -> file.matches(".*(?:^|/)PREREG[^/]*\\.md") || file.startsWith("eval/f0/results/") || file.startsWith("eval/f0/chat-template/"))) throw new EvalException(2, "PREREG_INVALID");
+            roles.clear();
+            for (String role : V2_ROLES) {
+                String file = mapping.path(role).asText("");
+                if (!inputs.containsKey(file) || !(file.startsWith("eval/f0/") || file.startsWith("eval/golden/")) || file.matches(".*(?:^|/)PREREG[^/]*\\.md") || file.startsWith("eval/f0/results/") || file.startsWith("eval/f0/chat-template/")) throw new EvalException(2, "PREREG_INVALID");
+                roles.put(role, file);
+            }
+            if (new HashSet<>(roles.values()).size() != roles.size()) throw new EvalException(2, "PREREG_INVALID");
+        }
+        if ((!versioned && !inputs.keySet().containsAll(REQUIRED_INPUTS)) || !block.path("harnessDigest").asText("").matches("[0-9a-f]{64}")) throw new EvalException(2, "PREREG_INVALID");
         JsonNode p = block.path("parameters");
-        if (!p.path("repeats").isInt() || p.path("repeats").asInt() < 1 || !p.path("temperature").isNumber() || p.path("temperature").asDouble() != 0 || p.path("maxTokens").path("classify").asInt() != 128
-            || p.path("maxTokens").path("plan").asInt() != 160 || p.path("requestTimeoutMs").asLong() < 1 || !p.path("generationModel").asText().equals(F0RunnerCli.GENERATION_MODEL) || !p.path("embeddingModel").asText().equals(F0RunnerCli.EMBEDDING_MODEL)
-            || !p.path("promptSha256").path("classify").asText().equals(inputs.get("eval/f0/prompts/classify-v1.txt")) || !p.path("promptSha256").path("plan").asText().equals(inputs.get("eval/f0/prompts/plan-v1.txt"))) throw new EvalException(2, "PREREG_INVALID");
+        if (versioned && !p.path("judgeRulesVersion").asText().equals("f0-judge-v2")) throw new EvalException(2, "PREREG_INVALID");
+        Budget budget = versioned ? Budget.V2 : Budget.V1;
+        // 문자열·소수 표기("192"·192.0)나 profile과 다른 값은 요청 max_tokens·판정으로 흘러가기 전에 거부합니다.
+        boolean budgetValid = exactInt(p.path("maxTokens").path("classify"), budget.classifyOutput()) && exactInt(p.path("maxTokens").path("plan"), budget.planOutput())
+            && exactInt(p.path("outputLimitTokens"), budget.outputLimit()) && budget.outputLimit() == budget.classifyOutput();
+        if (versioned) budgetValid &= exactInt(p.path("inputLimitTokens").path("classify"), budget.classifyInput()) && exactInt(p.path("inputLimitTokens").path("plan"), budget.planInput())
+            && exactInt(p.path("contextTokens"), CONTEXT_TOKENS) && budget.classifyInput() + budget.classifyOutput() <= CONTEXT_TOKENS && budget.planInput() + budget.planOutput() <= CONTEXT_TOKENS;
+        if (!budgetValid || !p.path("repeats").isInt() || p.path("repeats").asInt() < 1 || !p.path("temperature").isNumber() || p.path("temperature").asDouble() != 0 || p.path("requestTimeoutMs").asLong() < 1 || !p.path("generationModel").asText().equals(F0RunnerCli.GENERATION_MODEL) || !p.path("embeddingModel").asText().equals(F0RunnerCli.EMBEDDING_MODEL)
+            || !p.path("promptSha256").path("classify").asText().equals(inputs.get(roles.get("classifyPrompt"))) || !p.path("promptSha256").path("plan").asText().equals(inputs.get(roles.get("planPrompt")))) throw new EvalException(2, "PREREG_INVALID");
         JsonNode commit = block.path("registeredCommit");
         String registered = commit.isNull() || commit.isMissingNode() ? null : commit.asText();
         if (registered != null && !registered.matches("[0-9a-f]{40}")) throw new EvalException(2, "PREREG_INVALID");
         return new Document(block, registered, Collections.unmodifiableMap(inputs), block.path("harnessDigest").asText(), p.deepCopy());
     }
+    private static boolean exactInt(JsonNode node, int expected) { return node.isInt() && node.intValue() == expected; }
     /** 현재 작업 트리 바이트가 등록값과 같은지(커밋 여부와 무관한 로컬 검사). */
     public static List<String> localMismatches(Path root, Document document) {
         List<String> mismatches = new ArrayList<>();
         document.inputs().forEach((file, sha) -> { Path p = root.resolve(file); if (!Files.isRegularFile(p) || !Json.sha(Json.bytes(p)).equals(sha)) mismatches.add(file); });
-        if (!HarnessDigest.compute(root).equals(document.harnessDigest())) mismatches.add("harnessDigest");
+        if (!HarnessDigest.compute(root, document).equals(document.harnessDigest())) mismatches.add("harnessDigest");
         return mismatches;
     }
     /** 측정 전 필수 검사: 등록 commit 존재·PREREG 별도 commit·순서·등록 바이트 일치·작업 트리 clean. 하나라도 아니면 exit 2. */
@@ -60,9 +107,7 @@ public final class Prereg {
         Document document = parse(preregPath);
         if (document.registeredCommit() == null) throw new EvalException(2, "PREREG_NOT_COMMITTED");
         if (!localMismatches(root, document).isEmpty()) throw new EvalException(2, "PREREG_INPUT_CHANGED");
-        GitReader.Result inside = git.run(root, List.of("rev-parse", "--is-inside-work-tree"));
-        if (inside.exit() != 0 || !text(inside).equals("true")) throw new EvalException(2, "PREREG_NOT_COMMITTED");
-        String relative = root.toAbsolutePath().normalize().relativize(preregPath.toAbsolutePath().normalize()).toString().replace('\\', '/');
+        String relative = relativePath(root, preregPath);
         List<String> statusArgs = new ArrayList<>(List.of("status", "--porcelain", "--untracked-files=all", "--", relative)); statusArgs.addAll(document.inputs().keySet()); statusArgs.addAll(HarnessDigest.ROOTS);
         GitReader.Result status = git.run(root, statusArgs);
         if (status.exit() != 0) throw new EvalException(2, "PREREG_NOT_COMMITTED");
@@ -71,6 +116,15 @@ public final class Prereg {
             String file = line.length() > 3 ? line.substring(3).replace("\"", "") : line;
             if (!file.startsWith("eval/f0/results/") && !file.startsWith("eval/f0/chat-template/")) throw new EvalException(2, "PREREG_WORKTREE_DIRTY");
         }
+        return verifyHistorical(root, preregPath, git, document);
+    }
+    /** 과거 등록의 정합성만 확인하며 현재 하네스의 측정·재판정 허가는 부여하지 않습니다. */
+    static State verifyHistorical(Path root, Path preregPath, GitReader git, Document document) {
+        if (document.registeredCommit() == null) throw new EvalException(2, "PREREG_NOT_COMMITTED");
+        GitReader.Result inside = git.run(root, List.of("rev-parse", "--is-inside-work-tree"));
+        if (inside.exit() != 0 || !text(inside).equals("true")) throw new EvalException(2, "PREREG_NOT_COMMITTED");
+        String relative = relativePath(root, preregPath);
+        if (document.inputs().containsKey(relative)) throw new EvalException(2, "PREREG_INVALID");
         GitReader.Result log = git.run(root, List.of("log", "-1", "--format=%H %ct", "--", relative));
         String[] head = text(log).split(" ");
         if (log.exit() != 0 || head.length != 2 || !head[0].matches("[0-9a-f]{40}")) throw new EvalException(2, "PREREG_NOT_COMMITTED");
@@ -80,10 +134,15 @@ public final class Prereg {
             GitReader.Result blob = git.run(root, List.of("cat-file", "blob", document.registeredCommit() + ":" + input.getKey()));
             if (blob.exit() != 0 || !Json.sha(blob.stdout()).equals(input.getValue())) throw new EvalException(2, "PREREG_REGISTERED_COMMIT_MISMATCH");
         }
-        if (!HarnessDigest.computeAtCommit(git, root, document.registeredCommit()).equals(document.harnessDigest())) throw new EvalException(2, "PREREG_REGISTERED_COMMIT_MISMATCH");
+        if (!HarnessDigest.computeAtCommit(git, root, document.registeredCommit(), document).equals(document.harnessDigest())) throw new EvalException(2, "PREREG_REGISTERED_COMMIT_MISMATCH");
         Instant committed;
         try { committed = Instant.ofEpochSecond(Long.parseLong(head[1])); } catch (NumberFormatException e) { throw new EvalException(2, "PREREG_NOT_COMMITTED"); }
         return new State(document, preregCommit, committed);
+    }
+    public static String relativePath(Path root, Path path) {
+        Path base = root.toAbsolutePath().normalize(), selected = path.toAbsolutePath().normalize();
+        if (!selected.startsWith(base) || selected.equals(base)) throw new EvalException(2, "ARGUMENT_NOT_REGISTERED");
+        return base.relativize(selected).toString().replace('\\', '/');
     }
     private static String text(GitReader.Result result) { return new String(result.stdout(), StandardCharsets.UTF_8).strip(); }
 }

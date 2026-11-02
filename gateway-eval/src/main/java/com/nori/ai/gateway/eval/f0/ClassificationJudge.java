@@ -8,7 +8,10 @@ import java.util.*;
 
 /** 압축 출력 판정: JSON 파싱 → 스키마(필수 키·enum·타입·형식) → finish_reason·usage 검사. 실패하면 오류 요지를 붙여 1회만 재시도한다. */
 public final class ClassificationJudge {
-    static final String TIME = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2})?";
+    /** judge 가 재시도 요지로 내는 고정 오류 코드 전체. 호출 전 입력 audit 은 코드마다 재시도 메시지를 계수합니다. */
+    public static final List<String> RETRY_ERROR_CODES = List.of("FINISH_LENGTH", "FINISH_REASON_INVALID", "USAGE_EXCEEDS_LIMIT", "JSON_PARSE_FAILED", "SCHEMA_KEYS_INVALID",
+        "ENUM_INVALID", "QREF_INVALID", "TYPE_INVALID", "FORMAT_INVALID", "ARG_LENGTH_EXCEEDED", "STEPS_INVALID");
+    static final String TIME ="\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2})?";
     /** 판정 결과. 인자 값은 메모리 판정에만 쓰고 결과 파일에는 SHA 만 남긴다. */
     public record Verdict(boolean valid, String errorCode, String t, Map<String,String> args, List<String> steps) {
         @Override public String toString() { return "Verdict[valid=" + valid + ", errorCode=" + errorCode + ", t=" + t + "]"; }
@@ -18,6 +21,14 @@ public final class ClassificationJudge {
     public interface Caller { OllamaChatClient.ChatResult call(List<Map<String,String>> messages); }
 
     public static Verdict judge(OllamaChatClient.ChatResult result, int maxTokens, MessageAssembler.Kind kind) {
+        return judge(result, maxTokens, kind, false, null);
+    }
+
+    public static Verdict judge(OllamaChatClient.ChatResult result, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone) {
+        return judge(result, maxTokens, kind, versioned, timezone, null);
+    }
+    public static Verdict judge(OllamaChatClient.ChatResult result, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references) {
+        if (versioned && references == null) return invalid("QREF_REQUEST_MISSING");
         if (result.finishReason().equals("length")) return invalid("FINISH_LENGTH");
         if (!result.finishReason().equals("stop")) return invalid("FINISH_REASON_INVALID");
         if (result.completionTokens() > maxTokens || result.completionTokens() < 0) return invalid("USAGE_EXCEEDS_LIMIT");
@@ -25,14 +36,28 @@ public final class ClassificationJudge {
         try { node = Json.MAPPER.readTree(result.content()); } catch (IOException | RuntimeException e) { return invalid("JSON_PARSE_FAILED"); }
         if (node == null || !node.isObject()) return invalid("JSON_PARSE_FAILED");
         Set<String> expectedKeys = kind == MessageAssembler.Kind.PLAN ? Set.of("t", "eqp", "from", "to", "q", "steps") : Set.of("t", "eqp", "from", "to", "q");
+        if (references != null) {
+            expectedKeys = new HashSet<>(expectedKeys); expectedKeys.remove("q"); expectedKeys.add("qRef");
+        }
         if (!GoldenSet.keys(node).equals(expectedKeys)) return invalid("SCHEMA_KEYS_INVALID");
         if (!node.path("t").isTextual() || !RegistryFixture.TASK_TYPES.contains(node.path("t").textValue())) return invalid("ENUM_INVALID");
+        if (references != null && !references.accepts(node.path("qRef"))) return invalid("QREF_INVALID");
         Map<String,String> args = new LinkedHashMap<>();
         for (String field : GoldenSet.ARG_FIELDS) {
+            if (field.equals("q") && references != null) { args.put(field, references.resolve(node.path("qRef"))); continue; }
             JsonNode value = node.path(field);
             if (value.isNull()) { args.put(field, null); continue; }
             if (!value.isTextual() || value.textValue().isEmpty()) return invalid("TYPE_INVALID");
             if ((field.equals("from") || field.equals("to")) && !value.textValue().matches(TIME)) return invalid("FORMAT_INVALID");
+            if (versioned) {
+                String text = value.textValue(); int length = text.codePointCount(0, text.length());
+                if (text.codePoints().anyMatch(c -> c >= Character.MIN_SURROGATE && c <= Character.MAX_SURROGATE)) return invalid("TYPE_INVALID");
+                if ((field.equals("eqp") && length > ArgLimits.V2_EQP_MAX_CODEPOINTS) || (field.equals("q") && length > ArgLimits.V2_QUERY_MAX_CODEPOINTS)) return invalid("ARG_LENGTH_EXCEEDED");
+                if (field.equals("from") || field.equals("to")) {
+                    // F0 정확 일치는 모델 원문으로 판정하며 시각 자동 보정으로 정답을 만들지 않습니다.
+                    try { ArgLimits.normalizeTime(text, timezone); } catch (EvalException e) { return invalid("FORMAT_INVALID"); }
+                }
+            }
             args.put(field, value.textValue());
         }
         List<String> steps = new ArrayList<>();
@@ -49,6 +74,15 @@ public final class ClassificationJudge {
 
     /** 송신~최종 응답(재시도 포함) 지연을 재고, timeout 은 그 시각까지의 경과로 남긴다. timeout 외 endpoint 오류는 호출자에게 전파(측정 중단). */
     public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind) {
+        return execute(caller, messages, maxTokens, kind, false, null);
+    }
+
+    public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone) {
+        return execute(caller, messages, maxTokens, kind, versioned, timezone, null);
+    }
+    public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references) {
+        if (versioned && references == null) throw new EvalException(2, "QREF_REQUEST_MISSING");
+        if (references != null) references.requireMessagesMatch(messages);
         List<String> finish = new ArrayList<>(), shas = new ArrayList<>(), errors = new ArrayList<>(); List<Integer> prompt = new ArrayList<>(), completion = new ArrayList<>();
         long start = System.nanoTime(); boolean retried = false, firstValid = false; Verdict verdict = null;
         try {
@@ -56,7 +90,7 @@ public final class ClassificationJudge {
                 OllamaChatClient.ChatResult result = caller.call(attempt == 0 ? messages : MessageAssembler.retry(messages, errors.getLast()));
                 finish.add(sanitize(result.finishReason())); prompt.add(result.promptTokens()); completion.add(result.completionTokens());
                 shas.add(Json.sha(result.content().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-                verdict = judge(result, maxTokens, kind);
+                verdict = judge(result, maxTokens, kind, versioned, timezone, references);
                 if (attempt == 0) firstValid = verdict.valid();
                 if (verdict.valid()) break;
                 errors.add(verdict.errorCode()); if (attempt == 0) retried = true;

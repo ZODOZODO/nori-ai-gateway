@@ -20,6 +20,11 @@ public final class F0Judgement {
     private F0Judgement() {}
 
     public static Outcome judge(Results results, Prereg.Document prereg, GoldenSet golden, RegistryFixture fixture, String tokenizerSha256, String casesSha256) {
+        return judge(results, prereg, golden, fixture, tokenizerSha256, casesSha256, null);
+    }
+
+    /** v2는 등록 케이스를 분모의 정본으로 사용합니다. v1은 보존된 판정 계약을 그대로 적용합니다. */
+    public static Outcome judge(Results results, Prereg.Document prereg, GoldenSet golden, RegistryFixture fixture, String tokenizerSha256, String casesSha256, List<JsonNode> registeredCases) {
         Map<String,Verdict> verdicts = new LinkedHashMap<>(); Map<String,MetricsAggregator.Metrics> paths = new TreeMap<>(); List<String> notes = new ArrayList<>();
         int repeats = prereg.repeats();
         JsonNode a = complete(results.get("A"), repeats), b = complete(results.get("B"), repeats);
@@ -44,7 +49,18 @@ public final class F0Judgement {
         List<ObjectNode> rows = new ArrayList<>();
         JsonNode boundary = complete(results.get("boundary"), repeats), gguf = complete(results.get("gguf"), 1), official = results.get("official");
         if (official != null && (!official.path("tokenizerSha256").asText().equals(tokenizerSha256) || !official.path("casesSha256").asText().equals(casesSha256))) { notes.add("OFFICIAL_COUNT_UNBOUND"); official = null; }
-        if (boundary != null && gguf != null && official != null) {
+        String integrityError = prereg.versioned() ? boundaryIntegrity(registeredCases, boundary, gguf, official, prereg) : null;
+        if (integrityError != null) {
+            // 무결성이 깨진 입력은 생성 실패와 구분하며, 잘못된 요약값으로 PASS를 만들지 않습니다.
+            Set<String> kinds = new HashSet<>();
+            if (registeredCases != null) registeredCases.forEach(c -> kinds.add(c.path("kind").asText()));
+            if (kinds.isEmpty()) kinds.addAll(List.of("NORMAL", "MAX", "ESCAPE"));
+            for (String kind : List.of("NORMAL", "MAX", "ESCAPE")) if (kinds.contains(kind)) {
+                String leaf = "AC-37-OUT-" + kind;
+                verdicts.put(leaf, new Verdict(leaf, "NOT_RUN", integrityError, Json.MAPPER.createObjectNode()));
+            }
+            notes.add(integrityError);
+        } else if (boundary != null && gguf != null && official != null) {
             boolean calibrated = calibrated(gguf, "ggufTokens") && calibrated(official, "officialTokens");
             for (String kind : List.of("NORMAL", "MAX", "ESCAPE")) {
                 String leaf = "AC-37-OUT-" + kind;
@@ -57,15 +73,63 @@ public final class F0Judgement {
         ObjectNode usage = results.get("usage") == null || !results.get("usage").path("complete").asBoolean() ? null : (ObjectNode)results.get("usage").path("equalOnCacheHit").deepCopy();
         return new Outcome(verdicts, paths, rows, usage, notes);
     }
+
+    /** 등록 집합과 회차별 사실을 확인한 뒤에만 기존 집계기를 사용합니다. 결과 입력은 수정하지 않습니다. */
+    private static String boundaryIntegrity(List<JsonNode> registeredCases, JsonNode boundary, JsonNode gguf, JsonNode official, Prereg.Document prereg) {
+        if (registeredCases == null || registeredCases.isEmpty()) return "BOUNDARY_REGISTERED_CASES_MISSING";
+        Map<String,String> kinds = new LinkedHashMap<>();
+        for (JsonNode c : registeredCases) {
+            String id = c.path("caseId").asText(""), kind = c.path("kind").asText("");
+            if (!c.path("caseId").isTextual() || id.isBlank() || !Set.of("NORMAL", "MAX", "ESCAPE").contains(kind) || kinds.put(id, kind) != null) return "BOUNDARY_REGISTERED_CASES_INVALID";
+        }
+        if (boundary == null || gguf == null || official == null) return "BOUNDARY_INPUT_INCOMPLETE";
+        if (!boundary.path("complete").isBoolean() || !boundary.path("repeats").isInt() || !gguf.path("complete").isBoolean() || !gguf.path("repeats").isInt()) return "BOUNDARY_INPUT_INCOMPLETE";
+        if (!matchingCases(boundary.path("cases"), kinds, null) || !matchingCases(gguf.path("rows"), kinds, "ggufTokens") || !matchingCases(official.path("rows"), kinds, "officialTokens")) return "BOUNDARY_CASE_SET_MISMATCH";
+        // 보정 표본도 중복을 허용하면 같은 행으로 분모를 채울 수 있으므로 정확한 집합을 요구합니다.
+        for (JsonNode counts : List.of(gguf, official)) {
+            JsonNode calibration = counts.path("calibration"); Set<String> ids = new HashSet<>();
+            if (!calibration.isArray() || calibration.size() != 2) return "BOUNDARY_CALIBRATION_INVALID";
+            for (JsonNode c : calibration) if (!ids.add(c.path("id").asText())) return "BOUNDARY_CALIBRATION_INVALID";
+        }
+        int repeats = prereg.repeats(), limit = prereg.budget().outputLimit();
+        for (JsonNode c : boundary.path("cases")) {
+            JsonNode attempts = c.path("attempts");
+            if (!attempts.isArray() || attempts.size() != repeats || !c.path("totalRounds").isInt() || c.path("totalRounds").asInt() != repeats) return "BOUNDARY_INPUT_INCOMPLETE";
+            Set<Integer> rounds = new HashSet<>(); int passed = 0;
+            for (JsonNode attempt : attempts) {
+                JsonNode round = attempt.path("round"), latency = attempt.path("latencyMs"), tokens = attempt.path("completionTokens"), finish = attempt.path("finishReason");
+                if (!round.isInt() || round.asInt() < 1 || round.asInt() > repeats || !rounds.add(round.asInt())) return "BOUNDARY_ROUND_MISMATCH";
+                if (!latency.isIntegralNumber() || !latency.canConvertToLong() || latency.asLong() < 0 || !attempt.path("retried").isBoolean()
+                    || !attempt.path("schemaValid").isBoolean() || !attempt.path("argsExact").isBoolean() || !attempt.path("status").isTextual()
+                    || !Set.of("OK", "INVALID", "TIMEOUT").contains(attempt.path("status").asText())
+                    || !(finish.isNull() || finish.isTextual()) || !(tokens.isNull() || (tokens.isInt() && tokens.asInt() >= 0))) return "BOUNDARY_ATTEMPT_INVALID";
+                if (attempt.path("status").asText().equals("OK") && finish.asText().equals("stop") && attempt.path("schemaValid").booleanValue()
+                    && attempt.path("argsExact").booleanValue() && tokens.isInt() && tokens.asInt() <= limit) passed++;
+            }
+            if (!c.path("passRounds").isInt() || c.path("passRounds").asInt() != passed) return "BOUNDARY_SUMMARY_MISMATCH";
+        }
+        return null;
+    }
+
+    private static boolean matchingCases(JsonNode rows, Map<String,String> kinds, String tokenField) {
+        if (!rows.isArray() || rows.size() != kinds.size()) return false;
+        Set<String> seen = new HashSet<>();
+        for (JsonNode row : rows) {
+            String id = row.path("caseId").asText("");
+            if (!row.path("caseId").isTextual() || !seen.add(id) || !Objects.equals(kinds.get(id), row.path("kind").asText())) return false;
+            if (tokenField != null && (!row.path(tokenField).isInt() || row.path(tokenField).asInt() < 0)) return false;
+        }
+        return seen.equals(kinds.keySet());
+    }
     static JsonNode complete(JsonNode node, int repeats) { return node != null && node.path("complete").asBoolean() && node.path("repeats").asInt() == repeats ? node : null; }
     private static boolean calibrated(JsonNode counts, String field) {
         Map<String,Integer> expected = Map.of("SPEC-14.5-OLD-EXAMPLE", 57, "SPEC-14.5-OLD-EXAMPLE-NO-Q", 53); Set<String> seen = new HashSet<>();
         for (JsonNode c : counts.path("calibration")) { if (!Objects.equals(expected.get(c.path("id").asText()), c.path(field).isInt() ? c.path(field).asInt() : null)) return false; seen.add(c.path("id").asText()); }
         return seen.equals(expected.keySet());
     }
-    /** PREREG: 각 케이스 max(공식, GGUF) + 종료 여유 ≤ 128 AND 모든 회차 pass(분모 = 케이스 × R, 실패 회차 포함). */
+    /** PREREG: 각 케이스 max(공식, GGUF) + 종료 여유 ≤ 등록 출력 상한(v1 128·v2 192) AND 모든 회차 pass(분모 = 케이스 × R, 실패 회차 포함). */
     private static Verdict outVerdict(String leaf, List<JsonNode> cases, JsonNode gguf, JsonNode official, Prereg.Document prereg, int repeats, List<ObjectNode> rows) {
-        int limit = prereg.parameters().path("outputLimitTokens").asInt(128), margin = prereg.parameters().path("terminationMarginTokens").asInt(1);
+        int limit = prereg.budget().outputLimit(), margin = prereg.parameters().path("terminationMarginTokens").asInt(1);
         boolean pass = true; int maxTokens = 0, passRounds = 0, totalRounds = 0, retried = 0; List<Long> latency = new ArrayList<>();
         for (JsonNode c : cases) {
             Integer o = tokens(official, c.path("caseId").asText(), "officialTokens"), g = tokens(gguf, c.path("caseId").asText(), "ggufTokens");
