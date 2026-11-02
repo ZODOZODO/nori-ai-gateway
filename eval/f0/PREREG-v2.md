@@ -1,11 +1,12 @@
-# F0 사전등록 v2 초안(PREREG-v2) — qRef wire·v2 예산 profile 재측정
+# F0 사전등록 v2(PREREG-v2) — qRef wire·v2 예산 profile 재측정
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = d44c51ddb275330881bc34fa025c04a6369014f8`(C3)**
 
-- 이 문서는 v1 `eval/f0/PREREG.md`(C1 `ca3b266…`/C2 `bd61f36…`)와 v1 회차 `20261029T234506Z`의 판정·실패 증거를 바꾸지 않는 **별도 v2 사전등록 초안**이다. v1 등록 입력 11개·v1 PREREG 바이트는 그대로다.
-- 등록 commit(C3 = 등록 대상·분석 코드, 이 문서는 `registeredCommit=null`)과 PREREG commit(C4 = 이 문서의 `registeredCommit`에 C3 SHA 기록)은 **사용자 허용 전이라 만들지 않았다**. 가짜 SHA를 적지 않는다.
-- 측정 명령(`f0 run`·`boundary-gen`·`gguf-count`·`usage-probe`·`token-golden`·`chat-template`)과 `f0 prereg-check`의 등록 검사는 `registeredCommit`이 없으므로 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부한다.
-- 아래 `inputs[].sha256`·`harnessDigest`는 2026-11-02 작업 트리 실제 바이트로 계산했다. C3 전에 대상 파일이 바뀌면 다시 계산해야 한다.
+- 이 문서는 v1 `eval/f0/PREREG.md`(C1 `ca3b266…`/C2 `bd61f36…`)와 v1 회차 `20261029T234506Z`의 판정·실패 증거를 바꾸지 않는 **별도 v2 사전등록**이다. v1 등록 입력 11개·v1 PREREG 바이트는 그대로다.
+- 등록 근거: 사용자 최신 승인 "로컬 C3/C4 허용 후 계속 진행"(2026-11-02, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C3 `d44c51ddb275330881bc34fa025c04a6369014f8` = 등록 대상·분석 코드(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C4 = 이 문서만 수정해 `registeredCommit`에 C3 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-02 C3 전까지 이 문서는 미등록 초안이었고, 그 동안 측정 명령·`f0 prereg-check`는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
+- 아래 `inputs[].sha256`·`harnessDigest`는 2026-11-02 작업 트리 실제 바이트로 계산했고 C3 직전 다시 대조해 불일치 0이었다.
 
 ## 1. v1 대비 변경(사용자 승인 계약 + 기술 선정)
 
@@ -13,7 +14,7 @@
 - 입력 역할 = v1 9개 역할 + `inputAudit`. `chatRenderers`는 검토된 v1 렌더러 등록 파일을 바이트 그대로 재사용한다.
 - 토큰 예산 profile(단일 값, `Prereg.Budget.V2`): 입력 상한 분류 3072·계획 3072, 요청 `max_tokens` 분류 192·계획 256, 경계 출력 상한 192(= 분류 `max_tokens`), context 4096. 입력+출력 = 3264/3328 ≤ 4096. PREREG 검사·요청 `max_tokens`·판정(`usage.completion_tokens ≤ max_tokens`)·경계 판정(max(공식, GGUF) + 종료 여유 1 ≤ 192)·보고서·증거 metrics가 이 값 하나를 쓴다. 숫자는 JSON 정수여야 하며 profile과 다르면 `PREREG_INVALID`다.
 - 호출 전 입력 확인(F0 전용): `inputAudit`은 등록 입력으로 하네스가 보낼 수 있는 모든 chat 메시지(골든 22문항 × A/B, 경계 9케이스, 각 첫 시도 + 고정 오류 코드 11종별 재시도, usage 2·token 13행)를 실제 Java `MessageAssembler`·검토 렌더러(template `40c21f34…b541`)·pin 공식 tokenizer로 센 표다(651행). 측정 명령은 등록 검사 후 전체 목록을, 세션은 매 호출 직전 그 메시지를 표에서 찾아 입력 ≤ 상한 AND 입력 + `max_tokens` ≤ 4096을 확인한다. 표에 없거나 초과면 송신하지 않는다(`INPUT_AUDIT_MISSING`/`INPUT_BUDGET_EXCEEDED`, exit 2). 측정 런타임 template·tokenizer SHA가 표와 다르면 run-binding 작성 전에 `INPUT_AUDIT_RUNTIME_MISMATCH`로 멈춘다. 이 표는 준비 정적 계수이며 Gateway 운영 사전 계수기(P18)가 아니다. 실제 응답 `usage.prompt_tokens`는 별도 열로 남기고 보고서에 사전 계수보다 작은 호출 수를 따로 적는다(판정 규칙 변경 없음).
-- 준비 정적 계수(미등록·모델 생성 아님): 입력 최대 A 첫 시도 1248·재시도 1287, B 1088/1127, 경계(B) 2701/2740, usage 1054, token 2793(TG12). 출력 기대 wire JSON 공식 계수 NORMAL 58/96, MAX·ESCAPE 145(`eval/f0/results/v2-qref-preparation/official-count.json`·`official-count-20261102.json`). GGUF 계수·실제 생성은 0이다.
+- 준비 정적 계수(등록 전 준비 계산·모델 생성 아님): 입력 최대 A 첫 시도 1248·재시도 1287, B 1088/1127, 경계(B) 2701/2740, usage 1054, token 2793(TG12). 출력 기대 wire JSON 공식 계수 NORMAL 58/96, MAX·ESCAPE 145(`eval/f0/results/v2-qref-preparation/official-count.json`·`official-count-20261102.json`). GGUF 계수·실제 생성은 0이다.
 - `token-golden-input-v2.jsonl`은 v1과 같은 13개 ID를 유지하고 `TG12-NEAR-COMPOSER-LIMIT`만 공식 tokenizer·검토 렌더러 기준 2793토큰(≤ 2816)으로 길이를 보정했다(v1 TG12는 실제 측정 3952). `usage-probe-input-v2.jsonl`은 v1과 같은 조립 행(G01·G02)이며 v2 역할(분류 v2 프롬프트·v2 골든·fixture)로 조립된다.
 
 ## 2. 판정 규칙(v1 §2~§5와 같고 아래만 다름)
@@ -23,19 +24,19 @@
 - AC-37-OUT-{NORMAL, MAX, ESCAPE}: 등록 케이스 집합을 분모 정본으로, 각 케이스 max(공식, GGUF) + 종료 여유 1 ≤ 192 AND `boundary-gen` 회차 1~5 전부 pass(stop·스키마 유효·resolved 인자 정확 일치·`completion_tokens` ≤ 192, 재시도 1회 허용). 보정(구 예시 57/53)이 어긋나면 `NOT_RUN`.
 - `f0 report --rejudge`의 런타임 대조는 `runtimeCaptureDir`(`eval/f0/chat-template/v2-qref`) 캡처만 쓴다.
 
-## 3. 등록 절차(사용자 허용 후)
+## 3. 등록 절차(이력: 2026-11-02 사용자 허용 후 수행)
 
-1. root가 최종 SPEC SHA를 승인 기준선에 반영하고 whole test·`test-evidence verify`를 실행한다.
-2. 대상 파일이 바뀌었으면 `inputs`·`harnessDigest`를 다시 계산한다(`f0 prereg-check --prereg eval/f0/PREREG-v2.md`의 `currentInputs`·`currentHarnessDigest`).
-3. C3: 이 문서(`registeredCommit=null`)와 등록 대상·분석 코드를 커밋한다. C4: `registeredCommit`에 C3 SHA, `registrationStatus=REGISTERED`로 이 문서만 커밋한다. 이후 `f0 chat-template --out eval/f0/chat-template/v2-qref`부터 새 runId로 측정한다.
+1. root가 최종 SPEC SHA를 승인 기준선(seq3)에 반영하고 whole test·`test-evidence verify`를 실행했다.
+2. C3 직전 `inputs`·`harnessDigest`를 다시 계산해 불일치 0을 확인했다.
+3. C3: 이 문서(`registeredCommit=null`)와 등록 대상·분석 코드를 커밋했다. C4: `registeredCommit`에 C3 SHA, `registrationStatus=REGISTERED`로 이 문서만 커밋했다. 이후 `f0 chat-template --out eval/f0/chat-template/v2-qref`부터 새 runId로 측정한다.
 
 ## 4. 기계 판독 블록
 
 ```json
 {
   "schema": "f0-prereg-v2",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "d44c51ddb275330881bc34fa025c04a6369014f8",
   "runtimeCaptureDir": "eval/f0/chat-template/v2-qref",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
