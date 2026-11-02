@@ -1,13 +1,16 @@
 # F0 정식 사전등록 v3-gate — 후보 c(v3 정리 프롬프트 + 서버 구조화 출력 제약), R=5
 
-## 0. 등록 상태 — **초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 05c5facab7daa5d9d46bad2caa5ec26e13760e77`(C5)**
 
 - 목적은 **정식(purpose=GATE)** 이다. `f0-prereg-v3` 의 GATE 등록은 `parameters.repeats=5` 만 유효하다(그 밖 값은 `PREREG_INVALID`, 실제 명령 `--repeats` 가 다르면 `ARGUMENT_NOT_REGISTERED` — 모두 endpoint 호출 전 거부).
 - 입력·예산·스키마는 진단 c(`PREREG-v3-diag-c.md`)와 바이트까지 같다: 원래 골든 22문항(`eval/golden/tc-f0-v2.jsonl`)·경계 9케이스·fixture v2·v3 프롬프트·`responseFormat=JSON_SCHEMA_V1`·c 입력 audit(`eval/f0/v3/input-audit-v3-c.json`)·입력 3072/3072, `max_tokens` 192/256, 경계 192, context 4096. 런타임 캡처 디렉터리만 별도(`eval/f0/chat-template/v3-gate`)다.
 - 정식 분모는 원래 22문항 + 경계 9케이스다. 개발 회귀 등록(`PREREG-v3-regression.md`)의 추가 문항·결과와 진단 a/b/c 결과는 이 분모·판정에 넣지 않는다.
 - 판정은 기존 F0 규칙 그대로다(`f0-judge-v2`, 3축 정확도 A↔B 상대 비교·동률 B 유지, AC-37-OUT-* 경계 계수+완결 생성, AC-38-F0, 지연 예산). 정확도 새 절대 최소 임계는 두지 않는다.
-- v1/v2 등록 문서·입력·측정 결과·보고서·증거는 바꾸지 않는다. 등록 commit(C5)과 `registeredCommit` 기록 commit(C6)은 아직 승인 전이다. 그 전에는 측정 명령이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다.
-- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-02 작업 트리 실제 바이트로 계산했다. C5 직전 다시 대조한다.
+- v1/v2 등록 문서·입력·측정 결과·보고서·증거는 바꾸지 않는다.
+- 등록 근거: 사용자 승인 "로컬 C5/C6 허용 후 계속 진행"(2026-11-02, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C5 `05c5facab7daa5d9d46bad2caa5ec26e13760e77` = 등록 대상·하네스 코드(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C6 = v3 사전등록 5문서(`PREREG-v3-{diag-a,diag-b,diag-c,regression,gate}.md`)만 수정해 `registeredCommit`에 C5 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-02 C5 전까지 이 문서는 미등록 초안이었고, 그 동안 측정 명령·`f0 prereg-check`는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
+- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-02 작업 트리 실제 바이트로 계산했다. C5 직전 등록 대상 30파일을 검토 SHA-256 과 대조해 불일치 0이었다.
 
 ## 1. 착수 조건(이 조건 전에는 이 등록으로 blind 정식 측정을 하지 않는다)
 
@@ -17,7 +20,7 @@
    - AC-38 문항(G08)이 A·B 모두 `t=INC`(UNS 0) — 기존 AC-38-F0 조건.
    - 경계 9케이스 boundary-gen 이 기존 oracle(완결 JSON·스키마·resolved 인자 정확 일치·≤192)로 모두 통과.
 3. 개발 회귀 30문항 진단 보고서를 root 가 원문 없는 근거로 검토했다. 신규 8문항의 실패 축은 기록·사용자 보고하되 정식 분모에 넣지 않는다. 조건 1·2 를 충족하고 새 업무 결정·제품 지원 범위 변경이 없으면 이미 승인된 P03 범위 안에서 후속 정식 측정을 진행하며, 정식 측정 자체를 위한 별도 사용자 재승인은 요구하지 않는다.
-4. 현재 대화의 P03 실행 승인과 별도로 필요한 C5/C6 로컬 commit 승인 범위 안에서 실행하고, C5/C6 등록 commit 뒤 `f0 prereg-check` 가 `PREREG_VERIFIED` 다. C5/C6 는 기존 C3/C4 허용에 포함되지 않으므로 아직 승인이 필요하다.
+4. 현재 대화의 P03 실행 승인과 별도로 필요한 C5/C6 로컬 commit 승인 범위 안에서 실행하고, C5/C6 등록 commit 뒤 `f0 prereg-check` 가 `PREREG_VERIFIED` 다. C5/C6 는 기존 C3/C4 허용에 포함되지 않아 별도 승인이 필요했고, 2026-11-02 사용자 승인 "로컬 C5/C6 허용 후 계속 진행"으로 C5 `05c5facab7daa5d9d46bad2caa5ec26e13760e77`·C6 를 만들었다(이 항목의 `PREREG_VERIFIED` 확인은 그대로 필요).
 
 - 하나라도 충족하지 않으면 이 등록을 실행하지 않는다. 프롬프트·스키마 보완은 새 사전등록 파일로 하며 이 초안을 고쳐 재사용하지 않는다(입력이 바뀌면 `PREREG_INPUT_CHANGED` 로 기계 거부).
 
@@ -49,8 +52,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "GATE",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "05c5facab7daa5d9d46bad2caa5ec26e13760e77",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-gate",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",

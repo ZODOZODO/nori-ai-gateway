@@ -1,11 +1,13 @@
 # F0 진단 사전등록 v3-diag-b — 현 v2 프롬프트 + 서버 구조화 출력 제약
 
-## 0. 등록 상태 — **초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 05c5facab7daa5d9d46bad2caa5ec26e13760e77`(C5)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC)** 이다. 이 등록의 회차는 `f0 report` 가 `diagnostic-report.md` 만 쓰고 F0 leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않는다(`--out`·`--rejudge`·`--spec-record-check` 는 `DIAGNOSTIC_NOT_GATE_ELIGIBLE`, exit 2). 따라서 F0 게이트 PASS 근거가 될 수 없다.
 - 이 문서는 v1 `eval/f0/PREREG.md`·v2 `eval/f0/PREREG-v2.md`, v1/v2 등록 입력·측정 결과·보고서·증거를 바꾸지 않는다. v2 등록 입력은 바이트 그대로 참조만 한다.
-- 등록 commit(C5: 등록 대상·하네스 코드)과 이 문서의 `registeredCommit` 기록 commit(C6)은 아직 승인 전이며 만들지 않았다. 그 전에는 측정 명령이 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다.
-- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-02 작업 트리 실제 바이트로 계산했다. C5 직전 다시 대조한다.
+- 등록 근거: 사용자 승인 "로컬 C5/C6 허용 후 계속 진행"(2026-11-02, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C5 `05c5facab7daa5d9d46bad2caa5ec26e13760e77` = 등록 대상·하네스 코드(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C6 = v3 사전등록 5문서(`PREREG-v3-{diag-a,diag-b,diag-c,regression,gate}.md`)만 수정해 `registeredCommit`에 C5 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-02 C5 전까지 이 문서는 미등록 초안이었고, 그 동안 측정 명령·`f0 prereg-check`는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
+- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-02 작업 트리 실제 바이트로 계산했다. C5 직전 등록 대상 30파일을 검토 SHA-256 과 대조해 불일치 0이었다.
 
 ## 1. 진단 설계(세 등록 a·b·c 공통)
 
@@ -42,8 +44,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "05c5facab7daa5d9d46bad2caa5ec26e13760e77",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-diag-b",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
