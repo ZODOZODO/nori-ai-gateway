@@ -77,6 +77,8 @@ public final class QRefContext {
         try { return Integer.parseInt(ref.substring(1)) <= candidates.size(); }
         catch (NumberFormatException e) { return false; }
     }
+    /** 진단 전용: 값이 이 요청의 후보 원문과 같은지만 알려 줍니다(후보 값 자체는 내보내지 않음). */
+    boolean isCandidate(String text) { return candidates.contains(text); }
     public String resolve(JsonNode reference) {
         if (!accepts(reference)) throw new EvalException(2, "QREF_INVALID");
         return reference.isNull() ? null : candidates.get(Integer.parseInt(reference.textValue().substring(1)) - 1);

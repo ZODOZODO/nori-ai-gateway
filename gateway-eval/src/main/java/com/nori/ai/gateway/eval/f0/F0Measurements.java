@@ -26,11 +26,11 @@ public final class F0Measurements {
             for (int round = 1; round <= repeats; round++) for (GoldenSet.Question q : golden.questions()) {
                 QRefContext references = session.prereg().document().versioned() ? QRefContext.extract(q.question()) : null;
                 session.ensureResident();
-                List<Integer> audited = new ArrayList<>();
-                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> send(session, m, inputLimit, maxTokens, audited), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references);
-                ObjectNode row = outcomeRow(outcome); row.put("questionId", q.id()); row.put("round", round); auditColumn(row, audited);
                 ObjectNode expected = Json.MAPPER.createObjectNode(); expected.put("t", q.expected().t());
                 for (String field : GoldenSet.ARG_FIELDS) expected.put(field, q.expected().field(field));
+                Attempts calls = new Attempts(session, assembler.kind(), references, maxTokens, expected, q.question(), q.context(), fixture);
+                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> calls.send(m, inputLimit), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references);
+                ObjectNode row = outcomeRow(outcome); row.put("questionId", q.id()); row.put("round", round); calls.columns(row);
                 row.set("diagnostics", diagnostics(outcome, expected));
                 row.set("predicted", outcome.verdict() != null && outcome.verdict().valid() ? PlanJudge.sanitize(outcome.verdict(), fixture, assembler.kind()) : Json.MAPPER.nullNode());
                 attempts.add(row); Json.write(file, result);
@@ -38,7 +38,7 @@ public final class F0Measurements {
         });
     }
     /** f0 boundary-gen: Path B 와 같은 분류 메시지 조립으로 케이스당 R 회 생성, oracle 은 회차별(완결 JSON·스키마·인자 코드포인트 정확 일치·≤ 등록 분류 출력 상한). */
-    public static void boundaryGen(MeasurementSession session, List<JsonNode> cases, MessageAssembler assembler, int repeats, String runId, Path out) {
+    public static void boundaryGen(MeasurementSession session, List<JsonNode> cases, RegistryFixture fixture, MessageAssembler assembler, int repeats, String runId, Path out) {
         if (assembler.kind() != MessageAssembler.Kind.CLASSIFY) throw new EvalException(2, "PROMPT_INVALID");
         ObjectNode result = header(runId, repeats); ArrayNode rows = result.putArray("cases"); Path file = out.resolve("boundary-results.json");
         Prereg.Budget budget = session.prereg().document().budget(); result.put("maxTokens", budget.classifyOutput()); result.put("inputLimitTokens", budget.classifyInput());
@@ -48,17 +48,20 @@ public final class F0Measurements {
             for (int round = 1; round <= repeats; round++) for (JsonNode c : cases) {
                 QRefContext references = session.prereg().document().versioned() ? QRefContext.extract(c.path("question").asText()) : null;
                 session.ensureResident();
-                List<Integer> audited = new ArrayList<>();
-                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> send(session, m, budget.classifyInput(), budget.classifyOutput(), audited), references == null ? assembler.messages(c.path("question").asText(), c.path("context")) : assembler.messages(c.path("question").asText(), c.path("context"), references), budget.classifyOutput(), MessageAssembler.Kind.CLASSIFY, session.prereg().document().versioned(), c.path("context").path("timezone").asText(), references);
-                boolean exact = argsExact(outcome.verdict(), c.has("expectedResolvedOutput") ? c.path("expectedResolvedOutput") : c.path("expectedOutput"));
+                JsonNode expected = c.has("expectedResolvedOutput") ? c.path("expectedResolvedOutput") : c.path("expectedOutput");
+                Attempts attempts = new Attempts(session, MessageAssembler.Kind.CLASSIFY, references, budget.classifyOutput(), expected, c.path("question").asText(), c.path("context"), fixture);
+                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> attempts.send(m, budget.classifyInput()), references == null ? assembler.messages(c.path("question").asText(), c.path("context")) : assembler.messages(c.path("question").asText(), c.path("context"), references), budget.classifyOutput(), MessageAssembler.Kind.CLASSIFY, session.prereg().document().versioned(), c.path("context").path("timezone").asText(), references);
+                boolean exact = argsExact(outcome.verdict(), expected);
                 ObjectNode attempt = Json.MAPPER.createObjectNode();
                 attempt.put("round", round); attempt.put("status", outcome.status()); attempt.put("retried", outcome.retried());
                 attempt.put("finishReason", outcome.finishReasons().isEmpty() ? null : outcome.finishReasons().getLast());
                 if (outcome.completionTokens().isEmpty()) attempt.putNull("completionTokens"); else attempt.put("completionTokens", outcome.completionTokens().getLast());
                 attempt.put("schemaValid", outcome.verdict() != null && outcome.verdict().valid()); attempt.put("argsExact", exact); attempt.put("latencyMs", outcome.latencyMs());
-                attempt.set("diagnostics", diagnostics(outcome, c.has("expectedResolvedOutput") ? c.path("expectedResolvedOutput") : c.path("expectedOutput")));
+                attempt.set("diagnostics", diagnostics(outcome, expected));
+                // 골든 행과 같은 고정 오류 코드 배열(시도 순서, 원문 없음)을 경계 행에도 남깁니다.
+                attempt.set("errorCodes", Json.MAPPER.valueToTree(outcome.errorCodes()));
                 attempt.put("outputSha256", outcome.outputSha256().isEmpty() ? null : outcome.outputSha256().getLast());
-                attempt.set("promptTokens", Json.MAPPER.valueToTree(outcome.promptTokens())); auditColumn(attempt, audited);
+                attempt.set("promptTokens", Json.MAPPER.valueToTree(outcome.promptTokens())); attempts.columns(attempt);
                 ObjectNode row = byCase.get(c.path("caseId").asText());
                 ((ArrayNode)row.get("attempts")).add(attempt);
                 row.put("totalRounds", row.path("totalRounds").asInt() + 1);
@@ -67,14 +70,30 @@ public final class F0Measurements {
             }
         });
     }
-    private static OllamaChatClient.ChatResult send(MeasurementSession session, List<Map<String,String>> messages, int inputLimit, int maxTokens, List<Integer> audited) {
-        MeasurementSession.Sent sent = session.chat(messages, inputLimit, maxTokens);
-        audited.add(sent.auditInputTokens()); return sent.result();
-    }
-    /** 사전 계수(준비 단계)와 응답 usage.prompt_tokens(실제)를 구분해 둘 다 남깁니다. v1 은 audit 이 없어 열을 만들지 않습니다. */
-    private static void auditColumn(ObjectNode row, List<Integer> audited) {
-        if (audited.stream().allMatch(Objects::isNull)) return;
-        row.set("auditInputTokens", Json.MAPPER.valueToTree(audited));
+    /**
+     * 한 요청(초회 + 재시도)의 송신 기록. 재시도도 같은 요청 바인딩으로 만든 같은 response_format 을 보내고, 시도마다 사전 입력 계수와
+     * 원문 없는 독립 진단을 남깁니다. 진단은 판정 결과(Outcome)에 영향을 주지 않습니다.
+     */
+    private static final class Attempts {
+        private final MeasurementSession session; private final MessageAssembler.Kind kind; private final QRefContext references; private final int maxTokens;
+        private final JsonNode expected, context; private final String question; private final RegistryFixture fixture; private final ObjectNode responseFormat;
+        private final List<Integer> audited = new ArrayList<>(); private final List<ObjectNode> diagnosed = new ArrayList<>();
+        Attempts(MeasurementSession session, MessageAssembler.Kind kind, QRefContext references, int maxTokens, JsonNode expected, String question, JsonNode context, RegistryFixture fixture) {
+            this.session = session; this.kind = kind; this.references = references; this.maxTokens = maxTokens; this.expected = expected; this.question = question; this.context = context; this.fixture = fixture;
+            this.responseFormat = session.prereg().document().responseFormat().equals(ResponseSchema.POLICY) ? ResponseSchema.responseFormat(kind, references) : null;
+        }
+        OllamaChatClient.ChatResult send(List<Map<String,String>> messages, int inputLimit) {
+            MeasurementSession.Sent sent = session.chat(messages, inputLimit, maxTokens, responseFormat);
+            audited.add(sent.auditInputTokens());
+            if (references != null) diagnosed.add(AttemptDiagnostics.diagnose(sent.result(), maxTokens, kind, references, expected, question, context, context.path("timezone").asText(), fixture));
+            return sent.result();
+        }
+        /** 사전 계수(준비 단계)와 응답 usage.prompt_tokens(실제)를 구분해 둘 다 남깁니다. v1 은 audit·qRef 가 없어 열을 만들지 않습니다. */
+        void columns(ObjectNode row) {
+            if (!audited.stream().allMatch(Objects::isNull)) row.set("auditInputTokens", Json.MAPPER.valueToTree(audited));
+            if (references != null) row.set("attemptDiagnostics", Json.MAPPER.valueToTree(diagnosed));
+            if (responseFormat != null) row.put("responseFormatSha256", ResponseSchema.sha256(responseFormat));
+        }
     }
     static boolean argsExact(ClassificationJudge.Verdict verdict, JsonNode expected) {
         if (verdict == null || !verdict.valid() || !expected.path("t").asText().equals(verdict.t())) return false;

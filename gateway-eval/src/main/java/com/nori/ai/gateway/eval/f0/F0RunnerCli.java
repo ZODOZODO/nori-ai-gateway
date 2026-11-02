@@ -72,7 +72,7 @@ public final class F0RunnerCli {
                 checkRepeats(document, repeats);
                 if (document.versioned()) audit(preregPath).requireAll(InputAudit.boundary(cases, assembler, document.budget()));
                 MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 boundary-gen", args.required("--endpoint"), runId, dir.resolve("run-binding.json"), null);
-                F0Measurements.boundaryGen(session, cases, assembler, repeats, runId, dir);
+                F0Measurements.boundaryGen(session, cases, fixture, assembler, repeats, runId, dir);
                 out.println("F0_BOUNDARY_COMPLETED " + cases.size());
             }
             case "gguf-count" -> {
@@ -150,9 +150,16 @@ public final class F0RunnerCli {
             }
             case "report" -> {
                 args.only("--run-id", "--results", "--prereg", "--out", "--rejudge", "--spec-record-check", "--proposal");
-                String runId = runId(args.required("--run-id")); Path results = path(args, "--results"), prereg = path(args, "--prereg"), target = path(args, "--out");
+                String runId = runId(args.required("--run-id")); Path results = path(args, "--results"), prereg = path(args, "--prereg");
                 Prereg.relativePath(context.root(), path(args, "--prereg"));
                 F0ReportWriter writer = new F0ReportWriter(context);
+                if (Prereg.parse(prereg).diagnostic()) {
+                    // 진단 등록은 leaf 증거 위치·재판정·SPEC 기록 확인을 받지 않습니다(F0 게이트 입력 생성 0).
+                    if (args.optional("--out") != null || args.flag("--rejudge") || args.flag("--spec-record-check") || args.optional("--proposal") != null) throw new EvalException(2, "DIAGNOSTIC_NOT_GATE_ELIGIBLE");
+                    out.println(writer.diagnosticReport(runId, results, prereg));
+                    return;
+                }
+                Path target = path(args, "--out");
                 if (args.flag("--rejudge") && args.flag("--spec-record-check")) throw new EvalException(2, "ARGUMENT_INVALID");
                 if (args.flag("--spec-record-check")) out.println(writer.specRecordCheck(runId, results, prereg, path(args, "--proposal"), target));
                 else if (args.optional("--proposal") != null) throw new EvalException(2, "ARGUMENT_INVALID");

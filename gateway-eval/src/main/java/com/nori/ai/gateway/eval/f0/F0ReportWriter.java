@@ -21,7 +21,8 @@ import java.util.*;
  */
 public final class F0ReportWriter {
     public static final String PROPOSAL_BEGIN = "<!-- AIGW-F0-SPEC-RECORD-BEGIN -->", PROPOSAL_END = "<!-- AIGW-F0-SPEC-RECORD-END -->";
-    private static final List<String> NON_RAW = List.of("report.md", "spec-14.5-proposal.md");
+    static final String DIAGNOSTIC_REPORT = "diagnostic-report.md";
+    private static final List<String> NON_RAW = List.of("report.md", "spec-14.5-proposal.md", DIAGNOSTIC_REPORT);
     private final MeasurementSession.Context context;
     private final LeafCatalog catalog = LeafCatalog.load(null);
     public F0ReportWriter(MeasurementSession.Context context) { this.context = context; }
@@ -29,6 +30,7 @@ public final class F0ReportWriter {
     record Loaded(Prereg.State prereg, JsonNode binding, F0Judgement.Results results, String rawResultsSha256, GoldenSet golden, RegistryFixture fixture, String casesSha256, List<JsonNode> registeredCases) {}
 
     public String report(String runId, Path results, Path prereg, Path out) {
+        requireGateEligible(prereg);
         Loaded loaded = load(runId, results, prereg);
         SpecBinding spec = new SpecGuard(context.env()).check(null, null, baseline());
         if (!spec.specSha().equals(loaded.binding().path("specSha").asText())) throw new EvalException(3, "SPEC_CHANGED_SINCE_MEASUREMENT");
@@ -44,6 +46,7 @@ public final class F0ReportWriter {
     }
 
     public String rejudge(String runId, Path results, Path prereg, Path out) {
+        requireGateEligible(prereg);
         // 하네스(사전등록 입력 포함) 변경은 사전등록 검사 실패보다 먼저 재측정 필요(exit 3)로 알립니다.
         if (!Prereg.localMismatches(context.root(), Prereg.parse(prereg)).isEmpty()) throw new EvalException(3, "HARNESS_CHANGED");
         Loaded loaded = load(runId, results, prereg);
@@ -74,6 +77,7 @@ public final class F0ReportWriter {
     }
 
     public String specRecordCheck(String runId, Path results, Path prereg, Path proposal, Path out) {
+        requireGateEligible(prereg);
         Loaded loaded = load(runId, results, prereg);
         SpecGuard.CheckedSpec checked = new SpecGuard(context.env()).readAndCheck(null, null, baseline());
         String block = proposalBlock(proposal);
@@ -85,6 +89,80 @@ public final class F0ReportWriter {
                 new F0Judgement.Verdict(leaf, present ? "PASS" : "FAIL", present ? "SPEC_RECORD_PRESENT" : "SPEC_RECORD_ABSENT", metrics), "SPEC_RECORD", "SPR", null));
         }
         return present ? "SPEC_RECORD_PRESENT" : "SPEC_RECORD_ABSENT";
+    }
+    /** 진단 등록(purpose=DIAGNOSTIC)은 F0 leaf 증거·게이트 입력을 만들 수 없습니다. */
+    private static void requireGateEligible(Path prereg) {
+        if (Prereg.parse(prereg).diagnostic()) throw new EvalException(2, "DIAGNOSTIC_NOT_GATE_ELIGIBLE");
+    }
+    /**
+     * 진단 회차 보고서 &lt;results&gt;/diagnostic-report.md: 등록 집계 규칙의 경로 지표와 시도별 원문 없는 진단 분포만 씁니다.
+     * leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않으므로 F0 게이트 판정에 들어갈 수 없습니다.
+     */
+    public String diagnosticReport(String runId, Path results, Path preregPath) {
+        Loaded loaded = load(runId, results, preregPath);
+        if (!loaded.prereg().document().diagnostic()) throw new EvalException(2, "DIAGNOSTIC_REGISTRATION_REQUIRED");
+        Path file = results.resolve(DIAGNOSTIC_REPORT);
+        if (Files.exists(file)) throw new EvalException(2, "REPORT_EXISTS");
+        Prereg.Document document = loaded.prereg().document();
+        StringBuilder md = new StringBuilder("# F0 진단 보고서 — ").append(runId).append("\n\n");
+        md.append("- **진단 전용(purpose=DIAGNOSTIC)**: F0 leaf 증거·게이트 입력·§14.5 제안서 0. 이 보고서는 AC 판정이 아니다.\n");
+        md.append("- 측정 시작: ").append(loaded.binding().path("startedAt").asText()).append(", 측정 SPEC SHA256: `").append(loaded.binding().path("specSha").asText()).append("`\n");
+        md.append("- 사전등록: `").append(Prereg.relativePath(context.root(), preregPath)).append("`, 등록 commit `").append(document.registeredCommit()).append("`, responseFormat `").append(document.responseFormat()).append("`\n");
+        md.append("- 신원: harnessDigest `").append(loaded.binding().path("harnessDigest").asText()).append("`, parameterManifestSha256 `").append(loaded.binding().path("parameterManifestSha256").asText()).append("`\n");
+        md.append("- 원시 결과 SHA256: `").append(loaded.rawResultsSha256()).append("` (원문 질문·응답 미저장)\n");
+        md.append(budgetLine(document)).append('\n');
+        md.append("- 실제 `usage.prompt_tokens` 대 사전 audit 계수(호출 수) — 작음/큼: ");
+        for (String key : List.of("A", "B", "boundary")) md.append(key).append(' ').append(belowAudit(loaded.results().get(key))).append('/').append(aboveAudit(loaded.results().get(key))).append(key.equals("boundary") ? "" : ", ");
+        md.append("\n\n## 경로 지표(등록 집계 규칙, 회차 ").append(document.repeats()).append(")\n\n| 경로 | taskType | 인자 | UNSUPPORTED | JSON 유효 | 1차 유효 | 재시도 | p95 ms | 출력 토큰 max |\n|---|---|---|---|---|---|---|---|---|\n");
+        for (String path : List.of("A", "B")) {
+            JsonNode node = F0Judgement.complete(loaded.results().get(path), document.repeats());
+            if (node == null) { md.append("| ").append(path).append(" | 결과 없음 |||||||\n"); continue; }
+            List<JsonNode> attempts = new ArrayList<>(); node.path("attempts").forEach(attempts::add);
+            MetricsAggregator.Metrics m = MetricsAggregator.aggregate(attempts, loaded.golden(), document.repeats());
+            md.append("| ").append(path).append(" | ").append(m.taskType().correct()).append('/').append(m.taskType().denominator()).append(" | ").append(m.args().correct()).append('/').append(m.args().denominator())
+                .append(" | ").append(m.unsupported().correct()).append('/').append(m.unsupported().denominator()).append(" | ").append(m.validCount()).append('/').append(m.attemptDenominator())
+                .append(" | ").append(m.firstValidCount()).append('/').append(m.attemptDenominator()).append(" | ").append(m.retriedCount()).append('/').append(m.attemptDenominator())
+                .append(" | ").append(m.latencyP95Ms()).append(" | ").append(m.outputTokensMax()).append(" |\n");
+        }
+        JsonNode boundary = F0Judgement.complete(loaded.results().get("boundary"), document.repeats());
+        if (boundary != null) {
+            md.append("\n## 경계 생성(boundary-gen)\n\n| caseId | kind | pass/전체 |\n|---|---|---|\n");
+            boundary.path("cases").forEach(c -> md.append("| ").append(c.path("caseId").asText()).append(" | ").append(c.path("kind").asText()).append(" | ").append(c.path("passRounds").asInt()).append('/').append(c.path("totalRounds").asInt()).append(" |\n"));
+        }
+        md.append("\n## 기대 t × 초회 진단 t (골든 문항, 전 회차)\n\n| 경로 | 기대 t | 초회 t 값 | 건수 |\n|---|---|---|---|\n");
+        for (String path : List.of("A", "B")) {
+            JsonNode node = loaded.results().get(path); if (node == null) continue;
+            Map<String,Integer> confusion = new TreeMap<>();
+            node.path("attempts").forEach(row -> {
+                JsonNode first = row.path("attemptDiagnostics").path(0);
+                if (first.isMissingNode()) return;
+                confusion.merge(loaded.golden().byId(row.path("questionId").asText()).expected().t() + " | " + first.path("t").path("value").asText(), 1, Integer::sum);
+            });
+            confusion.forEach((key, count) -> md.append("| ").append(path).append(" | ").append(key).append(" | ").append(count).append(" |\n"));
+        }
+        md.append("\n## 시도별 진단 분포(고정 분류·불리언·개수만)\n\n| 출처 | 시도 | 항목=값 | 건수 |\n|---|---|---|---|\n");
+        for (String source : List.of("A", "B", "boundary")) {
+            JsonNode node = loaded.results().get(source); if (node == null) continue;
+            List<JsonNode> rows = new ArrayList<>(); node.path("attempts").forEach(rows::add); node.path("cases").forEach(c -> c.path("attempts").forEach(rows::add));
+            Map<String,Integer> counts = new TreeMap<>();
+            for (JsonNode row : rows) {
+                JsonNode diagnosed = row.path("attemptDiagnostics");
+                for (int i = 0; i < diagnosed.size(); i++) {
+                    String attempt = i == 0 ? "초회" : "재시도";
+                    flatten("", diagnosed.get(i), key -> counts.merge(attempt + " | " + key, 1, Integer::sum));
+                    counts.merge(attempt + " | qRef.kind@candidateCount=" + diagnosed.get(i).path("qRef").path("candidateCount").asInt() + "=" + diagnosed.get(i).path("qRef").path("kind").asText(), 1, Integer::sum);
+                }
+                row.path("errorCodes").forEach(code -> counts.merge("판정 | errorCode=" + code.asText(), 1, Integer::sum));
+            }
+            counts.forEach((key, count) -> md.append("| ").append(source).append(" | ").append(key).append(" | ").append(count).append(" |\n"));
+        }
+        MeasurementSession.writeNew(file, md.toString().getBytes(StandardCharsets.UTF_8));
+        return "F0_DIAGNOSTIC_REPORT_WRITTEN";
+    }
+    /** 진단 객체의 말단(문자열·불리언·정수)만 "경로=값"으로 펼칩니다. 진단에는 고정 값만 있으므로 원문이 섞이지 않습니다. */
+    private static void flatten(String prefix, JsonNode node, java.util.function.Consumer<String> sink) {
+        if (node.isObject()) node.properties().forEach(e -> flatten(prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey(), e.getValue(), sink));
+        else sink.accept(prefix + "=" + node.asText());
     }
     static String proposalBlock(Path proposal) {
         String text = new String(Json.bytes(proposal), StandardCharsets.UTF_8);
@@ -228,17 +306,20 @@ public final class F0ReportWriter {
             + ", 경계 출력 상한 " + b.outputLimit() + ", context " + Prereg.CONTEXT_TOKENS;
     }
     /** A/B 행 또는 boundary 회차의 promptTokens[i] < auditInputTokens[i] 개수. 결과가 없으면 "-". */
-    static String belowAudit(JsonNode results) {
+    static String belowAudit(JsonNode results) { return auditCount(results, -1); }
+    /** promptTokens[i] > auditInputTokens[i] 개수: 서버가 출력 제약 스키마 등을 입력에 덧붙이면 사전 계수 예산 가정이 깨지므로 따로 셉니다. */
+    static String aboveAudit(JsonNode results) { return auditCount(results, 1); }
+    private static String auditCount(JsonNode results, int sign) {
         if (results == null) return "-";
         List<JsonNode> rows = new ArrayList<>();
         results.path("attempts").forEach(rows::add);
         results.path("cases").forEach(c -> c.path("attempts").forEach(rows::add));
-        int below = 0;
+        int count = 0;
         for (JsonNode row : rows) {
             JsonNode prompt = row.path("promptTokens"), audit = row.path("auditInputTokens");
-            for (int i = 0; i < Math.min(prompt.size(), audit.size()); i++) if (audit.get(i).isInt() && prompt.get(i).isInt() && prompt.get(i).asInt() < audit.get(i).asInt()) below++;
+            for (int i = 0; i < Math.min(prompt.size(), audit.size()); i++) if (audit.get(i).isInt() && prompt.get(i).isInt() && Integer.signum(prompt.get(i).asInt() - audit.get(i).asInt()) == sign) count++;
         }
-        return String.valueOf(below);
+        return String.valueOf(count);
     }
     private static String proposal(String runId, Loaded loaded, F0Judgement.Outcome outcome) {
         StringBuilder text = new StringBuilder("# SPEC §14.5 기록 제안 — F0 회차 ").append(runId).append("\n\nSPEC 소유자가 아래 표지 사이 블록을 §14.5 에 그대로 반영한다(이 파일은 SPEC 을 고치지 않음).\n\n");

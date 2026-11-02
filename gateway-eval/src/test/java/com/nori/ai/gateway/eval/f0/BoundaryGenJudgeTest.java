@@ -36,7 +36,8 @@ class BoundaryGenJudgeTest {
             assertThat(result.path("cases")).hasSize(6);
             for (JsonNode c : result.path("cases")) {
                 assertThat(c.path("passRounds").asInt()).isEqualTo(2); assertThat(c.path("totalRounds").asInt()).isEqualTo(2);
-                for (JsonNode a : c.path("attempts")) assertThat(GoldenSet.keys(a)).isEqualTo(Set.of("round", "status", "retried", "finishReason", "completionTokens", "schemaValid", "argsExact", "latencyMs", "outputSha256", "diagnostics", "promptTokens"));
+                for (JsonNode a : c.path("attempts")) assertThat(GoldenSet.keys(a)).isEqualTo(Set.of("round", "status", "retried", "finishReason", "completionTokens", "schemaValid", "argsExact", "latencyMs", "outputSha256", "diagnostics", "promptTokens", "errorCodes"));
+                for (JsonNode a : c.path("attempts")) assertThat(a.path("errorCodes")).isEmpty();
             }
             String stored = f.allOutput("eval/f0/results/R1");
             for (JsonNode c : BoundaryCases.load(f.root.resolve("eval/f0/output-boundary-cases.jsonl"))) {
@@ -76,7 +77,8 @@ class BoundaryGenJudgeTest {
                 assertThat(c.path("passRounds").asInt()).as(id).isZero(); assertThat(c.path("totalRounds").asInt()).as(id).isEqualTo(2);
                 c.path("attempts").forEach(a -> assertThat(a.path("argsExact").asBoolean()).as(id).isFalse());
             }
-            byCase.get("MAX-HANGUL").path("attempts").forEach(a -> { assertThat(a.path("schemaValid").asBoolean()).isFalse(); assertThat(a.path("retried").asBoolean()).isTrue(); });
+            byCase.get("MAX-HANGUL").path("attempts").forEach(a -> { assertThat(a.path("schemaValid").asBoolean()).isFalse(); assertThat(a.path("retried").asBoolean()).isTrue(); assertThat(a.path("errorCodes")).hasSize(2); });
+            normal.path("attempts").forEach(a -> assertThat(a.path("errorCodes")).extracting(JsonNode::asText).containsExactly("FINISH_LENGTH"));
             byCase.get("MAX-DIGIT").path("attempts").forEach(a -> assertThat(a.path("completionTokens").asInt()).isEqualTo(129));
             assertThat(byCase.get("MAX-ASCII").path("passRounds").asInt()).isEqualTo(2);
         }

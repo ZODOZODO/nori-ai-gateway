@@ -74,7 +74,7 @@ class F0VersionedInputsTest {
         return f.exec(all.toArray(String[]::new));
     }
     static int run(F0TestRoot f, OllamaStub stub, Prereg.Document doc, String route) {
-        return execute(f, "run", "--path", route, "--endpoint", stub.endpoint(), "--golden", doc.input("golden"), "--fixture", doc.input("fixture"), "--prompt", doc.input(route.equals("A") ? "planPrompt" : "classifyPrompt"), "--repeats", "2", "--run-id", RUN, "--out", "eval/f0/results/" + RUN + "/" + route);
+        return execute(f, "run", "--path", route, "--endpoint", stub.endpoint(), "--golden", doc.input("golden"), "--fixture", doc.input("fixture"), "--prompt", doc.input(route.equals("A") ? "planPrompt" : "classifyPrompt"), "--repeats", String.valueOf(doc.repeats()), "--run-id", RUN, "--out", "eval/f0/results/" + RUN + "/" + route);
     }
 
     @Test void everyMeasurementAndReportUsesSelectedRegistrationAndAssemblyRoles() throws Exception {

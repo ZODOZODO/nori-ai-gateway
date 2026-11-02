@@ -26,6 +26,8 @@ final class OllamaStub implements AutoCloseable {
     volatile Function<JsonNode,JsonNode> chat = body -> chatResponse("{\"t\":\"INC\",\"eqp\":null,\"from\":null,\"to\":null,\"q\":null}", "stop", 50, 20);
     volatile Function<JsonNode,JsonNode> generate = body -> generateResponse(7);
     volatile int failChatAfter = -1;
+    /** 참이면 그 chat 요청을 HTTP 400 으로 거부합니다(서버가 response_format 을 지원하지 않는 경우 재현). */
+    volatile java.util.function.Predicate<JsonNode> rejectChat = body -> false;
     /** n 번째 chat 응답은 헤더·본문 절반만 보내고 close 까지(최대 10초) 멈춥니다(본문 시간 초과 시험). */
     volatile IntPredicate stallChatBody = n -> false;
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -48,6 +50,7 @@ final class OllamaStub implements AutoCloseable {
                     case "/v1/chat/completions" -> {
                         chatCount++; stall = stallChatBody.test(chatCount);
                         if (failChatAfter >= 0 && chatCount > failChatAfter) { status = 500; response = Json.MAPPER.createObjectNode().put("error", SENTINEL); }
+                        else if (rejectChat.test(body)) { status = 400; response = Json.MAPPER.createObjectNode().put("error", SENTINEL); }
                         else response = chat.apply(body);
                     }
                     case "/api/generate" -> response = generate.apply(body);

@@ -35,8 +35,18 @@ public final class Prereg {
         public int output(MessageAssembler.Kind kind) { return kind == MessageAssembler.Kind.PLAN ? planOutput : classifyOutput; }
         public int input(MessageAssembler.Kind kind) { return kind == MessageAssembler.Kind.PLAN ? planInput : classifyInput; }
     }
+    /** v3 등록 목적. DIAGNOSTIC 회차는 진단 보고서만 만들며 F0 leaf 증거(게이트 입력)를 만들 수 없습니다. */
+    public static final Set<String> PURPOSES = Set.of("DIAGNOSTIC", "GATE");
+    /** v3 GATE 등록의 고정 회차 수(SPEC §14.5 정식 R=5). */
+    public static final int GATE_REPEATS = 5;
+    /** v3 서버 출력 제약 선택. NONE = v1/v2 와 같은 요청 body. */
+    public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
-        public boolean versioned() { return block.path("schema").asText().equals("f0-prereg-v2"); }
+        /** qRef wire 계약(v2·v3 공통). */
+        public boolean versioned() { return Set.of("f0-prereg-v2", "f0-prereg-v3").contains(block.path("schema").asText()); }
+        public String purpose() { return block.path("schema").asText().equals("f0-prereg-v3") ? block.path("purpose").asText() : "GATE"; }
+        public boolean diagnostic() { return purpose().equals("DIAGNOSTIC"); }
+        public String responseFormat() { return parameters.path("responseFormat").asText("NONE"); }
         public Budget budget() { return versioned() ? Budget.V2 : Budget.V1; }
         public String input(String role) { return versioned() ? block.path("inputRoles").path(role).asText() : LEGACY_ROLES.get(role); }
         public String runtimeCaptureDir() { return versioned() ? block.path("runtimeCaptureDir").asText() : "eval/f0/chat-template"; }
@@ -57,13 +67,17 @@ public final class Prereg {
         int start = text.indexOf("```json\n"), end = start < 0 ? -1 : text.indexOf("\n```", start + 8);
         if (start < 0 || end < 0 || text.indexOf("```json\n", end) >= 0) throw new EvalException(2, "PREREG_INVALID");
         JsonNode block = Json.parse(text.substring(start + 8, end + 1).getBytes(StandardCharsets.UTF_8));
-        if (!Set.of("f0-prereg-v1", "f0-prereg-v2").contains(block.path("schema").asText())) throw new EvalException(2, "PREREG_INVALID");
+        if (!Set.of("f0-prereg-v1", "f0-prereg-v2", "f0-prereg-v3").contains(block.path("schema").asText())) throw new EvalException(2, "PREREG_INVALID");
         Map<String,String> inputs = new LinkedHashMap<>();
         for (JsonNode input : block.path("inputs")) {
             String file = input.path("path").asText(""), sha = input.path("sha256").asText("");
             if (!sha.matches("[0-9a-f]{64}") || !file.matches("[A-Za-z0-9_./-]+") || file.contains("..") || file.startsWith("/") || !Path.of(file).normalize().toString().replace('\\', '/').equals(file) || inputs.put(file, sha) != null) throw new EvalException(2, "PREREG_INVALID");
         }
-        boolean versioned = block.path("schema").asText().equals("f0-prereg-v2");
+        boolean v3 = block.path("schema").asText().equals("f0-prereg-v3"), versioned = v3 || block.path("schema").asText().equals("f0-prereg-v2");
+        // 목적·출력 제약은 v3 에서만 선언하며 v1/v2 에 같은 키가 있으면 기존 등록과 다른 요청으로 오해될 수 있어 거부합니다.
+        JsonNode responseFormat = block.path("parameters").path("responseFormat");
+        if (v3 ? !PURPOSES.contains(block.path("purpose").asText()) || !responseFormat.isTextual() || !RESPONSE_FORMATS.contains(responseFormat.asText())
+               : block.has("purpose") || !responseFormat.isMissingNode()) throw new EvalException(2, "PREREG_INVALID");
         Map<String,String> roles = new LinkedHashMap<>(LEGACY_ROLES);
         if (versioned) {
             JsonNode mapping = block.path("inputRoles");
@@ -89,6 +103,8 @@ public final class Prereg {
             && exactInt(p.path("contextTokens"), CONTEXT_TOKENS) && budget.classifyInput() + budget.classifyOutput() <= CONTEXT_TOKENS && budget.planInput() + budget.planOutput() <= CONTEXT_TOKENS;
         if (!budgetValid || !p.path("repeats").isInt() || p.path("repeats").asInt() < 1 || !p.path("temperature").isNumber() || p.path("temperature").asDouble() != 0 || p.path("requestTimeoutMs").asLong() < 1 || !p.path("generationModel").asText().equals(F0RunnerCli.GENERATION_MODEL) || !p.path("embeddingModel").asText().equals(F0RunnerCli.EMBEDDING_MODEL)
             || !p.path("promptSha256").path("classify").asText().equals(inputs.get(roles.get("classifyPrompt"))) || !p.path("promptSha256").path("plan").asText().equals(inputs.get(roles.get("planPrompt")))) throw new EvalException(2, "PREREG_INVALID");
+        // v3 정식(GATE) 등록은 최종 프로토콜 R=5 만 허용합니다. v1/v2 등록과 DIAGNOSTIC 회차 수는 기존 규칙 그대로입니다.
+        if (v3 && block.path("purpose").asText().equals("GATE") && p.path("repeats").asInt() != GATE_REPEATS) throw new EvalException(2, "PREREG_INVALID");
         JsonNode commit = block.path("registeredCommit");
         String registered = commit.isNull() || commit.isMissingNode() ? null : commit.asText();
         if (registered != null && !registered.matches("[0-9a-f]{40}")) throw new EvalException(2, "PREREG_INVALID");

@@ -80,7 +80,9 @@ public final class EvalCli {
                 if (command.equals("ingest")) new EvidenceIngestor(repository, catalog).ingest(path(args.required("--input")), args.value("--source", "measurement"), stage, parent, binding);
                 else if (command.equals("gate")) {
                     var report = new GateEvaluator().evaluate(stage, parent, repository.readAll(stage), catalog, SpecBaseline.parseChain(baseline));
-                    new GateReportWriter().write(root.resolve("evidence/" + stage + "/GATE-REPORT.md"), report); out.println(report.result());
+                    if (args.optional("--out") == null) new GateReportWriter().write(root.resolve("evidence/" + stage + "/GATE-REPORT.md"), report);
+                    else new GateReportWriter().writeNew(derivedGateReport(path(args.required("--out"))), report);
+                    out.println(report.result());
                 } else if (command.equals("record")) new ManualRecorder(catalog, repository).record(operation, stage, args.required("--leaf"), args.required("--run-id"), parent, args.all("--field"), binding);
                 else {
                     if (!operation.equals("report")) throw new EvalException(2, "UNKNOWN_COMMAND");
@@ -91,6 +93,16 @@ public final class EvalCli {
             case "ci-evidence" -> throw new EvalException(2, "COMMAND_NOT_IMPLEMENTED_IN_P01");
             default -> throw new EvalException(2, "UNKNOWN_COMMAND");
         }
+    }
+    /**
+     * gate --out: 회차별 파생 보고서는 레포 안·evidence 밖이고, eval/f0/results 아래면 gate-reports 디렉터리만 허용합니다.
+     * 측정 회차 디렉터리에 쓰면 그 회차 원시 결과 SHA(F0ReportWriter.rawResultsSha256) 집계가 바뀌기 때문입니다.
+     */
+    private Path derivedGateReport(Path output) {
+        Path results = root.resolve("eval/f0/results"), reports = results.resolve("gate-reports");
+        if (!output.startsWith(root) || output.equals(root) || output.startsWith(root.resolve("evidence")) || (output.startsWith(results) && !output.getParent().equals(reports))
+            || !output.getFileName().toString().endsWith(".md")) throw new EvalException(2, "GATE_REPORT_PATH_INVALID");
+        return output;
     }
     private LeafCatalog catalog(Args args) { return LeafCatalog.load(args.optional("--catalog") == null ? null : path(args.optional("--catalog"))); }
     private String tokenFile(Args args) { return args.optional("--token-file") == null ? null : path(args.optional("--token-file")).toString(); }

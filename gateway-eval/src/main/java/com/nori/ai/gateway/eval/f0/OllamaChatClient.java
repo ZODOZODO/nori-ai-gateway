@@ -49,9 +49,17 @@ public final class OllamaChatClient {
         return node.textValue();
     }
     public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens) {
+        return chat(gate, model, messages, maxTokens, null);
+    }
+    /**
+     * responseFormat 이 null 이면 v1/v2 와 같은 body 입니다. 있으면 OpenAI 호환 response_format 만 더하며, 서버가 거부해도(HTTP 오류)
+     * JSON 모드·비제약 호출로 다시 보내지 않고 고정 오류로 측정을 멈춥니다.
+     */
+    public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, JsonNode responseFormat) {
         Objects.requireNonNull(gate, "preflight");
         Map<String,Object> body = new LinkedHashMap<>();
         body.put("model", model); body.put("messages", messages); body.put("temperature", 0); body.put("max_tokens", maxTokens); body.put("stream", false);
+        if (responseFormat != null) body.put("response_format", responseFormat);
         JsonNode response = send("POST", "/v1/chat/completions", body);
         JsonNode choice = response.path("choices").path(0), usage = response.path("usage");
         if (!choice.path("message").path("content").isTextual() || !choice.path("finish_reason").isTextual() || !isCount(usage.path("completion_tokens")) || !isCount(usage.path("prompt_tokens")) || response.path("choices").size() != 1) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");

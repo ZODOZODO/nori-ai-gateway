@@ -770,3 +770,365 @@
 - root가 Python 두 시험 파일을 `python -I -B`로 다시 실행했다. `test_count_tokens_qref_v2.py` 4개와 `test_count_input_audit_v2.py` 3개가 모두 OK다.
 - root 독립 보존·초안 검사: 보호 대상 37개 파일의 SHA 불일치 0, 기존 commit C1/C2 두 개 유지, v2 등록 입력 15개 SHA 불일치 0. 실제 소스와 등록 입력으로 계산한 harnessDigest는 `98611f510266172915c825b5efcc75c7aad1ceab943caf0a34ece1c385a1407d`로 초안과 같다. `registeredCommit=null`은 유지했다.
 - **현재 상태:** qRef·예산·등록 보호의 로컬 수정 검증 완료. P03은 미완료이며 기존 F0 FAIL을 유지한다. 정식 v2 사전등록 C3/C4, 실제 GGUF 계수·생성·정확도·p95 재측정, SPEC 결과 기록 및 공급 게이트는 미실행이다. P04는 미착수다. 신규 C3/C4는 기존 사용자 허용 C1/C2 범위를 넘어가므로 별도 허용 전에는 만들지 않는다.
+
+### 12.8 P03 v2 사전등록 C3/C4·정식 v2 실측 (2026-11-02, 별도 독립 Claude Code 세션 — claude-opus-5-5, effort medium)
+
+- §12.1~§12.7과 v1 회차 `20261029T234506Z`의 판정·증거는 이력으로 보존한다. 사용자 승인: "로컬 C3/C4 허용 후 계속 진행". push·원격 publish·보호 변수·서비스/설정·TC backend 변경 0. 이 절은 미커밋이다(추가 commit 금지).
+- **결론: 정식 v2 측정은 끝까지 실행됐으나(측정 실행 실패 0) F0 gate = FAIL. P03 미완료, P04 미착수.** SPEC 결과 반영·새 기준선·publish·9단계(`--rejudge`·`--spec-record-check`)는 root/SPEC 소유자 후속이며 NOT_RUN이다(SPR component NOT_RUN은 PASS가 아니다).
+
+#### 1) 사전등록 C3/C4
+
+- C3 직전 대조: 등록 입력 15개 SHA 불일치 0, harnessDigest 재계산 `98611f510266172915c825b5efcc75c7aad1ceab943caf0a34ece1c385a1407d`(초안 일치), v1 PREREG·v1 등록 입력 11개·tokenizer/pin의 HEAD 대비 delta 0, `git diff --cached --check` 0.
+- **C3 `d44c51ddb275330881bc34fa025c04a6369014f8`**(45파일, 명시 목록 stage): f0 `src/main` 수정 11·신규 2(`InputAudit`·`QRefContext`), f0 `src/test` 수정 6·신규 7, `eval/f0/PREREG-v2.md`(`registeredCommit=null` 초안), `eval/f0/v2/**` 8, `eval/golden/tc-{f0-v2.jsonl,registry-fixture-v2.json}`, `eval/py/count_{tokens_qref,input_audit}_v2.py`와 시험 2, `docs/gates/{spec-baseline.md,spec-approvals/2.md,spec-approvals/3.md,f0/arg-limits.md}`, 이 dev report(§12.7까지).
+- **C4 `a861004f170c747d028bf9f7404ab7cb84821574`**: `eval/f0/PREREG-v2.md`만. `registeredCommit`=C3, `registrationStatus=REGISTERED`, 미등록·요청 0 문구를 이력으로 분리, 사용자 승인 기록.
+- C3에 넣지 않은 것(원래 dirty 보존): `docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/` 최상위 4개, `evidence/F0/**`, `eval/py/**/__pycache__`.
+
+#### 2) 실행 조건
+
+- 부모 회차 **`20261102T003840Z`**. 레포 밖 새 디렉터리 `%TEMP%\aigw-p03v2\`의 `g.ps1`(그 프로세스에만 `AIGW_SPEC_FILE`=실제 SPEC, `AIGW_PARENT_RUN_ID`=runId, `DEBUG`=빈 값, `.\gradlew.bat :gateway-eval:run --console=plain "--args=…"`, 출력은 로그 파일)로 하나씩 실행했다. 옛 `%TEMP%\aigw-p03\` 스크립트는 읽기만 했다.
+- 터널: 착수 전 로컬 11434 리스너 0 확인 → 숨김 ssh(`-i k8s-node01`, BatchMode, ConnectTimeout 12, `jetson@192.168.0.52`, PID 7028) → 측정 후 그 PID만 종료, 리스너 0. 키 파일은 존재만 확인했다.
+- 모델: 착수 preflight와 종료 직전 읽기 전용 `/api/ps` 모두 qwen3:4b-instruct(`0edcdef3…8ba0`, ctx 4096)·bge-m3:latest(`79076464…6bab`, ctx 4096) 상주. 로드·pull·관리 API·num_ctx·서비스 변경 0.
+- SPEC SHA `0f00921b…1e28`(보고서 측정 SPEC SHA 일치), 기준선 seq3. 원문 질문·응답은 파일·화면에 남기지 않았다(하네스 정제 필드·메트릭만).
+
+#### 3) 명령과 exit(UTC)
+
+| 단계 | 명령(`--prereg eval/f0/PREREG-v2.md` 공통, endpoint `http://127.0.0.1:11434`) | 시각 | exit | 결과 |
+|---|---|---|---|---|
+| 0 | `f0 prereg-check` | 00:38:44~00:38:50 | 0 | `PREREG_VERIFIED`, digest 일치 |
+| 1 | `f0 preflight --out eval/f0/results/$runId/preflight.json` | 00:39:12~00:39:22 | 0 | `F0_PREFLIGHT_OK 2` |
+| 2 | `f0 chat-template --model qwen3:4b-instruct --out eval/f0/chat-template/v2-qref`(신규 디렉터리) | 00:39:27~00:39:34 | 0 | template 4040 B `40c21f34…b541`(= audit), model-digest `0edcdef3…8ba0` |
+| 3 | `f0 run --path B --golden eval/golden/tc-f0-v2.jsonl --fixture eval/golden/tc-registry-fixture-v2.json --prompt eval/f0/v2/prompts/classify-v2.txt --repeats 5 --run-id $runId --out …/B` | 00:39:39~00:51:08 | 0 | 110/110, complete |
+| 4 | `f0 run --path A … --prompt eval/f0/v2/prompts/plan-v2.txt … --out …/A` | 00:51:59~01:03:14 | 0 | 110/110, complete |
+| 5 | `python.exe -I -B eval/py/count_tokens_qref_v2.py --tokenizer … --expect-sha256-file … --cases eval/f0/v2/output-boundary-cases.jsonl --out …/official-count.json` | 01:03 | 0 | `OFFICIAL_COUNT_WRITTEN 9`, 준비 파일과 바이트 동일 |
+| 6 | `f0 gguf-count --cases eval/f0/v2/output-boundary-cases.jsonl --out …/gguf` | 01:04:13~01:04:44 | 0 | `F0_GGUF_COUNT_COMPLETED 9` |
+| 7 | `f0 boundary-gen --cases … --fixture …-v2.json --prompt …/classify-v2.txt --repeats 5 --run-id $runId --out …/boundary` | 01:04:48~01:11:44 | 0 | 45/45 회차, complete |
+| 8 | `f0 usage-probe --messages eval/f0/v2/usage-probe-input-v2.jsonl --out …/usage.json` | 01:12:11~01:12:37 | 0 | complete |
+| 9 | `f0 token-golden --messages eval/f0/v2/token-golden-input-v2.jsonl --out …/token-golden.jsonl` | 01:12:41~01:13:23 | 0 | 13행 |
+| 10 | 터널 종료(본인 PID) | 01:13 | 0 | 리스너 0 |
+| 11 | `f0 report --run-id $runId --results eval/f0/results/$runId --out evidence/F0` | 01:13:41~01:13:47 | 0 | `F0_REPORT_WRITTEN 5`, report.md `af26e536…`, proposal `9eaf60f6…`, 신규 hash 파일 6(leaf 5·RUN 1) |
+| 12 | gate(레포 밖 `%TEMP%\aigw-p03v2\gatehelper\GateToFile.java`: `SpecGuard`→`LeafCatalog.load(null)`→`EvidenceRepositoryFs`→`GateEvaluator.evaluate`→`GateReportWriter`, EvalCli `gate`와 같은 호출, 출력만 `eval/f0/results/gate-reports/$runId.md`, 6) 후속 보정 참조) | 01:14:56~01:14:58 | 0 | **FAIL**, 기준선 seq3, `a66b2617…` |
+| 13 | 사후 `f0 prereg-check` | 01:15:25~01:15:31 | 0 | `PREREG_VERIFIED`, `localMismatches=[]` |
+
+- EvalCli `gate --stage F0`는 `evidence/F0/GATE-REPORT.md`를 덮어쓰므로 실행하지 않았다. 옛 GATE-REPORT.md는 불변이다.
+
+#### 4) 결과(report.md·증거 metrics 정제값)
+
+| 경로 | taskType | 인자 | UNSUPPORTED | UNS 오탐 | JSON 유효 | 1차 유효 | 재시도 | timeout | p50/p95 ms | 출력 토큰 p50/p95/max |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | 6/22 | 11/22 | 12/22 | 1 | 70/110 | 70/110 | 40/110 | 0 | 3302/13192 | 37/89/90 |
+| B | 7/22 | 10/22 | 10/22 | 1 | 60/110 | 55/110 | 55/110 | 0 | 5446/11543 | 30/79/79 |
+
+- 기대 T별 p95 ms — A: UNS 5060·LQ 12353·KQ 5947·GQ 2606·INC 13363 / B: UNS 5477·LQ 11543·KQ 2780·GQ 2454·INC 11589. 경로 예산(UNS 15s·LQ/KQ/GQ 30s·INC 90s) 안이지만, 유효율·정확도가 낮아 지연 결과만으로 합격을 주장하지 않는다.
+- 잠정 후보 `KEEP_B`(AC-37-CMP F0R PASS — 후보 선택 규칙의 결과이며 정확도 합격이 아님).
+- 비유효 원인(정제 오류 코드): A `QREF_INVALID` 60·`STEPS_INVALID` 20, B `QREF_INVALID` 105. 비유효 문항은 회차 5/5로 결정적이다(A 8문항: G01·G07·G11·G12·G17·G20·G21·G22, B 10문항: G01·G02·G06·G11·G12·G16·G17·G19·G20·G22). 모든 finish=`stop`, 출력 상한 도달 0.
+- 입력 audit: 실제 `usage.prompt_tokens`가 사전 계수보다 작은 호출 A 0·B 0·boundary 0. 최대 입력 A 1248, B 1125.
+- 출력 경계: 9케이스 모두 공식=GGUF(NORMAL-01 58, NORMAL-PRECISE 96, MAX·ESCAPE 7개 145), 종료 여유 ≥ 47 → 계수 조건 충족. 그러나 boundary-gen pass **0/5 전 케이스**: NORMAL 2케이스는 재시도 후에도 스키마 비유효 5/5, MAX·ESCAPE 7케이스는 스키마 유효 5/5이나 `TASK_TYPE_MISMATCH`·eqp 불일치로 argsExact 0/5. completion 79~99 ≤ 192.
+- AC-38-F0: INC 기대 10표본 모두 UNS로 판정(incCount 0, unsCount 10) → FAIL `AC38_MISMATCH`.
+- G-USAGE: `equalOnCacheHit` usage·evalCount 모두 true(U1 cold/warm 1054, U2 1036).
+- token-golden: 13행 실제 `promptTokens`가 등록 audit 공식 계수와 13/13 일치(TG12 2793).
+
+#### 5) 판정(`eval/f0/results/gate-reports/20261102T003840Z.md`)
+
+| leaf | F0R | SPR |
+|---|---|---|
+| AC-37-CMP | PASS(KEEP_B) | NOT_RUN |
+| AC-37-OUT-NORMAL | FAIL | NOT_RUN |
+| AC-37-OUT-MAX | FAIL | NOT_RUN |
+| AC-37-OUT-ESCAPE | FAIL | NOT_RUN |
+| AC-38-F0 | FAIL(AC38_MISMATCH) | — |
+
+- 수치·임계·분모·답·프롬프트·회차·모델 변경 0, 재측정 0.
+
+#### 6) 보존 확인
+
+- 작업 전 스냅샷한 보호 대상 35개(옛 `evidence/F0/**`·GATE-REPORT.md, `eval/f0/results/{20261029T234506Z,v2-preparation,v2-qref-preparation}/**`, `eval/f0/chat-template/` 최상위, 기존 pycache, `p03-run-20261029T234506Z.md`) SHA 불일치 0. 새 파일은 `eval/f0/results/20261102T003840Z/**`, `eval/f0/chat-template/v2-qref/**`, `evidence/F0/` 신규 hash 6개뿐이다. 새 `__pycache__` 0.
+- 로컬 commit은 C1·C2·C3·C4 네 개이며 push 0.
+- 후속 보정(파생 보고서 위치): root가 gate 파생 보고서 출력 위치를 회차 결과 디렉터리 `eval/f0/results/20261102T003840Z/gate-report.md`로 잘못 지정해, 이 파일이 `F0ReportWriter.rawResultsSha256` 집계(report.md·제안서 외 모든 파일)에 들어갔다(포함 시 `b2b84940…`). 그 한 파일만 PowerShell `Move-Item -LiteralPath`로 `eval/f0/results/gate-reports/20261102T003840Z.md`로 옮겼다(이동 전후 SHA `a66b2617…` 동일). 측정 파일 14개·evidence 바이트 변경 0이며, 같은 정의(정렬 상대 경로+바이트 SHA 쌍 목록의 RFC 8785 SHA-256)로 다시 계산한 raw SHA가 기록값 `1c6d04175ec04a17ed153453609c43361fea536ce9c0eba73e228f62f01df774`와 일치한다. 레포 밖 `%TEMP%\aigw-p03v2\gatehelper\GateToFile.java`·`gate.ps1`은 이번 회차 실행 이력이므로 수정하지 않고 보존했다. 앞으로 실행할 때는 파생 gate 보고서를 `eval/f0/results/gate-reports/$runId.md`에 쓴다.
+
+#### root 최종 독립 확인 (2026-11-02, C3/C4 이후)
+
+- 등록 입력 15개 SHA와 실제 소스의 harnessDigest를 다시 계산해 모두 등록값과 같음을 확인했다. 이전부터 root가 보관한 보호 대상 37개 파일의 SHA 불일치도 0이다. C1/C2 보존, 로컬 commit 총 4개, SPEC SHA `0f00921bce3ad642ede4be22ede0e9e00450eeed460a8b6bef063cce4e761e28` 유지다. Plan은 이번 회차 진행 기록만 추가되어 최종 SHA `7d7b2644a9ff58928c65e15c5739e50123ecfe7adcc5f92932fa1a068f2f54e5`다.
+- root가 A/B 각각 110개 고유 문항·회차와 회차 1 정확도 3축, nearest-rank p50/p95, 재시도 수를 원래 정제 결과에서 독립 계산해 위 표와 일치함을 확인했다. 경계 45회도 중복·누락 없이 확인했다. MAX·ESCAPE 35회는 q·from·to가 일치하고 eqp와 taskType이 불일치했으며, NORMAL 10회는 schemaValid=false였다. G08은 A/B 10회 모두 effectiveT=UNS다. QREF_INVALID의 잘못된 참조 값·유형 등 더 세부적인 원인은 보존 자료만으로 단정하지 않는다.
+- 원시 결과 14개 파일의 bundle SHA `1c6d04175ec04a17ed153453609c43361fea536ce9c0eba73e228f62f01df774`, 신규 증거 6개의 canonical content SHA와 파일명, leaf 증거의 rawResultsSha256을 독립 계산해 모두 일치함을 확인했다. 이동한 파생 gate 보고서 SHA는 `a66b2617bf13910a2a7cf59df968a88bbb2fc5f46ac3e2ae25bb76823b6aed24`다. 공개 API helper가 SpecGuard→LeafCatalog→EvidenceRepositoryFs→GateEvaluator→GateReportWriter를 호출하며 판정 로직을 추가하지 않았음도 확인했다.
+- C4의 PREREG 메타데이터 변경은 선언된 F0 시험 입력에 포함되므로 최종 커밋 상태에서 whole test를 다시 실행했다. 실제 SPEC 경로를 AIGW_SPEC_FILE로 지정한 `.\gradlew.bat :gateway-eval:test --console=plain`은 **exit 0, BUILD SUCCESSFUL(3m 15s), 162/162 PASS·35클래스·FAIL/SKIP/ABORTED 0**이다. 직후 별도 `.\gradlew.bat :gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test" --console=plain`도 **exit 0, TEST_EVIDENCE_VERIFIED**다.
+- 최종 로컬 시험 신원: `runId=45417c25-121a-482c-ae23-3822c25c3d3a`, `inputFingerprint=42e81fb63dfe17d099d023738e55677cc2d711332838b3dc981d9f93a86d74d2`, `contentSha256=85c56582095431cd9d821f1f05cde586f5910ee57237168cc0929ab421f19d26`, `otrSha256=11f275fe6852a75a950e12820af704bc62a240cda241750769cca33c0ee9a9b7`, `records=[]`다. 이 로컬 하네스 시험의 PASS를 실제 모델 F0 합격으로 계산하지 않는다.
+- **최종 상태: 승인된 C3/C4와 v2 정식 측정·판정 실행 완료, F0 FAIL, P03 미완료, P04 미착수.** SPEC 결과 반영·새 기준선·publish·보호 변수 변경·추가 commit·push는 미실행이다. 다음 보완 대상은 원문을 노출하지 않는 QREF_INVALID 세부 진단과 taskType·설비 ID 추출 실패이며, 출력 토큰 상한 도달은 이번 측정에서 확인되지 않았다.
+
+### 12.9 P03 실패 근본 보완 — 서버 구조화 출력 조건부 검증·원문 없는 시도별 진단·진단 사전등록 초안 (2026-11-02, 별도 독립 Claude Code 세션 — claude-opus-5-5, effort medium)
+
+- §12.1~§12.8과 v1 회차 `20261029T234506Z`·v2 회차 `20261102T003840Z`의 판정·원시 결과·보고서·증거는 이력으로 보존한다.
+- **결론: 로컬 구현·시험만 완료. 실제 모델·SSH 호출 0, C5/C6 commit 0, 진단·정식 재측정 0. F0 FAIL 유지, P03 미완료, P04 미착수.**
+- 적용 지침: 사용자 전역 `~/.claude/CLAUDE.md`, Plan 79행 정본 예외(중앙 work item·새 audit 문서 0). 레포 안 AGENTS/CLAUDE 없음. `nori-sdd-specs/AGENTS.md`는 그 레포 SDD 실행기 계약이라 이 작업의 직접 대상이 아니다.
+- 착수 시 SPEC SHA `0f00921b…1e28`(기준선 seq3), Plan `7d7b2644…54e5`로 전달값과 같았다. `docs/gates/spec-baseline.md`·`spec-approvals/`는 편집하지 않았다(root 단독 writer).
+
+#### 1) 원문 없는 실패 진단(보존 자료 범위)
+
+- **확인된 구조 결함:**
+  - `ClassificationJudge.judge`는 첫 위반(QREF 44행)에서 바로 무효를 반환한다.
+  - `F0Measurements.diagnostics`는 무효면 인자 일치를 모두 false로 쓴다.
+  - 그래서 QREF 뒤의 `t`·eqp·시간 상태가 결과에 남지 않았다. v2 오류 세부(잘못된 qRef 값 종류 등)는 보존 자료로 단정할 수 없다.
+- **v2 프롬프트 정적 불일치(인과는 미측정):**
+  - Path A의 "160토큰 안에서 객체를 완결" 문구가 실제 `max_tokens` 256과 다르다.
+  - steps 규칙이 "GQ·UNS는 []" 한 방향뿐이다. 판정은 KQ/LQ/INC의 빈 steps도 무효로 본다(A `STEPS_INVALID` 20과 같은 축).
+  - "offset은 같은 instant로 timezone 변환" 지시는 경계 NORMAL-PRECISE 기대값(질문의 offset 표기 원문 유지)과 어긋날 수 있다. 다만 경계 파일에 오류 코드가 없으므로 NORMAL 0/10의 직접 원인으로 단정하지 않는다.
+  - 출력 예시가 GQ·UNS 전부-null 두 개뿐이다. 라벨 편향 가능성은 있으나 측정으로 분리하지 않았다.
+- `RegistryFixture.renderRegistry`는 aliases·ownedAreas·capabilities만 싣는다. 리소스·workflow 목록 누락을 원인으로 가정하지 않았고 모델에 리소스 목록이나 정답을 주입하지 않았다.
+
+#### 2) 구현(gateway, harnessDigest 대상 f0 소스 포함)
+
+- **`ResponseSchema`(신규):** 같은 요청 `QRefContext`로 OpenAI 호환 `response_format{type:"json_schema", json_schema{name, strict:true, schema}}`을 만든다.
+  - schema: `required`, `additionalProperties:false`, `t` enum 5개, `eqp`/`from`/`to` `["string","null"]`
+  - `qRef`: 후보 0이면 `{"type":"null"}`, 후보가 있으면 발급 ID enum(null 불가)
+  - Path A `steps`: `{"type":"array","items":{"type":"string"}}`
+  - 정답·기대 출력·리소스·capability·후보 원문은 넣지 않는다. 길이·시간 형식·비활성/미등록 Tool backstop은 기존 Gateway 판정 그대로다.
+- **`OllamaChatClient.chat(…, responseFormat)`:** null이면 기존 body(`model, messages, temperature, max_tokens, stream`) 그대로다. 서버가 거부하면(HTTP 오류) `ENDPOINT_HTTP_ERROR` exit 5로 멈추며 JSON 모드·비제약 재송신은 없다.
+- **`Prereg` `f0-prereg-v3`:** `purpose`(DIAGNOSTIC|GATE)와 `parameters.responseFormat`(NONE|`JSON_SCHEMA_V1`)이 필수다. v1/v2 문서에 이 키가 있으면 `PREREG_INVALID`. qRef wire·예산 profile V2·`f0-judge-v2`는 v2와 같다.
+- **`F0Measurements.Attempts`:** 한 요청의 초회·재시도가 같은 `response_format`을 보낸다. 시도마다 audit 입력 계수와 `AttemptDiagnostics`를 기록하고, 행에 `responseFormatSha256`을 남긴다.
+- **`AttemptDiagnostics`(신규):** 판정과 분리된 순수 함수다. 고정 값만 남긴다.
+  - `finish` STOP/LENGTH/OTHER, `usageWithinLimit`, `json` OBJECT/NOT_OBJECT/PARSE_FAILED, `keys` EXACT/MISSING/EXTRA/MISSING_AND_EXTRA, `rawQKey`
+  - `t.value`(알려진 enum 또는 UNKNOWN_TEXT/NON_TEXT/ABSENT)·`t.match`
+  - `qRef.kind` JSON_NULL/ID_IN_RANGE/ID_OUT_OF_RANGE/EMPTY_TEXT/TEXT_OTHER/NON_TEXT/ABSENT, `candidateCount`, `accepted`, `textInQuestion`
+  - eqp/from/to: `value` 종류, `match` MATCH/MISMATCH/NOT_EVALUABLE, eqp `inQuestion`·`equalsContext`·`equalsQuoteCandidate`·`registered`, 시간 `formatValid`·`equalsContext`
+  - `q.match`(수용된 qRef의 복원값 기준), steps `shape`·`toolConsistency`·`unknownCount`·`inactiveCount`
+  - 원문·카탈로그 값·부분 문자열·길이·toString은 내보내지 않는다. 원문 SHA는 기존 `outputSha256`만 쓴다.
+- **`F0ReportWriter`:**
+  - DIAGNOSTIC 등록은 `diagnosticReport`만 허용한다(`<results>/diagnostic-report.md`, 원시 SHA 집계 제외 파일로 추가).
+  - `report`·`rejudge`·`specRecordCheck`는 `DIAGNOSTIC_NOT_GATE_ELIGIBLE`. CLI도 `--out`·`--rejudge`·`--spec-record-check`·`--proposal`을 같은 코드로 거부한다.
+  - 진단 보고서에는 경로 지표, 경계 pass, 기대 t×초회 t, 시도별 진단 분포, 실제 usage 대 audit 계수의 작음/큼 호출 수를 쓴다. 큼은 서버가 스키마를 입력에 덧붙이는지 확인하는 용도다.
+- **`EvalCli gate --out` + `GateReportWriter.writeNew`:** 회차 파생 보고서를 새 파일로만 쓴다.
+  - 거부(`GATE_REPORT_PATH_INVALID`): 레포 밖, `evidence/`, `eval/f0/results/` 아래의 `gate-reports/` 직하 이외 위치, `.md`가 아닌 파일
+  - 이미 있으면 `OUTPUT_EXISTS`. `--out`을 생략하면 기존 `evidence/<stage>/GATE-REPORT.md` 동작 그대로다.
+  - 지난 회차의 레포 밖 helper·원시 SHA 오염 문제를 정식 CLI로 해소했다.
+- `ClassificationJudge`의 엄격 판정·재시도·오류 코드 11종은 바꾸지 않았다.
+- `harnessDigest`가 바뀌므로 PREREG-v1/v2로 신규 측정과 `report`는 `PREREG_INPUT_CHANGED`, `--rejudge`는 `HARNESS_CHANGED`(exit 3)로 거부된다. 기존 시험이 확인하는 계약 그대로이며 옛 결과·보고서·증거 바이트는 바뀌지 않는다.
+
+#### 3) v3 입력·진단 사전등록 초안(UNCOMMITTED)
+
+- **프롬프트 c:** `eval/f0/v3/prompts/classify-v3.txt`(`f041e300…cd19`), `plan-v3.txt`(`0c3547d1…2c03`).
+  - v1의 명료한 구조(스키마·t 정의·소유 시스템 판단·인자 규칙)를 qRef·시간 계약에 맞게 복구했다.
+  - TC 송수신 실패 로그 대 WM 정본 소유권 규칙을 유지했다.
+  - qRef 설명을 host와 모델 책임으로 나눴다. 추출 문법은 Gateway 몫이고, 모델에는 []→null, 목록 ID만, 원문·q 키 금지를 남겼다.
+  - 시간: 초·소수초·offset이 적힌 절대 시각은 원문 그대로, 그 밖은 Context 기준 `YYYY-MM-DDTHH:mm`.
+  - Path A는 256으로 정정하고 steps/t 규칙을 양방향으로 했다. 출력 값 예시는 두지 않았다(복사 오염 방지).
+  - 특정 문항 문구·정답 예시는 넣지 않았다.
+- **c 입력 audit:** `eval/f0/v3/input-audit-v3-c.json`(`29b3c8f4…91c0`).
+  - Java `f0 input-audit-render`(레포 밖 `%TEMP%\aigw-p03v3\render-c.jsonl`, 보존)로 렌더하고, `count_input_audit_v2.py`(pin tokenizer `aeb13307…dae4`·template `40c21f34…b541`)로 셌다.
+  - 결과: `INPUT_AUDIT_WRITTEN 651 OVER_BUDGET 0`. 최대 A 1580/1619, B 1372/1411, 경계 2985/3024(≤3072), usage 1338, token 2793.
+- **사전등록 초안** `eval/f0/PREREG-v3-diag-{a,b,c}.md`: `f0-prereg-v3`, `purpose=DIAGNOSTIC`, R=1, 같은 v2 골든 22·경계 9·fixture·arg-limits·예산.
+
+| 등록 | 프롬프트 | responseFormat | 입력 audit | harnessDigest |
+|---|---|---|---|---|
+| a | v2 원문(160 문구 보존) | NONE | v2 `c30c3b60…8ce0` | `59912312…43ca` |
+| b | v2 원문 | JSON_SCHEMA_V1 | v2 | `59912312…43ca` |
+| c | v3 | JSON_SCHEMA_V1 | v3-c | `2da9e242…9b44` |
+
+- 15개 입력 SHA 불일치 0이다. Java `f0 prereg-check`가 `localMismatches=[]` 뒤 `PREREG_NOT_COMMITTED`(exit 2, endpoint 호출 0)를 냈고, Python 독립 재계산 digest도 세 파일 모두 일치했다.
+- 권장 실행 순서: a → b → c, 각 등록마다 별도 runId(`<id>-a|b|c`)로 B·A·boundary-gen·report(`--out` 없음).
+  - b에서 서버가 거부하면(exit 5) c는 실행하지 않고 보고한다.
+  - b의 `qRef.kind@candidateCount=0` 분포에 ID_OUT_OF_RANGE가 남으면 스키마가 실제로 적용되지 않은 것이다(서버가 조용히 무시). 이 경우 지원 확정을 주장하지 않는다.
+  - 선택 권장: b가 효과 없음으로 나오면 프롬프트 단독 효과를 보려고 v3 프롬프트+NONE 대조(d)를 별도 승인으로 추가한다. 이번에는 준비하지 않았다.
+- 표현 변경·미지 ID·소유권 쌍·Context 복사 방지 회귀는 stub 시험 자료로만 두었다. 골든 기대·분모는 바꾸지 않았다.
+
+#### 4) SPEC·Plan 정합 개정
+
+- **SPEC §14.5(1203행, 줄 안에서만 수정):** "서버 구조화 출력은 F2 확인"을 F0(P03) 상주 모델 조건부 검증 게이트로 앞당겼다.
+  - 근거: root 확인 `ollama version is 0.31.1`, 같은 tag 공식 `openai/openai.go`가 `json_schema`를 `format`으로 전달.
+  - 정한 것: 스키마 표현 범위, 의미 판정 미이관, 자동 대체 0, 진단은 게이트 증거 아님, 채택은 정식 사전등록 판정, 운영 적용은 F2 확정.
+  - 지원 확정·PASS로 쓰지 않았다.
+- **SPEC §27.5:** 변경 이력 1행을 추가했다. 1~1208행 줄 수는 그대로이고 SCHEMA ref 1207·1208은 같은 근거 줄이다.
+- **새 SPEC SHA-256 `60a1e2dae84976c245822a5ae3541b4323c231dc2f002d98605a37ce95c2ecf8`**(2,603줄, CR 0). `measurementAffecting=true` 권장(요청 body·측정 하네스 변경).
+- **Plan:**
+  - P03에 v3 근본 보완 흐름 1항과 진행 기록 1줄을 추가했다.
+  - P03 v2 실측 기록 줄(작업 전 397행)의 helper gate 출력 경로를 현재 위치 `eval/f0/results/gate-reports/20261102T003840Z.md`로 정정했다(이동 사실 명기, 과거 증거 불변).
+  - P21 추가 기록 문구를 "운영 경로 적용 여부 확정"으로 맞췄다.
+  - §12 권위표·phase 구성·수치는 바꾸지 않았다. 새 Plan SHA `2812106c99e618358e93bcc0ac35fe2b3121b9e1906b4810987a2159bf4842b8`.
+
+#### 5) 실행 명령과 실제 결과
+
+- Gradle은 이 세션 Git Bash에서 `AIGW_SPEC_FILE`=실제 SPEC, `DEBUG`=빈 값으로 실행했다. Python은 venv `-I -B`로 실행했다.
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `:gateway-eval:test --tests f0.* --tests GateReportOutputTest`(SPEC 수정 전) | 0 | 신규 `F0StructuredOutputDiagnosticTest` 6·`GateReportOutputTest` 1 포함 PASS |
+| 변이 확인: `Attempts.responseFormat=null`로 임시 변경 후 신규 시험 | 1 | 스키마·fallback 시험 2건 FAILED 확인 → 원본 복원(`cmp` 일치) |
+| `f0 input-audit-render`(c) / `count_input_audit_v2.py` | 0 / 0 | `F0_INPUT_AUDIT_RENDERED 651` / `INPUT_AUDIT_WRITTEN 651 OVER_BUDGET 0` |
+| `f0 prereg-check --prereg eval/f0/PREREG-v3-diag-{a,b,c}.md` | Java 2 ×3 | `localMismatches=[]`, `PREREG_NOT_COMMITTED` |
+| 무필터 `:gateway-eval:test --console=plain`(SPEC 수정 전, 기준선 seq3 일치) | 0 | `BUILD SUCCESSFUL in 3m 12s`. XML 독립 집계 **169/169 PASS·37클래스·failures/errors/skipped 0** |
+| 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| `python -I -B tests/test_count_tokens_qref_v2.py` / `test_count_input_audit_v2.py` | 0 / 0 | `Ran 4 tests … OK` / `Ran 3 tests … OK` |
+| SPEC 수정 후 `:gateway-eval:run --args="spec-guard"` | 2 | `SPEC_BASELINE_MISMATCH`(기준선 seq4 전 정상 차단, 우회 0) |
+
+- 최신 시험 신원(SPEC 수정 전): `runId=09894039-72e2-4852-9838-3d4f67d1e76b`, `inputFingerprint=25e0f2692d2ab7260eb0c5a5f6928943914fefde240f8f8ea7387fbe2052cf5d`, `contentSha256=a1b9607f601fbcd670ad0e1bca21dccc3bfae223f2e4fe35d1a7d73109a45b88`, `otrSha256=4f4f85e52d116a4440806079af5df8781343517bc6b91f6aac92f9e3704eaf13`, `specSha=0f00921b…1e28`, `records=[]`. 이 PASS는 stub·로컬 시험이며 실제 모델 F0 합격이 아니다.
+- SPEC 바이트가 바뀐 뒤에는 위 시험 PASS를 재사용하지 않는다. root가 seq4를 추가한 뒤 whole test와 verify를 다시 실행해야 한다.
+
+#### 6) 보존 확인
+
+- `git diff HEAD`의 `eval/f0/PREREG.md`·`PREREG-v2.md`·`eval/f0/v2/**`·`eval/f0/prompts/**`·`eval/golden/**` 변경 0.
+- v2 원시 bundle 14파일 SHA 재계산 `1c6d04175ec04a17ed153453609c43361fea536ce9c0eba73e228f62f01df774` 일치, 파생 gate 보고서 `a66b2617…ed24` 불변.
+- `evidence/F0/**`·`eval/f0/chat-template/**`·`eval/f0/results/**` 기존 파일 수정 0. 새 결과 디렉터리 0, 새 `__pycache__` 0.
+- 기존 dirty 파일(`p03-run-20261029T234506Z.md` 등)은 손대지 않았다. 로컬 commit은 C1~C4 그대로이며 push 0.
+
+#### 7) root 인계·남은 승인
+
+1. **root:** 새 SPEC `60a1e2da…ecf8`를 기준선 seq4(`changedSections` §14.5·§27.5, `measurementAffecting=true`)로 추가한다. 그 뒤 무필터 `:gateway-eval:test`와 직후 별도 `test-evidence verify`를 다시 실행한다. 그 전에는 spec-guard 차단으로 시험이 실패한다.
+2. **사용자 승인 필요 — C5:** 등록 대상·하네스 코드.
+   - main 수정 9: `EvalCli`, `GateReportWriter`, f0 `{F0Measurements, F0ReportWriter, F0RunnerCli, MeasurementSession, OllamaChatClient, Prereg, QRefContext}`
+   - main 신규 2: `ResponseSchema`, `AttemptDiagnostics`
+   - 시험 수정 1·신규 2: `OllamaStub`, `F0StructuredOutputDiagnosticTest`, `GateReportOutputTest`
+   - `eval/f0/v3/**`, `PREREG-v3-diag-{a,b,c}.md`(`registeredCommit=null`), 이 절, 기준선 seq4(root)
+   - **C6:** 세 PREREG의 `registeredCommit`=C5와 `registrationStatus=REGISTERED`만 기록한다.
+   - C5 직전 입력·digest를 다시 대조한다.
+3. **진단 실측(승인 후):** 터널 → a/b/c 각각 `prereg-check`·preflight·B·A·boundary-gen(R=1)·report(`--out` 없음). 모델 로드·관리 API·num_ctx·서비스 변경 0.
+4. **확인할 지원 실측 항목:**
+   - 서버가 `response_format`을 받는지(HTTP 오류면 exit 5)
+   - 실제로 적용되는지(b의 후보 0 qRef 분포, 키·enum 위반 0 여부)
+   - 입력 계수 증가(usage 대 audit 큼)
+   - `["string","null"]`·`enum`·`{"type":"null"}` 문법의 서버 수용
+5. **정식 측정:** 진단 결과로 채택안을 정한 뒤 별도 `purpose=GATE` 등록(R=5)·새 회차로 기존 F0 판정과 `gate --out eval/f0/results/gate-reports/<runId>.md`를 실행한다. G-F0-TARGET(b)·정확도 목표는 기준선 뒤 F2 전에 SPEC 소유자가 확정한다(이번에 새 임계 0).
+6. **미실행:** 실제 모델·HTTP·SSH 호출, GGUF 계수, 진단·정식 측정, C5/C6, push·publish·보호 변수·Jetson·k8s 변경, P04.
+
+#### 8) root 최종 검토 보완 (2026-11-02, 별도 독립 Claude Code 세션 — claude-opus-5-5, effort medium)
+
+- 위 1)~7)은 그대로 보존한다. 이 절은 root가 찾은 수정 요구 A~F를 반영한 기록이다.
+- **결론: 로컬 구현·시험·등록 초안 대조만 완료. 실제 모델·SSH·k8s 호출 0, commit·push 0(C5/C6 미허용), 진단·회귀·정식 실측 0. F0 FAIL 유지, P03 미완료, P04 미착수.**
+- 착수 시 SPEC `60a1e2da…ecf8`, Plan `2812106c…42b8`로 전달값과 같았다. `docs/gates/spec-baseline.md`·`spec-approvals/`는 편집하지 않았다(root가 중간 `SPEC_FROZEN` 출력을 읽고 seq4를 추가).
+
+##### A. SPEC·Plan 최종 정합
+
+- **SPEC §14.5(줄 안에서만 수정, 1~1208행 줄 수 불변 — SCHEMA ref 1203·1207·1208 같은 근거 줄):**
+  - 1203행: v2 준비의 "GGUF·완결 생성 아직 미측정" 문구를 등록 전 역사 시점으로 고쳤다. v2 실측 회차 `20261102T003840Z`(§12.8)는 경계 공식·GGUF 계수 일치·종료 여유 충족, 완결 생성 oracle 불통과, F0 FAIL이며 PASS가 아니라고 적었다. 형식 `SPEC_RECORD` 블록은 만들지 않았다.
+  - 1203행: 구조화 출력 채택은 정식 GATE 등록 R=5 회차로만 판정하고, 진단·추가 개발 회귀 등록의 문항·결과는 정식 분모·판정 밖이라고 적었다.
+  - 1207행: 질문에 명시된 초·소수초·offset 절대 시각은 LLM wire에서 표기 그대로 보존한다(F0 디코드 원문 정확 일치 기준). Context 시간대 변환·같은 instant·나노초 보존은 wire 검증 뒤 Gateway 정규화다. 유효 형식·범위·Source 지원·기대값은 바꾸지 않았다.
+  - 1211행: "F0 v2 재측정 전"을 "F0 정식 재측정 PASS 전(v2 회차 FAIL)"으로 고쳤다.
+- **SPEC §27.5:** 변경 이력 1행을 추가했다.
+- **새 SPEC SHA-256 `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be`**(2,604줄, 486,552바이트, CR 0, BOM 없음). changedSections §14.5·§27.5. root가 seq4(`measurementAffecting=true`, affectedLeaves ALL)로 추가한 값과 일치한다.
+- **Plan(새 SHA `43cb0cc718294576a8dd389883b0c23b748c4b9ce60ea7023ddba06ab72b451f`):**
+  - §0 "Plan 상태"·"실행·증거 상태" 행 맨 앞에 2026-11-02 최신 상태를 적었다. 옛 2026-10-30 문구는 "이하 이력"으로 보존했다.
+  - §0 R6: ⑥ 로컬 재판정·재측정·`gate`의 선행은 ③ 사슬 항목과 실제 정본 파일의 G-SPEC-HASH (a)뿐이다. ④ publish·⑤ protected 변수는 (b) 원격 공급 조건으로, 그 공급을 소비하는 CI job·`ci-evidence verify`·배포 수용 전에만 필요하다.
+  - P03 9단계와 §6 F0 exit 행도 같은 기준으로 정정했다. 근거: 실제 코드 `SpecGuard`는 비 CI(`CI`≠true)에서 실제 파일 SHA와 기준선 마지막 항목만 대조한다. `F0ReportWriter.report/rejudge/specRecordCheck`·`MeasurementSession`도 같은 `SpecGuard.check`를 쓰며 publish·`AIGW_APPROVED_SPEC_SHA`를 읽지 않는다. 기존 §5 G-SPEC-HASH (a)/(b) 분리를 따르는 문구 정합일 뿐, 업무·보안 정책 변경이 아니다. 원격 공급 게이트는 PASS 처리하지 않았고 publish·설정 변경은 0이다.
+  - P03 v3 흐름에 ⑦(아래 B~E)을 추가하고 진행 기록 1줄을 추가했다.
+
+##### B~D. 프롬프트·GATE R5·경계 errorCodes
+
+- **B. c 프롬프트(`classify-v3`·`plan-v3` 같은 줄):** "큰따옴표 안의 검색어는 EQP ID 가 아니다"를 다음으로 바꿨다: "설비로 가리킨 ID 면 큰따옴표 안에 있어도 eqp 다. 코드·클래스·오류 이름처럼 검색어로 쓰인 문구는 eqp 가 아니다."
+  - 특정 문항·정답·골든 문장은 넣지 않았다.
+  - 새 SHA는 classify `2772aa56…5143`, plan `43da76c3…c982`이다.
+  - 예산 상한 3072는 그대로다.
+- **C. `Prereg`:** v3 `purpose=GATE`는 `parameters.repeats == 5`(`GATE_REPEATS`)만 허용하고 그 밖은 `PREREG_INVALID`다. 실제 명령 `--repeats`가 등록과 다르면 기존 `ARGUMENT_NOT_REGISTERED`로 endpoint 호출 전에 거부한다. v1/v2(R3/R5/R7 기존 시험)와 DIAGNOSTIC(R≥1, 시험 R2·초안 R1) 규칙은 그대로다. 시험의 v3 GATE fixture는 R5로 맞췄고, 시험 `run` 헬퍼는 등록 회차 수를 그대로 쓴다.
+- **D. `F0Measurements.boundaryGen`:** 각 시도 행에 `errorCodes`(골든 행과 같은 고정 오류 코드 배열, 원문 0)를 추가했다. 진단 보고서는 이미 `errorCodes`를 집계하므로 경계 행도 그대로 집계된다. 판정(`F0Judgement`)·분모는 그대로다.
+
+##### E. 등록 초안 5개(모두 `f0-prereg-v3`, `registeredCommit=null`, UNCOMMITTED)
+
+- **c 입력 audit 재생성:** `eval/f0/v3/input-audit-v3-c.json`, `b56e8a11…5d43`, 651행, OVER_BUDGET 0.
+  - 최대값: A 1610/1649, B 1402/1441, 경계 3015/3054(≤3072), usage 1368, token 2793.
+  - 이전 파일(`29b3c8f4…91c0`)은 삭제하지 않고 레포 밖 `%TEMP%\aigw-p03v3s2\input-audit-v3-c.prev.json`으로 옮겼다.
+- **회귀 골든 `eval/f0/v3/golden-regression-v3.jsonl`(`ef1803d6…7337`, 30행):**
+  - v2 골든 22행을 바이트 그대로 두고(접두 `cmp` 일치, 시험이 재확인) 신규 8행 R01~R08을 붙였다.
+  - 신규 8행: 인용된 정상 EQP, 설비 대 코드명 구분, Context 전용 ID·시간 복사 금지, TC 송수신 실패(INC) 대 WM 정본 자료(UNS) 대조 쌍, 표현 바뀐 분 단위 구간, 인용 후보 2개 중 의도상 두 번째, fixture 기존 64 코드포인트 EQP.
+  - 실제 모델 출력을 보기 전에 고정했다. 레포 밖 `%TEMP%\aigw-p03v3s2\make_regression.py`로 생성했으며 모델 호출은 0이다.
+  - GoldenSet 범용 리팩터는 0이다. 초·소수초·offset은 기존 경계 NORMAL-PRECISE와 ArgLimits 시험이 계속 맡는다.
+- **회귀 audit `eval/f0/v3/input-audit-v3-regression.json`(`f2594893…8e24`):** 843행(= 651 + 8문항 × 2경로 × 12시도), OVER_BUDGET 0, 최대값은 c와 같다.
+- 두 audit 모두 Java `f0 input-audit-render`(레포 밖 `%TEMP%\aigw-p03v3s2\render-{c,reg}.jsonl`)와 `count_input_audit_v2.py`(pin tokenizer `aeb13307…dae4`, template `40c21f34…b541` — `chat-renderers-v1.json`·PREREG-v2 등록값)로 만들었다.
+
+| 등록 | purpose / R | 골든 | 프롬프트 | responseFormat | audit | runtimeCaptureDir | harnessDigest |
+|---|---|---|---|---|---|---|---|
+| `PREREG-v3-diag-a.md` | DIAGNOSTIC / 1 | v2 22 | v2 원문 | NONE | v2 `c30c3b60…8ce0` | `v3-diag-a` | `ef72cc42…a7b8` |
+| `PREREG-v3-diag-b.md` | DIAGNOSTIC / 1 | v2 22 | v2 원문 | JSON_SCHEMA_V1 | v2 | `v3-diag-b` | `ef72cc42…a7b8` |
+| `PREREG-v3-diag-c.md` | DIAGNOSTIC / 1 | v2 22 | v3(정정) | JSON_SCHEMA_V1 | v3-c `b56e8a11…5d43` | `v3-diag-c` | `55d61c55…f408` |
+| `PREREG-v3-regression.md` | DIAGNOSTIC / 1 | 회귀 30 | v3(정정) | JSON_SCHEMA_V1 | v3-regression `f2594893…8e24` | `v3-regression` | `5a8f0f0f…daaa` |
+| `PREREG-v3-gate.md` | **GATE / 5** | v2 22 | v3(정정) | JSON_SCHEMA_V1 | v3-c | `v3-gate` | `55d61c55…f408` |
+
+- 경계는 모두 v2 9케이스(`eval/f0/v2/output-boundary-cases.jsonl`)다. 전체 digest:
+  - a/b `ef72cc4297f2dcac06db23a38158c96ad1f8a6f3d61e439f3d488bfae5bfa7b8`
+  - c·gate `55d61c55333b7ecc210d7d45fc5fdd1e7e213c3847511b69343258283b6bf408`
+  - 회귀 `5a8f0f0f9d85339df9d3c9d8d6246af7453fe20fbd76765f9f6055f280f7daaa`
+- A/B/C 비교 분모(원래 22 + 경계 9, R1)는 바꾸지 않았다. gate는 c와 입력·예산·스키마가 같고 목적·회차·캡처 디렉터리만 다르다(시험 확인).
+- **정식 착수 조건(`PREREG-v3-gate.md` 1절):**
+  1. 진단 a·b·c와 회귀가 완결되고 서버 거부 0
+  2. c 진단에서 기존 oracle로 v2 실패 원인이 해소됨: `QREF_INVALID` 0·후보 0 `ID_OUT_OF_RANGE` 0, G08 A·B `t=INC`, 경계 9케이스 통과
+  3. 회귀 검토
+  4. C5/C6 뒤 `PREREG_VERIFIED`
+  - 하나라도 아니면 blind 정식 측정은 0이고, 보완은 새 등록 파일로 한다. 정확도 새 절대 임계는 두지 않았다.
+  - 이 세션 작성 뒤 다른 작업자가 3·4항 문구를 고쳤다(아래 "동시 편집" 참조).
+- **실행 명령(생략 없는 정확한 명령은 각 PREREG 2절, PowerShell, cwd 레포 루트, 각 명령 별도·exit 0 확인):**
+  - 공통 endpoint `http://127.0.0.1:11434`, fixture `eval/golden/tc-registry-fixture-v2.json`, cases `eval/f0/v2/output-boundary-cases.jsonl`, `$env:AIGW_SPEC_FILE`=정본 SPEC.
+  - 진단 묶음: `$runId`를 한 번 정하고 a → b → c → 회귀 순서다. 각 등록은 `prereg-check` → `preflight --out eval/f0/results/<회차>/preflight.json` → `chat-template --model qwen3:4b-instruct --out eval/f0/chat-template/<캡처>` → `run --path B`·`run --path A`(`--repeats 1 --run-id <회차> --out eval/f0/results/<회차>/{B,A}`) → `boundary-gen --repeats 1 --out eval/f0/results/<회차>/boundary` → 터널 종료 → `report --run-id <회차> --results eval/f0/results/<회차>`(`--out` 없음)를 실행한다.
+  - 회차는 a `$runId-a`, b `$runId-b`, c `$runId-c`, 회귀 `$runId-regression`이다. 각 명령에 `--prereg eval/f0/PREREG-v3-<id>.md`를 붙이고 `$env:AIGW_PARENT_RUN_ID`=그 회차로 둔다.
+  - 프롬프트: a·b는 `eval/f0/v2/prompts/{classify,plan}-v2.txt`, c·회귀는 `eval/f0/v3/prompts/{classify,plan}-v3.txt`다. 골든은 회귀만 `eval/f0/v3/golden-regression-v3.jsonl`이고 나머지는 `eval/golden/tc-f0-v2.jsonl`이다.
+  - b가 exit 5면 c 이후는 중단한다.
+  - 정식(조건 충족 후, 새 `$runId`=부모 회차, `--prereg eval/f0/PREREG-v3-gate.md`): 환경 검사 → 터널 → `prereg-check` → `preflight` → `chat-template --out eval/f0/chat-template/v3-gate` → `run --path B/A --repeats 5`(v3 프롬프트·v2 골든) → `count_tokens_qref_v2.py … --out eval\f0\results\$runId\official-count.json` → `gguf-count` → `boundary-gen --repeats 5` → `usage-probe --messages eval/f0/v2/usage-probe-input-v2.jsonl` → `token-golden --messages eval/f0/v2/token-golden-input-v2.jsonl` → 터널 종료 → `report --run-id $runId --results eval/f0/results/$runId --out evidence/F0` → `gate --stage F0 --parent-run-id $runId --spec $env:AIGW_SPEC_FILE --out eval/f0/results/gate-reports/$runId.md`
+  - 새 audit 문서·임시 호출 스크립트는 0이다.
+
+##### F. 실행 결과(Git Bash, `AIGW_SPEC_FILE`=실제 SPEC, `DEBUG`=빈 값, Python venv `-I -B`)
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `f0 input-audit-render`(c·회귀) / `count_input_audit_v2.py` ×2 | 0 / 0 | `F0_INPUT_AUDIT_RENDERED 651`·`843` / `INPUT_AUDIT_WRITTEN 651 OVER_BUDGET 0`·`843 OVER_BUDGET 0` |
+| 관련 시험 `--tests F0StructuredOutputDiagnosticTest --tests BoundaryGenJudgeTest --tests F0VersionedInputsTest`(seq4 뒤) | 0 | 16/16 PASS(7·3·6) |
+| `f0 prereg-check --prereg eval/f0/PREREG-v3-{diag-a,diag-b,diag-c,regression,gate}.md` | Gradle 1(Java 2) ×5 | 모두 `localMismatches=[]`, `currentHarnessDigest`=등록값, `PREREG_NOT_COMMITTED`(미커밋 거부, endpoint 호출 0). 레포 밖 Python 독립 재계산(`%TEMP%\aigw-p03v3s2\digest.py`)도 inputs 불일치 0·digest 일치(최종 시험 뒤 재확인) |
+| 1차 무필터 `:gateway-eval:test`(12:10) / 직후 verify | 0 / 0 | 173/173·38클래스 / `TEST_EVIDENCE_VERIFIED` — 아래 동시 편집 전 트리 |
+| 2차 무필터 시험 / verify | 0 / 1 | 174/174 PASS이나 실행 중 외부 편집(`PREREG-v3-gate.md` 12:14:59)으로 `STALE_TEST_EVIDENCE` — 정상 차단, 재사용 0 |
+| **최종** 무필터 `:gateway-eval:test --console=plain`(90초 정착 확인 뒤, 실행 중 레포 파일 변경 0) | 0 | `BUILD SUCCESSFUL in 3m 18s`. XML 독립 집계 **174/174 PASS·38클래스·failures/errors/skipped 0** |
+| 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+
+- **최종 시험 신원:** `runId=c38a7ab0-6925-4b9d-b319-39794d0f265a`, `inputFingerprint=5db577841870b4a69bfaafef2945b3673e5284e92966cc46cccc2561b694e771`, `contentSha256=e8cdc9089f08eb6f28dffe7332c52cb80fcc990ea53ca148d625fc5ae413ca24`, `otrSha256=086ea8b5e9a3146451452285f74e8cbccdcb2213e4ef21f21b8a6d851b1e1508`, `specSha=34fd6223…66be`(seq4), `executedTestCount=174`, `records=[]`. stub·로컬 시험이며 실제 모델 F0 합격이 아니다.
+- **신규·변경 시험(169 → 174):**
+  - `F0StructuredOutputDiagnosticTest`:
+    - GATE R5 강제: R1·R2·R7 변조 `PREREG_INVALID`, `--repeats 2` 명령은 `ARGUMENT_NOT_REGISTERED`·chat 0, R5 실행 110행
+    - DIAGNOSTIC R1·R2 유효
+    - 신규 경계 시험: 후보 0 케이스 범위 밖 qRef → 시도 행 `errorCodes=[QREF_INVALID,QREF_INVALID]`, 이후 t·eqp·from·to 진단 MATCH, 질문·eqp 원문 저장 0
+  - `BoundaryGenJudgeTest`: 키 집합에 `errorCodes`, 정상 `[]`, 잘림 재시도 `[FINISH_LENGTH]`, 무효 2건
+  - 신규 `F0V3RegistrationDraftTest`(실제 레포 파일, Test 선언 입력 `eval/**`로 fingerprint 결속):
+    - 이 세션 3건: 5개 초안의 목적·R·responseFormat·로컬 일치·캡처 디렉터리 고유, a/b/c/gate v2 골든·경계와 gate=c 입력·예산, 회귀=c와 골든·audit만 다름·접두 22행 바이트 일치·30문항, PREREG-v2 등록 입력 바이트 불변, 각 audit이 실제 하네스 호출 전부를 profile 안에서 덮음(651/843행)
+    - 외부 추가 1건: 등록 수명 메타데이터 UNCOMMITTED/REGISTERED 일관성
+- 추가 변이 실험은 하지 않았다. 신규 단언이 기존 코드(R≥1 허용, 경계 행 키 집합)에서 실패하는 형태임을 코드 대조로 확인했다.
+
+##### 동시 편집(이 세션 밖 작업자, 되돌리지 않음)
+
+- `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V3RegistrationDraftTest.java`(최종 `14fe6945…ee1b`): 다른 작업자가 `registeredCommit=null` 단정을 수명 일관성 검사(UNCOMMITTED=null, REGISTERED=40hex)로 바꿨고, 시험 1건(`lifecycleCheckAccepts…`)과 helper를 추가했다. C6 뒤에도 시험이 유지되도록 한 변경으로 보인다.
+- `eval/f0/PREREG-v3-gate.md`(최종 `11318d36…12eb`): 다른 작업자가 1절 3·4항을 고쳤다.
+  - 3항: 조건 1·2 충족과 새 업무 결정이 없으면 root 검토로 진행하며 "정식 측정 자체의 별도 사용자 재승인은 요구하지 않음".
+  - 4항: C5/C6는 아직 승인이 필요함.
+  - 기계 판독 블록·digest는 그대로이고 로컬 일치다. 승인 범위 문구는 이 세션이 결정하지 않았으며 root·사용자 확인 대상이다.
+
+##### 보존 확인
+
+- `git diff HEAD`에서 `eval/f0/PREREG.md`·`PREREG-v2.md`·`eval/f0/v2/**`·`eval/f0/prompts/**`·`eval/golden/**`·`eval/py/**` 변경은 0이다. `docs/gates/**` 변경은 root의 seq4·`spec-approvals/4.md`뿐이다.
+- 이전 세션 종료 시점 이후 `evidence/**`·`eval/f0/results/**`·`eval/f0/chat-template/**`·`eval/py/**`의 새·수정 파일은 0이다(`find -newer`). 새 `__pycache__`도 0이다.
+- 기존 dirty(`p03-run-20261029T234506Z.md` 등)는 손대지 않았다. 로컬 commit은 C1~C4 그대로이며 push는 0이다.
+
+##### 이번 세션 변경 파일
+
+- 정본(exec 레포): `nori-tc-exec/docs/task/ai-rag-gateway-architecture.md`(§14.5·§27.5), `ai-rag-gateway-architecture-plan.md`(§0 상태·R6, §6 F0 exit, P03 v3 흐름·9단계·진행 기록)
+- gateway main: `f0/Prereg.java`, `f0/F0Measurements.java`
+- gateway test: `f0/F0StructuredOutputDiagnosticTest.java`, `f0/BoundaryGenJudgeTest.java`, `f0/F0VersionedInputsTest.java`, 신규 `f0/F0V3RegistrationDraftTest.java`(이후 외부 편집)
+- 데이터: `eval/f0/v3/prompts/{classify,plan}-v3.txt`, `eval/f0/v3/input-audit-v3-c.json`(재생성), 신규 `eval/f0/v3/golden-regression-v3.jsonl`·`eval/f0/v3/input-audit-v3-regression.json`
+- 등록: `eval/f0/PREREG-v3-diag-{a,b,c}.md`(2절 정확한 명령·digest, c 입력 SHA), 신규 `eval/f0/PREREG-v3-regression.md`·`eval/f0/PREREG-v3-gate.md`(이후 외부 편집)
+- 문서: 이 절
+
+##### C5/C6 인계(사용자 승인 필요, 이번에 실행 0)
+
+- **C5 대상(선별 stage):**
+  - main 수정 9: `EvalCli`, `report/GateReportWriter`, f0 `{F0Measurements, F0ReportWriter, F0RunnerCli, MeasurementSession, OllamaChatClient, Prereg, QRefContext}`
+  - main 신규 2: `ResponseSchema`, `AttemptDiagnostics`
+  - test 수정 3: `OllamaStub`, `BoundaryGenJudgeTest`, `F0VersionedInputsTest`
+  - test 신규 3: `F0StructuredOutputDiagnosticTest`, `GateReportOutputTest`, `F0V3RegistrationDraftTest`
+  - `eval/f0/v3/**` 5파일
+  - `eval/f0/PREREG-v3-{diag-a,diag-b,diag-c,regression,gate}.md`(null 상태)
+  - 이 Dev report
+  - root의 `docs/gates/spec-baseline.md`(seq4)·`spec-approvals/4.md`
+- **C5 제외:** `docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/**`, `evidence/F0/**`, `__pycache__/`
+- `Prereg.verify`는 `eval/f0` 전체 worktree clean(results·chat-template 제외)을 요구하므로 `eval/f0` 아래 새 파일은 모두 C5에 들어가야 한다.
+- **C6:** 위 5개 PREREG의 `registeredCommit`=C5 SHA와 `registrationStatus=REGISTERED`만 기록한다.
+- C5 직전 `prereg-check`로 입력·digest를 다시 대조한다.
+
+##### root 독립 최종 확인 (2026-11-02)
+
+- 위 "동시 편집" 2건은 root가 별도의 독립 Claude Code Opus 5.5 medium 세션에 범위를 나눠 위임한 작업이다. 사전등록 수명 시험 보완과 불필요한 정식 측정 재승인 조건 제거이며, 사용자 작업을 덮어쓴 변경이나 새 업무 정책 결정이 아니다. 현재 사용자의 P03 실행 승인 범위에서 진단·회귀를 검토한 뒤 조건이 충족되면 정식 측정을 계속하며, 별도로 제한된 C5/C6 commit 허용은 아직 받지 않았다.
+- root가 실제 호출 경로를 대조했다: 요청별 스키마는 질문의 현재 참조 목록과 구조 제약만 포함하고 정답·설비 목록을 주입하지 않는다. Gateway의 엄격 판정·재시도 1회는 유지하며, 독립 진단은 실행 인자를 바꾸지 않는다. 진단 등록은 F0 증거 생성 경로에서 거부되고 v3 GATE는 R=5만 허용된다.
+- root가 XML 38개를 직접 합산해 174건·failures/errors/skipped 0을 확인했다. 정제 요약도 passed=174·failed/skipped/aborted=0·records=[]이며 위 최종 시험 runId·fingerprint·SPEC SHA와 일치한다.
+- root가 별도 프로세스로 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test" --console=plain`을 실행해 exit 0·`TEST_EVIDENCE_VERIFIED`·`BUILD SUCCESSFUL in 3s`를 확인했다. 이는 로컬/stub 시험 증거이며 실제 모델 F0 PASS가 아니다.
+- root Node 재계산: 등록 초안 5개 모두 inputs SHA 불일치 0·harnessDigest 일치. c/gate audit 651행, 개발 회귀 843행, 최대 입력 3054≤3072·입력+출력≤4096 위반 0. 회귀 파일의 앞 22행은 원래 v2 골든의 바이트 접두부와 일치하고 총 30행이다.
+- 보호 스냅샷 75파일 중 변경은 root가 seq4를 추가한 baseline 1파일뿐이다. 기존 baseline 항목 3개는 git HEAD의 원 항목과 값·순서가 같다. 기존 v2 원시 결과는 14파일·SHA `1c6d04175ec04a17ed153453609c43361fea536ce9c0eba73e228f62f01df774`로 그대로다. `git diff --check` exit 0, git commit 수 4(C1~C4) 유지.
+- C5 검토 대상은 위 선별 목록 30파일이며, C6 대상은 신규 사전등록 5문서의 등록 수명 메타데이터와 그 설명이다. 기존 v1/v2 증거·등록 입력·untracked 이력은 stage하지 않는다.
+- 실제 v3 모델 호출·진단·회귀·정식 측정, C5/C6, push·publish·보호 변수·서비스 변경은 미실행이다. P03 미완료·기존 F0 FAIL·P04 미착수 상태를 유지한다.
