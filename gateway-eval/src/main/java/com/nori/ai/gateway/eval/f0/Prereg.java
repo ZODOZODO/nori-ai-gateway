@@ -42,7 +42,7 @@ public final class Prereg {
     /** v3 서버 출력 제약 선택. NONE = v1/v2 와 같은 요청 body. */
     public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY);
     /** v3 에서만 명시 opt-in 하는 LLM 입력 Context 투영. 키가 없으면 기존 전체 Context(FULL) 그대로이며 FULL 은 등록 값으로 쓰지 않습니다. */
-    public static final Set<String> CONTEXT_PROJECTIONS = Set.of(MessageAssembler.EXTRACTION_V1);
+    public static final Set<String> CONTEXT_PROJECTIONS = Set.of(MessageAssembler.EXTRACTION_V1, MessageAssembler.PRESENCE_V1);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
         /** qRef wire 계약(v2·v3 공통). */
         public boolean versioned() { return Set.of("f0-prereg-v2", "f0-prereg-v3").contains(block.path("schema").asText()); }
