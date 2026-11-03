@@ -1,18 +1,20 @@
 # F0 정식 사전등록 v3-gate-d — 후보 d(Context 투영 + d 정리 프롬프트 + 서버 구조화 출력 제약), R=5
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 4e1e866440e50799b4466e23ed344e0651de6081`(C7)**
 
 - 목적은 **정식(purpose=GATE)** 이다. `f0-prereg-v3` 의 GATE 등록은 `parameters.repeats=5` 만 유효하다(그 밖 값은 `PREREG_INVALID`, 실제 명령 `--repeats` 가 다르면 `ARGUMENT_NOT_REGISTERED` — 모두 endpoint 호출 전 거부).
 - 입력·예산·스키마·투영은 진단 d(`PREREG-v3-diag-d.md`)와 바이트까지 같다: 원래 골든 22문항(`eval/golden/tc-f0-v2.jsonl`)·경계 9케이스·fixture v2·`classify-v3-d`·`plan-v3-d`·`responseFormat=JSON_SCHEMA_V1`·`contextProjection=EXTRACTION_V1`·d 입력 audit(`eval/f0/v3/input-audit-v3-d.json`)·입력 3072/3072, `max_tokens` 192/256, 경계 192, context 4096. 런타임 캡처 디렉터리만 별도(`eval/f0/chat-template/v3-gate-d`)다.
 - 정식 분모는 원래 22문항 + 경계 9케이스다. 개발 회귀(`PREREG-v3-regression-d.md`)의 추가 문항·결과와 진단 a/b/c/d 결과는 이 분모·판정에 넣지 않는다.
 - 판정은 기존 F0 규칙 그대로다(`f0-judge-v2`, 3축 정확도 A↔B 상대 비교·동률 B 유지, AC-37-OUT-* 경계 계수+완결 생성, AC-38-F0, 지연 예산). 정확도 새 절대 최소 임계·업무 범위 변경은 두지 않는다.
 - 기존 `PREREG-v3-gate.md`(후보 c)와 그 §1 착수 조건은 과거 문서로 그대로 보존한다. 후보 c 는 진단에서 경계 2/9 로 그 조건 2 를 충족하지 못했으며, 이 문서는 c 를 대체하는 새 후보 d 의 정식 등록이다. 진단 a/b 는 서버 구조화 출력 효과의 이력일 뿐 이 문서의 R5 를 대체하지 않는다.
-- 현재 상태: 등록 대상·하네스 코드 commit(C7 예정)과 이 문서의 `registeredCommit` 기록 commit(C8 예정)은 **사용자 미허용**이다. 그 전까지 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0).
-- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다.
+- 등록 근거: 사용자 승인 "로컬 C7/C8 허용 후 계속 진행(권장)"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C7 `4e1e866440e50799b4466e23ed344e0651de6081` = 후보 d 등록 대상·하네스 코드·관련 시험 16파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C8 = 후보 d 사전등록 3문서(`PREREG-v3-{diag-d,regression-d,gate-d}.md`)만 수정해 `registeredCommit`에 C7 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C7 전까지 이 문서는 미등록 초안(C7/C8 사용자 미허용)이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
+- 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다. C7 직전 등록 대상 16파일을 root 검토 SHA-256 과 대조해 불일치 0이었다.
 
 ## 1. 착수 조건(이 조건 전에는 이 등록으로 blind 정식 측정을 하지 않는다)
 
-1. C7/C8 등록 commit 뒤 이 문서·`PREREG-v3-diag-d.md`·`PREREG-v3-regression-d.md` 의 `f0 prereg-check` 가 `PREREG_VERIFIED` 다. C7/C8 은 기존 C3~C6 허용에 포함되지 않으며 C7/C8 구체 범위 검토 뒤 사용자의 별도 commit 허용이 필요하다.
+1. C7/C8 등록 commit 뒤 이 문서·`PREREG-v3-diag-d.md`·`PREREG-v3-regression-d.md` 의 `f0 prereg-check` 가 `PREREG_VERIFIED` 다. C7/C8 은 기존 C3~C6 허용에 포함되지 않으며 C7/C8 구체 범위 검토 뒤 사용자의 별도 commit 허용이 필요하다. — 이 별도 허용은 2026-11-03 "로컬 C7/C8 허용 후 계속 진행(권장)"으로 받았다(이력 문구 보존).
 2. 진단 d 와 개발 회귀 d 가 모두 exit 0·`complete=true` 로 끝났다. 서버 `response_format` 거부(exit 5) 0.
 3. 진단 d 의 원문 없는 `diagnostic-report.md` 에서 기존 oracle 만으로:
    - B·A 모두 판정 `errorCode=QREF_INVALID` 0, 후보 0 문항의 `qRef.kind=ID_OUT_OF_RANGE` 0.
@@ -50,8 +52,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "GATE",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "4e1e866440e50799b4466e23ed344e0651de6081",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-gate-d",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
