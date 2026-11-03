@@ -16,7 +16,8 @@ import java.util.function.IntPredicate;
 final class OllamaStub implements AutoCloseable {
     static final String SENTINEL = "SENTINEL_RAW_7c1d";
     static final String GEN_DIGEST = "1".repeat(64), EMB_DIGEST = "2".repeat(64);
-    record Request(String method, String path, JsonNode body) {}
+    /** raw = 받은 본문 바이트 그대로(키 순서·공백 포함 송신 바이트 시험용). */
+    record Request(String method, String path, JsonNode body, byte[] raw) {}
     final List<Request> requests = new CopyOnWriteArrayList<>();
     final HttpServer server;
     volatile JsonNode ps = models(4096, 8192, GEN_DIGEST);
@@ -40,7 +41,7 @@ final class OllamaStub implements AutoCloseable {
             byte[] input = exchange.getRequestBody().readAllBytes();
             JsonNode body = input.length == 0 ? null : Json.MAPPER.readTree(input);
             String path = exchange.getRequestURI().getPath();
-            requests.add(new Request(exchange.getRequestMethod(), path, body));
+            requests.add(new Request(exchange.getRequestMethod(), path, body, input));
             JsonNode response; int status = 200; boolean stall = false;
             synchronized (this) {
                 switch (path) {

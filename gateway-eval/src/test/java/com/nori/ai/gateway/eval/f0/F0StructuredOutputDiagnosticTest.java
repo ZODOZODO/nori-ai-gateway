@@ -61,7 +61,7 @@ class F0StructuredOutputDiagnosticTest {
         for (JsonNode row : f.json(RESULTS + "/B/f0-results.json").path("attempts")) {
             assertThat(row.path("retried").asBoolean()).isTrue(); assertThat(row.path("status").asText()).isEqualTo("OK");
             String question = golden(f, doc).byId(row.path("questionId").asText()).question();
-            assertThat(row.path("responseFormatSha256").asText()).isEqualTo(ResponseSchema.sha256(ResponseSchema.responseFormat(MessageAssembler.Kind.CLASSIFY, QRefContext.extract(question))));
+            assertThat(row.path("responseFormatSha256").asText()).isEqualTo(Json.sha(Json.canonical(ResponseSchema.responseFormat(MessageAssembler.Kind.CLASSIFY, QRefContext.extract(question)))));
             assertThat(row.path("attemptDiagnostics")).hasSize(2);
             assertThat(row.path("attemptDiagnostics").get(0).path("keys").asText()).isEqualTo("MISSING");
         }

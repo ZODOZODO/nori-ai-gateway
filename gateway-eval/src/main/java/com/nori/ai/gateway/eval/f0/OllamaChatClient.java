@@ -53,14 +53,18 @@ public final class OllamaChatClient {
     }
     /**
      * responseFormat 이 null 이면 v1/v2 와 같은 body 입니다. 있으면 OpenAI 호환 response_format 만 더하며, 서버가 거부해도(HTTP 오류)
-     * JSON 모드·비제약 호출로 다시 보내지 않고 고정 오류로 측정을 멈춥니다.
+     * JSON 모드·비제약 호출로 다시 보내지 않고 고정 오류로 측정을 멈춥니다. response_format 값은 Format.bytes() 와 같은 바이트로 송신합니다.
      */
-    public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, JsonNode responseFormat) {
+    public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, ResponseSchema.Format responseFormat) {
         Objects.requireNonNull(gate, "preflight");
         Map<String,Object> body = new LinkedHashMap<>();
         body.put("model", model); body.put("messages", messages); body.put("temperature", 0); body.put("max_tokens", maxTokens); body.put("stream", false);
-        if (responseFormat != null) body.put("response_format", responseFormat);
-        JsonNode response = send("POST", "/v1/chat/completions", body);
+        Set<List<String>> keepOrder = new HashSet<>();
+        if (responseFormat != null) {
+            body.put("response_format", responseFormat.node());
+            for (List<String> path : responseFormat.orderedPaths()) { List<String> full = new ArrayList<>(List.of("response_format")); full.addAll(path); keepOrder.add(full); }
+        }
+        JsonNode response = send("POST", "/v1/chat/completions", body, keepOrder);
         JsonNode choice = response.path("choices").path(0), usage = response.path("usage");
         if (!choice.path("message").path("content").isTextual() || !choice.path("finish_reason").isTextual() || !isCount(usage.path("completion_tokens")) || !isCount(usage.path("prompt_tokens")) || response.path("choices").size() != 1) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
         return new ChatResult(choice.path("message").path("content").textValue(), choice.path("finish_reason").textValue(), usage.path("prompt_tokens").intValue(), usage.path("completion_tokens").intValue());
@@ -79,11 +83,13 @@ public final class OllamaChatClient {
      * 요청 송신~응답 헤더~본문 끝을 하나의 총 기한(timeout)으로 묶습니다. HttpRequest.timeout 은 헤더 수신까지만 적용되므로
      * 본문은 상한 있는 BodySubscriber 로 받고 sendAsync 결과를 남은 기한만큼만 기다립니다. 기한 초과·interrupt 면 구독과 교환을 취소합니다.
      */
-    private JsonNode send(String method, String path, Object body) {
+    private JsonNode send(String method, String path, Object body) { return send(method, path, body, Set.of()); }
+    /** 본문은 키 정렬 canonical JSON 이며, keepOrder 경로의 객체만 노드 순서로 보냅니다(비어 있으면 전체 정렬 = 기존 송신 바이트). */
+    private JsonNode send(String method, String path, Object body, Set<List<String>> keepOrder) {
         if (!PATHS.contains(path)) throw new EvalException(2, "ENDPOINT_PATH_FORBIDDEN");
         HttpRequest.Builder request = HttpRequest.newBuilder(endpoint.resolve(path)).timeout(timeout).header("Accept", "application/json");
         if (body == null) request.GET();
-        else request.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(Json.canonical(Json.MAPPER.valueToTree(body))));
+        else request.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(ResponseSchema.canonicalKeepingOrder(Json.MAPPER.valueToTree(body), keepOrder)));
         long deadline = System.nanoTime() + timeout.toNanos();
         AtomicReference<CappedBody> subscriber = new AtomicReference<>();
         CompletableFuture<HttpResponse<byte[]>> future = http.sendAsync(request.build(), info -> { CappedBody capped = new CappedBody(info.statusCode() == 200); subscriber.set(capped); return capped; });

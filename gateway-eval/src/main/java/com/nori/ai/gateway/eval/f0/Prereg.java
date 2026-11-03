@@ -39,8 +39,8 @@ public final class Prereg {
     public static final Set<String> PURPOSES = Set.of("DIAGNOSTIC", "GATE");
     /** v3 GATE 등록의 고정 회차 수(SPEC §14.5 정식 R=5). */
     public static final int GATE_REPEATS = 5;
-    /** v3 서버 출력 제약 선택. NONE = v1/v2 와 같은 요청 body. */
-    public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY);
+    /** v3 서버 출력 제약 선택. NONE = v1/v2 와 같은 요청 body. PLAN_ORDERED_POLICY 는 새 등록에서만 쓰는 opt-in 값입니다. */
+    public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY, ResponseSchema.PLAN_ORDERED_POLICY);
     /** v3 에서만 명시 opt-in 하는 LLM 입력 Context 투영. 키가 없으면 기존 전체 Context(FULL) 그대로이며 FULL 은 등록 값으로 쓰지 않습니다. */
     public static final Set<String> CONTEXT_PROJECTIONS = Set.of(MessageAssembler.EXTRACTION_V1, MessageAssembler.PRESENCE_V1);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {

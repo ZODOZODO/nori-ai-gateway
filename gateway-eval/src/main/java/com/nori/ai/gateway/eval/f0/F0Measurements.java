@@ -82,11 +82,11 @@ public final class F0Measurements {
      */
     private static final class Attempts {
         private final MeasurementSession session; private final MessageAssembler.Kind kind; private final QRefContext references; private final int maxTokens;
-        private final JsonNode expected, context; private final String question; private final RegistryFixture fixture; private final ObjectNode responseFormat;
+        private final JsonNode expected, context; private final String question; private final RegistryFixture fixture; private final ResponseSchema.Format responseFormat;
         private final List<Integer> audited = new ArrayList<>(); private final List<ObjectNode> diagnosed = new ArrayList<>();
         Attempts(MeasurementSession session, MessageAssembler.Kind kind, QRefContext references, int maxTokens, JsonNode expected, String question, JsonNode context, RegistryFixture fixture) {
             this.session = session; this.kind = kind; this.references = references; this.maxTokens = maxTokens; this.expected = expected; this.question = question; this.context = context; this.fixture = fixture;
-            this.responseFormat = session.prereg().document().responseFormat().equals(ResponseSchema.POLICY) ? ResponseSchema.responseFormat(kind, references) : null;
+            this.responseFormat = ResponseSchema.forPolicy(session.prereg().document().responseFormat(), kind, references);
         }
         OllamaChatClient.ChatResult send(List<Map<String,String>> messages, int inputLimit) {
             MeasurementSession.Sent sent = session.chat(messages, inputLimit, maxTokens, responseFormat);
@@ -98,7 +98,7 @@ public final class F0Measurements {
         void columns(ObjectNode row) {
             if (!audited.stream().allMatch(Objects::isNull)) row.set("auditInputTokens", Json.MAPPER.valueToTree(audited));
             if (references != null) row.set("attemptDiagnostics", Json.MAPPER.valueToTree(diagnosed));
-            if (responseFormat != null) row.put("responseFormatSha256", ResponseSchema.sha256(responseFormat));
+            if (responseFormat != null) row.put("responseFormatSha256", responseFormat.sha256());
         }
     }
     static boolean argsExact(ClassificationJudge.Verdict verdict, JsonNode expected) {

@@ -1,6 +1,5 @@
 package com.nori.ai.gateway.eval.f0;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nori.ai.gateway.eval.EvalException;
 import com.nori.ai.gateway.eval.io.Json;
@@ -90,8 +89,8 @@ public final class MeasurementSession {
     /** v2 는 사전 계수 표에 있고 예산 안인 메시지만 보냅니다(재시도 포함, 매 호출 직전). */
     public Integer audited(List<Map<String,String>> messages, int inputLimit, int maxTokens) { return audit == null ? null : audit.require(messages, inputLimit, maxTokens); }
     public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens) { return chat(messages, inputLimit, maxTokens, null); }
-    /** 분류·계획 호출. responseFormat 은 등록 parameters.responseFormat 이 JSON_SCHEMA_V1 일 때만 요청별로 만든 값입니다. */
-    public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens, JsonNode responseFormat) {
+    /** 분류·계획 호출. responseFormat 은 등록 parameters.responseFormat 이 NONE 이 아닐 때만 요청별로 만든 값입니다. */
+    public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens, ResponseSchema.Format responseFormat) {
         Integer counted = audited(messages, inputLimit, maxTokens);
         return new Sent(client.chat(verified, prereg.document().generationModel(), messages, maxTokens, responseFormat), counted);
     }

@@ -2463,3 +2463,469 @@
 - 정본 SPEC SHA `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be`·Plan SHA `264abe99d904bf7fb9e0da2b6be0ab0efff8b3be52e72e74ab7fa0988e803907` 불변이다. HEAD C12 `48561f3eefaef7e230939da0169c2f3e1a9e5070`, staged 0, git 쓰기 0이다.
 - `eval/f0/results`·`eval/f0/chat-template`·`evidence`·`eval/golden`·하네스 소스·기존 프롬프트·기존 PREREG·기존 audit 변경 0, 새 `.pyc` 0(Python 은 `-I -B`). `eval/f0` 아래 신규 파일은 위 6개뿐이다.
 - 기존 dirty(Devreport)·untracked 항목은 그대로 보존했다. 응답 원문·API 응답·secrets·환경값은 출력·저장하지 않았다. 이 절은 root 검토 전이며 완료·PASS 를 확정하지 않는다.
+
+#### 로컬 C13/C14 등록·최종 시험 (2026-11-03, 독립 Claude Code Opus 5.5 medium)
+
+- 승인 근거: 사용자 승인 "C13/C14 허용 후 진행 (권장)"(2026-11-03). 허용 범위는 로컬 commit C13·C14 두 개뿐이며 push·amend·원격 publish 는 하지 않았다.
+- 착수 전 확인: HEAD C12 `48561f3eefaef7e230939da0169c2f3e1a9e5070`(12커밋), staged 0, C13 대상 8파일 SHA-256 이 기대값과 모두 일치했다(이 Devreport 의 C13 시점 SHA `1c91353498936f5a556700ce9b0d21ec633b0adf5cef933a6264576e7925daa3` 포함).
+
+| commit | 전체 SHA | 시각 | 파일 |
+|---|---|---|---|
+| C13 | `1b1ded2566e911520e03cbf82606eba4e7f2b133` | 2026-11-03 12:05:34 +0900 | 8파일, 816 insertions(+), 19 deletions(-) |
+| C14 | `87113b50a0a57f75c80c3e33a6faec1c3d39189d` | 2026-11-03 12:06:13 +0900 | 3파일, 18 insertions(+), 12 deletions(-) |
+
+- C13 정확 8파일(파일 지정 `git add` 뒤 `git diff --cached --name-only` 8개 확인): `eval/f0/v3/prompts/plan-v3-g.txt`, `eval/f0/v3/input-audit-v3-g.json`, `eval/f0/v3/input-audit-v3-regression-g.json`, `eval/f0/PREREG-v3-diag-g.md`, `eval/f0/PREREG-v3-regression-g.md`, `eval/f0/PREREG-v3-gate-g.md`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V3RegistrationDraftTest.java`, `docs/ai-rag-gateway-architecture-dev-report.md`. 초안 3문서는 UNCOMMITTED/null 상태로 들어갔다. 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`, `evidence/F0/`, `eval/py/**/__pycache__/`)는 넣지 않았다.
+- C14 정확 3파일: `eval/f0/PREREG-v3-{diag-g,regression-g,gate-g}.md`. §0 제목·현재 상태 문구를 C12 방식(등록 근거·C13/C14 설명·이력)으로 바꾸고, 기계 판독 블록의 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C13 SHA 만 바꿨다. §1 이하는 그 2줄 외 바이트 그대로다.
+- JSON 검사(Node, 파싱 실패 시 원문 비출력): 3문서 모두 전 값이 UNCOMMITTED/null, 후 값이 REGISTERED/C13 SHA 이고, 두 키를 뺀 나머지 객체 동일·키 순서 동일·§1 이하 2줄 외 동일이 true 였다. `git diff C13 C14` 의 JSON 변경 줄도 문서당 이 2키 2줄뿐이다.
+- gate-g §1 조건 1 의 "C13/C14 는 기존 C3~C12 허용에 포함되지 않으며 C13/C14 구체 범위 검토 뒤 사용자의 별도 commit 허용이 필요하다" 문장은 지시에 따라 바꾸지 않았다(보고만 한다).
+- C14 뒤 14커밋, staged 0 이다.
+
+`f0 prereg-check`(endpoint 인자 없음, 모델 요청 0, 순차 실행, 그 프로세스에만 `AIGW_SPEC_FILE`=원 SPEC·`DEBUG`=빈 값):
+
+| 등록 | localMismatches | currentHarnessDigest | 결과 | Gradle exit |
+|---|---|---|---|---|
+| diag-g | `[]` | `4de7eadb…5597` | `PREREG_VERIFIED` | 0 |
+| regression-g | `[]` | `fd7e9523…6cb5` | `PREREG_VERIFIED` | 0 |
+| gate-g | `[]` | `4de7eadb…5597` | `PREREG_VERIFIED` | 0 |
+| diag-f | `[]` | `35fd218f…bd10` | `PREREG_VERIFIED` | 0 |
+| regression-f | `[]` | `89cb4ebb…455e` | `PREREG_VERIFIED` | 0 |
+| gate-f | `[]` | `35fd218f…bd10` | `PREREG_VERIFIED` | 0 |
+
+- f 3문서는 C13 전 `PREREG_WORKTREE_DIRTY` 였으나 C13 으로 `eval/f0` 미커밋 g 파일이 없어져 다시 `PREREG_VERIFIED` 가 됐다(앞 절의 추정을 실행으로 확인).
+
+등록 뒤 전체 시험(Gradle 동시 실행 0, 순차):
+
+- `.\gradlew.bat :gateway-eval:test --console=plain --rerun-tasks` → exit 0, `BUILD SUCCESSFUL in 4m 50s`, `6 actionable tasks: 6 executed`. XML 독립 집계 40클래스·189 tests·failures 0·errors 0·skipped 0.
+- 이어서 `.\gradlew.bat :gateway-eval:run --console=plain --args="test-evidence verify --tasks :gateway-eval:test"` → exit 0, `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 3s`.
+
+보존: 모델 실측 0회, SSH·HTTP 요청·다운로드·서비스 변경 0. 코드·시험·프롬프트·골든·기존 PREREG·audit·결과·capture·evidence·SPEC·Plan 변경 0. push·amend·rebase·reset 0. 이 절은 commit 하지 않았으며(C13 커밋 바이트 불변, 작업 트리에만 추가), 응답 원문·API 응답·secrets 는 출력·저장하지 않았다. 다음 순서는 앞 절 7) 그대로이며(진단 g → 회귀 g → gate-g §1 충족 시 R5), 이 세션은 착수하지 않았다.
+
+### 12.20 P03 후보 g 진단·개발 회귀 g 실행 (2026-11-03, 독립 Claude Code Opus 5.5 medium, root 검토 전)
+
+- §12.1~§12.19는 바꾸지 않았다. 이 절 앞 바이트(327195 B, SHA `db224078a7670eb557b2fa5a698d9c6f4ba1f254da5e45b9253eb6ed9c97b9b3`)는 그대로이며 이 절만 추가했다.
+- 산출물: 신규 결과 디렉터리 `eval/f0/results/20261103T032128Z-g/`(8파일)·`eval/f0/results/20261103T032128Z-regression-g/`(8파일), 신규 capture `eval/f0/chat-template/v3-diag-g/`·`eval/f0/chat-template/v3-regression-g/`(각 4파일), 이 절.
+- 하지 않은 것: 코드·시험·프롬프트·골든·fixture·PREREG·audit·기존 결과/capture·evidence·SPEC·Plan 변경, git 쓰기 전부, 모델 load/pull/unload·서비스 재시작·num_ctx 변경·다운로드, 정식 R5(gate-g)·F0 leaf 증거·gate·SPR, P04.
+- **결론(진단 R1, 판정 아님):**
+  - 진단 g 7개 명령과 개발 회귀 g 7개 명령은 모두 exit 0·`complete=true`다. 서버 `response_format` 거부, timeout, 서비스 재시작·OOM은 0이다.
+  - 진단 g: 경계 boundary-gen 9/9, B G08 최종 t `INC`, `QREF_INVALID` 0·`ID_OUT_OF_RANGE` 0이다. A는 taskType 21/22로 G06·G19가 `LQ`로 돌아왔다. 그러나 A G08은 두 시도 모두 t=`INC`·steps `EMPTY_FOR_TOOL_TASK`(`STEPS_INVALID` 2회)로 최종 `INVALID`다(f와 같은 실패 축).
+  - 개발 회귀 g: R01~R08 A·B 모두 통과다. 원래 22문항 행은 진단 g와 첫 출력 SHA가 A·B 22/22 같고, 경계도 9/9 같다.
+  - 따라서 gate-g §1 조건 3b(G08 최종 t A·B 모두 INC)가 미충족이다(판정은 root). 기존 v2 F0 FAIL 유지, P03 미완료, P04 미착수.
+
+#### 1) 착수 전 환경(읽기 전용 확인)
+
+- 확인 방법: §12.18과 같다(SSH 읽기 전용 + `bash -s`, `GET /api/ps`는 Jetson 안 python3로 허용 필드만 파싱하고 실패 시 `parse failed`만 출력). 사용자가 12:16:36 KST에 `systemctl restart ollama`를 직접 실행했고, 이 세션은 warmup이 두 모델을 적재할 때까지 읽기 전용 확인만 했다(03:17:57Z 상주 0 → 03:19:14Z qwen3 1개 → 03:21:04Z 2개).
+- 03:21:04Z 확인 결과(착수 조건 충족):
+  - 서비스: active/running, `ActiveEnterTimestamp=2026-11-03 12:16:36 KST`, NRestarts 0.
+  - journal(서비스 시작 이후): `library=cpu` 0건, `Load failed` 0건, `library=CUDA` 4줄.
+  - `qwen3:4b-instruct` `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0` ctx 4096, size_vram=size 3178149969.
+  - `bge-m3:latest` `7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab` ctx 4096, size_vram=size 664000265.
+  - Mem 7619 MiB 중 available 2173, swap 3809 MiB 중 사용 1241. 로컬 11434는 미사용이었다.
+- 각 B·A·boundary 뒤 재확인에서 중단 조건 항목(ActiveEnterTimestamp·NRestarts 0·2모델 digest·ctx 4096·size_vram=size·`library=cpu`/`Load failed` 0)은 모두 유지됐다. Jetson 시계는 로컬보다 약 3초 늦다.
+
+| 확인 시각(UTC) | 시점 | 상주 모델 | Mem available MiB | swap 사용 MiB | 중단 조건 |
+|---|---|---|---|---|---|
+| 03:17:57 | warmup 중 | 0 | 5643 | 1127 | 대기 |
+| 03:19:14 | warmup 중 | 1(qwen3) | 2994 | 1136 | 대기 |
+| 03:21:04 | 진단 g 착수 전 | 2 | 2173 | 1241 | 충족 |
+| 03:24:09 | 진단 g B 뒤 | 2 | 2134 | 1224 | 충족 |
+| 03:25:58 | 진단 g A 뒤 | 2 | 1918 | 1223 | 충족 |
+| 03:27:50 | 진단 g boundary 뒤 | 2 | 1862 | 1271 | 충족 |
+| 03:28:21 | 회귀 g 착수 전 | 2 | 1853 | 1271 | 충족 |
+| 03:30:51 | 회귀 g B 뒤 | 2 | 1429 | 1317 | 충족 |
+| 03:33:16 | 회귀 g A 뒤 | 2 | 1479 | 1316 | 충족 |
+| 03:35:00 | 회귀 g boundary 뒤 | 2 | 1661 | 1328 | 충족 |
+| 03:37:22 | 전 명령 종료 뒤 | 2 | 1656 | 1328 | 충족 |
+
+- 진단 f 때(§12.18 1) available 160~271 MiB·swap 1784→3621 MiB)와 달리 이번에는 available이 1429 MiB 아래로 내려가지 않았고 swap 증가는 약 90 MiB였다.
+
+#### 2) 실행 기록
+
+- 공통 조건: §12.18 2)와 같다. Bash에서 `powershell.exe -NoProfile -File <scratchpad 래퍼>`로 실행했고, 래퍼는 `Set-Location C:\workspace_nori\nori-ai-gateway` 뒤 `.\gradlew.bat :gateway-eval:run --console=plain "--args=…"`를 호출한다. `--args` 값은 각 등록 §2와 같다. 명령마다 `AIGW_SPEC_FILE`=정본 SPEC 경로, `AIGW_PARENT_RUN_ID`=각 회차 ID, `DEBUG`=빈 값. 한 명령씩 실행하고 exit 0을 확인한 뒤 넘어갔다. 측정 중 다른 Gradle 실행은 0이다.
+- run prefix `20261103T032128Z`(시작 때 1회 결정). 회차 ID는 `20261103T032128Z-g`·`20261103T032128Z-regression-g`다. 결과 2디렉터리·capture 2디렉터리는 사전 부재를 확인했다.
+- 터널: `Start-Process -WindowStyle Hidden`으로 `ssh … -o ExitOnForwardFailure=yes -N -L 11434:127.0.0.1:11434`를 띄웠다. 진단 g는 PID 13436, 회귀 g는 PID 7904이며, 각각 명령행을 확인한 뒤 report 전에 `Stop-Process`로 종료했다. 종료 후 11434 LISTENING 0·ssh 프로세스 0이다. 다른 프로세스 중단은 0이다.
+
+| 단계 | 명령(§2 그대로) | exit | 결과(UTC) |
+|---|---|---|---|
+| g-1 | `f0 prereg-check --prereg eval/f0/PREREG-v3-diag-g.md` | 0 | `PREREG_VERIFIED`, localMismatches `[]`, harnessDigest `4de7eadb…5597`, parameterManifestSha256 `b9b25664…8a2d` |
+| g-2 | `f0 preflight … --out eval/f0/results/20261103T032128Z-g/preflight.json` | 0 | `F0_PREFLIGHT_OK 2` |
+| g-3 | `f0 chat-template … --out eval/f0/chat-template/v3-diag-g`(사전 부재 확인, 신규) | 0 | `F0_CHAT_TEMPLATE_CAPTURED`, template 4040 B `40c21f34…b541`, model-digest `0edcdef3…8ba0` |
+| g-4 | `f0 run … --path B … --prompt eval/f0/v3/prompts/classify-v3-f.txt --run-id 20261103T032128Z-g --out …/B` | 0 | 03:22:15~03:24:08, `F0_RUN_COMPLETED B`(Gradle 1m 51s) |
+| g-5 | `f0 run … --path A … --prompt eval/f0/v3/prompts/plan-v3-g.txt …` | 0 | 03:24:19~03:26:01, `F0_RUN_COMPLETED A`(1m 41s) |
+| g-6 | `f0 boundary-gen … --prompt eval/f0/v3/prompts/classify-v3-f.txt …` | 0 | 03:26:09~03:27:53, `F0_BOUNDARY_COMPLETED 9`(1m 43s) |
+| g-7 | 터널 종료 뒤 `f0 report --prereg eval/f0/PREREG-v3-diag-g.md --run-id 20261103T032128Z-g --results …`(`--out` 없음) | 0 | `F0_DIAGNOSTIC_REPORT_WRITTEN`, rawResultsSha256 `1258fe32…9176` |
+| r-1 | `f0 prereg-check --prereg eval/f0/PREREG-v3-regression-g.md` | 0 | `PREREG_VERIFIED`, localMismatches `[]`, harnessDigest `fd7e9523…6cb5` |
+| r-2 | `f0 preflight …/20261103T032128Z-regression-g/preflight.json` | 0 | `F0_PREFLIGHT_OK 2` |
+| r-3 | `f0 chat-template … --out eval/f0/chat-template/v3-regression-g`(사전 부재 확인, 신규) | 0 | `F0_CHAT_TEMPLATE_CAPTURED`, template `40c21f34…b541`, model-digest `0edcdef3…8ba0` |
+| r-4 | `f0 run … --path B --golden eval/f0/v3/golden-regression-v3.jsonl …` | 0 | 03:28:52~03:30:54, `F0_RUN_COMPLETED B`(2m 1s) |
+| r-5 | `f0 run … --path A --golden eval/f0/v3/golden-regression-v3.jsonl … --prompt eval/f0/v3/prompts/plan-v3-g.txt …` | 0 | 03:31:03~03:33:19, `F0_RUN_COMPLETED A`(2m 15s) |
+| r-6 | `f0 boundary-gen …` | 0 | 03:33:20~03:35:03, `F0_BOUNDARY_COMPLETED 9`(1m 42s) |
+| r-7 | 터널 종료 뒤 `f0 report --prereg eval/f0/PREREG-v3-regression-g.md --run-id 20261103T032128Z-regression-g --results …`(`--out` 없음) | 0 | `F0_DIAGNOSTIC_REPORT_WRITTEN` |
+
+- 소요 시간은 d·e 수준이고 진단 f(B 3m 4s·A 12m 6s)보다 짧다. preflight 두 파일의 SHA 차이는 모델 나열 순서뿐이다(같은 두 digest·ctx 4096·residentCount 2).
+- F0 leaf 증거·RUN PARENT·§14.5 제안서 생성은 0이다.
+
+#### 3) 런타임 동일성
+
+- run-binding 8개(진단 g B·A·boundary·capture, 회귀 g B·A·boundary·capture)의 runtimeManifest는 모두 같다.
+  - model `0edcdef3…8ba0`, template `40c21f34…b541`, tokenizer `aeb13307…dae4`(runtimeManifestSha256 `b1e6a3af…6f6a`, c·d·e·f와 같음), specSha `34fd6223…66be`(FILE_HASHED, LOCAL_FILE)
+  - registeredCommit C13 `1b1ded2566e911520e03cbf82606eba4e7f2b133`, preregCommit C14 `87113b50a0a57f75c80c3e33a6faec1c3d39189d`
+  - `contextProjection=PRESENCE_V1`, `responseFormat=JSON_SCHEMA_V1`, parameterManifestSha256 `b9b25664…8a2d`
+  - harnessDigest: 진단 g `4de7eadb…5597`, 회귀 g `fd7e9523…6cb5`(각 등록값과 같음)
+- 실제 `usage.prompt_tokens`와 사전 audit 계수가 다른 호출(작음/큼)은 두 회차 모두 A 0/0, B 0/0, boundary 0/0이다(보고서와 정제 필드 재집계 모두).
+- 첫 시도 프롬프트 토큰 범위: 진단 g A 1754~1791·B 1353~1390, 회귀 g A 1754~1807·B 1353~1406. audit 최대(A 1791/1807·B 1390/1406)와 같다. 출력 토큰 최대: 진단 g A 89·B 60, 회귀 g A 89·B 78.
+
+#### 4) 진단 g 결과(`eval/f0/results/20261103T032128Z-g/diagnostic-report.md`, R1·분모 22, 원문 없는 정제 필드 재집계와 일치)
+
+- 재집계는 §12.18과 같은 스크립트(결과 JSON의 열거형·불리언·개수·해시 필드만)로 했다.
+
+| 경로 | taskType | 인자 | UNSUPPORTED | JSON 유효 | 1차 유효 | 재시도 | p50/p95 ms | 판정 errorCode |
+|---|---|---|---|---|---|---|---|---|
+| A | 21/22 | 15/22 | 21/22 | 21/22 | 21/22 | 1/22 | 3102/6736 | `STEPS_INVALID` 2(G08) |
+| B | 20/22 | 18/22 | 20/22 | 22/22 | 22/22 | 0/22 | 2949/5307 | 0 |
+
+- 오류 종류: A `ARGUMENT_MISMATCH` 6·`INVALID_OUTPUT` 1, B `ARGUMENT_MISMATCH` 4·`TASK_TYPE_MISMATCH` 2. timeout은 A·B 모두 0이다.
+- 지연 최대: A 9744 ms(G01), B 32170 ms(G01, 회차 첫 요청). B 나머지 21건은 ≤5307 ms다.
+- A 재시도 1건: G08만이다. 두 시도 모두 t=`INC`·steps `EMPTY_FOR_TOOL_TASK`라 최종 `INVALID`다. f에서 재시도가 있던 G05·G07·G16은 g에서 초회 유효다.
+- t 오답:
+  - A: G08(최종 무효). timeout 0.
+  - B: G07(UNS→INC), G16(UNS→GQ).
+- 인자 오답:
+  - A: G01·G09·G11·G12·G17 from+to, G16 eqp, G08 무효.
+  - B: G01·G11·G12·G17 to.
+- A 최종 steps(유효 21문항, `predicted.steps` capability ID):
+  - INC 6문항 모두 `tc.logs.search`를 포함한다: G01 `tc.logs.search;tc.git.searchCode`, G09 `tc.logs.search`, G12 `tc.dlq.list;tc.logs.search`, G17 `tc.logs.search`, G20 `tc.logs.search`, G22 `tc.logs.search;tc.event.getRecent`.
+  - LQ: G02·G06·G10·G19 `tc.eqp.getOperationalSnapshot`, G11 `tc.event.getRecent`. KQ: G04·G13 `tc.knowledge.search`, G21 `tc.git.searchCode`. GQ·UNS 7문항 `[]`.
+- 두 경로 모두 판정 `QREF_INVALID` 0이다. 후보 0 시도는 모두 `qRef.kind=JSON_NULL`(A 20 = G08 2시도 포함, B 19)이고, 후보 1 시도는 `ID_IN_RANGE`(A 3·B 3)다. `ID_OUT_OF_RANGE`는 경계를 포함해 0이다.
+- **Context 복사**: A·B·경계의 모든 시도에서 eqp·from·to의 `equalsContext=true`는 0건이다.
+- **G08(AC-38, 최종 `predicted.effectiveT`와 최종 시도 diagnostics 기준)**:
+  - B: 초회 t=`INC`, 재시도 0, 최종 effectiveT `INC`. eqp·from·to는 모두 NULL·MATCH·`equalsContext=false`, qRef `JSON_NULL`. 첫 출력 SHA `b4db4d71…`은 f와 같다.
+  - A: 초회·재시도 모두 t=`INC`, steps `EMPTY_FOR_TOOL_TASK`(steps 길이 0) → 최종 `INVALID`, effectiveT 없음(`INVALID_OUTPUT`). 최종 시도 eqp·from·to는 NULL·MATCH·`equalsContext=false`, qRef `JSON_NULL`.
+  - **A G08 최종 steps에 `tc.logs.search`는 없다.** 최종 상태가 `INVALID`라 `predicted`(따라서 `predicted.steps` 정제 필드)가 null이며, 대신 최종 시도 `attemptDiagnostics.steps.toolConsistency=EMPTY_FOR_TOOL_TASK`(길이 0)로 확인했다.
+  - A G08 두 시도 출력 SHA는 같고(`d648833f…b242`), 정제 필드 값으로 만든 키 정렬·공백 없는 직렬화 `{"eqp":null,"from":null,"qRef":null,"steps":[],"t":"INC","to":null}`의 SHA-256과 정확히 같다(64자 일치). f(`8979805c…ce47`)와는 `"to"` 앞 공백 1개만 다르고, 키 순서는 여전히 steps가 t보다 앞이다. 즉 g 프롬프트 뒤에도 G08은 steps를 빈 배열로 먼저 쓰고 t=`INC`를 썼다.
+- **경계 9케이스 boundary-gen 9/9**(모두 status OK, schemaValid=true, argsExact=true, finish=stop, 재시도 0, completion ≤192, `equalsContext` 0, prompt=audit 9/9). 첫 출력 `outputSha256`은 9/9 모두 f와 같다(입력 바이트가 f와 같음).
+
+| caseId | 판정 | 불통과 축 | completion | qRef | 첫 출력 SHA = f |
+|---|---|---|---|---|---|
+| NORMAL-01 | 통과 | – | 59 | JSON_NULL/후보0 | 같음 |
+| NORMAL-PRECISE | 통과 | – | 97 | JSON_NULL/후보0 | 같음 |
+| MAX-MIXED | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| MAX-HANGUL | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| MAX-DIGIT | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| MAX-ASCII | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| MAX-SUPPLEMENTARY | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| ESCAPE-01 | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+| ESCAPE-CONTROL | 통과 | – | 146 | ID_IN_RANGE/후보1 | 같음 |
+
+- **B 22문항 첫 출력 `outputSha256`은 22/22 f와 같다.** 따라서 B 결과(t·인자·qRef·Context 복사)는 f와 같고, B 지연만 달라졌다(f p95 7100 → g 5307).
+
+#### 5) 개발 회귀 g 결과(`eval/f0/results/20261103T032128Z-regression-g/diagnostic-report.md`, R1·분모 30)
+
+| 경로 | taskType | 인자 | UNSUPPORTED | JSON 유효 | 1차 유효 | 재시도 | p50/p95 ms | 판정 errorCode |
+|---|---|---|---|---|---|---|---|---|
+| A | 29/30 | 23/30 | 29/30 | 29/30 | 29/30 | 1/30 | 3250/8116 | `STEPS_INVALID` 2(G08) |
+| B | 28/30 | 26/30 | 28/30 | 30/30 | 30/30 | 0/30 | 3047/6239 | 0 |
+
+- 오류 종류: A `ARGUMENT_MISMATCH` 6·`INVALID_OUTPUT` 1, B `ARGUMENT_MISMATCH` 4·`TASK_TYPE_MISMATCH` 2. timeout 0, `QREF_INVALID` 0, `ID_OUT_OF_RANGE` 0, Context 복사 0이다. qRef는 A·B 각각 `JSON_NULL`(A 25·B 24), `ID_IN_RANGE` 후보1 5, 후보2 1(R07)이다.
+- 원래 22문항 행은 진단 g와 첫 출력 SHA가 A 22/22·B 22/22 같으므로 t·인자 오답은 진단 g와 같다(A G08 무효·G01·G09·G11·G12·G17 from+to·G16 eqp, B G07·G16 t·G01·G11·G12·G17 to). 회귀 경계도 진단 g와 첫 출력 SHA 9/9가 같고 9/9 통과다.
+- 회귀 A G08도 같은 SHA `d648833f…b242`로 두 시도 `STEPS_INVALID`, 최종 `INVALID`다.
+- 신규 8문항 A 최종 steps: R01·R03·R08 `tc.eqp.getOperationalSnapshot`, R02·R04·R06 `tc.logs.search`, R05 `[]`, R07 `tc.knowledge.search`.
+
+| id | 축 | 회귀(c) | 회귀 d | 회귀 f | 회귀 g |
+|---|---|---|---|---|---|
+| R01 | REG_QUOTED_EQP | A·B 통과 | A·B 통과 | 미측정 | A·B 통과 |
+| R02 | REG_EQP_VS_CODE_TERM | A·B 통과 | A·B 통과 | 미측정 | A·B 통과 |
+| R03 | REG_CONTEXT_ONLY_NO_COPY | A·B 실패 | A·B 통과 | 미측정 | A·B 통과 |
+| R04 | REG_TC_TRANSFER_FAILURE | A 실패·B 통과 | A·B 통과 | 미측정 | A·B 통과 |
+| R05 | REG_WM_OWNED_RECORD | A·B 통과 | A·B 통과 | 미측정 | A·B 통과 |
+| R06 | REG_PARAPHRASED_RANGE | A·B 통과 | A from·to 실패·B 통과 | 미측정 | A·B 통과 |
+| R07 | REG_SECOND_QUOTED_INTENT | A·B 실패 | A·B 통과 | 미측정 | A·B 통과 |
+| R08 | REG_LONG_EQP_ID | A·B 실패 | A·B 통과 | 미측정 | A·B 통과 |
+
+- 회귀(c)·회귀 d 열은 이 세션에서 `20261102T231328Z-regression`·`20261103T001459Z-regression-d` 정제 필드로 다시 계산했고 §12.18 5) 기록과 같다.
+- 회귀 g B·경계 요청은 회귀 f와 메시지 바이트가 같으므로(regression-g §1), 회귀 g B·경계 결과는 f 분류 입력의 회귀 결과로도 읽을 수 있다(R=1).
+
+#### 6) c·d·e·f·g 비교(원문 없는 정제 필드·출력 해시만)
+
+- 등록 구성: c = FULL + c 프롬프트, d = EXTRACTION_V1 + d 프롬프트, e = EXTRACTION_V1 + c 프롬프트, f = PRESENCE_V1 + f 프롬프트, g = PRESENCE_V1 + `classify-v3-f` + `plan-v3-g`.
+
+| 지표 | c | d | e | f | g |
+|---|---|---|---|---|---|
+| A taskType / 인자 | 20/22 / 13/22 | 19/22 / 15/22 | 16/22 / 13/22 | 17/22 / 13/22(timeout 2 포함) | 21/22 / 15/22 |
+| B taskType / 인자 | 18/22 / 15/22 | 17/22 / 15/22 | 17/22 / 17/22 | 20/22 / 18/22 | 20/22 / 18/22 |
+| A JSON 유효 / 1차 유효 / 재시도 | 22 / 18 / 4 | 21 / 17 / 5 | 21 / 18 / 4 | 19 / 16 / 4 | 21 / 21 / 1 |
+| A / B p95 ms | 10724 / 6107 | 11335 / 6211 | 10135 / 6136 | 120011 / 7100 | 6736 / 5307 |
+| G08 최종 t A / B | INC / INC | UNS / UNS | UNS / UNS | 무효(두 시도 t=INC) / INC | 무효(두 시도 t=INC) / INC |
+| Context 복사 시도 A / B | 3 / 2 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| 경계 boundary-gen | 2/9 | 7/9 | 0/9 | 9/9 | 9/9 |
+
+- A 문항별(셀 = 최종 effectiveT / 틀린 인자, 굵게 = t 오답·무효·timeout, (ctx) = Context 복사 시도 있음):
+
+| id | 기대 t | A c | A d | A e | A f | A g |
+|---|---|---|---|---|---|---|
+| G01 | INC | INC / from+to | INC / from+to | INC / from+to | **TIMEOUT** | INC / from+to |
+| G02 | LQ | LQ / – | LQ / – | LQ / – | **TIMEOUT** | LQ / – |
+| G03 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G04 | KQ | KQ / – | KQ / – | KQ / – | KQ / – | KQ / – |
+| G05 | GQ | GQ / – | GQ / – | **무효** | GQ / – | GQ / – |
+| G06 | LQ | **KQ** / – | **KQ** / – | **KQ** / – | **KQ** / – | LQ / – |
+| G07 | UNS | UNS / – | UNS / – | **GQ** / – | UNS / – | UNS / – |
+| G08 | INC | INC / from+to (ctx) | **UNS** / – | **UNS** / – | **무효** | **무효** |
+| G09 | INC | INC / – | INC / from+to | INC / from+to | INC / from+to | INC / from+to |
+| G10 | LQ | LQ / – | LQ / – | LQ / – | LQ / – | LQ / – |
+| G11 | LQ | LQ / from+to | LQ / from+to | LQ / from+to | LQ / from+to | LQ / from+to |
+| G12 | INC | INC / from+to | INC / from+to | INC / from+to | INC / from+to | INC / from+to |
+| G13 | KQ | KQ / – | KQ / – | KQ / – | KQ / – | KQ / – |
+| G14 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G15 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G16 | UNS | UNS / eqp | UNS / – | UNS / eqp | UNS / eqp | UNS / eqp |
+| G17 | INC | INC / from+to | **무효** | **UNS** / eqp+from+to | INC / from+to | INC / from+to |
+| G18 | GQ | GQ / – | GQ / – | GQ / – | GQ / – | GQ / – |
+| G19 | LQ | **KQ** / – | LQ / – | **KQ** / – | **KQ** / – | LQ / – |
+| G20 | INC | INC / eqp+from+to (ctx) | INC / – | INC / – | INC / eqp | INC / – |
+| G21 | KQ | KQ / eqp | KQ / eqp | KQ / eqp | KQ / – | KQ / – |
+| G22 | INC | INC / from+to | INC / from+to | INC / from+to | INC / – | INC / – |
+
+- B 문항별(g는 f와 첫 출력 SHA 22/22 같음):
+
+| id | 기대 t | B c | B d | B e | B f | B g |
+|---|---|---|---|---|---|---|
+| G01 | INC | INC / from+to | INC / to | INC / from+to | INC / to | INC / to |
+| G02 | LQ | LQ / – | LQ / – | LQ / – | LQ / – | LQ / – |
+| G03 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G04 | KQ | KQ / – | KQ / – | KQ / – | KQ / – | KQ / – |
+| G05 | GQ | GQ / – | GQ / – | GQ / – | GQ / – | GQ / – |
+| G06 | LQ | LQ / – | LQ / – | LQ / – | LQ / – | LQ / – |
+| G07 | UNS | **INC** / – | **GQ** / – | **GQ** / – | **INC** / – | **INC** / – |
+| G08 | INC | INC / from+to (ctx) | **UNS** / – | **UNS** / – | INC / – | INC / – |
+| G09 | INC | **LQ** / – | **LQ** / from+to | **LQ** / – | INC / – | INC / – |
+| G10 | LQ | LQ / – | LQ / – | LQ / – | LQ / – | LQ / – |
+| G11 | LQ | LQ / from+to | LQ / to | LQ / to | LQ / to | LQ / to |
+| G12 | INC | **LQ** / from+to | **LQ** / from+to | **LQ** / from+to | INC / to | INC / to |
+| G13 | KQ | KQ / – | KQ / – | KQ / – | KQ / – | KQ / – |
+| G14 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G15 | UNS | UNS / – | UNS / – | UNS / – | UNS / – | UNS / – |
+| G16 | UNS | **GQ** / – | **GQ** / – | **GQ** / – | **GQ** / – | **GQ** / – |
+| G17 | INC | INC / from+to | INC / from+to | INC / from+to | INC / to | INC / to |
+| G18 | GQ | GQ / – | GQ / – | GQ / – | GQ / – | GQ / – |
+| G19 | LQ | LQ / – | LQ / – | LQ / – | LQ / – | LQ / – |
+| G20 | INC | INC / eqp+from+to (ctx) | INC / – | INC / – | INC / – | INC / – |
+| G21 | KQ | KQ / eqp | KQ / eqp | KQ / eqp | KQ / – | KQ / – |
+| G22 | INC | INC / – | INC / from+to | INC / – | INC / – | INC / – |
+
+- c·d·e·f 열은 §12.18 6) 표를 옮긴 것이다. 경계 케이스별 c·d·e·f는 §12.18 6) 표와 같고, g는 9/9 통과이며 첫 출력 SHA가 f와 9/9 같다(completion 59·97·146×7).
+- 첫 시도 `outputSha256` 일치 수(22문항): A g=c 4·g=d 6·g=e 7·g=f 6/20(f G01·G02는 출력 없음), B g=c 14·g=d 15·g=e 15·g=f 22.
+- 관찰(R1, 인과 확정 아님):
+  - g에서 A 실패는 G08 무효 하나와 인자 축(from+to 5·eqp 1)만 남았다. c~f 전반의 A G06·G19 `KQ`는 g에서 `LQ`(steps `tc.eqp.getOperationalSnapshot`)로 바뀌었고, f의 G05·G07·G16 `NONEMPTY_FOR_NO_TOOL_TASK` 재시도도 사라졌다.
+  - A의 유효 INC 6문항은 모두 steps에 `tc.logs.search`를 포함한다(f 유효 INC 5문항 G09·G12·G17·G20·G22 중 `tc.logs.search` 포함은 G09 1건).
+  - A G08만은 g 프롬프트 뒤에도 steps를 빈 배열로 먼저 쓰고 t=`INC`를 썼다. §12.19 위험 항목의 "t가 `UNS`로 따라감"은 일어나지 않았고, f와 같은 무효 축이 그대로 남았다.
+  - A·B 지연은 c~e 수준 이하로 돌아왔다. 진단 f의 A timeout·지연 증가는 이번처럼 메모리 여유가 큰 조건에서는 재현되지 않았다(인과 확정 아님).
+
+#### 7) `PREREG-v3-gate-g.md` §1 착수 조건 대조(판정은 root)
+
+| 조건 | 상태 | 근거 |
+|---|---|---|
+| 1. C13/C14 뒤 세 문서 `PREREG_VERIFIED` | 충족 | diag-g·regression-g는 이번 g-1·r-1, gate-g는 §12.19 C13/C14 절(이 세션 미재실행) |
+| 2. 진단 g·회귀 g exit 0·`complete=true`, 서버 `response_format` 거부(exit 5) 0 | 충족 | 14개 명령 exit 0, A·B·boundary `complete=true`(두 회차), 거부 0 |
+| 3a. B·A `QREF_INVALID` 0, 후보 0 `ID_OUT_OF_RANGE` 0 | 충족 | 위 4) |
+| 3b. G08 최종 t A·B 모두 INC | **미충족** | B 최종 `INC`. A는 두 시도 t=INC였지만 steps `EMPTY_FOR_TOOL_TASK` 2회로 최종 `INVALID`(effectiveT 없음) |
+| 3c. 경계 9 boundary-gen 9/9 | 충족 | 위 4) |
+| 4. root 원문 없는 검토 | 미완(대기) | 이 절과 진단 g·회귀 g 보고서 |
+
+- 조건 3b가 미충족이므로 gate-g §1에 따라 이 등록으로 R5를 실행하지 않는다. 이 세션은 R5·F0 leaf·gate·SPR을 만들지 않았다.
+
+#### 8) 미실행·원인 미확정·다음 정확 조치
+
+- 미실행: gate-g prereg-check 재실행, 정식 R5, P04.
+- 원인 미확정:
+  - A G08만 steps가 빈 배열로 남는 이유. 같은 프롬프트에서 다른 INC 6문항은 `tc.logs.search`를 넣었다. 원문을 저장하지 않으므로 출력 형태를 추정으로 결론 내리지 않는다.
+  - B G07 UNS→INC, B G16 UNS→GQ(분류 입력 불변이라 f와 같음).
+  - A 인자 축(G01·G09·G11·G12·G17 from+to, G16 eqp).
+- 다음 정확 조치(root 결정):
+  1. root가 진단 g·회귀 g 보고서와 이 재집계를 원문 없이 검토한다.
+  2. A G08 무효 축에 대한 보완은 새 사전등록 파일로만 한다(gate-g §1 마지막 항목). 이 세션은 설계하지 않았다.
+
+#### 9) 보존 확인
+
+- 정본 SPEC SHA `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be`는 불변이다(모든 run-binding specSha). HEAD C14 `87113b50a0a57f75c80c3e33a6faec1c3d39189d`, staged 0이며 git 쓰기는 0이다.
+- `git status --short`는 세션 시작과 같다(Devreport M, 기존 untracked 5항목). PREREG·입력·코드 변경은 0이다.
+
+| 파일 | 바이트 | SHA-256 |
+|---|---|---|
+| `eval/f0/results/20261103T032128Z-g/preflight.json` | 304 | `c9c344acfed2de216b5dc41b87b808e574107601830ed9385ce6bcd2da4d69e2` |
+| `eval/f0/results/20261103T032128Z-g/B/f0-results.json` | 31111 | `3ca5ba38bcec98ae92c94e9feac4a03e1efddcdde295df87b46763ba782a2b97` |
+| `eval/f0/results/20261103T032128Z-g/B/run-binding.json` | 1747 | `ec780be689192f9ba5e15f9a8d68dfd9a63ad39009101e653a25f0de25dea067` |
+| `eval/f0/results/20261103T032128Z-g/A/f0-results.json` | 35001 | `c2cedc5485df34fb8953bf991b65f1984529e8ca30055eba56c7fea20cfafb19` |
+| `eval/f0/results/20261103T032128Z-g/A/run-binding.json` | 1744 | `e714e82a6ec6142515371e334d1401e46762858b8f1e33d32b5efddbee253212` |
+| `eval/f0/results/20261103T032128Z-g/boundary/boundary-results.json` | 10005 | `f2ca5f60ad439d887718d32db55aa3b760d609e1b31770bd46325dc3d021f331` |
+| `eval/f0/results/20261103T032128Z-g/boundary/run-binding.json` | 1747 | `8138ecf619ee389c9b5c49e489dea2c4616beda655c053aca93cad7fd89fd97b` |
+| `eval/f0/results/20261103T032128Z-g/diagnostic-report.md` | 8833 | `648d27b9886fdc64f9a85aeabd272a076de5077b85331599e0469ddb3973ca94` |
+| `eval/f0/results/20261103T032128Z-regression-g/preflight.json` | 304 | `fe4a66cbe943907bb8a934a2dfb87136baa2d3b35af3d590972e471fbc291b10` |
+| `eval/f0/results/20261103T032128Z-regression-g/B/f0-results.json` | 42240 | `6f21d38a30c59bff45bfadc0d2107e88ea8e361a516a705ed73e9a3a8356393e` |
+| `eval/f0/results/20261103T032128Z-regression-g/B/run-binding.json` | 1761 | `764977bbcc0186d836d156864ce8ee4d0b6dae1ba2cdf9b1ee560788af2d813a` |
+| `eval/f0/results/20261103T032128Z-regression-g/A/f0-results.json` | 47437 | `17b20c06359ba5f635ca3e88db6b2cb3e602a038735594775113dc2d0bf42ea5` |
+| `eval/f0/results/20261103T032128Z-regression-g/A/run-binding.json` | 1761 | `d1475c72fe3b2d1b82fc7724ed13a1346f2d4c1f70b9452f3860adfd417d6952` |
+| `eval/f0/results/20261103T032128Z-regression-g/boundary/boundary-results.json` | 10016 | `5d33368e16d27c1cfbe43f4763b33d8f74502cd7b31634c216dd53f862e0ab68` |
+| `eval/f0/results/20261103T032128Z-regression-g/boundary/run-binding.json` | 1764 | `2c9863523bd0351f441b15a386ec1423b24d46092bac759f8c7b5ca3ee4a2468` |
+| `eval/f0/results/20261103T032128Z-regression-g/diagnostic-report.md` | 9162 | `93c802a885702e8246e65f5df52779dd6351fd2dfb58747679dfb2272b9d997b` |
+| `eval/f0/chat-template/v3-diag-g/qwen3-4b-instruct.template` | 4040 | `40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541` |
+| `eval/f0/chat-template/v3-diag-g/qwen3-4b-instruct.template.sha256` | 65 | `3dec2c0e5ff73781b43228f662b2555bb5d24f1eb741bb9a62ae39376550db33` |
+| `eval/f0/chat-template/v3-diag-g/model-digest.txt` | 65 | `235b84f5c9e0059f6830b38611571d3269572ed386b8b791b97400ef0df65ddd` |
+| `eval/f0/chat-template/v3-diag-g/run-binding.json` | 1748 | `1eb4b2f0ec7534089e595fdc712ffb68156ea9d1f9e937dd66486cf36171926a` |
+| `eval/f0/chat-template/v3-regression-g/qwen3-4b-instruct.template` | 4040 | `40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541` |
+| `eval/f0/chat-template/v3-regression-g/qwen3-4b-instruct.template.sha256` | 65 | `3dec2c0e5ff73781b43228f662b2555bb5d24f1eb741bb9a62ae39376550db33` |
+| `eval/f0/chat-template/v3-regression-g/model-digest.txt` | 65 | `235b84f5c9e0059f6830b38611571d3269572ed386b8b791b97400ef0df65ddd` |
+| `eval/f0/chat-template/v3-regression-g/run-binding.json` | 1765 | `7992270f51e4d796477ab9a917e72613dfb701135809e6f11e414a40a412b983` |
+
+- 기존 dirty(Devreport)·untracked 항목은 그대로 보존했다. 이 Devreport는 UTF-8·LF·BOM 없음이다.
+- 원문 질문·응답·API 응답·secrets·환경값은 출력·저장하지 않았다. 집계는 결과 JSON의 열거형·불리언·개수·해시 필드, `predicted.steps` capability ID, 골든의 id·기대 t만 사용했다. 이 절은 root 검토 전이며 완료·PASS를 확정하지 않는다.
+
+### 12.21 P03 A 스키마 키 순서 보완 후보 h 구현·등록 초안 (2026-11-03, 독립 Claude Code Opus 5.5 high, root 검토 전)
+
+- §12.1~§12.20은 바꾸지 않았다. 이 절 앞 바이트(354784 B, SHA `1ad9d388947861b69d5d78ce894bf77f78edf610edc75b54cbb2694bb582eb43`)는 그대로이며 이 절만 추가했다.
+- 하지 않은 것: 모델 실측(SSH·HTTP·모델 call/load/pull/unload), 서비스 변경, 다운로드, 새 capture, git 쓰기 전부. 제품 wire 키 집합·의미(`t`·`eqp`·`from`·`to`·`qRef`·`steps`)·`f0-judge-v2`·정확 일치 oracle·골든·fixture·경계 케이스·임계·분모·예산(입력 3072, `max_tokens` 192/256, ctx 4096)·재시도 1회·timeout·`classify-v3-f`·`PRESENCE_V1`·기존 등록·결과·capture·evidence·SPEC·Plan 변경 0.
+- **결론: A G08 의 구조적 원인(요청 본문 전체 키 정렬로 계획 스키마 `properties` 가 `eqp, from, qRef, steps, t, to` 순서로 송신됨)을 코드로 확정했고, 새 등록에서만 켜지는 응답 형식 값 `JSON_SCHEMA_PLAN_ORDERED_V1`(계획 스키마 `properties` 만 `t, eqp, from, to, qRef, steps` 순서로 송신)과 `plan-v3-h` 의 구현·시험·audit·등록 초안 3개까지 마쳤다. 기존 등록 값(NONE·JSON_SCHEMA_V1)과 B·경계·usage·token 요청 바이트는 그대로다. h 는 실측하지 않았으므로 F0 판정은 그대로다(기존 v2 F0 FAIL 유지, P03 미완료, P04 미착수).** 진단 h 를 실행하려면 로컬 C15/C16 사용자 허용이 먼저 필요하다.
+
+#### 1) 현재 키 순서 확인(코드·기록 대조)
+
+- 송신 경로(변경 전 HEAD C14 기준):
+  - `F0Measurements.Attempts` 가 등록 값이 `JSON_SCHEMA_V1` 이면 `ResponseSchema.responseFormat(kind, references)` 를 만든다(`F0Measurements.java:89`).
+  - `MeasurementSession.chat`(`:96`) → `OllamaChatClient.chat` 이 본문 Map 에 `response_format` 를 넣는다(`OllamaChatClient.java:62`).
+  - `send` 가 본문 전체를 `Json.canonical(Json.MAPPER.valueToTree(body))` 로 직렬화한다(`OllamaChatClient.java:86`). `Json.canonicalString` 은 모든 객체 키를 정렬한다(`Json.java:56` `Collections.sort(names)`).
+- `ResponseSchema.responseFormat` 은 `properties` 를 `t, eqp, from, to, qRef(, steps)` 순서로 만든다(변경 후 `ResponseSchema.java:44-52`, 본문 불변). 그러나 송신 바이트의 `properties` 는 A(계획) `eqp, from, qRef, steps, t, to`, B·경계(분류) `eqp, from, qRef, t, to` 다. 배열인 `required` 는 정렬되지 않아 `t, eqp, from, to, qRef(, steps)` 그대로 간다. 관찰된 A 출력 키 순서(§12.19 39건, §12.20 G08)는 송신된 `properties` 순서와 같고 `required` 순서와는 다르다.
+- 기록 대조: 진단 g·회귀 g 결과 122행(A 52·B 52·경계 18)의 `responseFormatSha256` 은 시험 쪽에서 독립 재구성한 스키마의 정렬 canonical SHA 와 122/122 같다(Node 재구성, 원문 없음).
+- A 스키마만 바꿀 수 있는가: 그렇다. 계획 스키마는 `Kind.PLAN` 에서만 만들어지고(`steps`·`name=f0_plan`), PLAN 을 쓰는 경로는 A 뿐이다. 근거는 run 의 프롬프트 역할 선택(`F0RunnerCli.java:54`), boundary-gen 의 CLASSIFY 강제(`F0Measurements.java:43`), usage·token 의 `response_format` 없는 3인자 chat(`F0Measurements.java:176`·`:196`)이다.
+
+#### 2) 후보 h 설계
+
+- opt-in 방식: 기존 `Prereg.RESPONSE_FORMATS` 에 새 값 `JSON_SCHEMA_PLAN_ORDERED_V1` 을 더했다(`Prereg.java:43`, `CONTEXT_PROJECTIONS` 와 같은 패턴). 서버 출력 제약 선택은 이미 `parameters.responseFormat` 하나가 담당하므로 별도 파라미터를 만들지 않았다. v3 전용이며 v1/v2 의 키 거부 규칙은 기존 그대로다. 기존 값 `NONE`·`JSON_SCHEMA_V1` 의 의미는 바뀌지 않는다.
+- 구현(f0 패키지 5파일):
+  - `ResponseSchema.Format(node, orderedPaths)` 레코드(`ResponseSchema.java:29`): 송신 값과 직렬화 규칙을 담는다. `bytes()` = `canonicalKeepingOrder(node, orderedPaths)`, `sha256()` = SHA-256(bytes()).
+  - `ResponseSchema.forPolicy(policy, kind, refs)`(`:34`): `NONE` 은 null, `JSON_SCHEMA_V1` 은 (기존 스키마, 경로 없음), `JSON_SCHEMA_PLAN_ORDERED_V1` 은 (같은 스키마, PLAN 일 때만 경로 `json_schema.schema.properties` 하나)이다.
+  - `canonicalKeepingOrder`(`:67`): 경로가 비면 `Json.canonical` 을 그대로 반환한다. 경로가 있으면 그 객체만 노드 순서로 쓰고, 나머지 객체는 정렬하며, 문자열·숫자는 `Json.canonicalString` 바이트 그대로다. `Json.java`(io 패키지)는 고치지 않았다. 따라서 전역 정렬은 그대로다. 또 이 코드를 f0 패키지에 둬서 변경이 harnessDigest(f0 소스만 포함)에 반영되게 했다.
+  - `OllamaChatClient.chat(…, ResponseSchema.Format)`(`:58-67`): 본문에 `node` 를 넣고 순서 보존 경로를 `response_format` 아래로 붙여 `send` 에 넘긴다. `send(method, path, body)` 는 `Set.of()` 로 위임하므로 ps·tags·show·generate·usage·token 송신은 기존 식과 같다(`:86-92`).
+  - `MeasurementSession.chat` 은 매개변수 타입만 바꿨다(`:93`). `F0Measurements.Attempts` 는 `forPolicy`·`responseFormat.sha256()` 을 쓴다(`:89`·`:101`).
+  - `ResponseSchema.sha256(ObjectNode)` 는 main 에서 쓰이지 않게 되어 제거했다. 이를 쓰던 시험 1줄(`F0StructuredOutputDiagnosticTest`)은 같은 정의인 `Json.sha(Json.canonical(…))` 로 직접 적었다.
+- `responseFormatSha256` 정의 변경: "정렬 canonical 의 SHA" 에서 "요청 본문 안 `response_format` 값의 실제 송신 바이트 SHA-256" 으로 바꿨다. `JSON_SCHEMA_V1` 과 h 의 분류 스키마는 송신 바이트가 정렬 canonical 이므로 값이 기존과 같다(시험 ②③, 위 기록 대조 122/122). h 의 계획 스키마만 순서 보존 바이트의 SHA 가 된다.
+- `plan-v3-h`(g 기반, diff 3곳 4줄):
+  - [출력 스키마] 제목을 "키는 이 순서로 출력되며 t 가 steps 보다 먼저 나온다" 로 바꿨고, 표시 줄은 `{"t":…,"eqp":…,"from":…,"to":…,"qRef":…,"steps":[…]}` 다(f 와 같은 줄, 송신 순서와 같음).
+  - [steps] 제목은 "출력에서 t 가 steps 보다 먼저 나온다. steps 는 앞서 [t 분류]·[소유 시스템 판단] 으로 정한 t 에 맞춘다" 다.
+  - "뒤에 쓰는 t 는 앞서 쓴 steps 와 맞는 t 다" 를 "steps 는 앞서 쓴 t 와 맞아야 한다" 로 바꿨다.
+  - t 별 Tool 규칙(INC 는 `tc.logs.search` 포함 등)·[t 분류]·[소유 시스템 판단]·[인자]·`STEPS_INVALID` 뜻은 g 와 바이트가 같다. 크기는 4104 B, pin tokenizer 1206토큰이다(g 1219, f 1044).
+- 3b 충족 근거:
+  - G08 실패는 t 가 아니라 t 보다 먼저 생성되는 steps 였다. A 두 시도의 t 는 f·g 모두 `INC` 였다.
+  - h 는 송신 스키마에서 `t` 를 첫 키, `steps` 를 마지막 키로 둔다. 프롬프트 지시만으로 바꾸지 못한 생성 순서를 서버 제약 쪽에서 맞추는 것이다.
+  - t 가 먼저 `INC` 로 정해지면, steps 는 g 와 같은 INC 규칙(`tc.logs.search` 포함)을 따른다. 진단 g 에서 다른 유효 INC 6문항은 모두 이 규칙대로 `tc.logs.search` 를 넣었다.
+  - B G08 은 g 와 같은 입력이므로 g 의 초회 `INC` 결과 조건과 같다.
+- 3a·3c·회귀 근거: B·경계 메시지와 분류 스키마 송신 바이트가 g 와 같다. 따라서 g 의 `QREF_INVALID` 0·`ID_OUT_OF_RANGE` 0·경계 9/9·회귀 R01~R08 B 통과와 같은 입력이다(R=1·temperature 0, 서버·모델 동일 전제). A 쪽 R01~R08 유지 여부는 회귀 h 로 확인한다.
+- 위험(실측 전 미확정):
+  - 서버가 스키마 `properties` 순서를 그대로 출력 생성 순서로 쓰는지는 서버 코드로 확인하지 않았다(추정). 지금까지 송신 순서와 정렬 순서가 같았으므로, 기존 39/39 관찰은 "서버가 송신 순서를 따른다" 와 "서버가 키를 다시 정렬한다" 를 구분하지 못한다. 후자라면 h 의 A 출력은 g 와 같은 키 순서가 되며, 진단 h 의 A 출력 SHA 로 판별된다.
+  - t 를 먼저 쓰면 A 의 t 판단이 steps 근거 없이 정해진다. 진단 g 에서 steps 와 맞춰 고쳐졌던 G06·G19(LQ)가 다시 `KQ` 로 갈 수 있다.
+  - 인자(eqp·from·to·qRef)가 steps 앞으로 오면서 A 인자 출력이 g 와 달라질 수 있다(실제 생성 순서가 c~g 와 달라지는 첫 후보).
+  - R=1·단일 결정 출력 근거다.
+- SPEC 계약: 정본 SPEC 1203줄은 요청별 스키마가 "wire 계약만 표현"(필수 키·추가 키 금지·`t` enum·nullable 인자·`qRef` enum/null·`steps` 문자열 배열)한다고 정하고 키 순서는 정하지 않는다. h 의 스키마 내용은 V1 과 같다(`Json.parse` 동등 시험). 따라서 SPEC 계약 변경은 필요 없다.
+
+#### 3) 변경 파일(이 절 제외 15파일 + Devreport)
+
+| 파일 | 구분 | 바이트 | SHA-256 |
+|---|---|---|---|
+| `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/ResponseSchema.java` | 수정(+46/−2) | 5824 | `8fbe19470dbd3af54d142bfb5c13cc071ad4f9cc8205c319d6bbcabcfd1eaaa0` |
+| `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/OllamaChatClient.java` | 수정(+12/−6) | 10586 | `39317a1c50b83f154b65115ded94c818e4867bec8158d5da3049e28c1a1741db` |
+| `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/MeasurementSession.java` | 수정(+2/−3) | 8080 | `f8162d1d1084070f3b6139c1b8d545215b50e2169629832007433c8733e3c11d` |
+| `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/F0Measurements.java` | 수정(+3/−3) | 20222 | `5d19695da945ea66ed576e0fe26b2e92d0c6a0d1487eadda9ceeb2b0bf9b6fdb` |
+| `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/Prereg.java` | 수정(+2/−2) | 16620 | `1445996e891ba060a53d63f7d2a4c34ea117eb67e486274842b5de46f2500f69` |
+| `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0PlanSchemaOrderTest.java` | 신규(4시험) | 16882 | `8aa4eb1a087a87c791198d018a0e902b41b4d2cd779658cab3a204386bf0afff` |
+| `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V3RegistrationDraftTest.java` | 수정(+78/−21) | 37135 | `c514cd08fa2797802169b5bb3a1fdc007225b6d77944c84fd25819111245f089` |
+| `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0StructuredOutputDiagnosticTest.java` | 수정(+1/−1) | 26813 | `52a7cf1ebf98b31c76860ba46b3243f61edd39f1dbfe1f0692342199918bf002` |
+| `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/OllamaStub.java` | 수정(+3/−2, 받은 본문 raw 바이트 기록) | 7792 | `87a3cc84a37cf325a4a50394bf27701fae3c595c447153e1779b5070774c9ad9` |
+| `eval/f0/v3/prompts/plan-v3-h.txt` | 신규(1206토큰) | 4104 | `6c6997f4a6263658f28bc1ab86fec86553db667f976c91e113b645f1a63d197a` |
+| `eval/f0/v3/input-audit-v3-h.json` | 신규(651행) | 92669 | `40201ea139c4e75a6d4c5209aa2bf0642fe2c27b397ab6ac7f59324635a4b9bc` |
+| `eval/f0/v3/input-audit-v3-regression-h.json` | 신규(843행) | 119389 | `25f7300b7811d6aa316c1b03e2b859dac1ecc6d06e9f354e4f1804838001cfdc` |
+| `eval/f0/PREREG-v3-diag-h.md` | 신규 초안 | 13053 | `63a565f3c71ee1e53e500d0eebd7fe30901612a2e5e54114d5ea5de594141a3b` |
+| `eval/f0/PREREG-v3-regression-h.md` | 신규 초안 | 9705 | `3c61ec91ecff0b581f59ca2fb11cbed7b83677dcae40bfcdbd0294430d11d98e` |
+| `eval/f0/PREREG-v3-gate-h.md` | 신규 초안 | 12145 | `b4a2f1f59776150d50fc21ab8fb834548293301028a53c3eaf082f3942753810` |
+
+- 15파일 모두 UTF-8·LF(CR 바이트 0)·BOM 없음, `git diff --check` exit 0.
+
+#### 4) 시험(이 세션 실행, root 실행 아님, Gradle 동시 실행 0)
+
+- 실패 시험 먼저: 구현 전 `:gateway-eval:compileTestJava` 가 `cannot find symbol`(`forPolicy`·`Format`·`PLAN_ORDERED_POLICY`·`canonicalKeepingOrder`) 컴파일 오류 28로 실패(`BUILD FAILED`, exit 1)함을 확인했다. 구현 뒤 `F0PlanSchemaOrderTest`·`F0StructuredOutputDiagnosticTest`·`OllamaChatClient*` 필터 실행은 PASS(4·7·3·9 tests, failures 0)였다.
+- `F0PlanSchemaOrderTest` 4건:
+  - ① 직렬화기: 경로 없음 = `Json.canonical` 바이트, 지정 객체만 노드 순서(형제·자식·조상 정렬, 이스케이프·숫자 canonical 그대로), 배열 안 객체는 지정되지 않는다(손으로 쓴 기대 문자열).
+  - ② 실제 등록 질문 61개(v2 골든 22·회귀 30·경계 9) × 두 종류:
+    - `NONE` = null.
+    - V1 `bytes` = 변경 전 정의 `Json.canonical(responseFormat)`, `sha256` 도 같다.
+    - 새 값의 분류 스키마는 V1 과 바이트·SHA 가 같다.
+    - 새 값의 계획 스키마는 내용(`Json.parse`)이 V1 과 같고, `properties` 순서가 `t, eqp, from, to, qRef, steps` 다. 송신 바이트는 정렬 canonical 문자열에서 `properties` 하나만 바꾼 독립 구성과 같다.
+  - ③ 실제 HTTP stub(B·A·경계·usage·token, 초회 무효 → 재시도 전수, `NONE`·V1·새 값 세 등록):
+    - `NONE`·V1 의 모든 요청 raw 바이트 = 받은 본문의 정렬 canonical(변경 전 식)이다.
+    - 새 값의 A 외 요청 raw 바이트 = V1 과 같다. A 요청은 내용이 같고 `properties` 순서만 다르다(독립 구성과 바이트 일치). 송신된 `response_format` 바이트 = `Format.bytes()` 이고, 초회와 재시도가 같다.
+    - 결과 행 `responseFormatSha256`: V1 B·A·경계와 새 값 B·경계는 정렬 canonical SHA, 새 값 A 는 송신 바이트 SHA 다. `NONE` 행에는 이 열이 없다.
+    - run-binding `parameterManifest.responseFormat`·진단 보고서 표기, sentinel 비노출도 확인했다.
+  - ④ 등록 값: `RESPONSE_FORMATS` = {NONE, V1, 새 값}. 소문자·`_V2`·`JSON_SCHEMA_V2`·v2 스키마에서의 키·GATE R1 은 `PREREG_INVALID`, GATE R5 는 유효다.
+- `F0V3RegistrationDraftTest` 변경(C7·C11 때와 같은 방식):
+  - 하네스 소스가 바뀌어 f(C11/C12)·g(C13/C14) 등록이 현재 하네스 기준 stale 이 된다. g 3문서를 과거 등록 묶음(C13·C14, `PRESENCE_V1`)에 넣었고, `HARNESS_UNCHANGED_SINCE_REGISTRATION` 은 비게 됐다.
+  - 따라서 f·g 는 역사 신원(등록 commit 트리 harnessDigest·PREREG commit·입력 바이트 불일치 0)과 현재 하네스 `localMismatches=["harnessDigest"]`·`verify`=`PREREG_INPUT_CHANGED` 를 단정한다. 기존 C5~C10 단정은 그대로다. g 의 `responseFormat=JSON_SCHEMA_V1` 단정을 추가했다.
+  - 후보 묶음은 h 3초안(`PRESENCE_V1`·`JSON_SCHEMA_PLAN_ORDERED_V1`, 로컬 불일치 0, 초안이면 `PREREG_NOT_COMMITTED`·등록 뒤면 실제 `verify` 통과, capture 경로 고유)으로 바꿨다.
+  - 비교 시험에 h↔gate-h·h↔regression-h 를 넣었다. g→h 는 `planPrompt`·`inputAudit`·`promptSha256.plan`·`responseFormat` 만 다르다고 단정한다.
+  - 신규 시험 `candidateHChangesOnlyPlanPromptAndPlanSchemaWireOrderAndKeepsEveryOtherRequestOfCandidateG`: g·h(진단, 회귀) 실제 조립 목록에서 A 외 행의 메시지 SHA·audit 행 SHA·계수가 g 와 같고, A 행은 system 만 다르다. 질문·경계마다 분류 스키마 송신 바이트가 g 와 같고, 계획 스키마는 내용이 같고 순서만 `t` 먼저다.
+  - 기존 f→g 비교 시험(`candidateGChanges…`)은 그대로 유지했다.
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `.\gradlew.bat :gateway-eval:test --console=plain`(무필터, `AIGW_SPEC_FILE`=정본 SPEC, test 태스크 실제 실행) | 0 | JUnit XML 41개 합산 194 tests·failures 0·errors 0·skipped 0(기존 189 + `F0PlanSchemaOrderTest` 4 + 등록 시험 1, `F0V3RegistrationDraftTest` 7) |
+| `.\gradlew.bat :gateway-eval:run --console=plain "--args=test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+
+- 전체 시험 출력 끝: `> Task :gateway-eval:test`, `> Task :gateway-eval:testLeafEvidence`, `BUILD SUCCESSFUL in 4m 34s`, `6 actionable tasks: 2 executed, 4 up-to-date`.
+
+#### 5) 입력 audit(실제 Java 조립 + 등록 렌더러 + pin tokenizer)
+
+- 렌더: `f0 input-audit-render --golden {v2 22 | 회귀 30} --fixture eval/golden/tc-registry-fixture-v2.json --classify-prompt eval/f0/v3/prompts/classify-v3-f.txt --plan-prompt eval/f0/v3/prompts/plan-v3-h.txt --cases eval/f0/v2/output-boundary-cases.jsonl --usage-messages eval/f0/v2/usage-probe-input-v2.jsonl --token-messages eval/f0/v2/token-golden-input-v2.jsonl --renderers eval/f0/chat-renderers-v1.json --template-sha256 40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541 --context-projection PRESENCE_V1` → `F0_INPUT_AUDIT_RENDERED 651`·`843`. 렌더 JSONL 은 레포 밖 세션 임시 디렉터리에 두었다.
+- 계수: `count_input_audit_v2.py`(Python `-I -B`, pin tokenizer `aeb13307…dae4`, template `40c21f34…b541`) → `INPUT_AUDIT_WRITTEN 651 OVER_BUDGET 0`·`843 OVER_BUDGET 0`.
+- 전수 재검증: 렌더↔audit 행 순서·id·messagesSha256 651/651·843/843 일치, 행별 입력 ≤ 상한·입력+`max_tokens` ≤ 4096 위반 0. 메타데이터(kind·schema·renderer·template·tokenizer·tokenizers 버전·tool)는 g audit 와 같고 `maxInputTokensByGroup` 만 다르다.
+
+| audit | A 첫/재시도 최대 | B 첫/재시도 최대 | 경계 첫/재시도 최대 | usage | token | 최대 입력+출력 |
+|---|---|---|---|---|---|---|
+| g | 1791/1830 | 1390/1429 | 3023/3062 | 1376 | 2793 | 3254 |
+| h | 1778/1817 | 1390/1429 | 3023/3062 | 1376 | 2793 | 3254(`boundary/ESCAPE-CONTROL/retry/USAGE_EXCEEDS_LIMIT`) |
+| 회귀 g | 1807/1846 | 1406/1445 | 3023/3062 | 1376 | 2793 | 3254 |
+| 회귀 h | 1794/1833 | 1406/1445 | 3023/3062 | 1376 | 2793 | 3254 |
+
+- g 대비(같은 위치 id): A 264/264·360/360 행은 SHA 가 모두 다르고 계수는 모두 −13 이다. **B 264·경계 108·usage 2·token 13(=387행)과 회귀 B 360·경계 108·usage 2·token 13(=483행)은 id 순서·messagesSha256·계수가 전부 같다.** A 최대 입력+출력은 2073(회귀 2089)이다.
+- `response_format` 과 입력 토큰 계수:
+  - audit 렌더는 chat 메시지만 렌더한다(`F0RunnerCli.java:148` `renderer.render(call.messages())`).
+  - 진단 g·회귀 g 실측 결과에서 `response_format` 을 보낸 호출 124건(A 23+31, B 22+30, 경계 9+9)의 `usage.prompt_tokens` 가 audit 계수와 124/124 같다(결과 JSON 정제 필드 재집계). 따라서 이 서버에서 `response_format` 은 입력 토큰 계수에 들어가지 않는다(V1 기준 확정).
+  - h 는 같은 스키마의 키 순서만 바꾸므로 같은 결과일 것으로 본다(추정, 진단 h 에서 확인).
+
+#### 6) 등록 초안 3개·등록 검사
+
+| 초안 | 목적 | R | 골든·audit | capture | harnessDigest | parameterManifestSha256 |
+|---|---|---|---|---|---|---|
+| `PREREG-v3-diag-h.md` | DIAGNOSTIC | 1 | v2 22 + `input-audit-v3-h.json` | `v3-diag-h` | `2c35eb07c28a3aa6f9f52c5158c17d1413368fd7d7e2ad8fb53a50a1ffbc9a9f` | `0ce7e01df9f7f074554c6df9f5b6da4f35cdc7a13226d5b1131e7c9dcdb781ee` |
+| `PREREG-v3-regression-h.md` | DIAGNOSTIC | 1 | 회귀 30 + `input-audit-v3-regression-h.json` | `v3-regression-h` | `63c9fa7ea8a0a6f7ec9da621e73b2bcfd1eb0b1924213b7404852ed67cd394d0` | `0ce7e01d…81ee` |
+| `PREREG-v3-gate-h.md` | GATE | 5 | v2 22 + `input-audit-v3-h.json`(diag-h 와 바이트 동일) | `v3-gate-h` | `2c35eb07…9a9f` | `647d127dc5ab009d3dddbe29884ef2b67f16552c2fb21230999c4f527c3ac278` |
+
+- 기계 판독 블록은 g 블록에서 만들었다. Node 키 단위 비교에서 g 대비 바뀐 것은 `registrationStatus`·`registeredCommit`(UNCOMMITTED/null)·`runtimeCaptureDir`·`inputRoles.{planPrompt,inputAudit}`·해당 inputs 2개·`harnessDigest`·`parameters.promptSha256.plan`·`parameters.responseFormat`(=`JSON_SCHEMA_PLAN_ORDERED_V1`)뿐이다. 최상위 키 순서는 같다. `classifyPrompt`·`contextProjection=PRESENCE_V1`·나머지 입력 13개·파라미터는 같다. gate-h 는 diag-h 와 inputs·inputRoles·repeats 외 파라미터가 같다.
+- §2 실행 순서는 g 문서의 §2 를 g→h 로만 바꾼 것과 3문서 모두 줄 단위로 같다(diff 0).
+- harnessDigest 는 Java `prereg-check` 의 `currentHarnessDigest` 와 Node 독립 재계산(등록 inputs + f0 소스 24파일, 정렬 경로·SHA 쌍 JSON 의 SHA-256)이 일치했다. 같은 Node 계산을 C13 트리에 적용하면 g 등록값(`4de7eadb…5597`·`fd7e9523…6cb5`)이 재현된다.
+- gate-h §1 착수 조건은 gate-g 와 같은 수준이다. C15/C16 뒤 3문서가 `PREREG_VERIFIED` 이고, 진단 h·회귀 h 가 exit 0·complete 이며, 진단 h 에서 `QREF_INVALID` 0·후보 0 `ID_OUT_OF_RANGE` 0·G08 최종 t A·B INC·경계 9/9 를 충족하고, root 가 원문 없이 검토해야 한다. AC-38-F0 의 A 쪽 workflow(`tc.logs.search`) 조건은 착수 조건이 아니라 R5 판정 규칙(기존 그대로)으로 적었다.
+- `f0 prereg-check`(endpoint 인자 없음, 모델 요청 0, 순차). 거부는 Java `EvalException(2, …)`, Gradle exit 1 이다.
+
+| 등록 | localMismatches | 결과 |
+|---|---|---|
+| diag-h·regression-h·gate-h(초안) | `[]` | `PREREG_NOT_COMMITTED` |
+| diag-g·regression-g·gate-g(C13/C14) | `["harnessDigest"]`(current `3871cf94…`·`fd47ed0b…`·`3871cf94…`) | `PREREG_INPUT_CHANGED`(이번 소스 변경으로 stale) |
+| diag-f(C11/C12) | `["harnessDigest"]` | `PREREG_INPUT_CHANGED`(이번 소스 변경으로 stale) |
+
+- 기존 등록 재현성: 15개 과거 등록 모두 입력 바이트 불일치 0 이고, 역사 신원은 실제 git `verifyHistorical` 로 재확인했다. `NONE`·V1 요청 바이트·`responseFormatSha256` 은 변경 전 식과 같다(시험 ②③, 실측 기록 122/122). 즉 신규 측정만 stale 로 거부된다. 진단 f·g 와 회귀 g 는 측정을 마쳤고(회귀 f 는 §12.18 미완 기록 그대로), gate-f·gate-g 는 착수 조건 미충족으로 실행 대상이 아니다.
+
+#### 7) 다음 커밋 범위 제안(사용자 허용 필요 — 기존 허용은 C13/C14까지)
+
+- C15(로컬 commit, 정확 16파일): 위 3) 표 15파일 + `docs/ai-rag-gateway-architecture-dev-report.md`. Devreport 에는 C13 뒤 미커밋으로 추가된 §12.19 "로컬 C13/C14 등록·최종 시험"·§12.20·이 절이 함께 들어간다. 초안 3문서는 UNCOMMITTED/null 그대로 넣는다. 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`, `evidence/F0/`, `eval/py/**/__pycache__/`)는 넣지 않는다.
+- C16(로컬 commit, 정확 3파일): `eval/f0/PREREG-v3-{diag-h,regression-h,gate-h}.md` 에 `registrationStatus=REGISTERED`, `registeredCommit`=C15 SHA, 등록 설명만 기록한다. inputs·harnessDigest·parameters 는 바꾸지 않는다.
+- C16 뒤 순서: 3문서 `f0 prereg-check` → (Jetson 메모리·서비스 상태 확인) → 진단 h(diag-h §2) → 회귀 h → gate-h §1 충족 시 R5 → SPEC §14.5 기록·재판정·F0 gate. P04 는 착수하지 않는다.
+
+#### 8) 보존 확인
+
+- 정본 SPEC SHA `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be` 불변이다. HEAD C14 `87113b50a0a57f75c80c3e33a6faec1c3d39189d`, staged 0, git 쓰기 0 이다.
+- `eval/f0/results`·`eval/f0/chat-template`·`evidence`·`eval/golden`·기존 프롬프트·기존 PREREG·기존 audit 변경 0, 새 `.pyc` 0(Python `-I -B`). `eval/f0` 아래 신규 파일은 위 6개뿐이다. `Json.java` 변경 0.
+- 기존 dirty(Devreport)·untracked 항목은 그대로 보존했다. 응답 원문·API 응답·secrets·환경값은 출력·저장하지 않았다. 이 절은 root 검토 전이며 완료·PASS 를 확정하지 않는다.
