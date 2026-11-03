@@ -53,7 +53,7 @@ public final class F0RunnerCli {
                 if (!ROUTES.contains(route)) throw new EvalException(2, "ARGUMENT_INVALID");
                 registered(args, "--golden", document.input("golden")); registered(args, "--fixture", document.input("fixture")); registered(args, "--prompt", document.input(route.equals("A") ? "planPrompt" : "classifyPrompt"));
                 Path dir = results(path(args, "--out"), runId);
-                RegistryFixture fixture = RegistryFixture.load(path(args, "--fixture")); GoldenSet golden = GoldenSet.load(path(args, "--golden"), fixture); MessageAssembler assembler = MessageAssembler.load(path(args, "--prompt"), fixture);
+                RegistryFixture fixture = RegistryFixture.load(path(args, "--fixture")); GoldenSet golden = GoldenSet.load(path(args, "--golden"), fixture); MessageAssembler assembler = MessageAssembler.load(path(args, "--prompt"), fixture, document.contextProjection());
                 if (document.versioned()) for (GoldenSet.Question q : golden.questions()) QRefContext.extract(q.question());
                 checkRepeats(document, repeats);
                 if (document.versioned()) audit(preregPath).requireAll(InputAudit.run(golden, assembler, document.budget(), route));
@@ -67,7 +67,7 @@ public final class F0RunnerCli {
                 String runId = runId(args.required("--run-id")); int repeats = repeats(args);
                 registered(args, "--cases", document.input("boundaryCases")); registered(args, "--fixture", document.input("fixture")); registered(args, "--prompt", document.input("classifyPrompt"));
                 Path dir = results(path(args, "--out"), runId);
-                RegistryFixture fixture = RegistryFixture.load(path(args, "--fixture")); List<JsonNode> cases = BoundaryCases.load(path(args, "--cases")); MessageAssembler assembler = MessageAssembler.load(path(args, "--prompt"), fixture);
+                RegistryFixture fixture = RegistryFixture.load(path(args, "--fixture")); List<JsonNode> cases = BoundaryCases.load(path(args, "--cases")); MessageAssembler assembler = MessageAssembler.load(path(args, "--prompt"), fixture, document.contextProjection());
                 validateCaseVersion(cases, document);
                 checkRepeats(document, repeats);
                 if (document.versioned()) audit(preregPath).requireAll(InputAudit.boundary(cases, assembler, document.budget()));
@@ -126,10 +126,13 @@ public final class F0RunnerCli {
             }
             case "input-audit-render" -> {
                 // 준비 전용: 등록 예정 입력으로 하네스가 보낼 모든 chat 메시지를 검토된 렌더러로 렌더해 공식 tokenizer 계수 입력을 만듭니다(추론 호출 0).
-                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--out");
+                // --context-projection 이 없으면 기존 전체 Context 조립 그대로입니다. 값은 등록 가능한 투영만 받고 측정 때는 등록 값으로 조립한 메시지 SHA 와 대조됩니다.
+                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--context-projection", "--out");
+                String requested = args.optional("--context-projection"), projection = requested == null ? MessageAssembler.FULL : requested;
+                if (requested != null && !Prereg.CONTEXT_PROJECTIONS.contains(requested)) throw new EvalException(2, "ARGUMENT_INVALID");
                 Path fixturePath = path(args, "--fixture"), classifyPath = path(args, "--classify-prompt"), goldenPath = path(args, "--golden");
                 RegistryFixture fixture = RegistryFixture.load(fixturePath); GoldenSet golden = GoldenSet.load(goldenPath, fixture);
-                MessageAssembler classify = MessageAssembler.load(classifyPath, fixture), plan = MessageAssembler.load(path(args, "--plan-prompt"), fixture);
+                MessageAssembler classify = MessageAssembler.load(classifyPath, fixture, projection), plan = MessageAssembler.load(path(args, "--plan-prompt"), fixture, projection);
                 if (classify.kind() != MessageAssembler.Kind.CLASSIFY || plan.kind() != MessageAssembler.Kind.PLAN) throw new EvalException(2, "PROMPT_INVALID");
                 String templateSha = args.required("--template-sha256");
                 ChatRenderers.Renderer renderer = ChatRenderers.forTemplate(path(args, "--renderers"), templateSha);
@@ -137,8 +140,8 @@ public final class F0RunnerCli {
                 if (cases.stream().anyMatch(row -> !row.has("expectedResolvedOutput"))) throw new EvalException(2, "CASES_VERSION_INVALID");
                 List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A"));
                 planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B")); planned.addAll(InputAudit.boundary(cases, classify, Prereg.Budget.V2));
-                planned.addAll(InputAudit.probes("usage", messages(path(args, "--usage-messages"), fixturePath, classifyPath, goldenPath, true)));
-                planned.addAll(InputAudit.probes("token", messages(path(args, "--token-messages"), fixturePath, classifyPath, goldenPath, true)));
+                planned.addAll(InputAudit.probes("usage", messages(path(args, "--usage-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
+                planned.addAll(InputAudit.probes("token", messages(path(args, "--token-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
                 StringBuilder lines = new StringBuilder();
                 for (InputAudit.Planned call : planned) {
                     Map<String,Object> row = new LinkedHashMap<>(); row.put("id", call.id()); row.put("messagesSha256", InputAudit.messagesSha256(call.messages()));
@@ -218,9 +221,12 @@ public final class F0RunnerCli {
         return messages(file, Prereg.parse(context.root().resolve(Prereg.DEFAULT_PATH)));
     }
     List<Map.Entry<String,List<Map<String,String>>>> messages(Path file, Prereg.Document document) {
-        return messages(file, context.root().resolve(document.input("fixture")), context.root().resolve(document.input("classifyPrompt")), context.root().resolve(document.input("golden")), document.versioned());
+        return messages(file, context.root().resolve(document.input("fixture")), context.root().resolve(document.input("classifyPrompt")), context.root().resolve(document.input("golden")), document.versioned(), document.contextProjection());
     }
     static List<Map.Entry<String,List<Map<String,String>>>> messages(Path file, Path fixturePath, Path classifyPrompt, Path goldenPath, boolean versioned) {
+        return messages(file, fixturePath, classifyPrompt, goldenPath, versioned, MessageAssembler.FULL);
+    }
+    static List<Map.Entry<String,List<Map<String,String>>>> messages(Path file, Path fixturePath, Path classifyPrompt, Path goldenPath, boolean versioned, String contextProjection) {
         List<Map.Entry<String,List<Map<String,String>>>> rows = new ArrayList<>(); Set<String> ids = new HashSet<>();
         MessageAssembler assembler = null; GoldenSet golden = null;
         for (String line : new String(Json.bytes(file), StandardCharsets.UTF_8).split("\n")) {
@@ -232,7 +238,7 @@ public final class F0RunnerCli {
             if (row.has("assemble")) {
                 if (assembler == null) {
                     RegistryFixture fixture = RegistryFixture.load(fixturePath);
-                    assembler = MessageAssembler.load(classifyPrompt, fixture); golden = GoldenSet.load(goldenPath, fixture);
+                    assembler = MessageAssembler.load(classifyPrompt, fixture, contextProjection); golden = GoldenSet.load(goldenPath, fixture);
                 }
                 GoldenSet.Question q = golden.byId(row.path("assemble").path("goldenId").asText());
                 messages.addAll(versioned ? assembler.messages(q.question(), q.context(), QRefContext.extract(q.question())) : assembler.messages(q.question(), q.context()));

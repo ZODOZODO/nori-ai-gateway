@@ -18,6 +18,7 @@ public final class F0Measurements {
 
     /** f0 run: 회차 r 에서 모든 문항을 고정 순서로 1회씩(라운드로빈), 그다음 회차. */
     public static void run(MeasurementSession session, String path, GoldenSet golden, RegistryFixture fixture, MessageAssembler assembler, int repeats, String runId, Path out) {
+        requireProjection(session, assembler);
         ObjectNode result = header(runId, repeats); result.put("path", path); result.put("questionCount", golden.questions().size());
         Prereg.Budget budget = session.prereg().document().budget(); int maxTokens = budget.output(assembler.kind()), inputLimit = budget.input(assembler.kind());
         result.put("goldenSha256", Json.sha(golden.bytes())); result.put("fixtureSha256", Json.sha(fixture.bytes())); result.put("promptSha256", Json.sha(assembler.promptBytes())); result.put("maxTokens", maxTokens); result.put("inputLimitTokens", inputLimit);
@@ -40,6 +41,7 @@ public final class F0Measurements {
     /** f0 boundary-gen: Path B 와 같은 분류 메시지 조립으로 케이스당 R 회 생성, oracle 은 회차별(완결 JSON·스키마·인자 코드포인트 정확 일치·≤ 등록 분류 출력 상한). */
     public static void boundaryGen(MeasurementSession session, List<JsonNode> cases, RegistryFixture fixture, MessageAssembler assembler, int repeats, String runId, Path out) {
         if (assembler.kind() != MessageAssembler.Kind.CLASSIFY) throw new EvalException(2, "PROMPT_INVALID");
+        requireProjection(session, assembler);
         ObjectNode result = header(runId, repeats); ArrayNode rows = result.putArray("cases"); Path file = out.resolve("boundary-results.json");
         Prereg.Budget budget = session.prereg().document().budget(); result.put("maxTokens", budget.classifyOutput()); result.put("inputLimitTokens", budget.classifyInput());
         Map<String,ObjectNode> byCase = new LinkedHashMap<>();
@@ -69,6 +71,10 @@ public final class F0Measurements {
                 Json.write(file, result);
             }
         });
+    }
+    /** 조립기의 Context 투영은 등록 parameters 값과 같아야 합니다(호출자가 다른 투영으로 만든 조립기로 송신 0). */
+    private static void requireProjection(MeasurementSession session, MessageAssembler assembler) {
+        if (!assembler.contextProjection().equals(session.prereg().document().contextProjection())) throw new EvalException(2, "CONTEXT_PROJECTION_MISMATCH");
     }
     /**
      * 한 요청(초회 + 재시도)의 송신 기록. 재시도도 같은 요청 바인딩으로 만든 같은 response_format 을 보내고, 시도마다 사전 입력 계수와

@@ -107,7 +107,7 @@ public final class F0ReportWriter {
         StringBuilder md = new StringBuilder("# F0 진단 보고서 — ").append(runId).append("\n\n");
         md.append("- **진단 전용(purpose=DIAGNOSTIC)**: F0 leaf 증거·게이트 입력·§14.5 제안서 0. 이 보고서는 AC 판정이 아니다.\n");
         md.append("- 측정 시작: ").append(loaded.binding().path("startedAt").asText()).append(", 측정 SPEC SHA256: `").append(loaded.binding().path("specSha").asText()).append("`\n");
-        md.append("- 사전등록: `").append(Prereg.relativePath(context.root(), preregPath)).append("`, 등록 commit `").append(document.registeredCommit()).append("`, responseFormat `").append(document.responseFormat()).append("`\n");
+        md.append("- 사전등록: `").append(Prereg.relativePath(context.root(), preregPath)).append("`, 등록 commit `").append(document.registeredCommit()).append("`, responseFormat `").append(document.responseFormat()).append("`, contextProjection `").append(document.contextProjection()).append("`\n");
         md.append("- 신원: harnessDigest `").append(loaded.binding().path("harnessDigest").asText()).append("`, parameterManifestSha256 `").append(loaded.binding().path("parameterManifestSha256").asText()).append("`\n");
         md.append("- 원시 결과 SHA256: `").append(loaded.rawResultsSha256()).append("` (원문 질문·응답 미저장)\n");
         md.append(budgetLine(document)).append('\n');

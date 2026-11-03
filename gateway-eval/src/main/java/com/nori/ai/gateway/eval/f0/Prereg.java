@@ -41,12 +41,15 @@ public final class Prereg {
     public static final int GATE_REPEATS = 5;
     /** v3 서버 출력 제약 선택. NONE = v1/v2 와 같은 요청 body. */
     public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY);
+    /** v3 에서만 명시 opt-in 하는 LLM 입력 Context 투영. 키가 없으면 기존 전체 Context(FULL) 그대로이며 FULL 은 등록 값으로 쓰지 않습니다. */
+    public static final Set<String> CONTEXT_PROJECTIONS = Set.of(MessageAssembler.EXTRACTION_V1);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
         /** qRef wire 계약(v2·v3 공통). */
         public boolean versioned() { return Set.of("f0-prereg-v2", "f0-prereg-v3").contains(block.path("schema").asText()); }
         public String purpose() { return block.path("schema").asText().equals("f0-prereg-v3") ? block.path("purpose").asText() : "GATE"; }
         public boolean diagnostic() { return purpose().equals("DIAGNOSTIC"); }
         public String responseFormat() { return parameters.path("responseFormat").asText("NONE"); }
+        public String contextProjection() { return parameters.path("contextProjection").asText(MessageAssembler.FULL); }
         public Budget budget() { return versioned() ? Budget.V2 : Budget.V1; }
         public String input(String role) { return versioned() ? block.path("inputRoles").path(role).asText() : LEGACY_ROLES.get(role); }
         public String runtimeCaptureDir() { return versioned() ? block.path("runtimeCaptureDir").asText() : "eval/f0/chat-template"; }
@@ -78,6 +81,9 @@ public final class Prereg {
         JsonNode responseFormat = block.path("parameters").path("responseFormat");
         if (v3 ? !PURPOSES.contains(block.path("purpose").asText()) || !responseFormat.isTextual() || !RESPONSE_FORMATS.contains(responseFormat.asText())
                : block.has("purpose") || !responseFormat.isMissingNode()) throw new EvalException(2, "PREREG_INVALID");
+        // Context 투영도 v3 opt-in 전용입니다. v1/v2 의 같은 키·v3 의 미정의 값·비문자열은 기존 전체 Context 로 조용히 떨어지지 않게 거부합니다.
+        JsonNode projection = block.path("parameters").path("contextProjection");
+        if (!projection.isMissingNode() && (!v3 || !projection.isTextual() || !CONTEXT_PROJECTIONS.contains(projection.asText()))) throw new EvalException(2, "PREREG_INVALID");
         Map<String,String> roles = new LinkedHashMap<>(LEGACY_ROLES);
         if (versioned) {
             JsonNode mapping = block.path("inputRoles");
