@@ -30,7 +30,7 @@ public final class F0Measurements {
                 ObjectNode expected = Json.MAPPER.createObjectNode(); expected.put("t", q.expected().t());
                 for (String field : GoldenSet.ARG_FIELDS) expected.put(field, q.expected().field(field));
                 Attempts calls = new Attempts(session, assembler.kind(), references, maxTokens, expected, q.question(), q.context(), fixture);
-                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> calls.send(m, inputLimit), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references);
+                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> calls.send(m, inputLimit), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references, session.prereg().document().retryHint());
                 ObjectNode row = outcomeRow(outcome); row.put("questionId", q.id()); row.put("round", round); calls.columns(row);
                 row.set("diagnostics", diagnostics(outcome, expected));
                 row.set("predicted", outcome.verdict() != null && outcome.verdict().valid() ? PlanJudge.sanitize(outcome.verdict(), fixture, assembler.kind()) : Json.MAPPER.nullNode());

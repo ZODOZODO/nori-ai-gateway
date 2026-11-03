@@ -57,12 +57,14 @@ class F0VersionedInputsTest {
     /** count_input_audit_v2.py 산출과 같은 모양의 표를 실제 Java 조립 목록으로 만듭니다(계수 값은 시험 지정). */
     static void writeAudit(F0TestRoot f, JsonNode roles, java.util.function.Function<String,Integer> counts) throws Exception { writeAudit(f, roles, counts, MessageAssembler.FULL); }
     /** projection 은 audit 를 만들 때 쓴 Context 투영(FULL = 기존 전체 Context 조립)입니다. */
-    static void writeAudit(F0TestRoot f, JsonNode roles, java.util.function.Function<String,Integer> counts, String projection) throws Exception {
+    static void writeAudit(F0TestRoot f, JsonNode roles, java.util.function.Function<String,Integer> counts, String projection) throws Exception { writeAudit(f, roles, counts, projection, ClassificationJudge.RETRY_HINT_NONE); }
+    /** retryHint 는 audit 를 만들 때 쓴 재시도 힌트(NONE = 기존 고정 오류 코드 11종 재시도)입니다. */
+    static void writeAudit(F0TestRoot f, JsonNode roles, java.util.function.Function<String,Integer> counts, String projection, String retryHint) throws Exception {
         java.util.function.Function<String,Path> role = name -> f.root.resolve(roles.path(name).asText());
         RegistryFixture fixture = RegistryFixture.load(role.apply("fixture")); GoldenSet golden = GoldenSet.load(role.apply("golden"), fixture);
         MessageAssembler classify = MessageAssembler.load(role.apply("classifyPrompt"), fixture, projection), plan = MessageAssembler.load(role.apply("planPrompt"), fixture, projection);
-        List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A"));
-        planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B")); planned.addAll(InputAudit.boundary(BoundaryCases.load(role.apply("boundaryCases")), classify, Prereg.Budget.V2));
+        List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A", retryHint));
+        planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B", retryHint)); planned.addAll(InputAudit.boundary(BoundaryCases.load(role.apply("boundaryCases")), classify, Prereg.Budget.V2));
         for (String use : List.of("usage", "token")) planned.addAll(InputAudit.probes(use, F0RunnerCli.messages(role.apply(use + "Messages"), role.apply("fixture"), role.apply("classifyPrompt"), role.apply("golden"), true, projection)));
         ObjectNode audit = Json.MAPPER.createObjectNode().put("schema", InputAudit.SCHEMA).put("tokenizerSha256", MeasurementSession.tokenizerSha(f.root))
             .put("templateSha256", Json.sha(OllamaStub.DEFAULT_TEMPLATE.getBytes(StandardCharsets.UTF_8)));

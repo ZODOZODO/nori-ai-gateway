@@ -47,17 +47,19 @@ public final class InputAudit {
     public static String messagesSha256(List<Map<String,String>> messages) { return Json.sha(Json.canonical(Json.MAPPER.valueToTree(messages))); }
 
     /** 측정 명령별 전체 호출 목록. 계수 표 생성과 호출 전 검사가 같은 목록을 씁니다. */
-    public static List<Planned> run(GoldenSet golden, MessageAssembler assembler, Prereg.Budget budget, String route) {
-        List<Planned> planned = new ArrayList<>();
+    public static List<Planned> run(GoldenSet golden, MessageAssembler assembler, Prereg.Budget budget, String route) { return run(golden, assembler, budget, route, ClassificationJudge.RETRY_HINT_NONE); }
+    /** retryHint 는 등록 parameters.retryHint 이며, 측정(ClassificationJudge.execute)과 같은 재시도 요지 목록(ClassificationJudge.retryCodes)으로 재시도 행을 만듭니다. */
+    public static List<Planned> run(GoldenSet golden, MessageAssembler assembler, Prereg.Budget budget, String route, String retryHint) {
+        List<Planned> planned = new ArrayList<>(); List<String> codes = ClassificationJudge.retryCodes(assembler.kind(), retryHint);
         for (GoldenSet.Question q : golden.questions())
-            withRetries(planned, route + "/" + q.id(), assembler.messages(q.question(), q.context(), QRefContext.extract(q.question())), budget.input(assembler.kind()), budget.output(assembler.kind()));
+            withRetries(planned, route + "/" + q.id(), assembler.messages(q.question(), q.context(), QRefContext.extract(q.question())), budget.input(assembler.kind()), budget.output(assembler.kind()), codes);
         return planned;
     }
     public static List<Planned> boundary(List<JsonNode> cases, MessageAssembler classify, Prereg.Budget budget) {
         List<Planned> planned = new ArrayList<>();
         for (JsonNode c : cases) {
             String question = c.path("question").asText();
-            withRetries(planned, "boundary/" + c.path("caseId").asText(), classify.messages(question, c.path("context"), QRefContext.extract(question)), budget.classifyInput(), budget.classifyOutput());
+            withRetries(planned, "boundary/" + c.path("caseId").asText(), classify.messages(question, c.path("context"), QRefContext.extract(question)), budget.classifyInput(), budget.classifyOutput(), ClassificationJudge.RETRY_ERROR_CODES);
         }
         return planned;
     }
@@ -67,8 +69,8 @@ public final class InputAudit {
         for (var row : rows) planned.add(new Planned(use + "/" + row.getKey(), row.getValue(), Prereg.CONTEXT_TOKENS - 1, 1));
         return planned;
     }
-    private static void withRetries(List<Planned> planned, String id, List<Map<String,String>> first, int inputLimit, int maxTokens) {
+    private static void withRetries(List<Planned> planned, String id, List<Map<String,String>> first, int inputLimit, int maxTokens, List<String> codes) {
         planned.add(new Planned(id + "/first", first, inputLimit, maxTokens));
-        for (String code : ClassificationJudge.RETRY_ERROR_CODES) planned.add(new Planned(id + "/retry/" + code, MessageAssembler.retry(first, code), inputLimit, maxTokens));
+        for (String code : codes) planned.add(new Planned(id + "/retry/" + code, MessageAssembler.retry(first, code), inputLimit, maxTokens));
     }
 }

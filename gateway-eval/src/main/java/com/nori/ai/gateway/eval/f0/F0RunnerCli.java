@@ -56,7 +56,7 @@ public final class F0RunnerCli {
                 RegistryFixture fixture = RegistryFixture.load(path(args, "--fixture")); GoldenSet golden = GoldenSet.load(path(args, "--golden"), fixture); MessageAssembler assembler = MessageAssembler.load(path(args, "--prompt"), fixture, document.contextProjection());
                 if (document.versioned()) for (GoldenSet.Question q : golden.questions()) QRefContext.extract(q.question());
                 checkRepeats(document, repeats);
-                if (document.versioned()) audit(preregPath).requireAll(InputAudit.run(golden, assembler, document.budget(), route));
+                if (document.versioned()) audit(preregPath).requireAll(InputAudit.run(golden, assembler, document.budget(), route, document.retryHint()));
                 MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 run --path " + route, args.required("--endpoint"), runId, dir.resolve("run-binding.json"), null);
                 F0Measurements.run(session, route, golden, fixture, assembler, repeats, runId, dir);
                 out.println("F0_RUN_COMPLETED " + route);
@@ -127,9 +127,12 @@ public final class F0RunnerCli {
             case "input-audit-render" -> {
                 // 준비 전용: 등록 예정 입력으로 하네스가 보낼 모든 chat 메시지를 검토된 렌더러로 렌더해 공식 tokenizer 계수 입력을 만듭니다(추론 호출 0).
                 // --context-projection 이 없으면 기존 전체 Context 조립 그대로입니다. 값은 등록 가능한 투영만 받고 측정 때는 등록 값으로 조립한 메시지 SHA 와 대조됩니다.
-                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--context-projection", "--out");
+                // --retry-hint 도 같은 방식입니다(없으면 기존 고정 오류 코드 재시도, 값은 등록 가능한 힌트만).
+                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--context-projection", "--retry-hint", "--out");
                 String requested = args.optional("--context-projection"), projection = requested == null ? MessageAssembler.FULL : requested;
                 if (requested != null && !Prereg.CONTEXT_PROJECTIONS.contains(requested)) throw new EvalException(2, "ARGUMENT_INVALID");
+                String requestedHint = args.optional("--retry-hint"), retryHint = requestedHint == null ? ClassificationJudge.RETRY_HINT_NONE : requestedHint;
+                if (requestedHint != null && !Prereg.RETRY_HINTS.contains(requestedHint)) throw new EvalException(2, "ARGUMENT_INVALID");
                 Path fixturePath = path(args, "--fixture"), classifyPath = path(args, "--classify-prompt"), goldenPath = path(args, "--golden");
                 RegistryFixture fixture = RegistryFixture.load(fixturePath); GoldenSet golden = GoldenSet.load(goldenPath, fixture);
                 MessageAssembler classify = MessageAssembler.load(classifyPath, fixture, projection), plan = MessageAssembler.load(path(args, "--plan-prompt"), fixture, projection);
@@ -138,8 +141,8 @@ public final class F0RunnerCli {
                 ChatRenderers.Renderer renderer = ChatRenderers.forTemplate(path(args, "--renderers"), templateSha);
                 List<JsonNode> cases = BoundaryCases.load(path(args, "--cases"));
                 if (cases.stream().anyMatch(row -> !row.has("expectedResolvedOutput"))) throw new EvalException(2, "CASES_VERSION_INVALID");
-                List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A"));
-                planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B")); planned.addAll(InputAudit.boundary(cases, classify, Prereg.Budget.V2));
+                List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A", retryHint));
+                planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B", retryHint)); planned.addAll(InputAudit.boundary(cases, classify, Prereg.Budget.V2));
                 planned.addAll(InputAudit.probes("usage", messages(path(args, "--usage-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
                 planned.addAll(InputAudit.probes("token", messages(path(args, "--token-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
                 StringBuilder lines = new StringBuilder();

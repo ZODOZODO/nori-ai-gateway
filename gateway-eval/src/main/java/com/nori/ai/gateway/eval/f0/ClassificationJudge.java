@@ -11,9 +11,17 @@ public final class ClassificationJudge {
     /** judge 가 재시도 요지로 내는 고정 오류 코드 전체. 호출 전 입력 audit 은 코드마다 재시도 메시지를 계수합니다. */
     public static final List<String> RETRY_ERROR_CODES = List.of("FINISH_LENGTH", "FINISH_REASON_INVALID", "USAGE_EXCEEDS_LIMIT", "JSON_PARSE_FAILED", "SCHEMA_KEYS_INVALID",
         "ENUM_INVALID", "QREF_INVALID", "TYPE_INVALID", "FORMAT_INVALID", "ARG_LENGTH_EXCEEDED", "STEPS_INVALID");
+    /**
+     * 재시도 힌트. NONE = 기존 등록과 같은 재시도(판정 errorCode 그대로). STEPS_DETAIL_V1 = v3 등록에서만 opt-in 하며, 계획 판정이 STEPS_INVALID 일 때
+     * 같은 검사가 찾은 세부 원인(STEPS_DETAIL_CODES)을 재시도 요지로 보냅니다. 판정(valid·errorCode·결과 행 errorCodes)은 바꾸지 않습니다.
+     */
+    public static final String RETRY_HINT_NONE = "NONE", STEPS_DETAIL_V1 = "STEPS_DETAIL_V1";
+    /** STEPS_INVALID 의 세부 원인 중 재시도 요지로 보내는 것(이름은 attemptDiagnostics.steps 의 shape·toolConsistency 값과 같음). 배열 아님·10개 초과·문자열 아닌 항목은 STEPS_INVALID 그대로입니다. */
+    public static final List<String> STEPS_DETAIL_CODES = List.of("ITEM_FORMAT_INVALID", "EMPTY_FOR_TOOL_TASK", "NONEMPTY_FOR_NO_TOOL_TASK");
     static final String TIME ="\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2})?";
-    /** 판정 결과. 인자 값은 메모리 판정에만 쓰고 결과 파일에는 SHA 만 남긴다. */
-    public record Verdict(boolean valid, String errorCode, String t, Map<String,String> args, List<String> steps) {
+    /** 판정 결과. 인자 값은 메모리 판정에만 쓰고 결과 파일에는 SHA 만 남긴다. stepsDetail 은 STEPS_INVALID 의 세부 원인(STEPS_DETAIL_CODES 중 하나, 없으면 null)입니다. */
+    public record Verdict(boolean valid, String errorCode, String t, Map<String,String> args, List<String> steps, String stepsDetail) {
+        public Verdict(boolean valid, String errorCode, String t, Map<String,String> args, List<String> steps) { this(valid, errorCode, t, args, steps, null); }
         @Override public String toString() { return "Verdict[valid=" + valid + ", errorCode=" + errorCode + ", t=" + t + "]"; }
     }
     public record Outcome(String status, boolean retried, boolean firstValid, List<String> finishReasons, List<Integer> promptTokens, List<Integer> completionTokens,
@@ -64,13 +72,33 @@ public final class ClassificationJudge {
         if (kind == MessageAssembler.Kind.PLAN) {
             JsonNode array = node.path("steps");
             if (!array.isArray() || array.size() > 10) return invalid("STEPS_INVALID");
-            for (JsonNode step : array) { if (!step.isTextual() || !step.textValue().matches("[a-z]+(?:\\.[A-Za-z]+){1,4}")) return invalid("STEPS_INVALID"); steps.add(step.textValue()); }
+            for (JsonNode step : array) {
+                if (!step.isTextual()) return invalid("STEPS_INVALID");
+                if (!step.textValue().matches("[a-z]+(?:\\.[A-Za-z]+){1,4}")) return invalidSteps("ITEM_FORMAT_INVALID");
+                steps.add(step.textValue());
+            }
             boolean noTool = Set.of("GQ", "UNS").contains(node.path("t").textValue());
-            if (noTool != steps.isEmpty()) return invalid("STEPS_INVALID");
+            if (noTool != steps.isEmpty()) return invalidSteps(noTool ? "NONEMPTY_FOR_NO_TOOL_TASK" : "EMPTY_FOR_TOOL_TASK");
         }
         return new Verdict(true, null, node.path("t").textValue(), Collections.unmodifiableMap(args), List.copyOf(steps));
     }
     private static Verdict invalid(String code) { return new Verdict(false, code, null, Map.of(), List.of()); }
+    private static Verdict invalidSteps(String detail) { return new Verdict(false, "STEPS_INVALID", null, Map.of(), List.of(), detail); }
+
+    /** 재시도 힌트가 보낼 수 있는 재시도 요지 전체. 호출 전 입력 audit 과 측정이 같은 목록을 씁니다(분류 재시도는 힌트와 무관하게 기존 목록). */
+    public static List<String> retryCodes(MessageAssembler.Kind kind, String retryHint) {
+        requireRetryHint(retryHint);
+        if (kind != MessageAssembler.Kind.PLAN || retryHint.equals(RETRY_HINT_NONE)) return RETRY_ERROR_CODES;
+        List<String> codes = new ArrayList<>(RETRY_ERROR_CODES); codes.addAll(STEPS_DETAIL_CODES);
+        return List.copyOf(codes);
+    }
+    /** 무효 판정 하나의 재시도 요지. STEPS_DETAIL_V1 에서 세부 원인이 있으면 그 코드, 아니면 판정 errorCode 입니다. */
+    static String retryCode(Verdict verdict, String retryHint) {
+        return retryHint.equals(STEPS_DETAIL_V1) && verdict.stepsDetail() != null ? verdict.stepsDetail() : verdict.errorCode();
+    }
+    private static void requireRetryHint(String retryHint) {
+        if (!RETRY_HINT_NONE.equals(retryHint) && !STEPS_DETAIL_V1.equals(retryHint)) throw new EvalException(2, "RETRY_HINT_INVALID");
+    }
 
     /** 송신~최종 응답(재시도 포함) 지연을 재고, timeout 은 그 시각까지의 경과로 남긴다. timeout 외 endpoint 오류는 호출자에게 전파(측정 중단). */
     public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind) {
@@ -81,19 +109,24 @@ public final class ClassificationJudge {
         return execute(caller, messages, maxTokens, kind, versioned, timezone, null);
     }
     public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references) {
+        return execute(caller, messages, maxTokens, kind, versioned, timezone, references, RETRY_HINT_NONE);
+    }
+    /** retryHint 는 재시도 메시지의 요지만 정합니다. errorCodes(결과 행)는 힌트와 무관하게 판정 errorCode 입니다. */
+    public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references, String retryHint) {
+        requireRetryHint(retryHint);
         if (versioned && references == null) throw new EvalException(2, "QREF_REQUEST_MISSING");
         if (references != null) references.requireMessagesMatch(messages);
         List<String> finish = new ArrayList<>(), shas = new ArrayList<>(), errors = new ArrayList<>(); List<Integer> prompt = new ArrayList<>(), completion = new ArrayList<>();
-        long start = System.nanoTime(); boolean retried = false, firstValid = false; Verdict verdict = null;
+        long start = System.nanoTime(); boolean retried = false, firstValid = false; Verdict verdict = null; String retryCode = null;
         try {
             for (int attempt = 0; attempt < 2; attempt++) {
-                OllamaChatClient.ChatResult result = caller.call(attempt == 0 ? messages : MessageAssembler.retry(messages, errors.getLast()));
+                OllamaChatClient.ChatResult result = caller.call(attempt == 0 ? messages : MessageAssembler.retry(messages, retryCode));
                 finish.add(sanitize(result.finishReason())); prompt.add(result.promptTokens()); completion.add(result.completionTokens());
                 shas.add(Json.sha(result.content().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
                 verdict = judge(result, maxTokens, kind, versioned, timezone, references);
                 if (attempt == 0) firstValid = verdict.valid();
                 if (verdict.valid()) break;
-                errors.add(verdict.errorCode()); if (attempt == 0) retried = true;
+                errors.add(verdict.errorCode()); retryCode = retryCode(verdict, retryHint); if (attempt == 0) retried = true;
             }
         } catch (EvalException e) {
             if (!e.getMessage().equals("ENDPOINT_TIMEOUT")) throw e;

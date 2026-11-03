@@ -43,6 +43,8 @@ public final class Prereg {
     public static final Set<String> RESPONSE_FORMATS = Set.of("NONE", ResponseSchema.POLICY, ResponseSchema.PLAN_ORDERED_POLICY);
     /** v3 에서만 명시 opt-in 하는 LLM 입력 Context 투영. 키가 없으면 기존 전체 Context(FULL) 그대로이며 FULL 은 등록 값으로 쓰지 않습니다. */
     public static final Set<String> CONTEXT_PROJECTIONS = Set.of(MessageAssembler.EXTRACTION_V1, MessageAssembler.PRESENCE_V1);
+    /** v3 에서만 명시 opt-in 하는 재시도 힌트. 키가 없으면 기존 재시도 메시지(NONE) 그대로이며 NONE 은 등록 값으로 쓰지 않습니다. */
+    public static final Set<String> RETRY_HINTS = Set.of(ClassificationJudge.STEPS_DETAIL_V1);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
         /** qRef wire 계약(v2·v3 공통). */
         public boolean versioned() { return Set.of("f0-prereg-v2", "f0-prereg-v3").contains(block.path("schema").asText()); }
@@ -50,6 +52,7 @@ public final class Prereg {
         public boolean diagnostic() { return purpose().equals("DIAGNOSTIC"); }
         public String responseFormat() { return parameters.path("responseFormat").asText("NONE"); }
         public String contextProjection() { return parameters.path("contextProjection").asText(MessageAssembler.FULL); }
+        public String retryHint() { return parameters.path("retryHint").asText(ClassificationJudge.RETRY_HINT_NONE); }
         public Budget budget() { return versioned() ? Budget.V2 : Budget.V1; }
         public String input(String role) { return versioned() ? block.path("inputRoles").path(role).asText() : LEGACY_ROLES.get(role); }
         public String runtimeCaptureDir() { return versioned() ? block.path("runtimeCaptureDir").asText() : "eval/f0/chat-template"; }
@@ -84,6 +87,9 @@ public final class Prereg {
         // Context 투영도 v3 opt-in 전용입니다. v1/v2 의 같은 키·v3 의 미정의 값·비문자열은 기존 전체 Context 로 조용히 떨어지지 않게 거부합니다.
         JsonNode projection = block.path("parameters").path("contextProjection");
         if (!projection.isMissingNode() && (!v3 || !projection.isTextual() || !CONTEXT_PROJECTIONS.contains(projection.asText()))) throw new EvalException(2, "PREREG_INVALID");
+        // 재시도 힌트도 v3 opt-in 전용입니다. v1/v2 의 같은 키·미정의 값·비문자열은 기존 재시도 메시지로 조용히 떨어지지 않게 거부합니다.
+        JsonNode retryHint = block.path("parameters").path("retryHint");
+        if (!retryHint.isMissingNode() && (!v3 || !retryHint.isTextual() || !RETRY_HINTS.contains(retryHint.asText()))) throw new EvalException(2, "PREREG_INVALID");
         Map<String,String> roles = new LinkedHashMap<>(LEGACY_ROLES);
         if (versioned) {
             JsonNode mapping = block.path("inputRoles");
