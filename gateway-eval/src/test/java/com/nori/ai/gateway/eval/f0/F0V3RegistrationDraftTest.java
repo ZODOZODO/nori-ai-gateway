@@ -11,33 +11,41 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * 레포의 실제 v3 사전등록 문서를 두 묶음으로 확인합니다(endpoint 호출 0, 측정 허가 아님).
- * - 과거 등록 9개(C5/C6: 진단 a/b/c·개발 회귀·정식 GATE, C7/C8: 후보 d 3개, C9/C10: 진단 e): 등록 입력 바이트는 현재 작업 트리와 같고,
- *   harnessDigest 는 실제 git 의 등록 commit 트리로 다시 계산한 역사 신원과 같습니다. 하네스 코드가 그 뒤 바뀌었으므로 현재 작업 트리 기준으로는 stale 이며
- *   Prereg.verify 가 PREREG_INPUT_CHANGED 로 신규 측정을 거부해야 합니다(등록 문서는 고치지 않음). 각 등록의 투영 조립·audit 결속도 계속 검사합니다.
- * - 후보 f 등록 3개(진단 f·개발 회귀 f·정식 GATE f): 현재 작업 트리와 로컬 불일치 0, PRESENCE_V1 조립 기준 audit 전수 결속.
+ * - 과거 등록 12개(C5/C6: 진단 a/b/c·개발 회귀·정식 GATE, C7/C8: 후보 d 3개, C9/C10: 진단 e, C11/C12: 후보 f 3개): 등록 입력 바이트는 현재 작업 트리와 같고,
+ *   harnessDigest 는 실제 git 의 등록 commit 트리로 다시 계산한 역사 신원과 같습니다. 등록 뒤 하네스 코드가 바뀐 등록(C5~C10)은 현재 작업 트리 기준으로 stale 이며
+ *   Prereg.verify 가 PREREG_INPUT_CHANGED 로 신규 측정을 거부해야 합니다(등록 문서는 고치지 않음). C11 뒤 f0 하네스 소스 변경이 없는 후보 f 는 현재 하네스로도 verify 를 통과해야 합니다.
+ *   각 등록의 투영 조립·audit 결속도 계속 검사합니다.
+ * - 후보 g 등록 3개(진단 g·개발 회귀 g·정식 GATE g): 현재 작업 트리와 로컬 불일치 0, PRESENCE_V1 조립 기준 audit 전수 결속.
  *   초안(UNCOMMITTED)이면 verify 가 PREREG_NOT_COMMITTED 로 거부하고, 등록 뒤(REGISTERED)면 실제 Prereg.verify 엄격 검증을 통과해야 합니다.
+ *   g 는 f 의 계획 프롬프트만 바꾸므로 A 외 호출(B·경계·usage·token) 메시지 바이트와 audit 행이 f 와 같아야 합니다.
  * 등록 수명 상태는 초안(UNCOMMITTED, registeredCommit=null)과 등록 완료(REGISTERED, 40자리 hex SHA) 두 가지를 메타데이터 자체 일관성으로 검사합니다.
  */
 class F0V3RegistrationDraftTest {
     static final Path ROOT = Path.of(System.getProperty("aigw.rootDir"));
     static final String V2_GOLDEN = "eval/golden/tc-f0-v2.jsonl", REGRESSION = "eval/f0/v3/golden-regression-v3.jsonl";
-    /** 등록 대상·하네스 commit 과 registeredCommit 기록 commit 쌍(과거 사실 고정값): C5/C6 = v3 5문서, C7/C8 = 후보 d 3문서, C9/C10 = 진단 e. */
+    /** 등록 대상·하네스 commit 과 registeredCommit 기록 commit 쌍(과거 사실 고정값): C5/C6 = v3 5문서, C7/C8 = 후보 d 3문서, C9/C10 = 진단 e, C11/C12 = 후보 f 3문서. */
     static final String C5 = "05c5facab7daa5d9d46bad2caa5ec26e13760e77", C6 = "01731891b58381ca9d873d2b931a2c482ffb8f5e",
         C7 = "4e1e866440e50799b4466e23ed344e0651de6081", C8 = "f2ffaeeacf28be86fcb557f6bf0a51642120cbfb",
-        C9 = "1b5be44f8549db157d0da2c69925e3f7b901431a", C10 = "ca6f8a92cf56ee65086111b3c7d59ec65a5b522b";
+        C9 = "1b5be44f8549db157d0da2c69925e3f7b901431a", C10 = "ca6f8a92cf56ee65086111b3c7d59ec65a5b522b",
+        C11 = "8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc", C12 = "48561f3eefaef7e230939da0169c2f3e1a9e5070";
     /** 과거 등록 1건의 고정 사실: 목적·등록 commit·PREREG commit·Context 투영. */
     record Historical(String purpose, String registeredCommit, String preregCommit, String projection) {}
     static final Map<String,Historical> HISTORICAL = new LinkedHashMap<>();
-    static final Map<String,String> CANDIDATE_F = new LinkedHashMap<>(), PURPOSE = new LinkedHashMap<>();
+    /** 등록 commit 뒤 f0 하네스 소스가 바뀌지 않은 과거 등록. 후보 g 는 프롬프트·audit·문서만 더했으므로 C11 하네스가 현재 하네스와 같습니다. */
+    static final Set<String> HARNESS_UNCHANGED_SINCE_REGISTRATION = new LinkedHashSet<>();
+    static final Map<String,String> CANDIDATE_G = new LinkedHashMap<>(), PURPOSE = new LinkedHashMap<>();
     static {
         for (String id : List.of("diag-a", "diag-b", "diag-c", "regression")) HISTORICAL.put("eval/f0/PREREG-v3-" + id + ".md", new Historical("DIAGNOSTIC", C5, C6, MessageAssembler.FULL));
         HISTORICAL.put("eval/f0/PREREG-v3-gate.md", new Historical("GATE", C5, C6, MessageAssembler.FULL));
         for (String id : List.of("diag-d", "regression-d")) HISTORICAL.put("eval/f0/PREREG-v3-" + id + ".md", new Historical("DIAGNOSTIC", C7, C8, MessageAssembler.EXTRACTION_V1));
         HISTORICAL.put("eval/f0/PREREG-v3-gate-d.md", new Historical("GATE", C7, C8, MessageAssembler.EXTRACTION_V1));
         HISTORICAL.put("eval/f0/PREREG-v3-diag-e.md", new Historical("DIAGNOSTIC", C9, C10, MessageAssembler.EXTRACTION_V1));
-        for (String id : List.of("diag-f", "regression-f")) CANDIDATE_F.put("eval/f0/PREREG-v3-" + id + ".md", "DIAGNOSTIC");
-        CANDIDATE_F.put("eval/f0/PREREG-v3-gate-f.md", "GATE");
-        HISTORICAL.forEach((file, h) -> PURPOSE.put(file, h.purpose())); PURPOSE.putAll(CANDIDATE_F);
+        for (String id : List.of("diag-f", "regression-f")) HISTORICAL.put("eval/f0/PREREG-v3-" + id + ".md", new Historical("DIAGNOSTIC", C11, C12, MessageAssembler.PRESENCE_V1));
+        HISTORICAL.put("eval/f0/PREREG-v3-gate-f.md", new Historical("GATE", C11, C12, MessageAssembler.PRESENCE_V1));
+        for (String id : List.of("diag-f", "regression-f", "gate-f")) HARNESS_UNCHANGED_SINCE_REGISTRATION.add("eval/f0/PREREG-v3-" + id + ".md");
+        for (String id : List.of("diag-g", "regression-g")) CANDIDATE_G.put("eval/f0/PREREG-v3-" + id + ".md", "DIAGNOSTIC");
+        CANDIDATE_G.put("eval/f0/PREREG-v3-gate-g.md", "GATE");
+        HISTORICAL.forEach((file, h) -> PURPOSE.put(file, h.purpose())); PURPOSE.putAll(CANDIDATE_G);
     }
     static Prereg.Document doc(String file) { return Prereg.parse(ROOT.resolve(file)); }
 
@@ -60,24 +68,43 @@ class F0V3RegistrationDraftTest {
         text = status.matcher(text).replaceFirst(java.util.regex.Matcher.quoteReplacement(statusLine));
         return commit.matcher(text).replaceFirst(java.util.regex.Matcher.quoteReplacement(commitLine)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
+    /** 실제 git status 로 등록 문서·입력·하네스 루트 아래 미커밋 경로를 셉니다(측정 산출물 디렉터리 results·chat-template 제외). */
+    private static List<String> uncommittedRegistrationPaths(GitReader git, Prereg.Document d, String file) {
+        List<String> args = new ArrayList<>(List.of("status", "--porcelain", "--untracked-files=all", "--", file)); args.addAll(d.inputs().keySet()); args.addAll(HarnessDigest.ROOTS);
+        GitReader.Result status = git.run(ROOT, args);
+        assertThat(status.exit()).as(file).isZero();
+        return new String(status.stdout(), java.nio.charset.StandardCharsets.UTF_8).lines().filter(line -> !line.isBlank()).map(line -> line.substring(3).replace("\"", ""))
+            .filter(path -> !path.startsWith("eval/f0/results/") && !path.startsWith("eval/f0/chat-template/")).toList();
+    }
     private static List<String> inputMismatches(Prereg.Document d) {
         List<String> mismatches = new ArrayList<>(Prereg.localMismatches(ROOT, d)); mismatches.remove("harnessDigest"); return mismatches;
     }
 
-    @Test void historicalRegistrationsKeepTheirRegisteredIdentityAndAreStaleForTheCurrentHarness() {
+    @Test void historicalRegistrationsKeepTheirRegisteredIdentityAndOnlyHarnessChangedOnesAreStale() {
         GitReader git = GitReader.process();
+        assertThat(HISTORICAL.keySet()).containsAll(HARNESS_UNCHANGED_SINCE_REGISTRATION);
         for (var entry : HISTORICAL.entrySet()) {
             Prereg.Document d = doc(entry.getKey()); Historical h = entry.getValue();
             assertThat(d.block().path("schema").asText()).as(entry.getKey()).isEqualTo("f0-prereg-v3");
             assertThat(d.purpose()).as(entry.getKey()).isEqualTo(h.purpose());
             assertThat(d.block().path("registrationStatus").asText()).as(entry.getKey()).isEqualTo("REGISTERED"); assertThat(d.registeredCommit()).as(entry.getKey()).isEqualTo(h.registeredCommit());
             assertThat(d.repeats()).as(entry.getKey()).isEqualTo(h.purpose().equals("GATE") ? Prereg.GATE_REPEATS : 1);
-            // C5 등록은 투영 키가 없어 기존 전체 Context 조립 그대로이고, d·e 등록은 EXTRACTION_V1 그대로입니다.
+            // C5 등록은 투영 키가 없어 기존 전체 Context 조립 그대로이고, d·e 등록은 EXTRACTION_V1, f 등록은 PRESENCE_V1 그대로입니다.
             assertThat(d.parameters().has("contextProjection")).as(entry.getKey()).isEqualTo(!h.projection().equals(MessageAssembler.FULL)); assertThat(d.contextProjection()).as(entry.getKey()).isEqualTo(h.projection());
             // 등록 입력 바이트는 그대로이고, harnessDigest 는 등록 commit 트리에서 다시 계산한 값과 같습니다(역사 신원).
             assertThat(inputMismatches(d)).as(entry.getKey()).isEmpty();
             Prereg.State state = Prereg.verifyHistorical(ROOT, ROOT.resolve(entry.getKey()), git, d);
             assertThat(state.preregCommit()).as(entry.getKey()).isEqualTo(h.preregCommit());
+            if (HARNESS_UNCHANGED_SINCE_REGISTRATION.contains(entry.getKey())) {
+                // 등록 commit 하네스 = 현재 하네스이므로 로컬 불일치 0 입니다. verify 는 작업 트리 검사까지 하므로, 다음 후보 파일이 eval/f0 에
+                // 미커밋으로 있으면 PREREG_WORKTREE_DIRTY 로 거부하고, 깨끗하면 실제 엄격 검증을 통과해야 합니다.
+                assertThat(HarnessDigest.compute(ROOT, d)).as(entry.getKey()).isEqualTo(d.harnessDigest());
+                assertThat(Prereg.localMismatches(ROOT, d)).as(entry.getKey()).isEmpty();
+                if (uncommittedRegistrationPaths(git, d, entry.getKey()).isEmpty()) assertThatCode(() -> Prereg.verify(ROOT, ROOT.resolve(entry.getKey()), git)).as(entry.getKey()).doesNotThrowAnyException();
+                else assertThatThrownBy(() -> Prereg.verify(ROOT, ROOT.resolve(entry.getKey()), git)).as(entry.getKey())
+                    .isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("PREREG_WORKTREE_DIRTY"));
+                continue;
+            }
             // 현재 하네스는 등록 commit 과 다르므로 stale 이며 신규 측정 허가(verify)는 endpoint 호출 전에 거부됩니다.
             assertThat(HarnessDigest.compute(ROOT, d)).as(entry.getKey()).isNotEqualTo(d.harnessDigest());
             assertThat(Prereg.localMismatches(ROOT, d)).as(entry.getKey()).containsExactly("harnessDigest");
@@ -85,13 +112,13 @@ class F0V3RegistrationDraftTest {
                 .isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("PREREG_INPUT_CHANGED"));
         }
         assertThat(doc("eval/f0/PREREG-v3-diag-a.md").responseFormat()).isEqualTo("NONE");
-        for (String id : List.of("diag-b", "diag-c", "regression", "gate", "diag-d", "regression-d", "gate-d", "diag-e")) assertThat(doc("eval/f0/PREREG-v3-" + id + ".md").responseFormat()).isEqualTo(ResponseSchema.POLICY);
+        for (String id : List.of("diag-b", "diag-c", "regression", "gate", "diag-d", "regression-d", "gate-d", "diag-e", "diag-f", "regression-f", "gate-f")) assertThat(doc("eval/f0/PREREG-v3-" + id + ".md").responseFormat()).isEqualTo(ResponseSchema.POLICY);
     }
 
-    @Test void candidateFDraftsMatchTheWorkingTreeAndBindProjectionPurposeRepeatsAndCaptureDirs() {
+    @Test void candidateGDraftsMatchTheWorkingTreeAndBindProjectionPurposeRepeatsAndCaptureDirs() {
         Set<String> captureDirs = new HashSet<>();
         for (String file : HISTORICAL.keySet()) captureDirs.add(doc(file).runtimeCaptureDir());
-        for (var entry : CANDIDATE_F.entrySet()) {
+        for (var entry : CANDIDATE_G.entrySet()) {
             Prereg.Document d = doc(entry.getKey());
             assertThat(d.block().path("schema").asText()).as(entry.getKey()).isEqualTo("f0-prereg-v3");
             assertThat(d.purpose()).as(entry.getKey()).isEqualTo(entry.getValue());
@@ -149,12 +176,13 @@ class F0V3RegistrationDraftTest {
         Prereg.Document c = doc("eval/f0/PREREG-v3-diag-c.md"), gate = doc("eval/f0/PREREG-v3-gate.md"), regression = doc("eval/f0/PREREG-v3-regression.md");
         Prereg.Document d = doc("eval/f0/PREREG-v3-diag-d.md"), gateD = doc("eval/f0/PREREG-v3-gate-d.md"), regressionD = doc("eval/f0/PREREG-v3-regression-d.md");
         Prereg.Document f = doc("eval/f0/PREREG-v3-diag-f.md"), gateF = doc("eval/f0/PREREG-v3-gate-f.md"), regressionF = doc("eval/f0/PREREG-v3-regression-f.md");
-        for (String id : List.of("diag-a", "diag-b", "diag-c", "gate", "diag-d", "gate-d", "diag-e", "diag-f", "gate-f")) {
+        Prereg.Document g = doc("eval/f0/PREREG-v3-diag-g.md"), gateG = doc("eval/f0/PREREG-v3-gate-g.md"), regressionG = doc("eval/f0/PREREG-v3-regression-g.md");
+        for (String id : List.of("diag-a", "diag-b", "diag-c", "gate", "diag-d", "gate-d", "diag-e", "diag-f", "gate-f", "diag-g", "gate-g")) {
             Prereg.Document x = doc("eval/f0/PREREG-v3-" + id + ".md");
             assertThat(x.input("golden")).isEqualTo(V2_GOLDEN); assertThat(x.input("boundaryCases")).isEqualTo("eval/f0/v2/output-boundary-cases.jsonl");
         }
-        // 정식 후보는 같은 후보의 진단 등록과 같은 입력·예산·스키마·투영이며 목적·회차만 다릅니다(c·d·f 각각).
-        for (Prereg.Document[] pair : List.of(new Prereg.Document[]{c, gate}, new Prereg.Document[]{d, gateD}, new Prereg.Document[]{f, gateF})) {
+        // 정식 후보는 같은 후보의 진단 등록과 같은 입력·예산·스키마·투영이며 목적·회차만 다릅니다(c·d·f·g 각각).
+        for (Prereg.Document[] pair : List.of(new Prereg.Document[]{c, gate}, new Prereg.Document[]{d, gateD}, new Prereg.Document[]{f, gateF}, new Prereg.Document[]{g, gateG})) {
             assertThat(pair[1].inputs()).isEqualTo(pair[0].inputs()); assertThat(pair[1].block().path("inputRoles")).isEqualTo(pair[0].block().path("inputRoles"));
             ObjectNode gateParameters = (ObjectNode)pair[1].parameters().deepCopy(); gateParameters.put("repeats", 1);
             assertThat(gateParameters).isEqualTo(pair[0].parameters());
@@ -162,7 +190,8 @@ class F0V3RegistrationDraftTest {
         // 회귀는 golden·audit 만 다르고 나머지 입력·파라미터는 같은 후보의 진단과 같습니다.
         for (Object[] row : List.of(new Object[]{c, regression, "eval/f0/v3/input-audit-v3-c.json", "eval/f0/v3/input-audit-v3-regression.json"},
                 new Object[]{d, regressionD, "eval/f0/v3/input-audit-v3-d.json", "eval/f0/v3/input-audit-v3-regression-d.json"},
-                new Object[]{f, regressionF, "eval/f0/v3/input-audit-v3-f.json", "eval/f0/v3/input-audit-v3-regression-f.json"})) {
+                new Object[]{f, regressionF, "eval/f0/v3/input-audit-v3-f.json", "eval/f0/v3/input-audit-v3-regression-f.json"},
+                new Object[]{g, regressionG, "eval/f0/v3/input-audit-v3-g.json", "eval/f0/v3/input-audit-v3-regression-g.json"})) {
             Prereg.Document diag = (Prereg.Document)row[0], reg = (Prereg.Document)row[1];
             assertThat(diag.input("inputAudit")).isEqualTo(row[2]); assertThat(reg.input("inputAudit")).isEqualTo(row[3]); assertThat(reg.input("golden")).isEqualTo(REGRESSION);
             Map<String,String> rest = new TreeMap<>(reg.inputs()); rest.remove(REGRESSION); rest.remove((String)row[3]);
@@ -185,6 +214,18 @@ class F0V3RegistrationDraftTest {
         assertThat(f.contextProjection()).isEqualTo(MessageAssembler.PRESENCE_V1);
         ObjectNode fParameters = (ObjectNode)f.parameters().deepCopy(); fParameters.remove("contextProjection"); fParameters.remove("promptSha256");
         assertThat(fParameters).isEqualTo(dParameters);
+        // 후보 g 는 f 대비 계획 프롬프트·audit 만 다르고 분류 프롬프트(B·경계·usage·token 입력)·투영·나머지 입력·파라미터는 같습니다.
+        for (Prereg.Document[] pair : List.of(new Prereg.Document[]{f, g}, new Prereg.Document[]{regressionF, regressionG})) {
+            assertThat(pair[1].input("classifyPrompt")).isEqualTo(pair[0].input("classifyPrompt")); assertThat(pair[1].input("planPrompt")).isNotEqualTo(pair[0].input("planPrompt"));
+            Map<String,String> before = new TreeMap<>(pair[0].inputs()), after = new TreeMap<>(pair[1].inputs());
+            for (String role : List.of("planPrompt", "inputAudit")) { before.remove(pair[0].input(role)); after.remove(pair[1].input(role)); }
+            assertThat(after).isEqualTo(before);
+            ObjectNode beforeParameters = (ObjectNode)pair[0].parameters().deepCopy(), afterParameters = (ObjectNode)pair[1].parameters().deepCopy();
+            assertThat(afterParameters.path("promptSha256").path("classify")).isEqualTo(beforeParameters.path("promptSha256").path("classify"));
+            assertThat(afterParameters.path("promptSha256").path("plan")).isNotEqualTo(beforeParameters.path("promptSha256").path("plan"));
+            ((ObjectNode)beforeParameters.path("promptSha256")).remove("plan"); ((ObjectNode)afterParameters.path("promptSha256")).remove("plan");
+            assertThat(afterParameters).isEqualTo(beforeParameters);
+        }
         // 회귀 골든 30 = 원래 22행 바이트 그대로 + 신규 8행(AC38 정확히 1, fixture 에 있는 eqp 만).
         byte[] original = Files.readAllBytes(ROOT.resolve(V2_GOLDEN)), extended = Files.readAllBytes(ROOT.resolve(REGRESSION));
         assertThat(Arrays.copyOf(extended, original.length)).isEqualTo(original);
@@ -235,6 +276,33 @@ class F0V3RegistrationDraftTest {
             }
             // 조립 메시지(첫 시도 + 재시도) = A/B 골든 × 12 + 경계 9 × 12 + usage 2 + token 조립 2.
             assertThat(crossed).as(file).isEqualTo(12 * 2 * GoldenSet.load(ROOT.resolve(d.input("golden")), RegistryFixture.load(ROOT.resolve(d.input("fixture")))).questions().size() + 12 * 9 + 2 + 2);
+        }
+    }
+
+    @Test void candidateGChangesOnlyPlanRequestsAndKeepsEveryOtherMessageAndAuditRowOfCandidateF() {
+        for (String[] pair : List.of(new String[]{"eval/f0/PREREG-v3-diag-f.md", "eval/f0/PREREG-v3-diag-g.md"}, new String[]{"eval/f0/PREREG-v3-regression-f.md", "eval/f0/PREREG-v3-regression-g.md"})) {
+            Prereg.Document f = doc(pair[0]), g = doc(pair[1]);
+            List<InputAudit.Planned> before = planned(f, f.contextProjection()), after = planned(g, g.contextProjection());
+            JsonNode beforeRows = Json.read(ROOT.resolve(f.input("inputAudit"))).path("rows"), afterRows = Json.read(ROOT.resolve(g.input("inputAudit"))).path("rows");
+            assertThat(after).hasSameSizeAs(before); assertThat(afterRows.size()).isEqualTo(beforeRows.size());
+            int planCalls = 0;
+            for (int i = 0; i < before.size(); i++) {
+                String id = before.get(i).id();
+                assertThat(after.get(i).id()).as(id).isEqualTo(id); assertThat(afterRows.get(i).path("id").asText()).as(id).isEqualTo(id);
+                String beforeSha = InputAudit.messagesSha256(before.get(i).messages()), afterSha = InputAudit.messagesSha256(after.get(i).messages());
+                if (id.startsWith("A/")) {
+                    // 계획 요청은 system 프롬프트만 바뀌고 user·재시도 메시지는 같습니다.
+                    planCalls++;
+                    assertThat(afterSha).as(id).isNotEqualTo(beforeSha);
+                    assertThat(after.get(i).messages().subList(1, after.get(i).messages().size())).as(id).isEqualTo(before.get(i).messages().subList(1, before.get(i).messages().size()));
+                    continue;
+                }
+                // B·경계·usage·token 은 같은 분류 프롬프트·투영이므로 송신 메시지·audit 행(SHA·계수)이 f 와 바이트까지 같습니다.
+                assertThat(afterSha).as(id).isEqualTo(beforeSha);
+                assertThat(afterRows.get(i).path("messagesSha256").asText()).as(id).isEqualTo(beforeRows.get(i).path("messagesSha256").asText());
+                assertThat(afterRows.get(i).path("inputTokens").asInt()).as(id).isEqualTo(beforeRows.get(i).path("inputTokens").asInt());
+            }
+            assertThat(planCalls).as(pair[1]).isEqualTo(12 * GoldenSet.load(ROOT.resolve(g.input("golden")), RegistryFixture.load(ROOT.resolve(g.input("fixture")))).questions().size());
         }
     }
 }
