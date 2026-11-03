@@ -1,10 +1,12 @@
 # F0 진단 사전등록 v3-diag-e — 단일 요인 분리: LLM 추출용 Context 투영 + 기존 c 프롬프트 + 서버 구조화 출력 제약
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 1b5be44f8549db157d0da2c69925e3f7b901431a`(C9)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC)** 이다. 이 등록의 회차는 `f0 report` 가 `diagnostic-report.md` 만 쓰고 F0 leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않는다(`--out`·`--rejudge`·`--spec-record-check` 는 `DIAGNOSTIC_NOT_GATE_ELIGIBLE`, exit 2). F0 게이트 PASS 근거가 될 수 없고, 어떤 정식 R5·게이트 착수 조건에도 성적을 더하지 않는다. root 의 원인 해석용이다.
 - 이 문서는 v1 `PREREG.md`·v2 `PREREG-v2.md`·v3 `PREREG-v3-{diag-a,diag-b,diag-c,diag-d,regression,regression-d,gate,gate-d}.md`, 그 등록 입력·측정 결과·보고서·증거·capture 를 바꾸지 않는다. 원래 골든 22문항·fixture v2·경계 9케이스·v2 메시지 입력·c 프롬프트는 바이트 그대로 참조만 한다.
-- 등록에는 사용자 허용이 필요한 로컬 commit 두 개가 필요하다. C9 = 이 문서(UNCOMMITTED 초안)·`eval/f0/v3/input-audit-v3-e.json`·Devreport, C10 = 이 문서만 수정해 `registrationStatus=REGISTERED`·`registeredCommit`=C9 SHA·등록 설명을 기록한다. 그 전까지 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0).
+- 등록 근거: 사용자 승인 "로컬 C9/C10 허용 후 진단 e 진행(권장)"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C9 `1b5be44f8549db157d0da2c69925e3f7b901431a` = 이 문서(그때 `registeredCommit=null`·UNCOMMITTED 초안 상태)·`eval/f0/v3/input-audit-v3-e.json`·Devreport 정확 3파일. C10 = 이 문서만 수정해 `registeredCommit`에 C9 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C9 전까지 이 문서는 미등록 초안(C9/C10 사용자 미허용)이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다(하네스 소스는 C8 과 같고 수정 0). 하네스 코드나 입력이 바뀌면 이 초안도 다시 계산해야 하며, 불일치는 `PREREG_INPUT_CHANGED` 로 기계 거부된다.
 - 이 회차 결과가 나온 뒤 설계·입력을 바꾸려면 새 진단 등록이 필요하다. 이 문서를 고쳐 다시 쓰지 않는다.
 
@@ -46,8 +48,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "1b5be44f8549db157d0da2c69925e3f7b901431a",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-diag-e",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
