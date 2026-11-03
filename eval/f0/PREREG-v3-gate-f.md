@@ -1,13 +1,15 @@
 # F0 정식 사전등록 v3-gate-f — 후보 f(존재 신호 Context 투영 + f 프롬프트 + 서버 구조화 출력 제약), R=5
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc`(C11)**
 
 - 목적은 **정식(purpose=GATE)** 이다. `f0-prereg-v3` 의 GATE 등록은 `parameters.repeats=5` 만 유효하다(그 밖 값은 `PREREG_INVALID`, 실제 명령 `--repeats` 가 다르면 `ARGUMENT_NOT_REGISTERED` — 모두 endpoint 호출 전 거부).
 - 입력·예산·스키마·투영은 진단 f(`PREREG-v3-diag-f.md`)와 바이트까지 같다: 원래 골든 22문항(`eval/golden/tc-f0-v2.jsonl`)·경계 9케이스·fixture v2·`classify-v3-f`·`plan-v3-f`·`responseFormat=JSON_SCHEMA_V1`·`contextProjection=PRESENCE_V1`·f 입력 audit(`eval/f0/v3/input-audit-v3-f.json`)·입력 3072/3072, `max_tokens` 192/256, 경계 192, context 4096. 런타임 캡처 디렉터리만 별도(`eval/f0/chat-template/v3-gate-f`)다.
 - 정식 분모는 원래 22문항 + 경계 9케이스다. 개발 회귀(`PREREG-v3-regression-f.md`)의 추가 문항·결과와 진단 a/b/c/d/e/f 결과는 이 분모·판정에 넣지 않는다.
 - 판정은 기존 F0 규칙 그대로다(`f0-judge-v2`, 3축 정확도 A↔B 상대 비교·동률 B 유지, AC-37-OUT-* 경계 계수+완결 생성, AC-38-F0, 지연 예산). 정확도 새 절대 최소 임계·업무 범위 변경은 두지 않는다.
 - 기존 `PREREG-v3-gate.md`(후보 c)·`PREREG-v3-gate-d.md`(후보 d)와 그 §1 착수 조건은 과거 문서로 그대로 보존한다. 후보 d 는 진단에서 G08 최종 t `UNS`·경계 7/9 로 조건 3 을 충족하지 못했으며, 이 문서는 d 를 대체하는 새 후보 f 의 정식 등록이다. 진단 a/b/c/d/e 는 이력일 뿐 이 문서의 R5 를 대체하지 않는다.
-- 현재 상태: 등록 대상·하네스 코드 commit(C11 예정)과 이 문서의 `registeredCommit` 기록 commit(C12 예정)은 **사용자 미허용**이다. 그 전까지 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0).
+- 등록 근거: 사용자 승인 "C11/C12 허용 후 진행(권장)"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C11 `8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc` = 후보 f 등록 대상·하네스 코드·관련 시험·Devreport 정확 12파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C12 = 후보 f 사전등록 3문서(`PREREG-v3-{diag-f,regression-f,gate-f}.md`)만 수정해 `registeredCommit`에 C11 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C11 전까지 이 문서는 미등록 초안(C11/C12 사용자 미허용)이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다.
 
 ## 1. 착수 조건(이 조건 전에는 이 등록으로 blind 정식 측정을 하지 않는다)
@@ -50,8 +52,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "GATE",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-gate-f",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",

@@ -1,10 +1,12 @@
 # F0 개발 회귀 사전등록 v3-regression-f — 후보 f(존재 신호 Context 투영 + f 프롬프트 + 서버 구조화 출력 제약), 원래 22문항 + 회귀 8문항
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc`(C11)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC) 개발 회귀**다. 이 등록의 회차는 `f0 report` 가 `diagnostic-report.md` 만 쓰고 F0 leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않는다(`--out`·`--rejudge`·`--spec-record-check` 는 `DIAGNOSTIC_NOT_GATE_ELIGIBLE`, exit 2). F0 게이트 PASS 근거가 될 수 없고, 추가 문항·결과는 정식 분모·판정(SPEC §14.5)에 넣지 않는다.
 - 기존 v1/v2/v3 등록 문서·입력·측정 결과·보고서·증거·capture 는 바꾸지 않는다. 회귀 골든 `eval/f0/v3/golden-regression-v3.jsonl`(30문항 = 원래 22행 바이트 그대로 + 신규 8행)은 `PREREG-v3-regression.md` 등록 바이트 그대로 참조만 한다.
-- 현재 상태: 등록 대상·하네스 코드 commit(C11 예정)과 이 문서의 `registeredCommit` 기록 commit(C12 예정)은 **사용자 미허용**이다. 그 전까지 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0).
+- 등록 근거: 사용자 승인 "C11/C12 허용 후 진행(권장)"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C11 `8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc` = 후보 f 등록 대상·하네스 코드·관련 시험·Devreport 정확 12파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C12 = 후보 f 사전등록 3문서(`PREREG-v3-{diag-f,regression-f,gate-f}.md`)만 수정해 `registeredCommit`에 C11 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C11 전까지 이 문서는 미등록 초안(C11/C12 사용자 미허용)이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다.
 
 ## 1. 회귀 설계
@@ -33,8 +35,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-regression-f",
   "inputRoles": {
     "golden": "eval/f0/v3/golden-regression-v3.jsonl",
