@@ -1,0 +1,19 @@
+{
+  "schema": "f0-probe-g08-v1",
+  "notice": "A 경로 G08 steps 공백 원인 확정 시험(PREREG-v3-probe-g08) 입력. 기준선은 후보 i(PRESENCE_V1·plan-v3-i·JSON_SCHEMA_V1)의 A/G08 첫 시도 입력이며, 각 시험은 기준선에서 요소 하나만 바꾼다. 질문 변형은 이 파일의 edit 로, 프롬프트·fixture 변형은 별도 파일로 두고 edit 를 기준 파일에 적용한 바이트와 같아야 한다.",
+  "goldenId": "G08",
+  "baseline": {
+    "messagesSha256": "c64d1f75a93ba9e7c3ee6a8178747be5b65f1d2751a24b64453692c405bdda9f",
+    "outputSha256": "d648833f1ddc7d17001e8fa6f14b60b99d11e448ebae6b0c934f96159257b242"
+  },
+  "experiments": [
+    {"id": "E0", "call": "GENERATE_RAW", "schemaPropertyOrder": "SORTED"},
+    {"id": "E-ORD", "call": "GENERATE_RAW", "schemaPropertyOrder": "T_FIRST"},
+    {"id": "E1", "call": "CHAT", "edit": {"target": "question", "find": "WORK_ORDER_REPLY", "replace": "메시지"}},
+    {"id": "E2", "call": "CHAT", "edit": {"target": "question", "find": "WM 으로 보낸 ", "replace": ""}},
+    {"id": "E3", "call": "CHAT", "edit": {"target": "question", "find": "가 왜 실패했어?", "replace": "가 실패한 원인 분석해줘"}},
+    {"id": "E5", "call": "CHAT", "edit": {"target": "planPrompt", "find": " TC 자료로 대신 채우지 않는다.", "replace": "", "file": "eval/f0/v3/probe-g08/plan-v3-i-e5.txt"}},
+    {"id": "E6", "call": "CHAT", "edit": {"target": "fixture", "find": "LOT·Workorder 진행 상태", "replace": "LOT 진행 상태", "file": "eval/f0/v3/probe-g08/tc-registry-fixture-v2-e6.json"}},
+    {"id": "N1", "call": "CHAT", "edit": {"target": "question", "find": "실패했어?", "replace": "실패했니?"}}
+  ]
+}

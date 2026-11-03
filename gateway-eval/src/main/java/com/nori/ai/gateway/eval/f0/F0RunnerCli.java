@@ -154,6 +154,41 @@ public final class F0RunnerCli {
                 MeasurementSession.writeNew(path(args, "--out"), lines.toString().getBytes(StandardCharsets.UTF_8));
                 out.println("F0_INPUT_AUDIT_RENDERED " + planned.size() + " " + templateSha);
             }
+            case "probe-g08-render" -> {
+                // 준비 전용: G08 원인 확정 시험 8건의 송신 메시지를 검토된 렌더러로 렌더해 count_input_audit_v2.py 입력을 만듭니다(추론 호출 0).
+                args.only("--golden", "--fixture", "--plan-prompt", "--context-projection", "--probe", "--renderers", "--template-sha256", "--out");
+                String projection = args.required("--context-projection");
+                if (!Prereg.CONTEXT_PROJECTIONS.contains(projection)) throw new EvalException(2, "ARGUMENT_INVALID");
+                G08Probe.Plan plan = G08Probe.load(context.root(), new G08Probe.Roles(path(args, "--golden"), path(args, "--fixture"), path(args, "--plan-prompt"), projection), path(args, "--probe"));
+                String templateSha = args.required("--template-sha256");
+                ChatRenderers.Renderer renderer = ChatRenderers.forTemplate(path(args, "--renderers"), templateSha);
+                StringBuilder lines = new StringBuilder();
+                for (InputAudit.Planned call : plan.planned(Prereg.Budget.V2)) {
+                    Map<String,Object> row = new LinkedHashMap<>(); row.put("id", call.id()); row.put("messagesSha256", InputAudit.messagesSha256(call.messages()));
+                    row.put("inputLimit", call.inputLimit()); row.put("maxTokens", call.maxTokens()); row.put("rendered", renderer.render(call.messages()));
+                    lines.append(Json.canonicalString(Json.MAPPER.valueToTree(row))).append('\n');
+                }
+                MeasurementSession.writeNew(path(args, "--out"), lines.toString().getBytes(StandardCharsets.UTF_8));
+                out.println("F0_PROBE_G08_RENDERED " + plan.experiments().size() + " " + templateSha);
+            }
+            case "probe-g08" -> {
+                // G08 원인 확정 시험: DIAGNOSTIC·R=1 등록만, manifest·변형 파일은 등록 inputs 여야 하며 사전 계수 검사까지 endpoint 호출 0.
+                args.only("--prereg", "--endpoint", "--probe", "--run-id", "--out");
+                Path preregPath = preregPath(args); Prereg.Document document = Prereg.parse(preregPath);
+                String runId = runId(args.required("--run-id"));
+                if (!document.diagnostic() || document.repeats() != 1) throw new EvalException(2, "PREREG_INVALID");
+                String probe = Prereg.relativePath(context.root(), path(args, "--probe"));
+                if (!document.inputs().containsKey(probe)) throw new EvalException(2, "ARGUMENT_NOT_REGISTERED");
+                Path dir = results(path(args, "--out"), runId);
+                G08Probe.Plan plan = G08Probe.load(context.root(), new G08Probe.Roles(context.root().resolve(document.input("golden")), context.root().resolve(document.input("fixture")), context.root().resolve(document.input("planPrompt")), document.contextProjection()), path(args, "--probe"));
+                if (!document.inputs().keySet().containsAll(plan.inputFiles())) throw new EvalException(2, "ARGUMENT_NOT_REGISTERED");
+                audit(preregPath).requireAll(plan.planned(document.budget()));
+                ChatRenderers.Renderer[] renderer = new ChatRenderers.Renderer[1];
+                MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 probe-g08", args.required("--endpoint"), runId, dir.resolve("run-binding.json"),
+                    runtime -> renderer[0] = ChatRenderers.forTemplate(context.root().resolve(document.input("chatRenderers")), runtime.templateSha256()));
+                G08Probe.run(session, plan, renderer[0], runId, dir);
+                out.println("F0_PROBE_G08_COMPLETED " + plan.experiments().size());
+            }
             case "report" -> {
                 args.only("--run-id", "--results", "--prereg", "--out", "--rejudge", "--spec-record-check", "--proposal");
                 String runId = runId(args.required("--run-id")); Path results = path(args, "--results"), prereg = path(args, "--prereg");

@@ -79,6 +79,52 @@ public final class OllamaChatClient {
         if (!isCount(count)) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
         return count.intValue();
     }
+    /** 생성 토큰 하나의 후보(문자열은 판정용 메모리에만 두며 toString 으로도 노출하지 않는다). */
+    public record TokenLogprob(String token, double logprob) {
+        @Override public String toString() { return "TokenLogprob[logprob=" + logprob + "]"; }
+    }
+    /** 생성 위치 하나: 실제 선택 토큰과 top_logprobs 후보. */
+    public record Position(TokenLogprob chosen, List<TokenLogprob> top) {
+        @Override public String toString() { return "Position[top=" + top.size() + "]"; }
+    }
+    /** /api/generate 응답의 판정용 필드. logprobs 는 응답에 필드가 없으면 null 입니다. 응답 본문은 toString 으로 노출하지 않는다. */
+    public record GenerateResult(String content, String doneReason, int promptEvalCount, int evalCount, List<Position> logprobs) {
+        @Override public String toString() { return "GenerateResult[doneReason=" + doneReason + ", evalCount=" + evalCount + "]"; }
+        public ChatResult asChatResult() { return new ChatResult(content, doneReason, promptEvalCount, evalCount); }
+    }
+    /**
+     * /api/generate raw 생성(G08 원인 확정 시험 전용). format 은 JSON schema 객체 자체이며 formatOrderedPaths 에 든 경로(format 기준)의 객체만 노드 순서로,
+     * 나머지는 키 정렬로 송신합니다. temperature 0·num_predict=maxTokens 외 options 는 보내지 않습니다(context 길이 등 모델 재적재를 일으키는 옵션 0).
+     */
+    public GenerateResult generateRawStructured(Preflight.Verified gate, String model, String prompt, JsonNode format, Set<List<String>> formatOrderedPaths, int maxTokens, int topLogprobs) {
+        Objects.requireNonNull(gate, "preflight");
+        Map<String,Object> body = new LinkedHashMap<>();
+        body.put("model", model); body.put("prompt", prompt); body.put("raw", true); body.put("stream", false); body.put("format", format);
+        Map<String,Object> options = new LinkedHashMap<>(); options.put("temperature", 0); options.put("num_predict", maxTokens); body.put("options", options);
+        body.put("logprobs", true); body.put("top_logprobs", topLogprobs);
+        Set<List<String>> keepOrder = new HashSet<>();
+        for (List<String> path : formatOrderedPaths) { List<String> full = new ArrayList<>(List.of("format")); full.addAll(path); keepOrder.add(full); }
+        JsonNode response = send("POST", "/api/generate", body, keepOrder);
+        if (!response.path("response").isTextual() || !response.path("done_reason").isTextual() || !isCount(response.path("prompt_eval_count")) || !isCount(response.path("eval_count"))) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
+        return new GenerateResult(response.path("response").textValue(), response.path("done_reason").textValue(), response.path("prompt_eval_count").intValue(), response.path("eval_count").intValue(), logprobs(response.get("logprobs")));
+    }
+    private static List<Position> logprobs(JsonNode node) {
+        if (node == null) return null;
+        if (!node.isArray()) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
+        List<Position> positions = new ArrayList<>();
+        for (JsonNode entry : node) {
+            List<TokenLogprob> top = new ArrayList<>();
+            JsonNode candidates = entry.path("top_logprobs");
+            if (!candidates.isMissingNode() && !candidates.isArray()) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
+            for (JsonNode candidate : candidates) top.add(tokenLogprob(candidate));
+            positions.add(new Position(tokenLogprob(entry), List.copyOf(top)));
+        }
+        return List.copyOf(positions);
+    }
+    private static TokenLogprob tokenLogprob(JsonNode node) {
+        if (!node.path("token").isTextual() || !node.path("logprob").isNumber()) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
+        return new TokenLogprob(node.path("token").textValue(), node.path("logprob").doubleValue());
+    }
     /**
      * 요청 송신~응답 헤더~본문 끝을 하나의 총 기한(timeout)으로 묶습니다. HttpRequest.timeout 은 헤더 수신까지만 적용되므로
      * 본문은 상한 있는 BodySubscriber 로 받고 sendAsync 결과를 남은 기한만큼만 기다립니다. 기한 초과·interrupt 면 구독과 교환을 취소합니다.
