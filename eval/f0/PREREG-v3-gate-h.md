@@ -1,13 +1,15 @@
 # F0 정식 사전등록 v3-gate-h — 후보 h(후보 g 의 분류 입력 고정 + 계획 스키마 송신 키 순서 + h 계획 프롬프트 + 서버 구조화 출력 제약), R=5
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 889e27b582dfbb4c4fac033d25a6d5cbc6c423a9`(C15)**
 
 - 목적은 **정식(purpose=GATE)** 이다. `f0-prereg-v3` 의 GATE 등록은 `parameters.repeats=5` 만 유효하다(그 밖 값은 `PREREG_INVALID`, 실제 명령 `--repeats` 가 다르면 `ARGUMENT_NOT_REGISTERED` — 모두 endpoint 호출 전 거부).
 - 입력·예산·스키마·투영은 진단 h(`PREREG-v3-diag-h.md`)와 바이트까지 같다: 원래 골든 22문항(`eval/golden/tc-f0-v2.jsonl`)·경계 9케이스·fixture v2·`classify-v3-f`·`plan-v3-h`·`responseFormat=JSON_SCHEMA_PLAN_ORDERED_V1`·`contextProjection=PRESENCE_V1`·h 입력 audit(`eval/f0/v3/input-audit-v3-h.json`)·입력 3072/3072, `max_tokens` 192/256, 경계 192, context 4096. 런타임 캡처 디렉터리만 별도(`eval/f0/chat-template/v3-gate-h`)다.
 - 정식 분모는 원래 22문항 + 경계 9케이스다. 개발 회귀(`PREREG-v3-regression-h.md`)의 추가 문항·결과와 진단 a/b/c/d/e/f/g/h 결과는 이 분모·판정에 넣지 않는다.
 - 판정은 기존 F0 규칙 그대로다(`f0-judge-v2`, 3축 정확도 A↔B 상대 비교·동률 B 유지, AC-37-OUT-* 경계 계수+완결 생성, AC-38-F0, 지연 예산). 정확도 새 절대 최소 임계·업무 범위 변경은 두지 않는다. AC-38-F0 의 A 쪽 workflow 조건(INCIDENT_ANALYSIS steps 에 `tc.logs.search`, `PlanJudge.java:42`·`F0Judgement.java:164`)도 기존 규칙 그대로다.
 - 기존 `PREREG-v3-gate.md`(후보 c)·`PREREG-v3-gate-d.md`(후보 d)·`PREREG-v3-gate-f.md`(후보 f)·`PREREG-v3-gate-g.md`(후보 g)와 그 §1 착수 조건은 과거 문서로 그대로 보존한다. 후보 g 는 진단에서 A G08 최종 `INVALID`(두 시도 t=`INC`·steps `EMPTY_FOR_TOOL_TASK`)로 조건 3 을 충족하지 못했으며, 이 문서는 g 를 대체하는 새 후보 h 의 정식 등록이다. 진단 a/b/c/d/e/f/g 는 이력일 뿐 이 문서의 R5 를 대체하지 않는다.
-- 현재 상태: 등록 대상 commit(C15 예정)과 이 문서의 `registeredCommit` 기록 commit(C16 예정)은 **사용자 미허용**이다. 그 전까지 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0).
+- 등록 근거: 사용자 승인 "C15/C16 허용 후 진행(권장)"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C15 `889e27b582dfbb4c4fac033d25a6d5cbc6c423a9` = 후보 h 등록 대상·plan 프롬프트·입력 audit·A 스키마 키 순서 보존 하네스 코드·관련 시험·Devreport 정확 16파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C16 = 후보 h 사전등록 3문서(`PREREG-v3-{diag-h,regression-h,gate-h}.md`)만 수정해 `registeredCommit`에 C15 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C15 전까지 이 문서는 미등록 초안(C15/C16 사용자 미허용)이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다.
 
 ## 1. 착수 조건(이 조건 전에는 이 등록으로 blind 정식 측정을 하지 않는다)
@@ -50,8 +52,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "GATE",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "889e27b582dfbb4c4fac033d25a6d5cbc6c423a9",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-gate-h",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
