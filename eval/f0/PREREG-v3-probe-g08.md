@@ -1,10 +1,12 @@
 # F0 진단 사전등록 v3-probe-g08 — A 경로 G08 steps 공백 원인 확정 시험(후보 i 기준선, 8건 각 1회)
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 0dcf104f2690f9438433b7242d643057a8a1f6ca`(C19)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC)** 이다. 이 등록은 `f0 probe-g08` 명령 한 개만 쓰며, 결과는 `eval/f0/results/<runId>-probe-g08/` 의 정제 필드뿐이다. F0 leaf 증거·RUN PARENT·§14.5 제안서·`diagnostic-report.md` 를 만들지 않고 F0 게이트 PASS 근거가 될 수 없다.
 - 이 문서는 v1 `PREREG.md`·v2 `PREREG-v2.md`·v3 `PREREG-v3-*.md`(a~i), 그 등록 입력·측정 결과·보고서·증거·capture 를 바꾸지 않는다. 기준선 입력(골든 22문항·fixture v2·`plan-v3-i`·`classify-v3-f`·v2 메시지 입력·경계 9케이스)은 바이트 그대로 참조만 한다.
-- 등록 예정: C19 = 이 문서(초안)·시험 입력·하네스 코드·관련 시험·Devreport, C20 = 이 문서의 `registrationStatus`·`registeredCommit` 만 기록. 등록 전에는 측정 명령·`f0 prereg-check` 가 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다.
+- 등록 근거: 사용자 승인 범위 "C19/C20 로컬 commit"(2026-11-03, 로컬 commit 두 개만 허용, push·원격 publish 없음).
+- C19 `0dcf104f2690f9438433b7242d643057a8a1f6ca` = G08 원인 확정 시험 등록 대상(manifest·E5 프롬프트·E6 fixture·입력 audit)·`f0 probe-g08` 하네스 코드·관련 시험·Devreport 정확 11파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C20 = 이 문서만 수정해 `registeredCommit`에 C19 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-03 C19 전까지 이 문서는 미등록 초안이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-03 작업 트리 실제 바이트로 계산했다. f0 하네스 소스가 바뀌면 불일치는 `PREREG_INPUT_CHANGED` 로 기계 거부된다. 이 등록의 하네스 변경(`G08Probe` 신규, `OllamaChatClient`·`F0RunnerCli` 추가) 때문에 후보 i 3문서(C17/C18)는 현재 작업 트리 기준 stale(`PREREG_INPUT_CHANGED`)이 되며 이는 예상된 것이다.
 
 ## 1. 시험 설계
@@ -84,8 +86,8 @@
 {
   "schema": "f0-prereg-v3",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "0dcf104f2690f9438433b7242d643057a8a1f6ca",
   "runtimeCaptureDir": "eval/f0/chat-template/v3-probe-g08",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
