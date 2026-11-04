@@ -3985,3 +3985,180 @@
 #### 5) 다음 단계
 
 - Plan §0 R6 ④⑤(`spec-input publish`·protected `AIGW_APPROVED_SPEC_SHA`=seq5)는 원격 공급을 소비하는 CI job·`ci-evidence verify`·배포 수용 전 조건이며 미실행이다. 다음은 P03 v4 ① G-INFER-ENV 읽기 전용 기록이며, SSH·실측은 사용자 승인 뒤에만 한다.
+
+#### 로컬 C21 커밋·최종 확인 (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 허용 범위: 로컬 commit C21 1개뿐이며 push·amend·`--force`·원격 publish 는 하지 않았다.
+
+| commit | 전체 SHA | 시각 | 파일 |
+|---|---|---|---|
+| C21 | `09c252a9c10a61a38c77381b1d50729578275283` | 2026-11-04 11:10:45 +0900 | 17파일, 886 insertions(+), 62 deletions(-) |
+
+- C21 정확 17파일(파일 지정 `git add` 뒤 `git diff --cached --name-only` 17개, 기대 목록과 diff 0, `git diff --cached --check` exit 0). 이 Devreport 의 C21 시점 바이트는 524,347 B, SHA `16325922c650b4aff894f03aa0a5c85b5ca4b41b1ac5a94d693fd2a3dec7a9ac`(C21 blob 과 같음)이며 앞 518,503 B SHA `4255882b…6ffa` 는 §12.28 추가 전후 같았다. 기존 untracked 는 넣지 않았다.
+- 커밋 뒤 정본 SPEC SHA `bb91146a…d0de4` 불변, 21커밋, staged 0. 측정·SSH·모델 호출은 실행하지 않았다. 이 소절은 commit 하지 않았다(C21 커밋 바이트 불변, 작업 트리에만 추가 — 다음 커밋에 포함).
+
+### 12.29 P03 v4 ① G-INFER-ENV 런타임 고정 기록·③ tokenizer pin·chat template 캡처·렌더러 등록 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: ① G-INFER-ENV 를 `docs/gates/f0/runtime-env-20261104T021454Z.json`(허용 필드만)에 기록했고, ③ Thinking-2507 공식 `tokenizer.json` pin(Instruct pin 과 바이트 동일), `/api/show` template 사전검토 캡처(Go template, SHA `2d54db2b…97f9`), v4 렌더러 `OLLAMA_GO_QWEN3_THINKING_V1` 등록(기존 `CHATML_NO_SYSTEM_DEFAULT` 는 재현 불가)과 시험을 작업트리에 추가했다. 모델 추론 호출 0(`/api/chat`·`/api/generate`·`/v1/*` 0), pull·load·unload·재시작·설정 변경·sudo 0, commit·push 0. ②(spec-guard)는 아래 시험 앞 `spec-guard` exit 0 으로 seq5 일치만 확인했다. P03 미완료·기존 F0 FAIL 유지·P04 미착수.**
+- 착수 시 HEAD C21 `09c252a`, SPEC `bb91146a…d0de4`, Plan `5d51c23bcbcd5bccd19f86c0f0d8ac5f4947af33afccbbf5a04bbe2583d6ba34`(1,757줄), 이 Dev report 525,397 B `159d0f140a7a602154a84946bf254050b21c3b0a2c1a9ad2462e8a89cc2edb61`(C21 뒤 미커밋 "로컬 C21 커밋·최종 확인" 소절 포함).
+
+#### 1) ① G-INFER-ENV(Plan §5 정의 항목, 읽기 전용)
+
+- 수집: 서버(192.168.0.160, hostname `ollama`, 시간대 Etc/UTC)에서 Python 표준 라이브러리로 `GET /api/version`·`/api/ps`·`/api/tags`·`POST /api/show {"model":"qwen3:4b"}` 만 호출하고 허용 필드만 try/except 로 뽑았다(파싱 실패 시 고정 문구만, 원문 출력·저장 0). 그 밖에 `systemctl show ollama`(OLLAMA_* 값·키 이름·unit/drop-in 경로와 SHA), `nvidia-smi` 요약. API 수집 시각 `2026-11-04T02:14:54Z`.
+- 값: Ollama `0.40.13`. 환경 `OLLAMA_CONTEXT_LENGTH=8192`·`OLLAMA_HOST=0.0.0.0:11434`·`OLLAMA_KEEP_ALIVE=24h`·`OLLAMA_MAX_LOADED_MODELS=2`·`OLLAMA_NUM_PARALLEL=1`(그 밖 키는 `PATH` 뿐), drop-in `/etc/systemd/system/ollama.service.d/override.conf`(SHA `d25df74d…2b09`, 6줄), 서비스 active since `2026-11-03T04:10:45Z`.
+- `/api/ps`: `qwen3:4b` digest **`359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`**·`context_length` 8192·size = size_vram 3,877,571,133(Q4_K_M, 4.0B); `bge-m3:latest` digest `7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab`·8192·689,187,061 = size_vram(F16). `/api/tags` digest 두 모델 모두 `/api/ps` 와 같다. `/api/ps` 필드 이름 = context_length·details·digest·expires_at·model·name·runner·size·size_vram(`expires_at`·`runner` 값은 기록하지 않음).
+- `/api/show qwen3:4b`: template SHA `2d54db2b9bb29ce7db54fea63a891f5859603813c555b1f88b5e0994652897f9`(1506 B), `template_source=go_template`, renderer·parser 없음, capabilities `[completion, tools, thinking]`, `thinking={default:true, values:[true]}`, parameters `top_k 20`·`top_p 0.95`·`repeat_penalty 1`·`stop ["<|im_start|>","<|im_end|>"]`·`temperature 0.6`(num_ctx 없음), Modelfile 지시어 FROM·TEMPLATE·PARAMETER 6·LICENSE, `general.finetune=Thinking`, `qwen3.context_length=262144`, `tokenizer.ggml.add_bos_token=false`.
+- GPU: GTX 1660 Ti, 드라이버 595.99.02, CUDA 13.2, 6144 MiB 중 used 4544·free 1205 MiB, P8, 사용률 0%, llama-server 2개(3798·742 MiB).
+- §12.26 8) 미확인 중 `/api/ps` `context_length` 필드는 **있음**(8192)으로 확인됐다.
+
+#### 2) ③ tokenizer pin
+
+- HF `Qwen/Qwen3-4B-Thinking-2507` revision `768f209d9ea81521153ed38c47d515654e938aea` 의 `tokenizer.json` 1개만 새 빈 디렉터리에 받았다(실행 코드·가중치 0). 302 헤더 `X-Linked-Size 11422654`·`X-Linked-ETag aeb13307…dae4` = 받은 바이트 재계산값. `eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json`(바이트 그대로) + pin `….sha256`(`aeb13307…dae4  qwen3-4b-thinking-2507.tokenizer.json` + LF, `sha256sum -c` OK, pin 파일 SHA `91fd22b9…bc03`). 이 경로는 C21 의 `RuntimeProfile.INFER_V4` 가 이미 가리키던 경로다.
+- **Instruct-2507 pin 과 비교: `cmp` 차이 0 — 두 공식 tokenizer.json 은 바이트 동일**(SHA `aeb13307…dae4`). pin 파일은 파일 이름 부분만 달라 바이트가 다르다(Instruct `445bc540…2113`). 기록 `docs/gates/f0/tokenizer-provenance-v4.md`(v1 `tokenizer-provenance.md` 형식). §12.26 8) 미확인 "Thinking-2507 tokenizer 와 Instruct pin 의 바이트 동일 여부" = 동일.
+
+#### 3) ③ chat template 캡처
+
+- 기존 관례 확인: v1 은 P03 준비 때 `/api/show` 의 `template` 필드만 `docs/gates/f0/preparation-template.template` 에 바이트 그대로 저장하고 `template-review.md` 로 검토했으며, `eval/f0/chat-template/**` 정식 캡처(템플릿 본문 + `.sha256` + `model-digest.txt` + `run-binding.json`)는 등록 PREREG 가 있는 `f0 chat-template` 측정 명령만 쓴다(v2/v3 는 각 PREREG 2절 명령). v4 등록 문서(⑥)는 아직 없으므로 정식 명령은 실행할 수 없고, v1 준비와 같은 방식으로 **사전검토 캡처** `docs/gates/f0/preparation-template-v4.template`(1506 B, LF, CR 0, 끝 개행 없음, SHA `2d54db2b…97f9`)만 만들었다. template 은 모델 설정이며 기존 관례도 본문을 저장했다.
+- 정식 캡처는 v4 PREREG 의 `runtimeCaptureDir` 아래 `qwen3-4b.template`(C21 `templateStem`)로 측정 회차에서 만든다.
+
+#### 4) ③ 렌더러 등록
+
+- 판정 근거 `docs/gates/f0/template-review-v4.md`: 이 모델은 HF Jinja 가 아니라 Ollama Go template 경로다(`/api/show` `template_source=go_template`, 서버 로그 `template selection` `selected=go_template` 2건, 생성 llama-server 인자 `--no-jinja --chat-template chatml`(시작용 자리표시), Ollama v0.40.13 `04088e7c…` 소스 `selectedTemplateSource`·`usesOllamaRenderedChat`·`renderPrompt`·`Template.Execute`·`collate`). 렌더 문자열은 `/completion` 에 그대로 간다(`add_bos_token=false`).
+- system+user 렌더 = `<|im_start|>system\n` + S + `\n\n<|im_end|>\n<|im_start|>user\n` + U' + `<|im_end|>\n<|im_start|>assistant\n<think>\n`, 재시도의 연속 user 는 `collate` 가 `\n\n` 으로 합친다(U' = U + `\n\n` + R). **v1 `chatMl` 과 3곳이 달라(system 뒤 빈 줄, 재시도 user 병합, `<think>\n` 접두) 재사용 불가.**
+- 실제 Go 엔진 대조: 로컬 Docker `golang:1.24-alpine`(go1.24.13, `--network none`)에서 저장 template 을 `text/template` 으로 실행(Ollama `collate` 와 같은 값 구성) — 6 사례 모두 위 공식과 바이트 동일. 대조 프로그램은 scratchpad 에만 두었다.
+- 추가: `ChatRenderers.OLLAMA_GO_QWEN3_THINKING`(=`OLLAMA_GO_QWEN3_THINKING_V1`)·`ollamaGoQwen3Thinking`(범위 밖 입력 = `RENDERER_INPUT_UNSUPPORTED` exit 2)과 `forTemplate` 의 이름 분기 1줄. v4 전용 등록 파일 `eval/f0/v4/chat-renderers-v4.json`(같은 형식 `f0-chat-renderers-v1`, template SHA `2d54db2b…97f9` → `OLLAMA_GO_QWEN3_THINKING_V1`, reviewRef `docs/gates/f0/template-review-v4.md`). v1~v3 등록 파일 `eval/f0/chat-renderers-v1.json`(`ba743ec7…c7e`)·`chatMl`·`CHATML_NO_SYSTEM_DEFAULT` 분기는 바이트·동작 불변. v4 등록(⑥)은 `chatRenderers` 역할에 v4 파일을 넣어야 한다.
+
+#### 5) 시험(`AIGW_SPEC_FILE`=정본 SPEC, `DEBUG`=빈 값, Gradle 동시 실행 0, 순차)
+
+- 신규 `F0V4ChatRendererTest` 4건(레포 실제 바이트): ①v4 등록 → 렌더러 선택, 첫 시도·재시도(직접 + `MessageAssembler.retry`)·system 없음·빈 system 문자열 ②범위 밖(assistant·system 만·system 뒤 위치·tool·빈 목록) 거부 ③v1 등록 SHA `ba743ec7…` 불변·v1 등록은 v4 template 거부·v4 등록은 v1 template 거부·`chatMl` 출력 불변 ④Thinking pin = 실제 바이트 = `aeb13307…`, pin 파일 내용, Instruct 원본과 바이트 동일.
+- 변이 확인: v4 렌더러를 `chatMl` 형태(system 빈 줄 제거·user 블록 분리·`<think>` 제거)로 바꾼 필터 실행에서 ①이 FAILED(1/4) → 원본 복원 `cmp` 일치.
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `:gateway-eval:test --tests "*F0V4ChatRendererTest" --tests "*F0V4RuntimeProfileTest"` | 0 | XML 4/4 + 10/10 PASS, `BUILD SUCCESSFUL in 30s` |
+| 같은 필터(`F0V4ChatRendererTest` 만) + 변이 | 1 | 4 중 1 FAILED(의도) → 복원 |
+| `:gateway-eval:run --args="spec-guard"` | 0 | `specSha`=`bb91146a…d0de4`, `BUILD SUCCESSFUL in 2s` |
+| 무필터 `:gateway-eval:test --console=plain --rerun-tasks` | 0 | `:gateway-eval:test`·`:gateway-eval:testLeafEvidence`, `BUILD SUCCESSFUL in 5m 27s`, `6 actionable tasks: 6 executed`. XML 독립 집계 **224/224 PASS·45클래스·failures/errors/skipped 0**(§12.28 220 + 신규 4) |
+| `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 3s` |
+
+- 시험 신원(`run-binding.json`): `runId=ff3e07b5-954b-45d6-9b14-a248c1d89ef8`, `inputFingerprint=5160fcd8f32b39ff5dcfc1e47f11197debc3ea7c158c0bcc862dc26ac73b8f31`, `specSha=bb91146a…d0de4`. stub·로컬 시험이며 실제 모델 F0 합격이 아니다.
+- 사전등록 영향: f0 소스(`ChatRenderers.java`) 변경으로 기존 24건의 `harnessDigest` 는 계속 stale(§12.28 3) 과 같은 상태, 이번에 재실행하지 않음)이고 등록 입력 파일은 바꾸지 않았다(새 파일 추가만).
+
+#### 6) 변경·신규 파일(작업트리, 커밋 0)
+
+- 수정: `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/ChatRenderers.java`, 이 Dev report(끝에 이 절 추가만).
+- 신규: `docs/gates/f0/runtime-env-20261104T021454Z.json`, `docs/gates/f0/tokenizer-provenance-v4.md`, `docs/gates/f0/preparation-template-v4.template`, `docs/gates/f0/template-review-v4.md`, `eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json`(11,422,654 B), `eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json.sha256`, `eval/f0/v4/chat-renderers-v4.json`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V4ChatRendererTest.java`.
+- 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`, `evidence/F0/`, `eval/py/**/__pycache__/`)는 건드리지 않았다.
+
+#### 7) 미확인·예상 밖
+
+- 예상 밖: 서버 모델은 GGUF Jinja 가 아니라 Ollama Go template 으로 렌더된다(Jetson v1 과 경로가 다름). 그래서 v4 입력 audit(⑤)는 v4 렌더러·v4 등록 파일과 Thinking pin 으로 다시 만들어야 하며, 재시도 입력은 user 두 블록이 아니라 한 블록으로 계수된다.
+- Modelfile 기본값 `temperature 0.6`·`top_k 20`·`top_p 0.95` 가 있다. 하네스 v4 요청은 temperature 를 등록값으로 보내지만 top_k·top_p 는 보내지 않으므로 서버 기본값이 적용된다(추정 — 요청별 옵션 병합 경로는 이번에 읽지 않음, ⑧ 진단 해석 때 확인).
+- `OLLAMA_NUM_PARALLEL=1`·`MAX_LOADED_MODELS=2`: 192.168.0.201 요청과 측정 요청이 서버 큐에서 직렬화될 수 있다(G-INFER-SHARE 겹침 제외의 전제와 같은 방향, 수치 미측정).
+- 미확인: Ollama 0.40.13 번들 llama.cpp 빌드 번호와 `/completion` special token 해석(v1 검토 근거를 따름), 실제 서버 `prompt_tokens` 와 pin 계수의 일치(⑤·⑧), 사고 분리 응답 형태(⑧). Ollama 소스에 `/api/chat` 의 렌더 전용 디버그 경로(`DebugRenderOnly`)가 있으나 이 세션은 `/api/chat` 금지이고 그 경로도 runner 스케줄 뒤에 있어 쓰지 않았다.
+- GIN 로그 형식(G-INFER-SHARE 열린 항목 11)은 이번 범위가 아니어서 보지 않았다(`template selection` 줄의 두 값만 집계).
+
+#### 8) 다음 단계
+
+- P03 v4 ④(하네스 v4 진단 분기 보완)·⑤(입력 audit 재생성 — `input-audit-render` 의 v4 예산·v4 렌더러, Python 계수기 context 8192)·⑥(진단·개발 회귀 등록 초안, `generationModelDigest`=`359d7dd4…fae7`, `chatRenderers`=`eval/f0/v4/chat-renderers-v4.json`). 커밋 포함 여부는 root 결정.
+
+#### 9) 보존 확인
+
+- SPEC `bb91146a…d0de4`·Plan `5d51c23b…ba34` 불변, 기존 PREREG·결과·evidence·v1~v3 입력·pin·캡처(`eval/f0/chat-renderers-v1.json`, `eval/f0/tokenizer/qwen3-4b-instruct-2507.*`, `docs/gates/f0/preparation-template.template`·`template-review.md`·`tokenizer-provenance.md`, `eval/f0/chat-template/**`) 변경 0. 이 Dev report 앞 525,397 B 의 SHA 는 추가 전후 같다(`159d0f14…db61`). 원문 응답·secrets 출력 0.
+
+### 12.30 P03 v4 ④ 하네스 v4 진단 분기 완성·⑤ v4 입력 audit·⑥ 진단·개발 회귀 사전등록 초안과 로컬 C22/C23 범위 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: Plan P03 v4 ⑥ 의 진단 최소 입력 항목을 원문 없이 관측하도록 하네스 v4 진단 분기를 보완했고(v4 GATE 등록 거부 유지), v4 렌더러·Thinking pin 으로 v4 입력 audit 4개(OVER_BUDGET 0)를 만들었으며, v4 진단 4·개발 회귀 2 사전등록 초안을 작성했다. 무필터 시험·`test-evidence verify`·`spec-guard` 모두 exit 0. 모델 추론 호출·SSH·측정 0, SPEC·Plan·기존 PREREG·결과·evidence·v1~v3 입력·pin 변경 0. P03 미완료·기존 F0 FAIL 유지·P04 미착수.**
+- 착수 시 HEAD C21 `09c252a`, SPEC `bb91146a…d0de4`(seq5), 이 Dev report 537,769 B `0868750a9cc9369799ac9aa2eb6fc85371e293c7bd6268d68bc2c839ba0e99dd`(§12.29·C21 뒤 소절 포함, 미커밋).
+- 사용자 결정(2026-11-04, 이 세션 입력): 프롬프트 arm = v2 계약 프롬프트(필수) + v3 마지막 구성 i(C17/C18 등록 구성), temperature arm = 0 + 0.6(DQ-1), 진단은 사고 상한 없이 `max_tokens = 8192 − 입력 상한`, 답변 상한 192/256 초과 = 실패·1회 재시도(I2), 겹친 호출만 지연 제외(I5), 골든셋·fixture·회귀·경계 케이스 바이트 재사용, 등록은 C22/C23 두 commit 만.
+
+#### 1) ④ 하네스 v4 진단 분기(f0 패키지, v1~v3 요청 body·판정·결과 모양 불변)
+
+- `OllamaChatClient.ThinkingObservation`: `thinkingCodepoints`(THINKING_FIELDS 순서 첫 문자열 분리 필드의 코드포인트 수, 없으면 null)·`contentCodepoints`(content 코드포인트 수)를 더했다 — usage 의 사고 포함 여부·사고 도중 상한 도달(content 0)을 원문 없이 가리는 개수.
+- `F0Measurements`: v4 행·경계 시도에 `outputKeyOrders`(답변 최상위 키 출력 순서 — 키가 모두 스키마 키 이름 `t·eqp·from·to·q·qRef·steps` 일 때만, 아니면 null; properties 순서 진단). v4 의 `max_tokens:1` 계수 호출(usage-probe chat·token-golden)에 `finishReason`·`completionTokens`·`thinking`(관측)·`auditInputTokens`(그 호출의 사전 audit 계수)를 더했다 — 사고 전용 모델에서 출력 상한 1 은 사고 도중 상한 도달이므로 `max_tokens` 의 사고 포함 여부와 그때의 finish_reason 을 직접 관측하고, `promptTokens` 대 `auditInputTokens` 로 v4 렌더러·pin 계수와 서버 계수의 동등성을 본다.
+- `F0RunnerCli input-audit-render --runtime-profile INFER_V4`(선택): 행 예산을 `Budget.V4_DIAGNOSTIC`(요청 `max_tokens` 5,120, 입력 상한 3,072)·probe context 8192 로 만든다. 값 없음 = 기존 `Budget.V2`·4096 그대로, 그 밖 값 = `ARGUMENT_INVALID`.
+- `Prereg.RuntimeProfile`: 입력 audit 계수기 필드(`inputAuditCounter`) — JETSON = `eval/py/count_input_audit_v2.py`(불변), INFER_V4 = 신규 `eval/py/count_input_audit_v4.py`. v2 계수기는 v2·v3 등록 입력이라 바이트를 바꿀 수 없어(바꾸면 v2·v3 24건이 입력 불일치) v2 와 계수 규칙·결과 형식이 같고 `CONTEXT_TOKENS=8192`·렌더러·도구 이름 기록만 다른 파일을 새로 뒀다(diff 4곳). Python 시험 `eval/py/tests/test_count_input_audit_v4.py`(실제 pin tokenizer 로 8192 경계·렌더러 기록) — 수동 실행 `unittest` 4/4 OK(v2 시험 3 포함, Gradle 밖).
+- `F0ReportWriter.diagnosticReport`: v4 등록에서만 "v4 사고 출력 관측" 절(출처·시도별 시도 수, 분리 필드=건수, `reasoning_tokens` 보고 수, content 표지 수, content 0 건수, 사고 토큰 p50/p95/max, 사고 코드포인트 max, 답변 토큰 p50/p95/max(계수 불가 수), 출력 키 순서=건수). 사고 토큰 분포는 ⑩ T 제안의 근거 입력이다.
+- 유지: v4 = DIAGNOSTIC 만(`Prereg` 가 v4 GATE `PREREG_INVALID`), v1~v3 상수(`F0RunnerCli.GENERATION_MODEL`·`Preflight.REQUIRED_CONTEXT`·`Prereg.CONTEXT_TOKENS`·temperature 0 검사) 불변.
+
+#### 2) ③ 렌더러 범위 확장(⑤ 의 선행 결함)
+
+- 예상 밖: 등록 token-golden 입력 `eval/f0/v2/token-golden-input-v2.jsonl`(재사용)의 `TG07-MULTI-TURN`(system·user·assistant·user — Plan P03 token golden 의 "다중 턴" 요구 행)이 §12.29 렌더러 범위(system + user 만) 밖이라 v4 audit 렌더가 `RENDERER_INPUT_UNSUPPORTED` 였다. 행을 빼면 Plan 요구가 깨지므로 렌더러를 넓혔다.
+- 근거: tagged source(`04088e7c…d5b`) `server/routes.go#L3662-L3688` `filterThinkTags`(qwen3: 마지막 user 앞 assistant content 를 thinking parser 로 다시 씀)와 `thinking/parser.go`(왼쪽 공백 뺀 값이 여는 태그·그 접두가 아니고 비어 있지 않으면 원문 그대로) → 첫 글자가 공백류도 `<` 도 아닌 비어 있지 않은 content 만 불변. template 은 마지막 user 앞 assistant 를 사고 블록 없이 `<|im_start|>assistant\n` + C + `<|im_end|>\n` 으로 렌더한다.
+- `ChatRenderers.ollamaGoQwen3Thinking`: system(첫 위치·선택) 뒤 user·assistant(연속 같은 역할 `\n\n` 병합, 마지막은 user). 범위 밖(마지막 assistant·빈/공백 시작/`<` 시작 assistant·tool·뒤쪽 system) = `RENDERER_INPUT_UNSUPPORTED`. §12.29 범위 입력의 출력은 바이트 그대로(기존 시험 통과).
+- Go 엔진 대조(로컬 Docker `golang:1.24-alpine` go1.24.13 `--network none`, Ollama `thinking/parser.go` 바이트 그대로 + `filterThinkTags`·`collate` 같은 규칙, 저장 template SHA `2d54db2b…97f9`): 7 사례 렌더 SHA 를 `F0V4ChatRendererTest.v4RendererMatchesGoTemplateForAssistantTurnsBeforeTheLastUser` 가 Java 렌더 SHA 와 대조(TG07 `d36326fe…6b05` 포함). 대조 프로그램은 scratchpad 에만 두었다.
+- 기록: `docs/gates/f0/template-review-v4.md` 판정 범위 문장·§6 근거 범위 1문장 + §7 신설, `eval/f0/v4/chat-renderers-v4.json` notice 1문장(둘 다 C21 뒤 미커밋 ③ 산출물 — 이번 C22 에 포함). 새 SHA: `chat-renderers-v4.json` `6b6d8bd7…bd56`, `template-review-v4.md` `aafc5a32…6a12`.
+
+#### 3) ⑤ v4 입력 audit(Java `input-audit-render --runtime-profile INFER_V4 --renderers eval/f0/v4/chat-renderers-v4.json --template-sha256 2d54db2b…97f9` → `count_input_audit_v4.py`, pin `aeb13307…dae4`)
+
+| audit | 프롬프트 arm·골든 | 행 | OVER_BUDGET | 최대 입력(A 초/재 · B 초/재 · 경계 초/재 · usage · token) | 최대 입력+요청 max_tokens | SHA-256 |
+|---|---|---|---|---|---|---|
+| `eval/f0/v4/input-audit-v4-v2.json` | V2·22 | 651 | 0 | 1250/1284 · 1090/1124 · 2703/2737 · 1056 · 2795 | 7857 | `65f54494df5e34a2a17c0f3ca981f8d20630a1140aa8e87fec1379427e978c5b` |
+| `eval/f0/v4/input-audit-v4-i.json` | I·22 | 717 | 0 | 1943/1978 · 1392/1426 · 3025/3059 · 1378 · 2795 | 8179 | `ee16e33d69836db3c3247fd82822536aa994ff597a62b964ab1f0cd6424f8384` |
+| `eval/f0/v4/input-audit-v4-regression-v2.json` | V2·30 | 843 | 0 | 1250/1284 · 1090/1124 · 2703/2737 · 1056 · 2795 | 7857 | `660780babeea53200a0a7eb63f0c268bce3f69872e7e0a616bf5cd4ab4c4d472` |
+| `eval/f0/v4/input-audit-v4-regression-i.json` | I·30 | 933 | 0 | 1959/1994 · 1408/1442 · 3025/3059 · 1378 · 2795 | 8179 | `5d2ada83e0d0a1b574a4577ecfb04ded29a6c0cfaa461b4f85a673f518814136` |
+
+- Jetson 등록 audit(`input-audit-v2.json`·`input-audit-v3-i.json`·`input-audit-v3-regression-i.json`)와 행 id 순서·messagesSha256 전부 같고 계수만 초회 +2·재시도 −3(재시도 user 병합)·probe +2. 회귀 audit 는 같은 arm 진단 audit 의 행을 id·SHA·계수 그대로 포함하고 `A/R0x`·`B/R0x` 행만 더한다(시험으로 검사).
+- I arm 최대 입력+`max_tokens` 8,179 ≤ 8,192(여유 13). 서버 `prompt_tokens` 가 audit 보다 크면 ctx 를 넘을 수 있어 사전등록에 token-golden 13/13 동등성 게이트를 장시간 회차 전에 두었다.
+- 렌더 입력(원문 포함 jsonl)은 scratchpad 에만 두었고 레포·결과에는 계수 표만 둔다.
+
+#### 4) ⑥ 사전등록 초안 6문서(`registrationStatus=UNCOMMITTED`, `registeredCommit=null`)
+
+| 등록 | arm | temperature | 골든 | 명령 | harnessDigest | parameterManifestSha256 |
+|---|---|---|---|---|---|---|
+| `eval/f0/PREREG-v4-diag-v2-t0.md`(공통 설계 §1 포함) | V2 | 0 | 22 | token-golden·usage-probe·B·A·boundary | `4c36e79e…e824` | `5a41be13…60fc` |
+| `eval/f0/PREREG-v4-diag-i-t0.md` | I | 0 | 22 | B·A·boundary | `87aebc06…66b1` | `538f7ffb…0d50` |
+| `eval/f0/PREREG-v4-diag-v2-t06.md` | V2 | 0.6 | 22 | B·A·boundary | `4c36e79e…e824` | `c1a2288b…5ef2` |
+| `eval/f0/PREREG-v4-diag-i-t06.md` | I | 0.6 | 22 | B·A·boundary | `87aebc06…66b1` | `3c80eab5…4ec2` |
+| `eval/f0/PREREG-v4-regression-v2.md` | V2 | 0 | 30 | B·A | `f8ccd2d0…8259` | `5a41be13…60fc` |
+| `eval/f0/PREREG-v4-regression-i.md` | I | 0 | 30 | B·A | `50ba7cc3…ad76` | `538f7ffb…0d50` |
+
+- 공통 parameters: `qwen3:4b`·digest `359d7dd4…fae7`·`bge-m3`·R=1·`maxTokens` 5120/5120·입력 3072/3072·context 8192·`answerLimitTokens` 192/256·`outputLimitTokens` 192·`requestTimeoutMs` 600000·`latencyBudgetMsByT`(v3 와 같음)·`f0-judge-v2`. V2 arm = `classify-v2`/`plan-v2`·`responseFormat=NONE`(투영·재시도 힌트 키 없음 — `PREREG-v2.md` 와 같은 요청 구성), I arm = `classify-v3-f`/`plan-v3-i`·`JSON_SCHEMA_V1`·`PRESENCE_V1`·`STEPS_DETAIL_V1`. 재사용 입력 SHA 는 v3 등록값과 같다(골든 `260da1e4…`, 회귀 `ef1803d6…`, fixture `87efe85b…`, 경계 `b5a31c95…`, usage `105a4edf…`, token `b1e865ce…`, 프롬프트 4개). `chatRenderers` = v4 등록 파일, 지원 입력 = Thinking pin 쌍·`count_tokens_qref_v2.py`·`count_input_audit_v4.py`·`requirements.txt`.
+- 결정과 근거(사용자 지시와 다른 점 포함):
+  - **문서 수 6(지시 예시는 `PREREG-v4-diag.md`·`PREREG-v4-regression.md` 2건)**: 하네스 사전등록 1건은 프롬프트·temperature·응답 형식을 하나씩만 담는다(`Prereg.Document.temperature()`·`responseFormat()` 단일 값). arm 을 한 문서에 담으려면 등록 schema·전 측정 명령에 arm 선택을 넣어야 해 범위가 커지므로, v3 `diag-a/b/c`(arm 별 문서) 선례대로 나눴다.
+  - **회귀는 temperature 0 만**: SPEC §16 F0 "temperature 는 정식(GATE) 등록 0, 진단 등록에 0.6 비교 arm" — 회귀는 정식 후보 구성의 추가 문항 확인이라 정식 기준값으로 뒀다.
+  - **회귀는 boundary-gen 미실행**: 같은 arm·temperature 0 진단과 경계 요청 메시지·`response_format` 바이트가 같다(audit `boundary/*` 108행 동일).
+  - **timeout 600초**: 새 장비 속도 미측정. 유일한 실측 근거인 Jetson ctx 8192(prefill 350.9·생성 12.5 tok/s)로 최대 호출 ≈ 418초, `NUM_PARALLEL=1` 큐 대기 여유 약 1.4배.
+- 호출 수·예상 시간(공통 설계 §1.5): 생성 호출 최소 332·최대 664(진단 53~106 × 4, 회귀 60~120 × 2) + 계수 38. 최악값 A(timeout 600초) 55.3~110.7시간, 최악값 B(입력 3,072·출력 5,120 × Jetson 속도 418초) 38.6~77.2시간, 가정값(근거 없음: 생성 40 tok/s·prefill 1,000 tok/s·평균 출력 1,500 토큰 ≈ 40초) 3.7~7.4시간. 첫 등록 `run B` 뒤 `latencyMs` 중앙값으로 다시 계산해 보고하는 규칙을 넣었다.
+- 판별 기준·무효 규칙: 사전등록 §1.4·§1.6. E0 류 경로 동등성 실험은 두지 않았다(v4 측정 호출이 모두 `/v1/chat/completions` 한 경로) — 대신 token-golden `promptTokens == auditInputTokens` 13/13 을 장시간 회차 전 게이트로 두었다.
+
+#### 5) 시험(`AIGW_SPEC_FILE`=정본 SPEC, `DEBUG`=빈 값, Gradle 동시 실행 0, 순차)
+
+- 신규/변경 시험: `F0V4DiagnosticObservationTest` 5건(출력 키 순서 기록 규칙, v4 run 행의 사고·content 개수·키 순서와 보고서 절, v3 보고서·행 모양 불변, v4 계수 호출 행의 finish·completion·thinking·auditInputTokens 와 v2 행 모양 불변, `--runtime-profile INFER_V4` 예산·같은 호출 목록·잘못된 값 거부), `F0V4RegistrationDraftTest` 4건(실제 6문서의 arm·temperature·런타임·예산·역할·로컬 일치·고유 capture·초안 verify 거부, temperature 쌍은 temperature 만 다름, 각 audit 이 계획 호출 전부를 v4 profile 안에서 덮고 v4 런타임 신원 기록·모든 호출이 v4 렌더러 범위 안·Jetson profile 로는 `INPUT_BUDGET_EXCEEDED`, 회귀 audit 는 진단 행 그대로 + R01~R08 만), `F0V4ChatRendererTest` +1(Go 엔진 7 사례)·범위 밖 시험 갱신, `F0V4RuntimeProfileTest` 관측 레코드 생성자·키 집합 갱신과 v4 시험 등록 지원 입력(`count_input_audit_v4.py`).
+- 변이 확인: ①렌더러 역할 고정(`user`) ②키 순서 정렬 ③계수 호출 v4 열 생략 ④`--runtime-profile` 무시 — 4변이를 함께 넣은 필터 실행에서 신규 4건 FAILED(`F0V4ChatRendererTest`·`F0V4DiagnosticObservationTest`, 10 중 4) → 원본 복원 `cmp` 일치.
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| 필터 `F0V4DiagnosticObservationTest`·`F0V4RuntimeProfileTest`·`F0V4ChatRendererTest` | 0 | XML 5/5·10/10·5/5 |
+| 필터 `F0V4RegistrationDraftTest`·`F0V3RegistrationDraftTest` | 0 | `BUILD SUCCESSFUL in 1m 58s` |
+| `:gateway-eval:run --args="spec-guard"` | 0 | `specSha`=`bb91146a…d0de4`, `specInputOrigin`=`LOCAL_FILE` |
+| 무필터 `:gateway-eval:test --console=plain --rerun-tasks` | 0 | `BUILD SUCCESSFUL in 5m 29s`, `6 actionable tasks: 6 executed`(testLeafEvidence 포함). XML 독립 집계 **234/234 PASS·47클래스·failures/errors/skipped 0**(§12.29 224 + 신규 10) |
+| `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+
+- 시험 신원(`run-binding.json`): `runId=4a9bc1a4-f801-47fe-8f71-6605fa437956`, `inputFingerprint=27fafa76d2dcbfe2227be2291931249d6539d9ffaf2345060bcdaf30b5813eaf`, `specSha=bb91146a…d0de4`. stub·로컬 시험이며 실제 모델 F0 합격이 아니다.
+
+#### 6) 사전등록 상태(`f0 prereg-check`, endpoint 인자 없음, 모델 요청 0)
+
+- 새 6문서: 모두 `localMismatches=[]`, `currentHarnessDigest` = 문서 값, 결과 `PREREG_NOT_COMMITTED`(초안 — 정상). 하네스 소스 변경으로 기존 24건(`PREREG.md`·`PREREG-v2.md`·v3 22건)은 §12.28 3) 과 같이 `harnessDigest` stale 그대로이며 등록 문서는 고치지 않았다.
+
+#### 7) 커밋 범위(사용자 허용: 로컬 C22/C23 두 개, push·`--force` 없음)
+
+- C22(정확 30파일): 수정 8 = `docs/ai-rag-gateway-architecture-dev-report.md`(C21 뒤 미커밋 소절·§12.29·이 절 포함, C5·…·C21 관례), `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/{ChatRenderers,F0Measurements,F0ReportWriter,F0RunnerCli,OllamaChatClient,Prereg}.java`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V4RuntimeProfileTest.java`. 신규 22 = ①·③ 산출물 `docs/gates/f0/{runtime-env-20261104T021454Z.json,tokenizer-provenance-v4.md,preparation-template-v4.template,template-review-v4.md}`·`eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json{,.sha256}`·`eval/f0/v4/chat-renderers-v4.json`, ⑤ `eval/f0/v4/input-audit-v4-{v2,i,regression-v2,regression-i}.json`·`eval/py/count_input_audit_v4.py`·`eval/py/tests/test_count_input_audit_v4.py`, ⑥ `eval/f0/PREREG-v4-{diag-v2-t0,diag-i-t0,diag-v2-t06,diag-i-t06,regression-v2,regression-i}.md`(초안), 시험 `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/{F0V4ChatRendererTest,F0V4DiagnosticObservationTest,F0V4RegistrationDraftTest}.java`. 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`, `evidence/F0/`, `eval/py/**/__pycache__/`)는 넣지 않는다.
+- C23(정확 6파일): 6문서의 §0 제목·상태 문구(C18·C20 방식)와 기계 판독 블록 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C22 SHA 만.
+- 이 절 추가 전 537,769 B 의 SHA(`0868750a…99dd`)는 추가 후 앞 537,769 B 에서 같아야 한다(커밋 직전 확인). 커밋 해시·확인 결과는 커밋 뒤 이 절 끝 "로컬 C22/C23" 소절에 작업 트리에만 기록한다(관례 — 다음 커밋에 포함).
+
+#### 8) 측정 실행 순서(C23 뒤, 사용자 승인 후, 이 세션은 실행하지 않음)
+
+- 진단: `PREREG-v4-diag-v2-t0` §2(spec-guard → prereg-check → preflight → chat-template(template SHA 확인) → token-golden → 동등성 게이트 13/13 → usage-probe → run B(예상 시간 재계산) → run A → boundary-gen → postflight → share-window 작성 → share-exclude → report) → `diag-i-t0` → `diag-v2-t06` → `diag-i-t06`(각 문서 §2, 같은 `$runId`). 회귀 2문서는 Plan ⑧ 뒤 각 문서 1절 착수 조건 충족 시만.
+
+#### 9) 위험·미확정
+
+- **properties 순서(Plan ⑥ 항목)는 이 arm 구성으로 일부만 판별된다**: I arm `JSON_SCHEMA_V1` 은 properties 를 키 정렬 순서로 송신하므로 출력 순서가 정렬이어도 "서버가 선언 순서를 보존하는지/재정렬하는지" 를 가릴 수 없다. 판별하려면 선언 순서 송신 arm(`JSON_SCHEMA_PLAN_ORDERED_V1`, v3 h 구성)이 필요하며 사용자 arm 결정 밖이라 넣지 않았다(사전등록 §1.4 에 한계로 명시).
+- `reasoning_tokens` 미보고면 v4 모든 시도가 `ANSWER_TOKENS_UNCOUNTABLE` → 재시도 포함 최대 호출(664)·정확도 축 사용 불가(§12.27 3) 추정 그대로).
+- I arm 최대 입력+`max_tokens` 여유 13 토큰 — token-golden 게이트로 확인 전에는 서버 계수 일치 미확인.
+- Plan ⑧ 에서 하네스가 바뀌면 회귀 2문서는 `PREREG_INPUT_CHANGED` 로 stale — 새 등록으로 대체(문서 수정 금지).
+- GIN 로그 줄 시각 의미(§12.27 5) 열린 항목 11)·Modelfile 기본 `top_k 20`·`top_p 0.95` 적용(§12.29 7))·새 장비 처리 속도는 미확인.
+
+#### 10) 보존 확인
+
+- SPEC `bb91146a…d0de4`·Plan 불변, 기존 PREREG 24건·결과·capture·evidence·v1~v3 입력·pin(`eval/f0/chat-renderers-v1.json`, `eval/py/count_input_audit_v2.py`, Instruct tokenizer 쌍 등) 변경 0. 이 Dev report 앞 537,769 B 의 SHA 는 추가 전후 같다(`0868750a…99dd`). 원문 응답·secrets 출력 0.

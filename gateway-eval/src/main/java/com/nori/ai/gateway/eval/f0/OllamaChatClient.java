@@ -30,13 +30,18 @@ public final class OllamaChatClient {
      * 사고(thinking) 출력 관측: 원문 없이 존재/부재와 수치만 담는다(사고문 전문 비저장, SPEC §12.3).
      * separateFields = message 에 null 이 아닌 값으로 있는 THINKING_FIELDS 이름(정렬), reasoningTokens = usage.completion_tokens_details.reasoning_tokens(정수가 아니거나 없으면 null),
      * contentThinkOpen/Close = 답변 content 에 `<think>`/`</think>` 표지가 있는지(사고문의 content 혼입 판별용).
+     * thinkingCodepoints = THINKING_FIELDS 순서로 첫 문자열 분리 필드의 코드포인트 수(없으면 null), contentCodepoints = content 코드포인트 수 —
+     * usage 의 사고 포함 여부·사고 도중 상한 도달(content 0)을 원문 없이 가리는 개수입니다(SPEC §14.5 열린 항목 ⓒ, P03 v4 ⑥ 진단 입력).
      */
-    public record ThinkingObservation(List<String> separateFields, Integer reasoningTokens, boolean contentThinkOpen, boolean contentThinkClose) {
+    public record ThinkingObservation(List<String> separateFields, Integer reasoningTokens, boolean contentThinkOpen, boolean contentThinkClose, Integer thinkingCodepoints, int contentCodepoints) {
         static ThinkingObservation of(JsonNode message, JsonNode usage, String content) {
-            List<String> fields = new ArrayList<>();
-            for (String name : THINKING_FIELDS) if (message.has(name) && !message.get(name).isNull()) fields.add(name);
+            List<String> fields = new ArrayList<>(); Integer thinking = null;
+            for (String name : THINKING_FIELDS) if (message.has(name) && !message.get(name).isNull()) {
+                fields.add(name);
+                if (thinking == null && message.get(name).isTextual()) thinking = message.get(name).textValue().codePointCount(0, message.get(name).textValue().length());
+            }
             JsonNode reasoning = usage.path("completion_tokens_details").path("reasoning_tokens");
-            return new ThinkingObservation(List.copyOf(fields), isCount(reasoning) ? reasoning.intValue() : null, content.contains("<think>"), content.contains("</think>"));
+            return new ThinkingObservation(List.copyOf(fields), isCount(reasoning) ? reasoning.intValue() : null, content.contains("<think>"), content.contains("</think>"), thinking, content.codePointCount(0, content.length()));
         }
     }
     private final URI endpoint;

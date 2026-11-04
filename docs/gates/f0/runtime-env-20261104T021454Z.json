@@ -1,0 +1,120 @@
+{
+  "schema": "f0-runtime-env-v1",
+  "gate": "G-INFER-ENV",
+  "purpose": "P03 v4 ① F0 런타임 고정 기록(읽기 전용, 허용 필드만). 모델 추론 호출 0, pull·load·unload·재시작·설정 변경 0.",
+  "collectedAt": "2026-11-04T02:14:54Z",
+  "collectedBy": "독립 Claude Code Opus 5.5 (P03 v4 ①·③ 세션)",
+  "server": {
+    "host": "192.168.0.160",
+    "hostname": "ollama",
+    "timezone": "Etc/UTC"
+  },
+  "readOnlySources": [
+    "GET /api/version",
+    "GET /api/ps",
+    "GET /api/tags",
+    "POST /api/show {\"model\":\"qwen3:4b\"}",
+    "systemctl show ollama (Environment 의 OLLAMA_* 만, FragmentPath·DropInPaths·ActiveState)",
+    "nvidia-smi --query-gpu / --query-compute-apps"
+  ],
+  "ollama": {
+    "version": "0.40.13",
+    "service": {
+      "unit": "ollama",
+      "activeState": "active",
+      "subState": "running",
+      "activeEnterTimestamp": "2026-11-03T04:10:45Z",
+      "fragmentPath": "/etc/systemd/system/ollama.service",
+      "fragmentSha256": "11758d469d3f103e53a9612a8ffcb3a3e61834c994c08d412bb051f3c827dbd3",
+      "dropInPaths": ["/etc/systemd/system/ollama.service.d/override.conf"],
+      "dropInSha256": {"/etc/systemd/system/ollama.service.d/override.conf": "d25df74d76d3f84178ddc4fc90437cad5a5a5d641131190201140567f9902b09"},
+      "environmentKeys": ["OLLAMA_CONTEXT_LENGTH", "OLLAMA_HOST", "OLLAMA_KEEP_ALIVE", "OLLAMA_MAX_LOADED_MODELS", "OLLAMA_NUM_PARALLEL", "PATH"],
+      "ollamaEnvironment": {
+        "OLLAMA_CONTEXT_LENGTH": "8192",
+        "OLLAMA_HOST": "0.0.0.0:11434",
+        "OLLAMA_KEEP_ALIVE": "24h",
+        "OLLAMA_MAX_LOADED_MODELS": "2",
+        "OLLAMA_NUM_PARALLEL": "1"
+      }
+    }
+  },
+  "ps": [
+    {
+      "name": "qwen3:4b",
+      "model": "qwen3:4b",
+      "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "context_length": 8192,
+      "size": 3877571133,
+      "size_vram": 3877571133,
+      "details": {"format": "gguf", "family": "qwen3", "parameter_size": "4.0B", "quantization_level": "Q4_K_M"}
+    },
+    {
+      "name": "bge-m3:latest",
+      "model": "bge-m3:latest",
+      "digest": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+      "context_length": 8192,
+      "size": 689187061,
+      "size_vram": 689187061,
+      "details": {"format": "gguf", "family": "bert", "parameter_size": "566.70M", "quantization_level": "F16"}
+    }
+  ],
+  "psFieldNames": ["context_length", "details", "digest", "expires_at", "model", "name", "runner", "size", "size_vram"],
+  "tags": [
+    {"name": "qwen3:4b", "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7", "size": 2497293931, "modified_at": "2026-11-03T02:51:33.069813407Z"},
+    {"name": "bge-m3:latest", "digest": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab", "size": 1157672605, "modified_at": "2026-11-03T02:52:28.679173552Z"}
+  ],
+  "show": {
+    "model": "qwen3:4b",
+    "templateSha256": "2d54db2b9bb29ce7db54fea63a891f5859603813c555b1f88b5e0994652897f9",
+    "templateBytes": 1506,
+    "templateSource": "go_template",
+    "renderer": null,
+    "parser": null,
+    "capabilities": ["completion", "tools", "thinking"],
+    "thinking": {"default": true, "values": [true]},
+    "parameters": {
+      "top_k": 20,
+      "top_p": 0.95,
+      "repeat_penalty": 1,
+      "stop": ["<|im_start|>", "<|im_end|>"],
+      "temperature": 0.6
+    },
+    "modelfileDirectiveCounts": {"FROM": 1, "LICENSE": 1, "PARAMETER": 6, "TEMPLATE": 1},
+    "details": {"format": "gguf", "family": "qwen3", "families": ["qwen3"], "parameter_size": "4.0B", "quantization_level": "Q4_K_M", "parent_model": ""},
+    "modelInfo": {
+      "general.architecture": "qwen3",
+      "general.basename": "Qwen3",
+      "general.finetune": "Thinking",
+      "general.size_label": "4B",
+      "general.parameter_count": 4022468096,
+      "general.file_type": 15,
+      "general.quantization_version": 2,
+      "qwen3.context_length": 262144,
+      "tokenizer.ggml.model": "gpt2",
+      "tokenizer.ggml.pre": "qwen2",
+      "tokenizer.ggml.add_bos_token": false
+    },
+    "modified_at": "2026-11-03T02:51:33.069813407Z"
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce GTX 1660 Ti",
+    "driverVersion": "595.99.02",
+    "cudaVersion": "13.2",
+    "memoryTotalMiB": 6144,
+    "memoryUsedMiB": 4544,
+    "memoryFreeMiB": 1205,
+    "temperatureC": 38,
+    "utilizationPercent": 0,
+    "pstate": "P8",
+    "computeApps": [
+      {"process": "/usr/local/lib/ollama/llama-server", "usedMiB": 3798},
+      {"process": "/usr/local/lib/ollama/llama-server", "usedMiB": 742}
+    ]
+  },
+  "notes": [
+    "/api/ps 의 expires_at·runner 값은 기록하지 않았다(필드 이름만). digest 는 sha256: 접두를 뗀 64 hex 이며 /api/ps 와 /api/tags 가 같다.",
+    "parameters 는 /api/show 의 Modelfile PARAMETER 문자열을 키별로 옮긴 것이다(num_ctx 없음 — context 8192 는 OLLAMA_CONTEXT_LENGTH 에서 온다).",
+    "collectedAt 은 API 필드 수집 시각이고 service·GPU 는 같은 세션에서 바로 뒤(수 분 안) 조회했다. 같은 세션의 /api/show 재조회(template 바이트 저장)도 SHA 가 같았다.",
+    "GPU 사용량은 수집 시각 한 점이며 다른 시스템(192.168.0.201)도 같은 서버를 쓴다."
+  ]
+}

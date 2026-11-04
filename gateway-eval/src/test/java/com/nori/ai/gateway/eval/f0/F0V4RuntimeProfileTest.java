@@ -33,7 +33,8 @@ class F0V4RuntimeProfileTest {
             if (file.equals(MeasurementSession.TOKENIZER_FILE) || file.equals(MeasurementSession.TOKENIZER_PIN)) continue;
             inputs.addObject().put("path", file).put("sha256", Json.sha(Json.bytes(f.root.resolve(file))));
         }
-        for (String file : List.of(V4.tokenizerFile(), V4.tokenizerPin())) inputs.addObject().put("path", file).put("sha256", Json.sha(Json.bytes(f.root.resolve(file))));
+        f.copy(V4.inputAuditCounter());
+        for (String file : List.of(V4.tokenizerFile(), V4.tokenizerPin(), V4.inputAuditCounter())) inputs.addObject().put("path", file).put("sha256", Json.sha(Json.bytes(f.root.resolve(file))));
         block.set("inputs", inputs);
         block.put("schema", "f0-prereg-v4"); block.put("purpose", "DIAGNOSTIC");
         ObjectNode p = (ObjectNode)block.path("parameters");
@@ -148,7 +149,7 @@ class F0V4RuntimeProfileTest {
             JsonNode observations = row.path("thinkingObservations");
             assertThat(observations).hasSize(row.path("completionTokens").size());
             JsonNode first = observations.get(0);
-            assertThat(GoldenSet.keys(first)).isEqualTo(Set.of("separateFields", "reasoningTokens", "contentThinkOpen", "contentThinkClose"));
+            assertThat(GoldenSet.keys(first)).isEqualTo(Set.of("separateFields", "reasoningTokens", "contentThinkOpen", "contentThinkClose", "thinkingCodepoints", "contentCodepoints"));
             assertThat(first.path("separateFields")).containsExactly(Json.MAPPER.getNodeFactory().textNode("reasoning"));
             assertThat(first.path("reasoningTokens").asInt()).isEqualTo(77);
             assertThat(first.path("contentThinkOpen").asBoolean()).isFalse(); assertThat(first.path("contentThinkClose").asBoolean()).isFalse();
@@ -223,16 +224,16 @@ class F0V4RuntimeProfileTest {
     @Test void answerTokensOverTheAnswerLimitOrUncountableAreFailuresWhileLegacyJudgeIsUnchanged() {
         QRefContext refs = QRefContext.extract("PHOTO_001 장애 원인");
         MessageAssembler.Kind classify = MessageAssembler.Kind.CLASSIFY;
-        var separated = new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 900, false, false);
+        var separated = new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 900, false, false, 2400, 60);
         // 사고 900 은 답변 상한에 넣지 않습니다: 답변 192 = 상한 안, 193 = 초과(SPEC §14.5 "답변 상한 초과 = 실패").
         assertThat(ClassificationJudge.judge(result(VALID_CLASSIFY, 900 + 192, separated), 5120, classify, true, "Asia/Seoul", refs, 192).valid()).isTrue();
         assertThat(ClassificationJudge.judge(result(VALID_CLASSIFY, 900 + 193, separated), 5120, classify, true, "Asia/Seoul", refs, 192).errorCode()).isEqualTo(ClassificationJudge.ANSWER_LIMIT_EXCEEDED);
         assertThat(ClassificationJudge.answerTokens(result(VALID_CLASSIFY, 900 + 193, separated))).isEqualTo(193);
         // 계수 불가(fail-closed): 사고 토큰 수 보고 없음 · content 에 사고 표지 · 사고 토큰 > completion · 관측 없음.
         List<OllamaChatClient.ChatResult> uncountable = List.of(
-            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of("reasoning"), null, false, false)),
-            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of(), 10, false, true)),
-            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 41, false, false)),
+            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of("reasoning"), null, false, false, 100, 60)),
+            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of(), 10, false, true, null, 70)),
+            result(VALID_CLASSIFY, 40, new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 41, false, false, 100, 60)),
             result(VALID_CLASSIFY, 40, null));
         for (OllamaChatClient.ChatResult r : uncountable) {
             assertThat(ClassificationJudge.answerTokens(r)).isNull();
@@ -327,7 +328,8 @@ class F0V4RuntimeProfileTest {
             Preflight.Verified verified = Preflight.run(client, "qwen3:4b", "bge-m3", 8192, OllamaStub.GEN_DIGEST).verified();
             List<Map<String,String>> messages = List.of(Map.of("role", "user", "content", "x"));
             OllamaChatClient.ChatResult result = client.chat(verified, "qwen3:4b", messages, 5120, null, Json.MAPPER.getNodeFactory().numberNode(0.6));
-            assertThat(result.thinking()).isEqualTo(new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 77, true, true));
+            String thinkingText = OllamaStub.SENTINEL + " 사고문", content = "<think>" + OllamaStub.SENTINEL + "</think>{}";
+            assertThat(result.thinking()).isEqualTo(new OllamaChatClient.ThinkingObservation(List.of("reasoning"), 77, true, true, thinkingText.codePointCount(0, thinkingText.length()), content.codePointCount(0, content.length())));
             assertThat(result.toString()).doesNotContain(OllamaStub.SENTINEL); assertThat(result.thinking().toString()).doesNotContain(OllamaStub.SENTINEL);
             client.chat(verified, "qwen3:4b", messages, 192, null);
             List<OllamaStub.Request> chats = F0StructuredOutputDiagnosticTest.chats(stub);

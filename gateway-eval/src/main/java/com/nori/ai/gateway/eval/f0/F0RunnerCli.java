@@ -129,7 +129,12 @@ public final class F0RunnerCli {
                 // 준비 전용: 등록 예정 입력으로 하네스가 보낼 모든 chat 메시지를 검토된 렌더러로 렌더해 공식 tokenizer 계수 입력을 만듭니다(추론 호출 0).
                 // --context-projection 이 없으면 기존 전체 Context 조립 그대로입니다. 값은 등록 가능한 투영만 받고 측정 때는 등록 값으로 조립한 메시지 SHA 와 대조됩니다.
                 // --retry-hint 도 같은 방식입니다(없으면 기존 고정 오류 코드 재시도, 값은 등록 가능한 힌트만).
-                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--context-projection", "--retry-hint", "--out");
+                // --runtime-profile INFER_V4 는 v4 진단 예산(요청 max_tokens 8192 − 입력 상한)·context 8192 로 행을 만듭니다(없으면 기존 v2·v3 예산 Budget.V2·4096 그대로).
+                args.only("--golden", "--fixture", "--classify-prompt", "--plan-prompt", "--cases", "--usage-messages", "--token-messages", "--renderers", "--template-sha256", "--context-projection", "--retry-hint", "--runtime-profile", "--out");
+                String requestedProfile = args.optional("--runtime-profile");
+                if (requestedProfile != null && !requestedProfile.equals("INFER_V4")) throw new EvalException(2, "ARGUMENT_INVALID");
+                Prereg.Budget budget = requestedProfile == null ? Prereg.Budget.V2 : Prereg.Budget.V4_DIAGNOSTIC;
+                int contextTokens = requestedProfile == null ? Prereg.CONTEXT_TOKENS : Prereg.RuntimeProfile.INFER_V4.contextTokens();
                 String requested = args.optional("--context-projection"), projection = requested == null ? MessageAssembler.FULL : requested;
                 if (requested != null && !Prereg.CONTEXT_PROJECTIONS.contains(requested)) throw new EvalException(2, "ARGUMENT_INVALID");
                 String requestedHint = args.optional("--retry-hint"), retryHint = requestedHint == null ? ClassificationJudge.RETRY_HINT_NONE : requestedHint;
@@ -142,10 +147,10 @@ public final class F0RunnerCli {
                 ChatRenderers.Renderer renderer = ChatRenderers.forTemplate(path(args, "--renderers"), templateSha);
                 List<JsonNode> cases = BoundaryCases.load(path(args, "--cases"));
                 if (cases.stream().anyMatch(row -> !row.has("expectedResolvedOutput"))) throw new EvalException(2, "CASES_VERSION_INVALID");
-                List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, Prereg.Budget.V2, "A", retryHint));
-                planned.addAll(InputAudit.run(golden, classify, Prereg.Budget.V2, "B", retryHint)); planned.addAll(InputAudit.boundary(cases, classify, Prereg.Budget.V2));
-                planned.addAll(InputAudit.probes("usage", messages(path(args, "--usage-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
-                planned.addAll(InputAudit.probes("token", messages(path(args, "--token-messages"), fixturePath, classifyPath, goldenPath, true, projection)));
+                List<InputAudit.Planned> planned = new ArrayList<>(InputAudit.run(golden, plan, budget, "A", retryHint));
+                planned.addAll(InputAudit.run(golden, classify, budget, "B", retryHint)); planned.addAll(InputAudit.boundary(cases, classify, budget));
+                planned.addAll(InputAudit.probes("usage", messages(path(args, "--usage-messages"), fixturePath, classifyPath, goldenPath, true, projection), contextTokens));
+                planned.addAll(InputAudit.probes("token", messages(path(args, "--token-messages"), fixturePath, classifyPath, goldenPath, true, projection), contextTokens));
                 StringBuilder lines = new StringBuilder();
                 for (InputAudit.Planned call : planned) {
                     Map<String,Object> row = new LinkedHashMap<>(); row.put("id", call.id()); row.put("messagesSha256", InputAudit.messagesSha256(call.messages()));

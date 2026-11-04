@@ -1,0 +1,11 @@
+{
+  "schema": "f0-chat-renderers-v1",
+  "notice": "v4(2026-11-04 교체 추론 서버) 입력 계수·raw 렌더 문자열 근거. 캡처한 qwen3:4b(Qwen3-4B-Thinking-2507, digest 359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7) Go template SHA-256 과 렌더 형식의 일치를 검토 기록(reviewRef)과 함께 등록한 항목만 쓴다. 측정 시점 template SHA 와 맞는 항목이 없으면 렌더러를 쓰는 명령은 TEMPLATE_RENDERER_UNVERIFIED(exit 2)로 거부한다. 2026-11-04 P03 v4 ③: Ollama 0.40.13 Go template(template_source=go_template) 경로, system(첫 위치, 선택) + user 1개 이상(tools·assistant·tool 없음) 범위로 검토·등록. 같은 날 P03 v4 ④⑤: 마지막 user 앞 assistant 대화(사고 블록 미진입, 검토 §7)로 범위를 넓혔다. v1~v3 등록은 eval/f0/chat-renderers-v1.json 그대로다.",
+  "renderers": [
+    {
+      "templateSha256": "2d54db2b9bb29ce7db54fea63a891f5859603813c555b1f88b5e0994652897f9",
+      "renderer": "OLLAMA_GO_QWEN3_THINKING_V1",
+      "reviewRef": "docs/gates/f0/template-review-v4.md"
+    }
+  ]
+}

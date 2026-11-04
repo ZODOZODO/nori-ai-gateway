@@ -156,8 +156,50 @@ public final class F0ReportWriter {
             }
             counts.forEach((key, count) -> md.append("| ").append(source).append(" | ").append(key).append(" | ").append(count).append(" |\n"));
         }
+        if (document.v4()) md.append(thinkingSection(loaded.results()));
         MeasurementSession.writeNew(file, md.toString().getBytes(StandardCharsets.UTF_8));
         return "F0_DIAGNOSTIC_REPORT_WRITTEN";
+    }
+    /**
+     * v4 진단 전용: 시도별 사고 출력 관측·답변 토큰·출력 키 순서의 분포(원문 없음 — 분리 필드 이름·표지 불리언·개수만). 사고 토큰 분포는 사고 상한 T 제안
+     * (Plan P03 v4 ⑩)의 근거 입력이며, 분리 필드·reasoning_tokens 보고 수와 content 0 건수는 답변 토큰 계수 방법(SPEC §14.5 열린 항목 ⓒ) 확인 입력입니다.
+     */
+    private static String thinkingSection(F0Judgement.Results results) {
+        StringBuilder md = new StringBuilder("\n## v4 사고 출력 관측(원문 없음, nearest-rank)\n\n| 출처 | 시도 | 시도 수 | 분리 필드=건수 | reasoning_tokens 보고 | content `<think>`/`</think>` | content 0 | 사고 토큰 p50/p95/max | 사고 코드포인트 max | 답변 토큰 p50/p95/max(계수 불가) | 출력 키 순서=건수 |\n|---|---|---|---|---|---|---|---|---|---|---|\n");
+        for (String source : List.of("A", "B", "boundary")) {
+            JsonNode node = results.get(source); if (node == null) continue;
+            List<JsonNode> rows = new ArrayList<>(); node.path("attempts").forEach(rows::add); node.path("cases").forEach(c -> c.path("attempts").forEach(rows::add));
+            for (int attempt = 0; attempt < 2; attempt++) {
+                int count = 0, reported = 0, open = 0, close = 0, empty = 0, uncountable = 0; Integer maxThinkingCodepoints = null;
+                Map<String,Integer> fields = new TreeMap<>(), orders = new TreeMap<>(); List<Integer> reasoning = new ArrayList<>(), answers = new ArrayList<>();
+                for (JsonNode row : rows) {
+                    JsonNode o = row.path("thinkingObservations").path(attempt);
+                    if (o.isMissingNode()) continue;
+                    count++;
+                    fields.merge(o.path("separateFields").isEmpty() ? "(없음)" : String.join("+", Json.MAPPER.convertValue(o.path("separateFields"), String[].class)), 1, Integer::sum);
+                    if (o.path("reasoningTokens").isInt()) { reported++; reasoning.add(o.path("reasoningTokens").intValue()); }
+                    if (o.path("contentThinkOpen").asBoolean()) open++;
+                    if (o.path("contentThinkClose").asBoolean()) close++;
+                    if (o.path("contentCodepoints").asInt(-1) == 0) empty++;
+                    if (o.path("thinkingCodepoints").isInt()) maxThinkingCodepoints = Math.max(maxThinkingCodepoints == null ? 0 : maxThinkingCodepoints, o.path("thinkingCodepoints").intValue());
+                    JsonNode answer = row.path("answerTokens").path(attempt);
+                    if (answer.isInt()) answers.add(answer.intValue()); else uncountable++;
+                    JsonNode order = row.path("outputKeyOrders").path(attempt);
+                    orders.merge(order.isArray() ? String.join(",", Json.MAPPER.convertValue(order, String[].class)) : "(판별 불가)", 1, Integer::sum);
+                }
+                if (count == 0) continue;
+                md.append("| ").append(source).append(" | ").append(attempt == 0 ? "초회" : "재시도").append(" | ").append(count).append(" | ").append(joined(fields)).append(" | ").append(reported).append('/').append(count)
+                    .append(" | ").append(open).append('/').append(close).append(" | ").append(empty).append(" | ").append(distribution(reasoning)).append(" | ").append(maxThinkingCodepoints == null ? "-" : maxThinkingCodepoints)
+                    .append(" | ").append(distribution(answers)).append('(').append(uncountable).append(") | ").append(joined(orders)).append(" |\n");
+            }
+        }
+        return md.toString();
+    }
+    private static String distribution(List<Integer> values) {
+        return values.isEmpty() ? "-" : MetricsAggregator.nearestRank(values, 50) + "/" + MetricsAggregator.nearestRank(values, 95) + "/" + Collections.max(values);
+    }
+    private static String joined(Map<String,Integer> counts) {
+        StringJoiner text = new StringJoiner("; "); counts.forEach((key, count) -> text.add(key + "=" + count)); return text.toString();
     }
     /** 진단 객체의 말단(문자열·불리언·정수)만 "경로=값"으로 펼칩니다. 진단에는 고정 값만 있으므로 원문이 섞이지 않습니다. */
     private static void flatten(String prefix, JsonNode node, java.util.function.Consumer<String> sink) {

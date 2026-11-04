@@ -31,11 +31,12 @@ public final class Prereg {
      * 등록 schema 가 고정하는 추론 런타임. v1~v3 = Jetson 등록(값 불변 — 과거 등록 재검증 보존), v4 = 2026-11-04 교체 추론 서버(SPEC D44·D51).
      * v4 는 생성 모델 digest 를 등록값으로 고정합니다(공유·무인증 서버에서 같은 태그가 다른 digest 로 바뀔 수 있음, SPEC §14.6).
      */
-    public record RuntimeProfile(String generationModel, int contextTokens, String tokenizerFile, String tokenizerPin, String templateStem) {
-        public static final RuntimeProfile JETSON = new RuntimeProfile(F0RunnerCli.GENERATION_MODEL, CONTEXT_TOKENS, MeasurementSession.TOKENIZER_FILE, MeasurementSession.TOKENIZER_PIN, "qwen3-4b-instruct");
-        public static final RuntimeProfile INFER_V4 = new RuntimeProfile("qwen3:4b", 8192, "eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json", "eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json.sha256", "qwen3-4b");
-        /** versioned 등록이 inputs 에 반드시 담는 지원 파일(tokenizer 쌍만 profile 별). */
-        public List<String> supportInputs() { return List.of(tokenizerFile, tokenizerPin, "eval/py/count_tokens_qref_v2.py", "eval/py/count_input_audit_v2.py", "eval/py/requirements.txt"); }
+    /** inputAuditCounter = 호출 전 입력 audit 표를 만든 계수기(v4 는 context 8192·v4 렌더러 기록 — v2 계수기는 v2·v3 등록 입력이라 바이트를 바꾸지 않음). */
+    public record RuntimeProfile(String generationModel, int contextTokens, String tokenizerFile, String tokenizerPin, String templateStem, String inputAuditCounter) {
+        public static final RuntimeProfile JETSON = new RuntimeProfile(F0RunnerCli.GENERATION_MODEL, CONTEXT_TOKENS, MeasurementSession.TOKENIZER_FILE, MeasurementSession.TOKENIZER_PIN, "qwen3-4b-instruct", "eval/py/count_input_audit_v2.py");
+        public static final RuntimeProfile INFER_V4 = new RuntimeProfile("qwen3:4b", 8192, "eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json", "eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json.sha256", "qwen3-4b", "eval/py/count_input_audit_v4.py");
+        /** versioned 등록이 inputs 에 반드시 담는 지원 파일(tokenizer 쌍·입력 audit 계수기만 profile 별). */
+        public List<String> supportInputs() { return List.of(tokenizerFile, tokenizerPin, "eval/py/count_tokens_qref_v2.py", inputAuditCounter, "eval/py/requirements.txt"); }
     }
     /**
      * 사전등록 하나가 쓰는 유일한 토큰 예산. 요청 max_tokens·판정 상한·경계 판정·보고가 모두 이 값을 씁니다.

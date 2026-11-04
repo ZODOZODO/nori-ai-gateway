@@ -85,7 +85,7 @@ public final class F0Measurements {
         private final JsonNode expected, context; private final String question; private final RegistryFixture fixture; private final ResponseSchema.Format responseFormat;
         private final List<Integer> audited = new ArrayList<>(); private final List<ObjectNode> diagnosed = new ArrayList<>();
         private final List<OllamaChatClient.ThinkingObservation> thinking = new ArrayList<>();
-        private final List<Integer> answers = new ArrayList<>(); private final List<CallWindow> windows = new ArrayList<>();
+        private final List<Integer> answers = new ArrayList<>(); private final List<CallWindow> windows = new ArrayList<>(); private final List<List<String>> keyOrders = new ArrayList<>();
         Attempts(MeasurementSession session, MessageAssembler.Kind kind, QRefContext references, int maxTokens, JsonNode expected, String question, JsonNode context, RegistryFixture fixture) {
             this.session = session; this.kind = kind; this.references = references; this.maxTokens = maxTokens; this.expected = expected; this.question = question; this.context = context; this.fixture = fixture;
             this.responseFormat = ResponseSchema.forPolicy(session.prereg().document().responseFormat(), kind, references);
@@ -95,7 +95,7 @@ public final class F0Measurements {
             java.time.Instant sentAt = session.clock().instant(); MeasurementSession.Sent sent;
             try { sent = session.chat(messages, inputLimit, maxTokens, responseFormat); }
             finally { windows.add(new CallWindow(sentAt.toString(), session.clock().instant().toString())); }
-            audited.add(sent.auditInputTokens()); thinking.add(sent.result().thinking()); answers.add(ClassificationJudge.answerTokens(sent.result()));
+            audited.add(sent.auditInputTokens()); thinking.add(sent.result().thinking()); answers.add(ClassificationJudge.answerTokens(sent.result())); keyOrders.add(outputKeyOrder(sent.result().content()));
             if (references != null) diagnosed.add(AttemptDiagnostics.diagnose(sent.result(), maxTokens, kind, references, expected, question, context, context.path("timezone").asText(), fixture));
             return sent.result();
         }
@@ -106,10 +106,22 @@ public final class F0Measurements {
             if (responseFormat != null) row.put("responseFormatSha256", responseFormat.sha256());
             // v4(thinking 전용 모델)만 시도별 사고 출력 관측(원문 없는 존재/부재·수치)을 남깁니다. v1~v3 결과 모양은 그대로입니다.
             // 답변 토큰(사고 제외, 셀 수 없으면 null)과 시도별 송신·수신 UTC 구간(공유 서버 겹침 판정 입력)도 v4 에만 둡니다.
+            // 답변 최상위 키 출력 순서(properties 순서 진단, 스키마 키 이름만)도 v4 에만 둡니다.
             if (session.prereg().document().v4()) {
                 row.set("thinkingObservations", Json.MAPPER.valueToTree(thinking)); row.set("answerTokens", Json.MAPPER.valueToTree(answers)); row.set("callWindows", Json.MAPPER.valueToTree(windows));
+                row.set("outputKeyOrders", Json.MAPPER.valueToTree(keyOrders));
             }
         }
+    }
+    /** 출력 키 이름으로 기록해도 원문이 새지 않는 wire·계획 스키마 키(q 는 v1 원문 복사 키). */
+    private static final Set<String> SCHEMA_KEY_NAMES = Set.of("t", "eqp", "from", "to", "q", "qRef", "steps");
+    /** 답변 content 가 JSON 객체이고 키가 모두 SCHEMA_KEY_NAMES 이면 최상위 키의 출력 순서, 아니면 null(그 밖 키 이름은 모델 원문이라 남기지 않음). */
+    static List<String> outputKeyOrder(String content) {
+        JsonNode node;
+        try { node = Json.MAPPER.readTree(content); } catch (java.io.IOException | RuntimeException e) { return null; }
+        if (node == null || !node.isObject()) return null;
+        List<String> keys = new ArrayList<>(); node.fieldNames().forEachRemaining(keys::add);
+        return SCHEMA_KEY_NAMES.containsAll(keys) ? List.copyOf(keys) : null;
     }
     /** 한 시도의 송신 직전~응답 수신(또는 timeout) 직후 시각(UTC ISO-8601). */
     public record CallWindow(String sentAt, String receivedAt) {}
@@ -186,7 +198,10 @@ public final class F0Measurements {
                 List<Map<String,String>> messages = inputs.get(step[0]);
                 int value;
                 int inputLimit = session.prereg().document().contextTokens() - 1;
-                if (metric.equals("promptTokens")) value = session.chat(messages, inputLimit, 1).result().promptTokens();
+                if (metric.equals("promptTokens")) {
+                    MeasurementSession.Sent sent = session.chat(messages, inputLimit, 1); value = sent.result().promptTokens();
+                    probeColumns(session, byCall.get(step[0] + "/" + step[1]), sent);
+                }
                 else { session.audited(messages, inputLimit, 1); value = session.client().generateRawPromptEvalCount(session.verified(), model, renderer.render(messages)); }
                 byCall.get(step[0] + "/" + step[1]).put(metric, value);
                 Json.write(out, result);
@@ -206,15 +221,27 @@ public final class F0Measurements {
         for (var input : inputs) {
             session.ensureResident();
             session.client().generateRawPromptEvalCount(session.verified(), model, "flush-" + (++flush));
-            int tokens = session.chat(input.getValue(), session.prereg().document().contextTokens() - 1, 1).result().promptTokens();
+            MeasurementSession.Sent sent = session.chat(input.getValue(), session.prereg().document().contextTokens() - 1, 1);
             ObjectNode row = Json.MAPPER.createObjectNode();
-            row.put("id", input.getKey()); row.put("messagesSha256", Json.sha(Json.canonical(Json.MAPPER.valueToTree(input.getValue())))); row.put("promptTokens", tokens);
+            row.put("id", input.getKey()); row.put("messagesSha256", Json.sha(Json.canonical(Json.MAPPER.valueToTree(input.getValue())))); row.put("promptTokens", sent.result().promptTokens());
             row.put("cacheExcluded", true); row.put("modelDigest", session.runtime().modelDigest()); row.put("templateSha256", session.runtime().templateSha256());
+            probeColumns(session, row, sent);
             lines.append(Json.canonicalString(row)).append('\n');
             writeText(partial, lines.toString());
         }
         writeText(out, lines.toString());
         try { Files.deleteIfExists(partial); } catch (java.io.IOException e) { throw new EvalException(5, "OUTPUT_WRITE_FAILED"); }
+    }
+    /**
+     * v4 의 max_tokens 1 계수 호출(usage-probe·token-golden)에 종료 사유·완료 토큰·사고 관측(원문 없음)과 그 호출의 사전 audit 계수를 더합니다. 사고 전용 모델에서
+     * 출력 상한 1 은 사고 도중 상한 도달이므로 max_tokens 의 사고 포함 여부와 그때의 finish_reason·content 상태를 보는 진단 입력이고, promptTokens 대 auditInputTokens 는
+     * v4 렌더러·tokenizer pin 계수와 서버 계수의 동등성 확인 입력입니다(P03 v4 ⑥). v1~v3 행 모양은 그대로입니다.
+     */
+    private static void probeColumns(MeasurementSession session, ObjectNode row, MeasurementSession.Sent sent) {
+        if (!session.prereg().document().v4()) return;
+        OllamaChatClient.ChatResult chat = sent.result();
+        row.put("finishReason", ClassificationJudge.sanitize(chat.finishReason())); row.put("completionTokens", chat.completionTokens()); row.set("thinking", Json.MAPPER.valueToTree(chat.thinking()));
+        row.put("auditInputTokens", sent.auditInputTokens());
     }
     private static void writeText(Path path, String text) {
         try { Files.createDirectories(path.toAbsolutePath().getParent()); Files.write(path, text.getBytes(StandardCharsets.UTF_8)); }
