@@ -18,6 +18,12 @@ public final class ClassificationJudge {
     public static final String RETRY_HINT_NONE = "NONE", STEPS_DETAIL_V1 = "STEPS_DETAIL_V1";
     /** STEPS_INVALID 의 세부 원인 중 재시도 요지로 보내는 것(이름은 attemptDiagnostics.steps 의 shape·toolConsistency 값과 같음). 배열 아님·10개 초과·문자열 아닌 항목은 STEPS_INVALID 그대로입니다. */
     public static final List<String> STEPS_DETAIL_CODES = List.of("ITEM_FORMAT_INVALID", "EMPTY_FOR_TOOL_TASK", "NONEMPTY_FOR_NO_TOOL_TASK");
+    /**
+     * v4(thinking 전용 모델) 답변 상한 판정 코드(SPEC §14.5 "답변 상한 초과 = 실패", 2026-11-04 사용자 결정). v1~v3 판정에는 나오지 않으며,
+     * 재시도 요지는 기존 USAGE_EXCEEDS_LIMIT 로 보냅니다(retryCode) — 사전 입력 audit 이 계수하는 재시도 메시지 집합을 v2·v3 과 같게 두기 위해서입니다.
+     */
+    public static final String ANSWER_LIMIT_EXCEEDED = "ANSWER_LIMIT_EXCEEDED", ANSWER_TOKENS_UNCOUNTABLE = "ANSWER_TOKENS_UNCOUNTABLE";
+    private static final Set<String> ANSWER_CODES = Set.of(ANSWER_LIMIT_EXCEEDED, ANSWER_TOKENS_UNCOUNTABLE);
     static final String TIME ="\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2})?";
     /** 판정 결과. 인자 값은 메모리 판정에만 쓰고 결과 파일에는 SHA 만 남긴다. stepsDetail 은 STEPS_INVALID 의 세부 원인(STEPS_DETAIL_CODES 중 하나, 없으면 null)입니다. */
     public record Verdict(boolean valid, String errorCode, String t, Map<String,String> args, List<String> steps, String stepsDetail) {
@@ -36,10 +42,19 @@ public final class ClassificationJudge {
         return judge(result, maxTokens, kind, versioned, timezone, null);
     }
     public static Verdict judge(OllamaChatClient.ChatResult result, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references) {
+        return judge(result, maxTokens, kind, versioned, timezone, references, null);
+    }
+    /** answerLimit = v4 등록 답변(사고 제외) 상한(분류 192·계획 256). null 이면 v1~v3 판정 그대로입니다(완료 토큰을 요청 max_tokens 로만 검사). */
+    public static Verdict judge(OllamaChatClient.ChatResult result, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references, Integer answerLimit) {
         if (versioned && references == null) return invalid("QREF_REQUEST_MISSING");
         if (result.finishReason().equals("length")) return invalid("FINISH_LENGTH");
         if (!result.finishReason().equals("stop")) return invalid("FINISH_REASON_INVALID");
         if (result.completionTokens() > maxTokens || result.completionTokens() < 0) return invalid("USAGE_EXCEEDS_LIMIT");
+        if (answerLimit != null) {
+            Integer answer = answerTokens(result);
+            if (answer == null) return invalid(ANSWER_TOKENS_UNCOUNTABLE);
+            if (answer > answerLimit) return invalid(ANSWER_LIMIT_EXCEEDED);
+        }
         JsonNode node;
         try { node = Json.MAPPER.readTree(result.content()); } catch (IOException | RuntimeException e) { return invalid("JSON_PARSE_FAILED"); }
         if (node == null || !node.isObject()) return invalid("JSON_PARSE_FAILED");
@@ -82,6 +97,16 @@ public final class ClassificationJudge {
         }
         return new Verdict(true, null, node.path("t").textValue(), Collections.unmodifiableMap(args), List.copyOf(steps));
     }
+    /**
+     * 답변(사고 제외) 토큰 수 = usage.completion_tokens − usage.completion_tokens_details.reasoning_tokens. 사고 토큰이 completion 에 포함된다는
+     * OpenAI 호환 정의를 전제하며, Ollama 0.40.13 의 실제 보고 의미는 F0 진단 확인 항목입니다(SPEC §14.5 열린 항목 ⓒ — 확인 전 GATE 등록은 Prereg 가 거부).
+     * 사고 토큰 수 보고가 없거나, content 에 사고 표지가 섞였거나, 사고 토큰 수가 completion 보다 크면 셀 수 없으므로 null 입니다(호출자는 실패로 판정, fail-closed).
+     */
+    static Integer answerTokens(OllamaChatClient.ChatResult result) {
+        OllamaChatClient.ThinkingObservation thinking = result.thinking();
+        if (thinking == null || thinking.reasoningTokens() == null || thinking.contentThinkOpen() || thinking.contentThinkClose() || thinking.reasoningTokens() > result.completionTokens()) return null;
+        return result.completionTokens() - thinking.reasoningTokens();
+    }
     private static Verdict invalid(String code) { return new Verdict(false, code, null, Map.of(), List.of()); }
     private static Verdict invalidSteps(String detail) { return new Verdict(false, "STEPS_INVALID", null, Map.of(), List.of(), detail); }
 
@@ -94,6 +119,7 @@ public final class ClassificationJudge {
     }
     /** 무효 판정 하나의 재시도 요지. STEPS_DETAIL_V1 에서 세부 원인이 있으면 그 코드, 아니면 판정 errorCode 입니다. */
     static String retryCode(Verdict verdict, String retryHint) {
+        if (ANSWER_CODES.contains(verdict.errorCode())) return "USAGE_EXCEEDS_LIMIT";
         return retryHint.equals(STEPS_DETAIL_V1) && verdict.stepsDetail() != null ? verdict.stepsDetail() : verdict.errorCode();
     }
     private static void requireRetryHint(String retryHint) {
@@ -113,6 +139,10 @@ public final class ClassificationJudge {
     }
     /** retryHint 는 재시도 메시지의 요지만 정합니다. errorCodes(결과 행)는 힌트와 무관하게 판정 errorCode 입니다. */
     public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references, String retryHint) {
+        return execute(caller, messages, maxTokens, kind, versioned, timezone, references, retryHint, null);
+    }
+    /** answerLimit 은 judge 와 같습니다(v4 등록 답변 상한, v1~v3 은 null). 초과·계수 불가도 다른 판정 실패처럼 1회만 재시도합니다. */
+    public static Outcome execute(Caller caller, List<Map<String,String>> messages, int maxTokens, MessageAssembler.Kind kind, boolean versioned, String timezone, QRefContext references, String retryHint, Integer answerLimit) {
         requireRetryHint(retryHint);
         if (versioned && references == null) throw new EvalException(2, "QREF_REQUEST_MISSING");
         if (references != null) references.requireMessagesMatch(messages);
@@ -123,7 +153,7 @@ public final class ClassificationJudge {
                 OllamaChatClient.ChatResult result = caller.call(attempt == 0 ? messages : MessageAssembler.retry(messages, retryCode));
                 finish.add(sanitize(result.finishReason())); prompt.add(result.promptTokens()); completion.add(result.completionTokens());
                 shas.add(Json.sha(result.content().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-                verdict = judge(result, maxTokens, kind, versioned, timezone, references);
+                verdict = judge(result, maxTokens, kind, versioned, timezone, references, answerLimit);
                 if (attempt == 0) firstValid = verdict.valid();
                 if (verdict.valid()) break;
                 errors.add(verdict.errorCode()); retryCode = retryCode(verdict, retryHint); if (attempt == 0) retried = true;

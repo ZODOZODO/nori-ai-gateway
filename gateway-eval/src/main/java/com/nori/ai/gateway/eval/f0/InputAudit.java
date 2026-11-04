@@ -17,10 +17,14 @@ public final class InputAudit {
     public record Planned(String id, List<Map<String,String>> messages, int inputLimit, int maxTokens) {}
     private final Map<String,Integer> tokens;
     private final String tokenizerSha256, templateSha256;
+    private final int contextTokens;
 
-    private InputAudit(Map<String,Integer> tokens, String tokenizerSha256, String templateSha256) { this.tokens = tokens; this.tokenizerSha256 = tokenizerSha256; this.templateSha256 = templateSha256; }
+    private InputAudit(Map<String,Integer> tokens, String tokenizerSha256, String templateSha256, int contextTokens) { this.tokens = tokens; this.tokenizerSha256 = tokenizerSha256; this.templateSha256 = templateSha256; this.contextTokens = contextTokens; }
 
-    public static InputAudit load(Path file) {
+    /** v2·v3(Jetson context 4096) 등록 표. */
+    public static InputAudit load(Path file) { return load(file, Prereg.CONTEXT_TOKENS); }
+    /** contextTokens = 등록 profile 의 context(입력 + max_tokens 상한). */
+    public static InputAudit load(Path file, int contextTokens) {
         JsonNode root = Json.read(file);
         if (!root.path("schema").asText().equals(SCHEMA) || !root.path("tokenizerSha256").asText().matches("[0-9a-f]{64}") || !root.path("templateSha256").asText().matches("[0-9a-f]{64}") || !root.path("rows").isArray()) throw new EvalException(2, "INPUT_AUDIT_INVALID");
         Map<String,Integer> tokens = new HashMap<>();
@@ -30,7 +34,7 @@ public final class InputAudit {
             Integer previous = tokens.put(row.path("messagesSha256").asText(), count.intValue());
             if (previous != null && previous != count.intValue()) throw new EvalException(2, "INPUT_AUDIT_INVALID");
         }
-        return new InputAudit(Map.copyOf(tokens), root.path("tokenizerSha256").asText(), root.path("templateSha256").asText());
+        return new InputAudit(Map.copyOf(tokens), root.path("tokenizerSha256").asText(), root.path("templateSha256").asText(), contextTokens);
     }
     /** 계수에 쓴 tokenizer·chat template 이 측정 런타임과 같아야 표를 씁니다. */
     public void requireRuntime(MeasurementSession.Runtime runtime) {
@@ -40,7 +44,7 @@ public final class InputAudit {
     public int require(List<Map<String,String>> messages, int inputLimit, int maxTokens) {
         Integer counted = tokens.get(messagesSha256(messages));
         if (counted == null) throw new EvalException(2, "INPUT_AUDIT_MISSING");
-        if (counted > inputLimit || counted + maxTokens > Prereg.CONTEXT_TOKENS) throw new EvalException(2, "INPUT_BUDGET_EXCEEDED");
+        if (counted > inputLimit || counted + maxTokens > contextTokens) throw new EvalException(2, "INPUT_BUDGET_EXCEEDED");
         return counted;
     }
     public void requireAll(List<Planned> planned) { for (Planned call : planned) require(call.messages(), call.inputLimit(), call.maxTokens()); }
@@ -64,9 +68,11 @@ public final class InputAudit {
         return planned;
     }
     /** usage-probe·token-golden 은 max_tokens 1 의 계수 호출이므로 context 안(입력 + 1 ≤ 4096)만 요구합니다. */
-    public static List<Planned> probes(String use, List<Map.Entry<String,List<Map<String,String>>>> rows) {
+    public static List<Planned> probes(String use, List<Map.Entry<String,List<Map<String,String>>>> rows) { return probes(use, rows, Prereg.CONTEXT_TOKENS); }
+    /** contextTokens = 등록 profile 의 context(입력 + 1 ≤ context). */
+    public static List<Planned> probes(String use, List<Map.Entry<String,List<Map<String,String>>>> rows, int contextTokens) {
         List<Planned> planned = new ArrayList<>();
-        for (var row : rows) planned.add(new Planned(use + "/" + row.getKey(), row.getValue(), Prereg.CONTEXT_TOKENS - 1, 1));
+        for (var row : rows) planned.add(new Planned(use + "/" + row.getKey(), row.getValue(), contextTokens - 1, 1));
         return planned;
     }
     private static void withRetries(List<Planned> planned, String id, List<Map<String,String>> first, int inputLimit, int maxTokens, List<String> codes) {

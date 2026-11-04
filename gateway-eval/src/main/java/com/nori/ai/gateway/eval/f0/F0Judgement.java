@@ -97,7 +97,9 @@ public final class F0Judgement {
             if (!attempts.isArray() || attempts.size() != repeats || !c.path("totalRounds").isInt() || c.path("totalRounds").asInt() != repeats) return "BOUNDARY_INPUT_INCOMPLETE";
             Set<Integer> rounds = new HashSet<>(); int passed = 0;
             for (JsonNode attempt : attempts) {
-                JsonNode round = attempt.path("round"), latency = attempt.path("latencyMs"), tokens = attempt.path("completionTokens"), finish = attempt.path("finishReason");
+                // v4 경계 상한은 답변(사고 제외) 토큰에 적용합니다(마지막 시도, 셀 수 없으면 null = 불통과). v1~v3 은 기존 완료 토큰 그대로입니다.
+                JsonNode round = attempt.path("round"), latency = attempt.path("latencyMs"), finish = attempt.path("finishReason"),
+                    tokens = prereg.v4() ? lastAnswerTokens(attempt.path("answerTokens")) : attempt.path("completionTokens");
                 if (!round.isInt() || round.asInt() < 1 || round.asInt() > repeats || !rounds.add(round.asInt())) return "BOUNDARY_ROUND_MISMATCH";
                 if (!latency.isIntegralNumber() || !latency.canConvertToLong() || latency.asLong() < 0 || !attempt.path("retried").isBoolean()
                     || !attempt.path("schemaValid").isBoolean() || !attempt.path("argsExact").isBoolean() || !attempt.path("status").isTextual()
@@ -111,6 +113,11 @@ public final class F0Judgement {
         return null;
     }
 
+    /** 응답을 받은 시도가 없으면(timeout) null, 배열이 아니면 무결성 실패로 보이도록 missing 을 그대로 돌려줍니다. */
+    private static JsonNode lastAnswerTokens(JsonNode answers) {
+        if (!answers.isArray()) return answers;
+        return answers.isEmpty() ? Json.MAPPER.nullNode() : answers.get(answers.size() - 1);
+    }
     private static boolean matchingCases(JsonNode rows, Map<String,String> kinds, String tokenField) {
         if (!rows.isArray() || rows.size() != kinds.size()) return false;
         Set<String> seen = new HashSet<>();

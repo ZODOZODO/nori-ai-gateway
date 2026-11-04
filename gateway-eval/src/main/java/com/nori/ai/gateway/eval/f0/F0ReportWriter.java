@@ -225,11 +225,12 @@ public final class F0ReportWriter {
     /** 재판정 시점 런타임 = 캡처된 chat template·모델 digest 파일과 tokenizer pin(endpoint 호출 0). */
     private String currentRuntimeSha(Prereg.Document document) {
         Path dir = context.root().resolve(document.runtimeCaptureDir());
-        Path sha = dir.resolve("qwen3-4b-instruct.template.sha256"), digest = dir.resolve("model-digest.txt"), template = dir.resolve("qwen3-4b-instruct.template");
+        String stem = document.profile().templateStem();
+        Path sha = dir.resolve(stem + ".template.sha256"), digest = dir.resolve("model-digest.txt"), template = dir.resolve(stem + ".template");
         if (!Files.isRegularFile(sha) || !Files.isRegularFile(digest) || !Files.isRegularFile(template)) throw new EvalException(3, "RUNTIME_UNVERIFIED");
         String templateSha = new String(Json.bytes(sha), StandardCharsets.UTF_8).strip();
         if (!Json.sha(Json.bytes(template)).equals(templateSha)) throw new EvalException(3, "RUNTIME_UNVERIFIED");
-        return new MeasurementSession.Runtime(new String(Json.bytes(digest), StandardCharsets.UTF_8).strip(), templateSha, MeasurementSession.tokenizerSha(context.root())).sha256();
+        return new MeasurementSession.Runtime(new String(Json.bytes(digest), StandardCharsets.UTF_8).strip(), templateSha, MeasurementSession.tokenizerSha(context.root(), document.profile())).sha256();
     }
     private ObjectNode leafRecord(SpecBinding spec, String recordRun, String parent, Loaded loaded, F0Judgement.Verdict v, String producer, String component, String measurementSpecSha) {
         Map<String,Object> fields = new LinkedHashMap<>();
@@ -303,7 +304,7 @@ public final class F0ReportWriter {
     static String budgetLine(Prereg.Document document) {
         Prereg.Budget b = document.budget();
         return "- 토큰 예산 profile: 입력 상한 분류 " + b.classifyInput() + "·계획 " + b.planInput() + ", 요청 max_tokens 분류 " + b.classifyOutput() + "·계획 " + b.planOutput()
-            + ", 경계 출력 상한 " + b.outputLimit() + ", context " + Prereg.CONTEXT_TOKENS;
+            + ", 경계 출력 상한 " + b.outputLimit() + ", context " + document.contextTokens();
     }
     /** A/B 행 또는 boundary 회차의 promptTokens[i] < auditInputTokens[i] 개수. 결과가 없으면 "-". */
     static String belowAudit(JsonNode results) { return auditCount(results, -1); }

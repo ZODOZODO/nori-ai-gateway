@@ -1,6 +1,7 @@
 package com.nori.ai.gateway.eval.f0;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.IntNode;
 import com.nori.ai.gateway.eval.EvalException;
 import com.nori.ai.gateway.eval.io.Json;
 import java.io.ByteArrayOutputStream;
@@ -18,9 +19,25 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class OllamaChatClient {
     public static final Set<String> PATHS = Set.of("/v1/chat/completions", "/api/ps", "/api/tags", "/api/generate", "/api/show");
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
-    /** 응답 본문(content)은 판정용으로 메모리에만 두며 toString 으로도 노출하지 않는다. */
-    public record ChatResult(String content, String finishReason, int promptTokens, int completionTokens) {
+    /** 응답 본문(content)은 판정용으로 메모리에만 두며 toString 으로도 노출하지 않는다. thinking 은 /v1/chat/completions 응답에서만 만들고 그 밖 경로는 null 이다. */
+    public record ChatResult(String content, String finishReason, int promptTokens, int completionTokens, ThinkingObservation thinking) {
+        public ChatResult(String content, String finishReason, int promptTokens, int completionTokens) { this(content, finishReason, promptTokens, completionTokens, null); }
         @Override public String toString() { return "ChatResult[finishReason=" + finishReason + ", completionTokens=" + completionTokens + "]"; }
+    }
+    /** 사고문을 따로 담을 수 있는 message 필드 후보. Ollama 0.40.13 의 실제 응답 형태는 미확인이라 어느 것이 오는지 이름만 기록한다. */
+    public static final List<String> THINKING_FIELDS = List.of("reasoning", "reasoning_content", "thinking");
+    /**
+     * 사고(thinking) 출력 관측: 원문 없이 존재/부재와 수치만 담는다(사고문 전문 비저장, SPEC §12.3).
+     * separateFields = message 에 null 이 아닌 값으로 있는 THINKING_FIELDS 이름(정렬), reasoningTokens = usage.completion_tokens_details.reasoning_tokens(정수가 아니거나 없으면 null),
+     * contentThinkOpen/Close = 답변 content 에 `<think>`/`</think>` 표지가 있는지(사고문의 content 혼입 판별용).
+     */
+    public record ThinkingObservation(List<String> separateFields, Integer reasoningTokens, boolean contentThinkOpen, boolean contentThinkClose) {
+        static ThinkingObservation of(JsonNode message, JsonNode usage, String content) {
+            List<String> fields = new ArrayList<>();
+            for (String name : THINKING_FIELDS) if (message.has(name) && !message.get(name).isNull()) fields.add(name);
+            JsonNode reasoning = usage.path("completion_tokens_details").path("reasoning_tokens");
+            return new ThinkingObservation(List.copyOf(fields), isCount(reasoning) ? reasoning.intValue() : null, content.contains("<think>"), content.contains("</think>"));
+        }
     }
     private final URI endpoint;
     private final HttpClient http;
@@ -56,9 +73,13 @@ public final class OllamaChatClient {
      * JSON 모드·비제약 호출로 다시 보내지 않고 고정 오류로 측정을 멈춥니다. response_format 값은 Format.bytes() 와 같은 바이트로 송신합니다.
      */
     public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, ResponseSchema.Format responseFormat) {
+        return chat(gate, model, messages, maxTokens, responseFormat, IntNode.valueOf(0));
+    }
+    /** temperature 는 v1~v3 고정 0, v4 는 등록값(Prereg.Document.temperature) 입니다. 그 밖 body 는 위와 같습니다. */
+    public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, ResponseSchema.Format responseFormat, JsonNode temperature) {
         Objects.requireNonNull(gate, "preflight");
         Map<String,Object> body = new LinkedHashMap<>();
-        body.put("model", model); body.put("messages", messages); body.put("temperature", 0); body.put("max_tokens", maxTokens); body.put("stream", false);
+        body.put("model", model); body.put("messages", messages); body.put("temperature", temperature); body.put("max_tokens", maxTokens); body.put("stream", false);
         Set<List<String>> keepOrder = new HashSet<>();
         if (responseFormat != null) {
             body.put("response_format", responseFormat.node());
@@ -67,7 +88,8 @@ public final class OllamaChatClient {
         JsonNode response = send("POST", "/v1/chat/completions", body, keepOrder);
         JsonNode choice = response.path("choices").path(0), usage = response.path("usage");
         if (!choice.path("message").path("content").isTextual() || !choice.path("finish_reason").isTextual() || !isCount(usage.path("completion_tokens")) || !isCount(usage.path("prompt_tokens")) || response.path("choices").size() != 1) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
-        return new ChatResult(choice.path("message").path("content").textValue(), choice.path("finish_reason").textValue(), usage.path("prompt_tokens").intValue(), usage.path("completion_tokens").intValue());
+        String content = choice.path("message").path("content").textValue();
+        return new ChatResult(content, choice.path("finish_reason").textValue(), usage.path("prompt_tokens").intValue(), usage.path("completion_tokens").intValue(), ThinkingObservation.of(choice.path("message"), usage, content));
     }
     /** 토큰 수·context 길이: JSON 정수 리터럴이고 int 로 손실 없이 표현되며 0 이상일 때만(128.9·128.0·음수·overflow·문자열 거부). */
     static boolean isCount(JsonNode node) { return node.isIntegralNumber() && node.canConvertToInt() && node.intValue() >= 0; }

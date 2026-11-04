@@ -30,7 +30,7 @@ public final class F0Measurements {
                 ObjectNode expected = Json.MAPPER.createObjectNode(); expected.put("t", q.expected().t());
                 for (String field : GoldenSet.ARG_FIELDS) expected.put(field, q.expected().field(field));
                 Attempts calls = new Attempts(session, assembler.kind(), references, maxTokens, expected, q.question(), q.context(), fixture);
-                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> calls.send(m, inputLimit), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references, session.prereg().document().retryHint());
+                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> calls.send(m, inputLimit), references == null ? assembler.messages(q.question(), q.context()) : assembler.messages(q.question(), q.context(), references), maxTokens, assembler.kind(), session.prereg().document().versioned(), q.context().path("timezone").asText(), references, session.prereg().document().retryHint(), session.prereg().document().answerLimit(assembler.kind()));
                 ObjectNode row = outcomeRow(outcome); row.put("questionId", q.id()); row.put("round", round); calls.columns(row);
                 row.set("diagnostics", diagnostics(outcome, expected));
                 row.set("predicted", outcome.verdict() != null && outcome.verdict().valid() ? PlanJudge.sanitize(outcome.verdict(), fixture, assembler.kind()) : Json.MAPPER.nullNode());
@@ -52,7 +52,7 @@ public final class F0Measurements {
                 session.ensureResident();
                 JsonNode expected = c.has("expectedResolvedOutput") ? c.path("expectedResolvedOutput") : c.path("expectedOutput");
                 Attempts attempts = new Attempts(session, MessageAssembler.Kind.CLASSIFY, references, budget.classifyOutput(), expected, c.path("question").asText(), c.path("context"), fixture);
-                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> attempts.send(m, budget.classifyInput()), references == null ? assembler.messages(c.path("question").asText(), c.path("context")) : assembler.messages(c.path("question").asText(), c.path("context"), references), budget.classifyOutput(), MessageAssembler.Kind.CLASSIFY, session.prereg().document().versioned(), c.path("context").path("timezone").asText(), references);
+                ClassificationJudge.Outcome outcome = ClassificationJudge.execute(m -> attempts.send(m, budget.classifyInput()), references == null ? assembler.messages(c.path("question").asText(), c.path("context")) : assembler.messages(c.path("question").asText(), c.path("context"), references), budget.classifyOutput(), MessageAssembler.Kind.CLASSIFY, session.prereg().document().versioned(), c.path("context").path("timezone").asText(), references, ClassificationJudge.RETRY_HINT_NONE, session.prereg().document().answerLimit(MessageAssembler.Kind.CLASSIFY));
                 boolean exact = argsExact(outcome.verdict(), expected);
                 ObjectNode attempt = Json.MAPPER.createObjectNode();
                 attempt.put("round", round); attempt.put("status", outcome.status()); attempt.put("retried", outcome.retried());
@@ -84,13 +84,18 @@ public final class F0Measurements {
         private final MeasurementSession session; private final MessageAssembler.Kind kind; private final QRefContext references; private final int maxTokens;
         private final JsonNode expected, context; private final String question; private final RegistryFixture fixture; private final ResponseSchema.Format responseFormat;
         private final List<Integer> audited = new ArrayList<>(); private final List<ObjectNode> diagnosed = new ArrayList<>();
+        private final List<OllamaChatClient.ThinkingObservation> thinking = new ArrayList<>();
+        private final List<Integer> answers = new ArrayList<>(); private final List<CallWindow> windows = new ArrayList<>();
         Attempts(MeasurementSession session, MessageAssembler.Kind kind, QRefContext references, int maxTokens, JsonNode expected, String question, JsonNode context, RegistryFixture fixture) {
             this.session = session; this.kind = kind; this.references = references; this.maxTokens = maxTokens; this.expected = expected; this.question = question; this.context = context; this.fixture = fixture;
             this.responseFormat = ResponseSchema.forPolicy(session.prereg().document().responseFormat(), kind, references);
         }
         OllamaChatClient.ChatResult send(List<Map<String,String>> messages, int inputLimit) {
-            MeasurementSession.Sent sent = session.chat(messages, inputLimit, maxTokens, responseFormat);
-            audited.add(sent.auditInputTokens());
+            // timeout 으로 끝난 시도도 송신~실패 시각 구간을 남겨 겹침 판정에서 빠지지 않게 합니다.
+            java.time.Instant sentAt = session.clock().instant(); MeasurementSession.Sent sent;
+            try { sent = session.chat(messages, inputLimit, maxTokens, responseFormat); }
+            finally { windows.add(new CallWindow(sentAt.toString(), session.clock().instant().toString())); }
+            audited.add(sent.auditInputTokens()); thinking.add(sent.result().thinking()); answers.add(ClassificationJudge.answerTokens(sent.result()));
             if (references != null) diagnosed.add(AttemptDiagnostics.diagnose(sent.result(), maxTokens, kind, references, expected, question, context, context.path("timezone").asText(), fixture));
             return sent.result();
         }
@@ -99,8 +104,15 @@ public final class F0Measurements {
             if (!audited.stream().allMatch(Objects::isNull)) row.set("auditInputTokens", Json.MAPPER.valueToTree(audited));
             if (references != null) row.set("attemptDiagnostics", Json.MAPPER.valueToTree(diagnosed));
             if (responseFormat != null) row.put("responseFormatSha256", responseFormat.sha256());
+            // v4(thinking 전용 모델)만 시도별 사고 출력 관측(원문 없는 존재/부재·수치)을 남깁니다. v1~v3 결과 모양은 그대로입니다.
+            // 답변 토큰(사고 제외, 셀 수 없으면 null)과 시도별 송신·수신 UTC 구간(공유 서버 겹침 판정 입력)도 v4 에만 둡니다.
+            if (session.prereg().document().v4()) {
+                row.set("thinkingObservations", Json.MAPPER.valueToTree(thinking)); row.set("answerTokens", Json.MAPPER.valueToTree(answers)); row.set("callWindows", Json.MAPPER.valueToTree(windows));
+            }
         }
     }
+    /** 한 시도의 송신 직전~응답 수신(또는 timeout) 직후 시각(UTC ISO-8601). */
+    public record CallWindow(String sentAt, String receivedAt) {}
     static boolean argsExact(ClassificationJudge.Verdict verdict, JsonNode expected) {
         if (verdict == null || !verdict.valid() || !expected.path("t").asText().equals(verdict.t())) return false;
         for (String field : GoldenSet.ARG_FIELDS) {
@@ -173,8 +185,9 @@ public final class F0Measurements {
                 if (step[0].equals("FLUSH")) { session.client().generateRawPromptEvalCount(session.verified(), model, "flush-" + (++flush[0])); continue; }
                 List<Map<String,String>> messages = inputs.get(step[0]);
                 int value;
-                if (metric.equals("promptTokens")) value = session.chat(messages, Prereg.CONTEXT_TOKENS - 1, 1).result().promptTokens();
-                else { session.audited(messages, Prereg.CONTEXT_TOKENS - 1, 1); value = session.client().generateRawPromptEvalCount(session.verified(), model, renderer.render(messages)); }
+                int inputLimit = session.prereg().document().contextTokens() - 1;
+                if (metric.equals("promptTokens")) value = session.chat(messages, inputLimit, 1).result().promptTokens();
+                else { session.audited(messages, inputLimit, 1); value = session.client().generateRawPromptEvalCount(session.verified(), model, renderer.render(messages)); }
                 byCall.get(step[0] + "/" + step[1]).put(metric, value);
                 Json.write(out, result);
             }
@@ -193,7 +206,7 @@ public final class F0Measurements {
         for (var input : inputs) {
             session.ensureResident();
             session.client().generateRawPromptEvalCount(session.verified(), model, "flush-" + (++flush));
-            int tokens = session.chat(input.getValue(), Prereg.CONTEXT_TOKENS - 1, 1).result().promptTokens();
+            int tokens = session.chat(input.getValue(), session.prereg().document().contextTokens() - 1, 1).result().promptTokens();
             ObjectNode row = Json.MAPPER.createObjectNode();
             row.put("id", input.getKey()); row.put("messagesSha256", Json.sha(Json.canonical(Json.MAPPER.valueToTree(input.getValue())))); row.put("promptTokens", tokens);
             row.put("cacheExcluded", true); row.put("modelDigest", session.runtime().modelDigest()); row.put("templateSha256", session.runtime().templateSha256());

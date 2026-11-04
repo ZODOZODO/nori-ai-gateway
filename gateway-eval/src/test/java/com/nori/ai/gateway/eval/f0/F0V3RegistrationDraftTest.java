@@ -15,7 +15,8 @@ import static org.assertj.core.api.Assertions.*;
  *   harnessDigest 는 실제 git 의 등록 commit 트리로 다시 계산한 역사 신원과 같습니다. 등록 뒤 하네스 코드가 바뀐 등록은 현재 작업 트리 기준으로 stale 이며
  *   Prereg.verify 가 PREREG_INPUT_CHANGED 로 신규 측정을 거부해야 합니다(등록 문서는 고치지 않음). G08 원인 확정 시험이 f0 하네스 소스(G08Probe 신규·generate logprobs 호출)를 바꿨으므로 i 도 stale 입니다.
  *   각 등록의 투영 조립·audit 결속도 계속 검사하며, i 외 과거 등록은 retryHint 키가 없어 기존 고정 오류 코드 11종 재시도 메시지 그대로입니다(i 는 STEPS_DETAIL_V1).
- * - G08 원인 확정 시험 등록 1개(PREREG-v3-probe-g08, 진단): 현재 작업 트리와 로컬 불일치 0, 진단 i 와 같은 파라미터(PRESENCE_V1·JSON_SCHEMA_V1·STEPS_DETAIL_V1).
+ * - G08 원인 확정 시험 등록 1개(PREREG-v3-probe-g08, 진단, C19/C20): 진단 i 와 같은 파라미터(PRESENCE_V1·JSON_SCHEMA_V1·STEPS_DETAIL_V1). 2026-11-04 v4 추론 서버 분기가
+ *   f0 하네스 소스를 바꿔 과거 등록과 같이 stale 이며 HISTORICAL 로 검사합니다(현재 v3 후보 0 — 아래 후보 시험은 후보가 생길 때만 검사).
  *   probe 의 audit·변형 입력 결속은 F0ProbeG08Test 가 검사합니다.
  *   초안(UNCOMMITTED)이면 verify 가 PREREG_NOT_COMMITTED 로 거부하고, 등록 뒤(REGISTERED)면 실제 Prereg.verify 엄격 검증을 통과해야 합니다.
  *   g 는 f 의 계획 프롬프트만, h 는 g 의 계획 프롬프트와 계획 스키마 송신 키 순서만, i 는 g 의 계획 프롬프트와 계획 재시도 세부 코드만 바꾸므로
@@ -32,7 +33,9 @@ class F0V3RegistrationDraftTest {
         C11 = "8ebacc365c1610fdf11de8ea0e8bc2e2a05cfbbc", C12 = "48561f3eefaef7e230939da0169c2f3e1a9e5070",
         C13 = "1b1ded2566e911520e03cbf82606eba4e7f2b133", C14 = "87113b50a0a57f75c80c3e33a6faec1c3d39189d",
         C15 = "889e27b582dfbb4c4fac033d25a6d5cbc6c423a9", C16 = "372dbb4653ab807324ec7361554ea1c9d5f87f82",
-        C17 = "76baa655f3487c8666398b44b9129b7ac219fc16", C18 = "086b619f65951b4d40e49ba00802a852e737793b";
+        C17 = "76baa655f3487c8666398b44b9129b7ac219fc16", C18 = "086b619f65951b4d40e49ba00802a852e737793b",
+        C19 = "0dcf104f2690f9438433b7242d643057a8a1f6ca", C20 = "7ab4e9a4ec181277a67fc9d85dc1a1325c3331d3";
+    static final String PROBE_G08 = "eval/f0/PREREG-v3-probe-g08.md";
     /** 과거 등록 1건의 고정 사실: 목적·등록 commit·PREREG commit·Context 투영. */
     record Historical(String purpose, String registeredCommit, String preregCommit, String projection) {}
     static final Map<String,Historical> HISTORICAL = new LinkedHashMap<>();
@@ -56,8 +59,10 @@ class F0V3RegistrationDraftTest {
         for (String id : List.of("diag-i", "regression-i")) HISTORICAL.put("eval/f0/PREREG-v3-" + id + ".md", new Historical("DIAGNOSTIC", C17, C18, MessageAssembler.PRESENCE_V1));
         HISTORICAL.put("eval/f0/PREREG-v3-gate-i.md", new Historical("GATE", C17, C18, MessageAssembler.PRESENCE_V1));
         for (String id : List.of("diag-i", "regression-i", "gate-i")) STEPS_DETAIL_REGISTRATIONS.add("eval/f0/PREREG-v3-" + id + ".md");
-        CANDIDATES.put("eval/f0/PREREG-v3-probe-g08.md", "DIAGNOSTIC");
         HISTORICAL.forEach((file, h) -> PURPOSE.put(file, h.purpose()));
+        // G08 원인 확정 시험(C19/C20)은 v4 추론 서버 분기(2026-11-04)가 f0 하네스 소스를 바꿔 stale 입니다. probe audit 은 F0ProbeG08Test 가 검사하므로
+        // 전체 호출 audit 검사 대상(PURPOSE)에는 넣지 않습니다. 현재 v3 후보(CANDIDATES)는 없습니다.
+        HISTORICAL.put(PROBE_G08, new Historical("DIAGNOSTIC", C19, C20, MessageAssembler.PRESENCE_V1)); STEPS_DETAIL_REGISTRATIONS.add(PROBE_G08);
     }
     static Prereg.Document doc(String file) { return Prereg.parse(ROOT.resolve(file)); }
 
@@ -160,7 +165,7 @@ class F0V3RegistrationDraftTest {
     @Test void lifecycleCheckAcceptsDraftAndRegisteredMetadataWithIdenticalPinnedInputsAndRejectsMismatches() throws Exception {
         // 고정 합성 SHA — 실측 등록 commit 이 아니며 메모리 안 검증에만 씁니다.
         String syntheticSha = "0123456789abcdef0123456789abcdef01234567";
-        List<String> files = new ArrayList<>(PURPOSE.keySet()); files.addAll(CANDIDATES.keySet());
+        List<String> files = new ArrayList<>(HISTORICAL.keySet()); files.addAll(CANDIDATES.keySet());
         for (String file : files) {
             Prereg.Document actual = doc(file);
             Prereg.Document draft = Prereg.parseBytes(withLifecycle(file, "\"registrationStatus\": \"UNCOMMITTED\",\n  ", "\"registeredCommit\": null"));

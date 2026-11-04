@@ -3774,3 +3774,214 @@
 - 정본 SPEC SHA `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be` 불변. HEAD C18 `086b619f65951b4d40e49ba00802a852e737793b`, 이 절 작성 시점 staged 0.
 - `eval/f0/results`·`eval/f0/chat-template`·`evidence`·`eval/golden`·기존 프롬프트·기존 PREREG·기존 audit·`MessageAssembler`·`AttemptDiagnostics`·`ClassificationJudge`·`ResponseSchema`·`F0Measurements`·`Json.java` 변경 0, 새 `.pyc` 0(Python `-I -B`).
 - 응답 원문·API 응답·secrets·환경값은 출력·저장하지 않았다. 이 절은 root 검토 전이며 완료·PASS 를 확정하지 않는다.
+
+#### 로컬 C19/C20 등록·최종 확인 (2026-11-03, 독립 Claude Code Opus 5.5)
+
+- 허용 범위: 로컬 commit C19·C20 두 개뿐이며 push·amend·원격 publish 는 하지 않았다.
+
+| commit | 전체 SHA | 시각 | 파일 |
+|---|---|---|---|
+| C19 | `0dcf104f2690f9438433b7242d643057a8a1f6ca` | 2026-11-03 16:15:39 +0900 | 11파일, 1260 insertions(+), 16 deletions(-) |
+| C20 | `7ab4e9a4ec181277a67fc9d85dc1a1325c3331d3` | 2026-11-03 16:16:08 +0900 | 1파일(`eval/f0/PREREG-v3-probe-g08.md`), 6 insertions(+), 4 deletions(-) |
+
+- C19 정확 11파일(파일 지정 `git add` 뒤 `git diff --cached --name-only` 11개, 기대 목록과 diff 0). 이 Devreport 의 C19 시점 바이트는 488032 B, SHA `3b346767cff06c9f1a90c2648dd95693f5fb88eb3be64f2a149333e0eb178a0f` 이며 앞 470594 B SHA `48a3aa40…e1e5` 는 추가 전후 같았다. 기존 untracked 는 넣지 않았다.
+- C20: §0 제목·상태 문구를 C18 방식(등록 근거·C19/C20 설명·이력)으로 바꾸고 기계 판독 블록의 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C19 SHA 만 바꿨다. JSON 검사(Node, 파싱 실패 시 원문 비출력): 바뀐 최상위 키 2개뿐, 나머지 객체·최상위 키 순서 동일. `git diff --check` exit 0.
+- C20 뒤 `f0 prereg-check --prereg eval/f0/PREREG-v3-probe-g08.md`: localMismatches `[]`, harnessDigest `b2109add…0c62`, parameterManifestSha256 `c13ed8bc…4cda`, `PREREG_VERIFIED`(Gradle exit 0). 같은 뒤 `F0ProbeG08Test`·`F0V3RegistrationDraftTest` 필터 실행 exit 0(등록 완료 문서가 실제 `Prereg.verify` 엄격 검증을 통과).
+- C20 뒤 20커밋, staged 0. 측정(§12.25 8))은 실행하지 않았다.
+
+### 12.26 추론 장비 교체 SPEC·Plan 개정 반영과 F0 하네스 v4 분기 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: SPEC·Plan 개정 반영과 하네스 v4 분기·시험까지 작업트리 변경만 했다. commit·push 0, SSH·모델 HTTP·측정 0, 기준선 seq5 미작성(root 단독 단계), v4 사전등록 0. P03 미완료·기존 F0 FAIL 유지·P04 미착수.**
+- 착수 시 SPEC `34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be`(seq4 와 같음), Plan `264abe99d904bf7fb9e0da2b6be0ab0efff8b3be52e72e74ab7fa0988e803907`, 이 Dev report 489,731 B `011442bb…0b35`, 레포 HEAD C20 `7ab4e9a`(20커밋)였다.
+
+#### 1) 장비 교체 결정과 근거(사용자 결정, 2026-11-04)
+
+- 추론 장비: Jetson Orin Nano(192.168.0.52) → LLM 노트북 서버(192.168.0.160, GTX 1660 Ti 6GiB, Ollama 0.40.13). 사유 = Jetson 이 GPU 부하 중 WiFi(RTL8822CE) PCIe AER 오류 폭주로 2회 정지(2026-11-03 57,533건·2026-11-04 47,478건, OOM 0).
+- 생성 모델: 서버의 `qwen3:4b` = Qwen3-4B-Thinking-2507(ID 359d7dd4bcda, Q4_K_M), 임베딩 `bge-m3`(ID 790764642607). ctx = 서버 설정 8192 그대로.
+- 개정안 권장안 일괄 채택: temperature 정식 0·진단 0.6 비교 arm, 요청 `max_tokens` = 답변 상한 + 사고 상한 T(T 는 진단 측정 후 확정 — 미정), §4.2 "상한 없는 CoT 금지", D44 배제 근거 이력 유지·같은 위험은 F0 측정 항목, D51 8192·입력 상한 유지·AC-33-CTX Fixture 4096, 공유 서버 겹침 회차 지연 축 무효·재측정, KEEP_ALIVE F0 24h·F2 착수 전 -1, 용량 확장 트리거 ⓐ 비해당, v4 신규·v1~v3 불변, readiness digest 검사 추가, v4.1 날짜 행, SSH 터널 유지, G-JETSON-*→G-INFER-*.
+- 인터넷 노출: 사용자 결정 "지금은 두고 나중에" — F2 착수 필수 게이트로만 기록, 서버 조치 0. AC-35-LOCAL 은 대상만 새 서버로 바꾸고 바인딩 형태는 조건부 권장으로 둔다.
+- 192.168.0.201 요청은 측정 중 멈출 수 없으므로 겹침 무효·재측정 규칙이 실제로 적용된다. 출발지 확인 경로 = 서버 `journalctl -u ollama` GIN 로그(`ubuntu` 계정 adm 그룹, 서버 시간대 UTC — 2026-11-04 root 확인), Plan G-INFER-SHARE 에 기록.
+- 미결정(이번에 정하지 않음): v4 등록에 함께 둘 v3 후보 구성, F2 readiness digest 불일치 errorCode 형태(신규 vs `MODEL_CONTEXT_MISMATCH` 의미 확장). 둘 다 SPEC·Plan 에 열린 항목으로 적었다.
+
+#### 2) SPEC 개정 요약
+
+- 새 SPEC SHA-256 `1f08318d5ce90611b2c4a8f7f33ced545caa84b2276a51db316e22e4f571637d`(2,612줄, 507,050 B, CR 0). 기존 70줄 개정 + 8줄 추가(§26.1 새 서버 사실 블록 7줄, §27.5 행 1줄).
+- 반영: 헤더·§0 D44/D51/D55/D56·§4.1~§4.3·§5.4·§9.5·§12.3·§13.3·§14.2·§14.5~§14.7·§16·§19 O1~O4·§26.1·§27.2 AC-31/AC-33-CTX/AC-35-LOCAL/AC-37/AC-37-OUT-*·§27.5. 표기는 기존 관례 `v4.1 대체(2026-11-04)`·§27.5 날짜 행.
+- **줄 번호 보존(개정안과 다른 배치):** 등록 입력 `eval/f0/arg-limits-v1.json`·`eval/f0/v2/arg-limits-v2.json` 이 SPEC `:1203`·`:1207`·`:1208`(SCHEMA 근거)과 `:1666`(후보 문구)을 참조하고 `ArgLimitsSchemaTest` 가 실제 SPEC 1203행 내용을 검사한다. 그래서 1~1838행 줄 수를 바꾸지 않았다(§12.10 A 의 "1~1208행 줄 수 불변" 선례와 같은 방식). 그 결과 ①§4.1 새 현재 전제는 개정안의 표 대신 306행 같은 줄의 ①~⑨ 항목 목록으로 두고 Jetson 표(308~318행)는 바이트 그대로 그 아래 이력으로 남겼다 ②§14.5 "표 아래 추가" 문장은 1199행 계산 근거 앞에 ③§14.6 새 장비 사실(S-29)은 1233행 셋째 글머리 끝에 넣었다. 내용은 개정안 문안과 같다.
+- 조건부 S-53(AC-35 계층 예외)은 적용하지 않았다(권장 (a) — AC-35-LOCAL 기대 불변). S-54(AC-37 답변 상한 "사고 토큰 제외")는 적용했다.
+
+#### 3) Plan 개정 요약
+
+- 새 Plan SHA-256 `52729527ae8298e13c5675adddb8678fb65cc16226e203a4d84f67450bac1b91`(1,756줄, 652,944 B). §0 상태·미완료 선행 조치, §4.1 SSH 규칙(`llm-notebook` skill, `AIGW_INFER_*`), §5 G-F0-ACCESS·G-F0-TARGET, G-JETSON-* → G-INFER-NET/CTX/RUNBOOK/EGRESS(옛 4행은 "폐기(대상 장비 변경, 이력)"로 남김) + 신규 G-INFER-ENV·G-INFER-SHARE, §6 DAG·병렬 규칙·F0/F2 exit, P03(v4 새 환경 흐름 ①~⑪, 선행·allowed_writes·oracle, 진행 기록 1줄), F2 이후 파급(P06·P15·P17·P18·P19·P21·P22·P27~P29·§11.1·§11.4·§12) 반영. P17 은 미착수라 Jetson 전용 절차를 이력으로 남기고 새 서버 기준 재작성 지침을 앞에 두었다.
+
+#### 4) SPEC 해시 파급(기준선)
+
+- Plan §0 R6: ①SPEC 반영(이 세션) ②root `Get-FileHash` ③**root 단독** `docs/gates/spec-approvals/5.md` + `spec-baseline.md` seq5 추가·커밋 ④⑤ 원격 publish·protected 변수(원격 소비 전) ⑥재측정. ③은 root 단독 writer 이고 commit 을 포함하므로 이 세션은 기준선 파일을 편집하지 않았다(§12.9·§12.10 선례).
+- SPEC 수정 후 `:gateway-eval:run --args="spec-guard"` = `SPEC_BASELINE_MISMATCH`(Java exit 3, Gradle exit 1) — seq5 전 정상 차단, 우회 0. `MeasurementSession` 도 같은 `SpecGuard` 를 쓰므로 seq5 전에는 모든 측정 명령이 시작되지 않는다.
+- root 에 권장하는 seq5: `sha256`=`1f08318d…637d`, `prevSha256`=`34fd6223…66be`, `approvedAt`=2026-11-04, `approvalRef`=`docs/gates/spec-approvals/5.md`, `changedSections`=["header","0","4.1","4.2","4.3","5.4","9.5","12.3","13.3","14.2","14.5","14.6","14.7","16","19","26.1","27.2","27.5"], `affectedLeaves`=ALL, `measurementAffecting`=true. seq5 뒤 v1~v3 레코드(specSha seq1~4)는 F0 gate 에 부적격(`SPEC_BASELINE_STALE`)이 되며 삭제·재해시 0.
+
+#### 5) 하네스 v4 분기(f0 패키지, v1~v3 상수·요청 body·판정 불변)
+
+- `Prereg`: schema `f0-prereg-v4` 추가. `RuntimeProfile`(JETSON = 기존 값 `qwen3:4b-instruct`·4096·Instruct tokenizer 쌍·`qwen3-4b-instruct` 템플릿 이름 / INFER_V4 = `qwen3:4b`·8192·`eval/f0/tokenizer/qwen3-4b-thinking-2507.tokenizer.json{,.sha256}`·`qwen3-4b`). v4 는 v3 선언 규칙(purpose·responseFormat·contextProjection·retryHint)을 그대로 쓰고, `generationModelDigest`(64 hex) 필수, `contextTokens` 8192, 예산 `Budget.V4_DIAGNOSTIC`(입력 3,072/3,072, 요청 `max_tokens` 5,120/5,120 = 8192 − 입력 상한, 경계 판정 상한 = 답변 192), `answerLimitTokens`{192, 256} 필수, temperature 0 또는 0.6. **v4 는 DIAGNOSTIC 만 허용**한다(사고 상한 T 확정 전 GATE 등록은 `PREREG_INVALID` — SPEC §14.5 "확정 전 정식 측정 0"). v1~v3 에 `generationModelDigest`·`answerLimitTokens` 가 있으면 `PREREG_INVALID`, v1~v3 temperature 는 0 만(기존과 같음).
+- `Preflight.run(..., requiredContext, registeredDigest)`: profile context 와 등록 digest 를 검사한다. 상주 digest ≠ 등록 digest 면 기존 tag·상주 불일치와 같은 `MODEL_DIGEST_MISMATCH`(측정 명령 exit 6, `f0 preflight` 명령은 기존대로 exit 4). 기존 3인자 `run` 은 4096·digest 검사 없음 그대로.
+  - errorCode 선택 근거: 하네스 관례는 검사 범주별 고정 사유 코드 + 범주별 exit 코드다(`F0RunnerCli` javadoc "6 모델 digest 불일치", `MeasurementSession` 이 `MODEL_DIGEST_MISMATCH` 만 exit 6 으로 매핑). 등록 digest 불일치는 같은 범주(생성 모델 digest 불일치)라 새 코드를 만들지 않고 기존 코드를 썼다. SPEC §14.6 F2 readiness errorCode 형태는 미결정 그대로다(하네스 선택이 그 결정을 대신하지 않음).
+- `OllamaChatClient`: `ChatResult` 에 `ThinkingObservation`(원문 없음 — message 의 `reasoning`·`reasoning_content`·`thinking` 중 null 아닌 필드 이름, `usage.completion_tokens_details.reasoning_tokens` 정수 또는 null, content 의 `<think>`·`</think>` 표지 존재 불리언)을 더했다. Ollama 0.40.13 의 실제 응답 형태는 미확인이라 존재/부재만 기록한다. 기존 4인자 생성자 유지, `toString` 은 기존대로 원문 비노출. content 비문자열은 기존처럼 `ENDPOINT_RESPONSE_INVALID`(exit 5, 부분 결과 보존). temperature 인자 overload 추가 — v1~v3 경로는 기존 정수 0 바이트 그대로.
+- `MeasurementSession`: profile 기반 preflight·tokenizer 쌍·audit context, v4 만 등록 temperature 송신. `InputAudit`: context 를 받는 `load`·`probes` overload(기존 overload = 4096). `F0Measurements`: usage·token-golden 입력 상한 = 등록 context − 1, v4 행에만 시도별 `thinkingObservations` 열. `F0RunnerCli`: `chat-template --model` = 등록 profile 모델·저장 파일 이름 profile 별, `probe-g08` 은 v3 전용(v4 = `PREREG_INVALID`). `F0ReportWriter`: 재판정 런타임 SHA·예산 줄 context 를 profile 에서 읽음(v1~v3 문구 바이트 동일).
+- 손대지 않은 것: `input-audit-render`·`probe-g08-render`(Budget.V2 고정)와 Python `count_input_audit_v2.py`(`CONTEXT_TOKENS = 4096`). v4 입력 audit 재생성(P03 v4 ⑥)에서 v4 계수기가 필요하며, 지금 v4 행을 v2 계수기에 넣으면 입력 + 5,120 > 4096 으로 `OVER_BUDGET`(fail-closed)이다. v4 지원 입력 목록은 tokenizer 쌍만 바꾸고 Python 파일은 v2 와 같게 두었으므로 ⑥에서 함께 정한다.
+
+#### 6) 시험(이 세션, Gradle 동시 실행 0, `AIGW_SPEC_FILE`=정본 SPEC, SPEC 수정 전 seq4 일치 상태)
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `:gateway-eval:test --tests "*F0V4RuntimeProfileTest"` | 0 | 7/7 PASS |
+| 변이: `Preflight` 등록 digest 조건 제거 후 같은 시험 | 1 | `preflightRequiresRegisteredDigestAnd8192BeforeAnyInference` FAILED 확인 → 원본 복원(`cmp` 일치) |
+| 무필터 `:gateway-eval:test --rerun-tasks`(1차) | 1 | 216 중 1 실패 — `F0V3RegistrationDraftTest.currentDraftsMatch…`: 현재 후보 `PREREG-v3-probe-g08.md` 의 `harnessDigest` stale |
+| 위 시험만(수정 후) | 0 | 8/8 PASS |
+| 무필터 `:gateway-eval:test --rerun-tasks`(2차) | 0 | `BUILD SUCCESSFUL in 5m 15s`, XML 독립 집계 **216/216 PASS·44클래스·failures/errors/skipped 0** |
+| 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| SPEC 수정 후 `spec-guard` | Java 3 | `SPEC_BASELINE_MISMATCH` |
+
+- 1차 실패 처리: C19 때 후보 i 를 HISTORICAL 로 옮긴 선례대로 `PREREG-v3-probe-g08.md` 를 `F0V3RegistrationDraftTest` HISTORICAL(C19/C20, PRESENCE_V1, STEPS_DETAIL_V1)로 옮겼다. 전체 호출 audit 검사(PURPOSE)에는 넣지 않았다(probe audit 은 `F0ProbeG08Test` 가 검사). 현재 v3 후보(CANDIDATES)는 0 이라 후보 시험은 후보가 생길 때만 실제로 검사한다.
+- 최종 시험 신원: `runId=b209118c-d651-417f-ba1a-b39197948e84`, `inputFingerprint=858a8adcb7edd674475c395ea83877f83df3ce3119c02a144849f5ebb854933f`, `specSha=34fd6223…66be`(seq4). stub·로컬 시험이며 실제 모델 F0 합격이 아니다. SPEC 바이트가 바뀌었으므로 root 가 seq5 를 추가한 뒤 무필터 시험과 verify 를 다시 실행해야 한다.
+- 신규 `F0V4RuntimeProfileTest` 7건: v1~v3 profile 불변·v4 profile/예산, v4 등록 규칙(GATE·Jetson 모델·4096·digest 누락/앞자리만·0.7·요청 192·답변 상한 누락·Jetson tokenizer 거부, 0.6 허용, v3 의 새 키·0.6 거부), v4 run 송신 body(키 집합 불변·`qwen3:4b`·5120·0.6)와 사고 관측 열·sentinel 비노출, content 혼입(`</think>`) = 무효 답변·표지만 기록, 등록 digest 불일치 exit 6·context 4096 exit 4·추론 호출 0, chat-template v4 모델·파일 이름과 probe-g08 v4 거부, 관측 `toString` 비노출과 정수 0 temperature 바이트.
+
+#### 7) 기존 사전등록 상태(`f0 prereg-check`, 변경 전 → 후)
+
+- 변경 전: `PREREG-v3-probe-g08.md` 만 `PREREG_VERIFIED`, 나머지 23건(`PREREG.md`·`PREREG-v2.md`·v3 21건)은 이미 `localMismatches=["harnessDigest"]`·`PREREG_INPUT_CHANGED`.
+- 변경 후: 24건 모두 `localMismatches=["harnessDigest"]`·`PREREG_INPUT_CHANGED`. 새로 stale 이 된 것은 `PREREG-v3-probe-g08.md`(f0 하네스 소스 변경)뿐이며 입력 바이트 불일치는 0건이다. 하네스 변경으로 stale 되는 것은 정상이며 등록 문서는 고치지 않았다.
+
+#### 8) 미확인·다음 단계
+
+- 미확인(P03 v4 ④ 진단에서 확인): 사고문 분리 필드 이름과 content 혼입 여부, `max_tokens`·`usage.completion_tokens` 의 사고 포함 여부와 사고 중 상한 도달 `finish_reason`, `response_format`+thinking, properties 순서, `/api/ps` `context_length` 필드, prompt cache·G-USAGE, temperature 0 의 비종결 빈도, Thinking-2507 tokenizer 와 Instruct pin 의 바이트 동일 여부, 새 서버 처리 속도·콜드 로드.
+- 다음: root seq5·`spec-approvals/5.md` → 무필터 시험·verify 재실행 → (사용자 허용 시) commit → P03 v4 ① G-INFER-ENV 읽기 전용 기록. 실측·SSH 는 사용자 승인 뒤에만.
+
+#### 9) 보존 확인
+
+- 기존 PREREG·결과·capture·evidence·v1~v3 입력·`docs/gates/**` 변경 0. 이 Dev report 앞 489,731 B 의 SHA 는 추가 전후 같다(`011442bb…0b35`). commit·push 0, 원문 응답·secrets 출력 0.
+
+### 12.27 v4 개정 독립 검토 결함 수정과 하네스 반영 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: 독립 검토 결함(차단 B1, 중요 I1~I5, 경미 M1~M9, 이력 표지)을 SPEC·Plan 에 반영하고, I2(답변 상한 초과 = 실패)·I5(겹친 호출 지연 표본만 제외)를 v4 하네스 판정·집계에 반영했다. 작업트리 변경만 했고 commit·push 0, SSH·모델 호출·측정 0, 기준선 seq5·`spec-approvals/**` 변경 0, 기존 PREREG·결과·evidence·v1~v3 입력 변경 0.**
+- 착수 시 SPEC `1f08318d…637d`(2,612줄), Plan `52729527…1b91`(1,756줄), 이 Dev report 503,142 B `ec9719ac…`.
+- 사용자 결정(2026-11-04) 두 건: ①답변 토큰이 답변 상한(분류 192·서술 128·계획 256)을 넘으면 실패(v1~v3 의 `finish_reason=length` 실패와 같은 판정, 1회 재시도 대상) ②공유 서버 겹침은 회차 전체 무효가 아니라 겹친 호출의 지연 표본만 제외(정확도 채점 유지).
+
+#### 1) SPEC 수정(1~1838행 줄 수 불변 — 모두 줄 안 수정·줄 끝 덧붙임, 새 줄 0)
+
+| 결함 | 위치 | 전 → 후 요지 |
+|---|---|---|
+| B1 | §14.5 표 1194·1196, 1199, §16 F0 행 1382 | "F0 진단 측정 후 G-F0-TARGET 확정" → **T 확정 순서**: 진단 분포로 `T_cls`·`T_pln` 제안 → SPEC 소유자 승인 → §14.5 표에 T 기록(`measurementAffecting=true`, 기준선 새 사슬 항목) → 그 뒤에만 정식(GATE) 등록·측정 |
+| I1 | 1195 | `T_cmp`(미정, F2 측정 후 확정) → F0 는 Composer 를 호출하지 않아 F0 근거 없음, 산정 절차·게이트는 열린 항목 ⓑ(F2 P18 착수 전) |
+| I2 | 1199, 1203, 1382 | 1199 에 "답변 상한 초과 = 실패"(1회 재시도, 분류·계획 = 검사 ④·`PLAN_INVALID`, Composer = 같은 재시도 뒤 §14.6 ②), 답변 토큰 = 사고를 뺀 wire JSON·서술 본문, 서버의 사고 분리 보고로 셀 수 없으면 실패(fail-closed), 계수 방법은 F0 진단 뒤·정식 GATE 등록 전(열린 항목 ⓒ). 1203 검사 ①~③ 에 ④ 추가(`KQ/LQ/INC/GQ/UNS` 유지). F0 측정 항목에 답변 상한 초과 건수 |
+| I3 | 306 ⑤, 328(§4.2), 1045(§12.3) | 사고문이 content 에 섞이면 분류·계획은 검사 ① JSON 파싱 실패로 걸러진다는 현재 사실만 적고, Composer 처리 규칙은 열린 항목 ⓓ(F2 P19/P20 착수 전) |
+| I4 | 1848·1849(§26.1) | F2 권장 문장의 ".201 도 proxy 경유(별도 토큰) 또는 사용 중단" 을 빼고 ② **재비교 대상** ⓐ0.0.0.0+방화벽 ⓑproxy 경유(비용: 노드 IP 만 허용하는 방화벽에 .201 추가, 경로 allowlist 에 `/api/embed`·`/api/chat` 추가, 단일 토큰 → 소비자별 토큰, AC-35-TOKEN·FW 재검토) ⓒ사용 중단으로 이동 |
+| I5 | 1382, 1225 ④ | "측정 창에 NORI 밖 요청 1건이라도 있으면 지연 축 무효·재측정" → 겹친 호출의 지연 표본만 제외, 채점 유지, 겹침 = 시도별 송신~수신 구간(UTC) ∩ 서버 GIN 로그 NORI 밖 요청 구간(서버 UTC), 회차의 시도 하나라도 겹치면 그 회차 지연 표본 제외, 제외 건수·비율·제외 뒤 표본 수 기록, digest·context·상주 변화만 회차 전체 무효, F2·F4 적용 여부 열린 항목 ⓔ. 1225 ④(F4 큐 회차 유효성)는 겹침 규칙과 별개임을 적음 |
+| M6 | 1245 | 세마포어 목적 = "Gateway 자신의 호출에 한해"(NORI 밖 요청 뒤 서버 내부 대기는 막지 못함) |
+| M7 | 1237 | digest READY errorCode 결정(P19 전) 때 AC-33 하위도 함께 정함(열린 항목 ⓕ) |
+| M8 | 2286(§27.5) | 미결정 목록에 `T_cls`·`T_pln` 값, `T_cmp` 절차·시점, 답변 토큰 계수 방법, Composer 사고문 혼입, 겹침 규칙 F2·F4 적용, AC-35-LOCAL 조건부 재정의, proxy 실행 방식, .201 처리 합의 추가. 같은 행의 겹침 규칙 요약을 새 결정으로 바꾸고 "같은 날 독립 검토 보정" 문장 추가 |
+| M9 | 306 ⑦ | VRAM 4544/6144(free 1205) 출처 = nvidia-smi `memory.used`·`memory.free`, 합이 total 과 다른 차이는 드라이버 예약분으로 추정 |
+| 이력 표지 | 1176, 1231, 321, 1830·1835·1836 | 1176 "결론(이력 — Jetson 실측 기준)", 1231 "(이력, Jetson) 콜드 로드 198s", 321 "위 표" → §4.1 현재 전제 ⑤⑦⑨, 1830 머리말에 클러스터 항목(Cilium SNAT·노드 IP·NetworkPolicy)은 현재 근거로 분리·1835/1836 "(클러스터)" 표시·방화벽 문장 "추론 서버 호스트 방화벽(Jetson·새 서버 공통)" |
+
+- §14.5 열린 항목 목록(1199 끝에 신설): ⓐ`T_cls`·`T_pln` 값 ⓑ`T_cmp` 산정 절차·게이트 ⓒ답변 토큰 계수 방법 ⓓComposer 서술 사고문 혼입 처리 ⓔ겹침 규칙의 F2·F4 적용 여부 ⓕreadiness digest 불일치 errorCode 와 AC-33 하위. 값·규칙은 정하지 않았다.
+
+#### 2) Plan 수정
+
+| 결함 | 위치 | 전 → 후 요지 |
+|---|---|---|
+| B1 | §5 G-F0-TARGET, P03 v4 흐름 | 필요 시점에 "(0) v4 정식 GATE 등록 전 — T 의 SPEC 기록·seq6 뒤에만 GATE 등록 commit" 추가. 흐름 ①~⑪ → ①~⑭ 재배열: ④하네스 v4 진단 분기 → ⑤audit → ⑥진단·개발 회귀 등록 → ⑦pre/postflight → ⑧진단 실행(계수 방법 확정) → ⑨개발 회귀 → ⑩T 제안·승인·SPEC 기록·seq6 → ⑪하네스 정식 분기·GATE R5 등록 → ⑫정식 R5 → ⑬report(겹침 제외)·gate → ⑭G-F0-TARGET 나머지·seq7. 직전 "④ 진단 등록 → ⑤ 하네스" 역순과 P03 준비 기록의 "⑤ 일부 선행" 문구를 바로잡음 |
+| I1 | §6 F2 DAG, P18 선행, `TokenBudgetPolicy` | `T_cmp` 절차 결정을 P18 선행에 추가, 정책에 사고 상한(`T_cls`·`T_pln` = G-F0-TARGET, `T_cmp` = 절차 결과·값 미정) 항목 |
+| I2 | P20 Classification·Composer | 답변 토큰 > 답변 상한(192/128, 계수 불가도 실패) → 같은 1회 재시도. Composer 요청 `max_tokens` = 128 + `T_cmp` |
+| I3 | P19 readiness 행, P20 Composer | Composer content 사고문 혼입 처리 = SPEC 열린 항목 ⓓ(P19/P20 착수 전) |
+| I5 | G-INFER-SHARE, P03 흐름 | GIN 로그에서 출발지별 건수 + NORI 밖 요청 구간 목록(UTC 시작·끝만)을 뽑고 `f0 share-exclude` 로 겹친 회차 지연 표본만 제외. GIN 로그 줄 시각이 완료 시각인지는 첫 수집 때 확인(미확인) |
+| M1~M5 | 862·864, 425, 1667, 1679, 1676·1752 | 198s → "콜드 로드 완료(새 장비 미측정)까지", 128 → 등록 답변 상한(현재 192), `ops/jetson/**` → `ops/inference-server/**`, readiness 4096 → 8192(이력 표시), G-JETSON-* → G-INFER-*(이력 표시) |
+| 이력 표지 | P02 363·376·388·391 | v1~v3 Jetson 등록 이력 표시와 v4 대응값 안내 |
+
+- P03 에 진행 기록 1줄(독립 검토 보정)을 추가했다.
+
+#### 3) 하네스 반영(f0 패키지, v1~v3 동작·요청 바이트 불변)
+
+- 판단: v4 진단 하네스는 요청 `max_tokens` 5,120 으로 완료 토큰만 검사했고 답변 상한 192/256 은 판정에 없었다. 또 v4 경계 무결성 재계산이 사고 포함 `completionTokens ≤ 192` 를 써서 GATE 판정 경로가 생기면 `BOUNDARY_SUMMARY_MISMATCH` 가 날 구조였다. 지연은 회차 단위 `latencyMs` 만 있어 겹침 판정 입력(시각)이 없었다. 그래서 I2·I5 모두 반영이 필요했다.
+- `ClassificationJudge`: `judge`·`execute` 에 `answerLimit`(Integer) overload 추가(기존 overload = null = 기존 판정). 길이·종료·완료 토큰 검사 뒤 ④ 답변 토큰 검사 — 셀 수 없으면 `ANSWER_TOKENS_UNCOUNTABLE`, 상한 초과면 `ANSWER_LIMIT_EXCEEDED`. 두 코드는 `RETRY_ERROR_CODES` 에 넣지 않고 재시도 요지는 기존 `USAGE_EXCEEDS_LIMIT` 로 보낸다(사전 입력 audit 이 계수하는 재시도 메시지 집합을 v2·v3 와 같게 유지 — 새 재시도 메시지를 만들면 audit 에 없어 `INPUT_AUDIT_MISSING`).
+- 답변 토큰 계수: `completion_tokens − completion_tokens_details.reasoning_tokens`. 사고 토큰이 completion 에 포함된다는 OpenAI 호환 정의를 전제한다. 사고 토큰 수 보고가 없거나, content 에 `<think>`/`</think>` 표지가 있거나, 사고 토큰 > completion 이면 계수 불가 = 실패(fail-closed). **보고: 이 계수는 사고 분리 방식(미확인)에 의존한다.** Ollama 0.40.13 의 OpenAI 호환 응답이 `reasoning_tokens` 를 주지 않으면 v4 모든 시도가 `ANSWER_TOKENS_UNCOUNTABLE` 로 실패하고 재시도로 호출 수가 두 배가 된다(서버 응답 형태는 미확인 — 추정). 이 경우 진단의 정확도 축은 쓸 수 없고 `attemptDiagnostics`(필드별 독립 진단)·`thinkingObservations`·완료 토큰만 남는다. 계수 방법 확정은 P03 v4 ⑧·SPEC 열린 항목 ⓒ 이며, GATE 등록은 지금도 `Prereg` 가 거부한다.
+- `Prereg.Document.answerLimit(kind)`: v4 등록 `answerLimitTokens`(분류 192·계획 256), v1~v3 = null.
+- `MeasurementSession`: `Context.clock()` 을 보관하고 `clock()` 제공. `F0Measurements.Attempts.send`: 시도마다 송신 직전·수신(또는 timeout) 직후 UTC 시각을 `CallWindow{sentAt, receivedAt}` 로 기록(finally — timeout 시도 포함). v4 행·경계 시도에만 `answerTokens`(시도별, 셀 수 없으면 null)·`callWindows` 열. run·boundary-gen 은 v4 등록 답변 상한을 judge 에 넘긴다(v1~v3 = null).
+- `F0Judgement.boundaryIntegrity`: v4 는 마지막 `answerTokens`(응답 없는 timeout 이면 null, 열 없음 = `BOUNDARY_ATTEMPT_INVALID`)로 경계 상한을 재계산, v1~v3 는 기존 `completionTokens` 그대로.
+- 신규 `SharedServerOverlap` + CLI `f0 share-exclude --prereg <v4> --results <회차 디렉터리> --intervals <파일>`(추론 호출 0, v4 전용 — v1~v3 = `PREREG_INVALID`): 구간 파일 schema `f0-share-intervals-v1`(`intervals[{start,end}]`, UTC `Z` 표기·start ≤ end 만, 위반 = `SHARE_INTERVALS_INVALID`). 회차의 `callWindows` 중 하나라도 외부 구간과 닫힌 구간으로 교차하면 그 회차 지연 표본 제외. 경로별(A·B·boundary) `samples`·`excluded`·`excludedRatio`·`keptSamples`·제외 뒤 p50/p95(표본 0 이면 null)·기대 t 별 p95 만 출력(원문·IP 0, 원시 결과 불변). 서버 로그 수집(SSH)·GIN 줄 → 구간 변환은 구현하지 않았다(사용자 실행, Plan G-INFER-SHARE). 정식 report·gate 연동은 v4 정식 분기(P03 ⑪) 몫이다.
+- 손대지 않은 것: `input-audit-render`(Budget.V2 고정)와 Python 계수기 — §12.26 5) 와 같다(P03 ⑤).
+
+#### 4) 시험
+
+- 신규 시험: `F0V4RuntimeProfileTest` 3건 — ①답변 192 유효·193 `ANSWER_LIMIT_EXCEEDED`·계수 불가 4형태(`reasoning_tokens` 없음·content `</think>`·사고 > completion·관측 없음) `ANSWER_TOKENS_UNCOUNTABLE`, 같은 응답의 v1~v3 판정 유효(불변), `FINISH_LENGTH` 가 먼저 ②v4 run: 답변 193 이면 문항마다 초회+재시도 2회·재시도 요지 `오류: USAGE_EXCEEDS_LIMIT`(사전 audit 통과)·요청 바이트에 `ANSWER_` 0·`errorCodes`·`answerTokens [193,193]`·`callWindows` 2개(UTC `Z`, sentAt ≤ receivedAt), 답변 192 면 재시도 0·OK ③`share-exclude`: 빈 구간 = 제외 0, 전 구간 = 전부 제외·p95 null, 닫힌 구간 경계(같은 시각 겹침·1ms 뒤 비겹침), offset 표기·역순 구간 거부, `callWindows` 없는 행 거부, v1 등록 거부, 원시 결과 불변. `F0BoundaryIntegrityTest` 1건 — v4 는 사고 포함 completion 960 이어도 답변 60 으로 PASS, 답변 193·null = `BOUNDARY_SUMMARY_MISMATCH`, 열 없음 = `BOUNDARY_ATTEMPT_INVALID`, 같은 입력의 v2 판정은 기존대로 불일치.
+- 기존 시험 조정 1건: `F0V4RuntimeProfileTest.withThinking` 이 `reasoning_tokens` 77 을 주면서 completion 은 40 으로 두던 것을 completion += 77(사고 포함 정의)로 맞췄다(새 판정에서 사고 > completion 은 계수 불가이므로).
+- 변이 확인: ①답변 상한 비교 제거 ②겹침 교차를 항상 false ③v4 경계 재계산을 completion 으로 되돌림 — 세 변이를 함께 넣은 필터 실행에서 신규 4건이 모두 FAILED(`fix-mut.log`), 원본 복원 후 `cmp` 일치.
+
+| 명령(`AIGW_SPEC_FILE`=정본 SPEC, Gradle 동시 실행 0) | exit | 결과 |
+|---|---|---|
+| `:gateway-eval:test --tests "*F0V4RuntimeProfileTest" --tests "*F0BoundaryIntegrityTest" --tests "*ClassificationJudgeTest"` | Gradle 1 | XML **28/28 PASS**(3클래스). `test` 태스크 성공, finalizer `testLeafEvidence` 가 `SPEC_BASELINE_MISMATCH`(Java exit 3) |
+| 같은 필터 + 변이 3종 | Gradle 1 | 신규 4건 FAILED(의도된 실패) → 원본 복원 `cmp` 일치 |
+| 무필터 `:gateway-eval:test --rerun-tasks` | Gradle 1 | `> Task :gateway-eval:test` 성공, XML 독립 집계 **220/220 PASS·44클래스·failures/errors/skipped 0**(§12.26 216 + 신규 4). `testLeafEvidence FAILED` — `SPEC_BASELINE_MISMATCH`, `BUILD FAILED in 5m 27s` |
+
+- SPEC 바이트가 기준선 seq4 와 다르므로(seq5 미작성 — root 몫, 이번에도 기준선 파일 변경 0) `testLeafEvidence` finalizer 가 spec-guard 로 막는다. 단위 결과(220 PASS)와 프로세스 실패는 별개이며 이 명령을 성공한 검증으로 계산하지 않는다. `test-evidence verify` 는 이 상태에서 실행하지 않았다(seq5 뒤 재실행 대상). 측정 명령도 같은 SpecGuard 로 시작되지 않는다.
+
+#### 5) 열린 항목(최종, 값·규칙 미정)
+
+1. `T_cls`·`T_pln` 값 — F0 진단 뒤, v4 정식 GATE 등록 전(SPEC §14.5 "T 확정 순서", Plan G-F0-TARGET (0)).
+2. `T_cmp` 산정 절차·게이트·확정 시점 — F2 P18 착수 전(F0 근거 없음).
+3. 답변 토큰 계수 방법 — F0 진단(⑧) 뒤, 정식 GATE 등록 전. 그때까지 계수 불가 = 실패.
+4. Composer 서술 content 사고문 혼입 처리 — F2 P19/P20 착수 전.
+5. 공유 서버 겹침 제외 규칙의 F2·F4 지연 축 적용 여부 — F2 착수 전.
+6. readiness 생성 모델 digest 불일치 errorCode 형태(신규 vs `MODEL_CONTEXT_MISMATCH` 확장)와 그 AC-33 하위 — F2 P19 착수 전.
+7. v4 등록에 함께 둘 v3 후보(c~i) 구성 — 사용자 결정 대기(기존).
+8. AC-35-LOCAL 조건부 재정의 — §26.1 ② 비교 결과에 따름.
+9. 추론 서버 proxy 실행 방식 — 새 서버 docker 유무 미확인, F2 산출물.
+10. 기존 소비자 192.168.0.201 처리(ⓐ0.0.0.0+방화벽 ⓑproxy 경유 ⓒ사용 중단) — 소유자 합의, F2 착수 전.
+11. GIN 로그 줄 시각의 의미(완료 시각 여부)와 구간 산출 방법 — 첫 수집 때 확인.
+
+#### 6) 다음 단계
+
+- root: 새 SPEC `bb91146a0f0c84f8ec885355dc840c42de06be346c910cd0f846745469bd0de4` 로 기준선 seq5 를 만든다(§12.26 4) 의 권장 seq5 는 이전 SHA `1f08318d…` 기준이므로 sha256 을 새 값으로 바꿔야 함. `prevSha256`=`34fd6223…66be` 그대로). 그 뒤 무필터 시험과 `test-evidence verify` 재실행 → (사용자 허용 시) commit → P03 v4 ①.
+
+#### 7) 보존 확인
+
+- 이 Dev report 앞 503,142 B(§12.26 끝까지)의 SHA 는 추가 전후 같다(`ec9719ac8b265dbdf86ede23fe260830659801e8af6872279d8236465ccbd62e`). 기존 PREREG·결과·capture·evidence·v1~v3 입력·`docs/gates/**` 변경 0. 원문 응답·secrets 출력 0.
+
+### 12.28 기준선 seq5 기록·전체 시험·로컬 C21 커밋 범위 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: Plan §0 R6 ③ 의 기준선 seq5 와 `docs/gates/spec-approvals/5.md` 를 기록했고, 그 뒤 `spec-guard`·무필터 시험(testLeafEvidence 포함)·`test-evidence verify` 가 모두 exit 0 이다. 로컬 commit C21 1개만 허용 범위다(push·`--force`·`spec-input publish`·protected 변수 갱신 0). SSH·모델 호출·측정 0. P03 미완료(v4 흐름 미착수)·기존 F0 FAIL 유지·P04 미착수.**
+- 승인 근거: 2026-11-04 사용자 결정 — SPEC v4.1 추론 장비 교체 개정 권장안 일괄 채택, 독립 검토 결함 수정 결정(답변 상한 초과 = 실패, 공유 서버 겹친 호출만 지연 제외), "seq5·C21 허용".
+- 착수 시 SPEC SHA-256 `bb91146a0f0c84f8ec885355dc840c42de06be346c910cd0f846745469bd0de4`(2,612줄, §12.27 6) 의 값과 일치), HEAD C20 `7ab4e9a`, 이 Dev report 518,503 B `4255882b29e94cbcedf05a495caefc140020c0a287eec3df0a7e3e31af226ffa`, staged 0.
+
+#### 1) 기준선 seq5
+
+- `docs/gates/spec-baseline.md` 배열 끝에 항목 1개만 추가했다(seq1~4 바이트 불변):
+
+```json
+{"seq":5,"sha256":"bb91146a0f0c84f8ec885355dc840c42de06be346c910cd0f846745469bd0de4","prevSha256":"34fd62233f96995054a48ce64c6aa0abe83585bab6c516183bce38ad739466be","approvedAt":"2026-11-04","approvalRef":"docs/gates/spec-approvals/5.md","changedSections":["header","0","4.1","4.2","4.3","5.4","9.5","12.3","13.3","14.2","14.5","14.6","14.7","16","19","26.1","27.2","27.5"],"affectedLeaves":"ALL","measurementAffecting":true}
+```
+
+- `approvalRef` 는 seq2~4 관례와 §12.26 4) 권장대로 승인 기록 경로로 두고, 승인 요지는 `spec-approvals/5.md` 에 적었다(`SpecBaseline` 은 이 값을 자유 문자열로 받는다).
+- `changedSections` 대조: seq4 바이트 사본(SHA `34fd6223…66be` 확인)과 현재 SPEC 의 줄 diff(54 hunk)의 변경 위치를 조항 머리글로 대응시킨 합집합이 §12.26 4) 목록 18개와 같다. §12.27 1) 수정 줄(306·321·328·1045·1176·1194~1203·1225·1231·1233·1237·1245·1382·1830~1849·2286)은 각각 §4.1·§4.2·§12.3·§14.5·§14.6·§14.7·§16·§26.1·§27.5 에 속해 새 조항을 더하지 않는다. 그래서 §12.26 4) 목록을 그대로 썼다(sha256 만 새 값).
+- 배열 JSON 파싱(Node, 실패 시 원문 비출력): 5항목, seq5 `prevSha256` = seq4 `sha256` true. 두 파일 UTF-8·LF(CR 0)·끝 개행.
+
+#### 2) 시험(`AIGW_SPEC_FILE`=정본 SPEC, `DEBUG`=빈 값, Gradle 동시 실행 0, 순차)
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| `:gateway-eval:run --args="spec-guard"` | 0 | `specSha`=`bb91146a…d0de4`, `specInputOrigin`=`LOCAL_FILE`, `BUILD SUCCESSFUL in 3s` |
+| 무필터 `:gateway-eval:test --console=plain --rerun-tasks` | 0 | `:gateway-eval:test`·`:gateway-eval:testLeafEvidence` 실행, `BUILD SUCCESSFUL in 5m 24s`, `6 actionable tasks: 6 executed`. XML 독립 집계 **220/220 PASS·44클래스·failures/errors/skipped 0** |
+| `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 3s` |
+
+- 시험 신원(`run-binding.json`): `runId=203aa122-1d4f-4854-aa3e-b92b5a124d51`, `inputFingerprint=22fd026b8c18345a2479d8547a791a248e08670709d35444ee3531021df9ca69`, `specSha=bb91146a…d0de4`(seq5). stub·로컬 시험이며 실제 모델 F0 합격이 아니다. §12.27 4) 의 `testLeafEvidence` `SPEC_BASELINE_MISMATCH` 는 seq5 기록으로 해소됐다(코드 변경 0).
+
+#### 3) 기존 사전등록 상태(`f0 prereg-check`, endpoint 인자 없음, 모델 요청 0)
+
+- 24건(`PREREG.md`·`PREREG-v2.md`·v3 22건) 모두 `localMismatches=["harnessDigest"]`·`PREREG_INPUT_CHANGED`(Gradle exit 1) — §12.26 7) 의 변경 후 상태와 같다. 입력 바이트 불일치 0.
+- `prereg-check` 는 하네스·입력 대조만 하며 기준선 적격(`SPEC_BASELINE_STALE`)은 `GateEvaluator`(gate 단계)가 판정한다. seq5(`affectedLeaves=ALL`) 뒤 v1~v3 레코드(specSha seq1~4)는 gate 에서 부적격이 된다. 등록 문서·결과·evidence 는 고치지 않았다.
+
+#### 4) 커밋 범위(사용자 허용: 로컬 C21 1개, push 없음)
+
+- C21(정확 17파일): `docs/gates/spec-baseline.md`, `docs/gates/spec-approvals/5.md`(신규), `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/{ClassificationJudge,F0Judgement,F0Measurements,F0ReportWriter,F0RunnerCli,InputAudit,MeasurementSession,OllamaChatClient,Preflight,Prereg}.java`, `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/SharedServerOverlap.java`(신규), `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/{F0BoundaryIntegrityTest,F0V3RegistrationDraftTest}.java`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/F0V4RuntimeProfileTest.java`(신규), `docs/ai-rag-gateway-architecture-dev-report.md`(C20 뒤 미커밋으로 추가된 §12.25 끝 "로컬 C19/C20 등록·최종 확인"·§12.26·§12.27·이 절 포함, C5·C7·…·C19 와 같은 관례). 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`, `evidence/F0/`, `eval/py/**/__pycache__/`)는 넣지 않는다.
+- 이 절 추가 전 518,503 B 의 SHA(`4255882b…6ffa`)는 추가 후 앞 518,503 B 에서 같아야 한다(커밋 직전 확인). 커밋 해시·확인 결과는 커밋 뒤 이 절 끝 "로컬 C21 커밋" 소절에 작업 트리에만 기록한다(C17/C18·C19/C20 관례 — 다음 커밋에 포함).
+
+#### 5) 다음 단계
+
+- Plan §0 R6 ④⑤(`spec-input publish`·protected `AIGW_APPROVED_SPEC_SHA`=seq5)는 원격 공급을 소비하는 CI job·`ci-evidence verify`·배포 수용 전 조건이며 미실행이다. 다음은 P03 v4 ① G-INFER-ENV 읽기 전용 기록이며, SSH·실측은 사용자 승인 뒤에만 한다.

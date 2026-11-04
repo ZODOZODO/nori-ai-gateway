@@ -15,6 +15,7 @@ import java.util.*;
  * exit: 0 완료, 2 입력·사전등록·결속 오류, 3 재판정 불가, 4 preflight 실패, 5 측정 중 endpoint 오류(부분 결과 보존), 6 모델 digest 불일치.
  */
 public final class F0RunnerCli {
+    /** GENERATION_MODEL = v1~v3(Jetson) 등록 모델. v4 는 Prereg.RuntimeProfile.INFER_V4 입니다. */
     public static final String GENERATION_MODEL = "qwen3:4b-instruct", EMBEDDING_MODEL = "bge-m3";
     private static final Set<String> ROUTES = Set.of("A", "B");
     private final MeasurementSession.Context context;
@@ -41,7 +42,7 @@ public final class F0RunnerCli {
                 Path file = path(args, "--out");
                 if (Files.exists(file)) throw new EvalException(2, "OUTPUT_EXISTS");
                 Prereg.verify(context.root(), preregPath, context.git());
-                Preflight.Result result = Preflight.run(new OllamaChatClient(args.required("--endpoint"), Duration.ofSeconds(30)), document.generationModel(), document.embeddingModel());
+                Preflight.Result result = Preflight.run(new OllamaChatClient(args.required("--endpoint"), Duration.ofSeconds(30)), document.generationModel(), document.embeddingModel(), document.contextTokens(), document.generationModelDigest());
                 MeasurementSession.writeNew(file, Json.canonical(Json.MAPPER.valueToTree(result.summary())));
                 if (!result.summary().ok()) throw new EvalException(4, result.summary().reason());
                 out.println("F0_PREFLIGHT_OK " + result.summary().residentCount());
@@ -89,11 +90,11 @@ public final class F0RunnerCli {
             case "chat-template" -> {
                 args.only("--prereg", "--endpoint", "--model", "--out");
                 Path preregPath = preregPath(args); Prereg.Document document = Prereg.parse(preregPath);
-                if (!args.required("--model").equals(GENERATION_MODEL)) throw new EvalException(2, "ARGUMENT_INVALID");
+                if (!args.required("--model").equals(document.profile().generationModel())) throw new EvalException(2, "ARGUMENT_INVALID");
                 String runId = envRunId(); Path dir = path(args, "--out");
                 if (document.versioned()) registered(args, "--out", document.runtimeCaptureDir());
                 MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 chat-template", args.required("--endpoint"), runId, dir.resolve("run-binding.json"), null);
-                F0Measurements.chatTemplate(session, dir, "qwen3-4b-instruct");
+                F0Measurements.chatTemplate(session, dir, document.profile().templateStem());
                 out.println("F0_CHAT_TEMPLATE_CAPTURED");
             }
             case "usage-probe" -> {
@@ -103,7 +104,7 @@ public final class F0RunnerCli {
                 String runId = envRunId(); Path file = results(path(args, "--out"), runId);
                 Map<String,List<Map<String,String>>> inputs = new LinkedHashMap<>(); for (var e : messages(path(args, "--messages"), document)) inputs.put(e.getKey(), e.getValue());
                 validateUsage(inputs);
-                if (document.versioned()) audit(preregPath).requireAll(InputAudit.probes("usage", List.copyOf(inputs.entrySet())));
+                if (document.versioned()) audit(preregPath).requireAll(InputAudit.probes("usage", List.copyOf(inputs.entrySet()), document.contextTokens()));
                 ChatRenderers.Renderer[] renderer = new ChatRenderers.Renderer[1];
                 // 렌더러 검증 실패는 run-binding 작성·추론 호출 전에 거부합니다(chat template 추정 0).
                 MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 usage-probe", args.required("--endpoint"), runId, sibling(file, ".run-binding.json"),
@@ -119,7 +120,7 @@ public final class F0RunnerCli {
                 if (Files.exists(file)) throw new EvalException(2, "OUTPUT_EXISTS");
                 List<Map.Entry<String,List<Map<String,String>>>> inputs = messages(path(args, "--messages"), document);
                 if (inputs.size() < 12) throw new EvalException(2, "TOKEN_GOLDEN_INPUT_INVALID");
-                if (document.versioned()) audit(preregPath).requireAll(InputAudit.probes("token", inputs));
+                if (document.versioned()) audit(preregPath).requireAll(InputAudit.probes("token", inputs, document.contextTokens()));
                 MeasurementSession session = MeasurementSession.start(context, preregPath, "f0 token-golden", args.required("--endpoint"), runId, sibling(file, ".run-binding.json"), null);
                 F0Measurements.tokenGolden(session, inputs, file);
                 out.println("F0_TOKEN_GOLDEN_COMPLETED " + inputs.size());
@@ -176,7 +177,8 @@ public final class F0RunnerCli {
                 args.only("--prereg", "--endpoint", "--probe", "--run-id", "--out");
                 Path preregPath = preregPath(args); Prereg.Document document = Prereg.parse(preregPath);
                 String runId = runId(args.required("--run-id"));
-                if (!document.diagnostic() || document.repeats() != 1) throw new EvalException(2, "PREREG_INVALID");
+                // G08 판별 기준은 Jetson·Ollama 0.31.1 출력에 결속된 v3 전용이라 v4 등록으로는 실행하지 않습니다.
+                if (!document.diagnostic() || document.repeats() != 1 || document.v4()) throw new EvalException(2, "PREREG_INVALID");
                 String probe = Prereg.relativePath(context.root(), path(args, "--probe"));
                 if (!document.inputs().containsKey(probe)) throw new EvalException(2, "ARGUMENT_NOT_REGISTERED");
                 Path dir = results(path(args, "--out"), runId);
@@ -207,6 +209,30 @@ public final class F0RunnerCli {
                 else if (args.flag("--rejudge")) out.println(writer.rejudge(runId, results, prereg, target));
                 else out.println(writer.report(runId, results, prereg, target));
             }
+            case "share-exclude" -> {
+                // 공유 서버 겹침 제외 집계(v4 결과만, 추론 호출 0): 경로별 지연 표본 수·제외 건수·비율·제외 뒤 p50/p95 만 출력합니다(원문·IP 0).
+                args.only("--prereg", "--results", "--intervals");
+                Path preregPath = preregPath(args); Prereg.Document document = Prereg.parse(preregPath);
+                if (!document.v4()) throw new EvalException(2, "PREREG_INVALID");
+                List<SharedServerOverlap.Interval> external = SharedServerOverlap.load(path(args, "--intervals"));
+                RegistryFixture fixture = RegistryFixture.load(context.root().resolve(document.input("fixture")));
+                Map<String,String> expectedT = new HashMap<>();
+                for (GoldenSet.Question q : GoldenSet.load(context.root().resolve(document.input("golden")), fixture).questions()) expectedT.put(q.id(), q.expected().t());
+                Path results = path(args, "--results"); Map<String,Object> summary = new TreeMap<>();
+                for (String route : List.of("A", "B")) {
+                    JsonNode node = F0Judgement.complete(readIfExists(results.resolve(route + "/f0-results.json")), document.repeats());
+                    if (node == null) continue;
+                    List<JsonNode> rows = new ArrayList<>(); node.path("attempts").forEach(rows::add);
+                    summary.put(route, SharedServerOverlap.summarize(rows, expectedT, external));
+                }
+                JsonNode boundary = F0Judgement.complete(readIfExists(results.resolve("boundary/boundary-results.json")), document.repeats());
+                if (boundary != null) {
+                    List<JsonNode> rows = new ArrayList<>(); boundary.path("cases").forEach(c -> c.path("attempts").forEach(rows::add));
+                    summary.put("boundary", SharedServerOverlap.summarize(rows, Map.of(), external));
+                }
+                if (summary.isEmpty()) throw new EvalException(2, "RESULTS_MISSING");
+                out.println(Json.canonicalString(Json.MAPPER.valueToTree(summary)));
+            }
             case "prereg-check" -> {
                 args.only("--prereg");
                 Prereg.relativePath(context.root(), path(args, "--prereg"));
@@ -232,7 +258,11 @@ public final class F0RunnerCli {
         return selected;
     }
     /** 등록 바이트 검증을 먼저 끝낸 audit 만 씁니다(변경된 입력은 계수 표 누락이 아니라 PREREG_INPUT_CHANGED 로 거부). 추론 호출 전 단계입니다. */
-    private InputAudit audit(Path preregPath) { return InputAudit.load(context.root().resolve(Prereg.verify(context.root(), preregPath, context.git()).document().input("inputAudit"))); }
+    private InputAudit audit(Path preregPath) {
+        Prereg.Document document = Prereg.verify(context.root(), preregPath, context.git()).document();
+        return InputAudit.load(context.root().resolve(document.input("inputAudit")), document.contextTokens());
+    }
+    private static JsonNode readIfExists(Path file) { return Files.isRegularFile(file) ? Json.read(file) : null; }
     private Path path(Args args, String key) { return context.root().resolve(args.required(key)).normalize(); }
     // 측정 입력은 사전등록한 파일만 허용합니다(다른 경로의 같은 이름 파일로 우회 0).
     private void registered(Args args, String key, String expected) { if (!path(args, key).equals(context.root().resolve(expected).normalize())) throw new EvalException(2, "ARGUMENT_NOT_REGISTERED"); }

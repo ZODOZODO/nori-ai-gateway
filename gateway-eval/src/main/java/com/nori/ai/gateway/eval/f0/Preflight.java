@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.nori.ai.gateway.eval.EvalException;
 import java.util.*;
 
-/** /api/ps·/api/tags 를 메모리에서만 읽어 허용 필드 요약을 만든다. ok=true 일 때만 추론 호출 증표(Verified)를 낸다. */
+/** /api/ps·/api/tags 를 메모리에서만 읽어 허용 필드 요약을 만든다. ok=true 일 때만 추론 호출 증표(Verified)를 낸다. REQUIRED_CONTEXT 는 v1~v3(Jetson) 등록 값이다. */
 public final class Preflight {
     public static final int REQUIRED_CONTEXT = 4096;
     private static final String NAME = "[A-Za-z0-9._:/-]{1,128}", DIGEST = "(?:sha256:)?[0-9a-f]{64}";
@@ -19,6 +19,13 @@ public final class Preflight {
     public record Result(Summary summary, Verified verified) {}
 
     public static Result run(OllamaChatClient client, String generationModel, String embeddingModel) {
+        return run(client, generationModel, embeddingModel, REQUIRED_CONTEXT, null);
+    }
+    /**
+     * requiredContext = 등록 profile 의 생성 모델 context(v1~v3 4096, v4 8192). registeredDigest 가 있으면(v4) 상주 생성 모델 digest 가
+     * 등록값과 같아야 하며, 다르면 기존 tag·상주 digest 불일치와 같은 MODEL_DIGEST_MISMATCH 로 실패합니다(측정 명령 exit 6).
+     */
+    public static Result run(OllamaChatClient client, String generationModel, String embeddingModel, int requiredContext, String registeredDigest) {
         JsonNode ps, tags;
         try { ps = client.ps(); tags = client.tags(); }
         catch (EvalException e) { return new Result(new Summary(List.of(), 0, false, "PREFLIGHT_ENDPOINT_ERROR"), null); }
@@ -34,11 +41,11 @@ public final class Preflight {
         if (malformed) return new Result(new Summary(List.copyOf(models), models.size(), false, "PREFLIGHT_RESPONSE_INVALID"), null);
         ModelSummary generation = find(models, generationModel), embedding = find(models, embeddingModel);
         if (generation == null || embedding == null) return new Result(new Summary(List.copyOf(models), models.size(), false, "MODEL_NOT_RESIDENT"), null);
-        // bge-m3 의 context_length 는 기록만 하고 4096 을 강제하지 않습니다.
-        if (generation.context_length() == null || generation.context_length() != REQUIRED_CONTEXT) return new Result(new Summary(List.copyOf(models), models.size(), false, "CONTEXT_LENGTH_MISMATCH"), null);
+        // bge-m3 의 context_length 는 기록만 하고 생성 모델 context 를 강제하지 않습니다.
+        if (generation.context_length() == null || generation.context_length() != requiredContext) return new Result(new Summary(List.copyOf(models), models.size(), false, "CONTEXT_LENGTH_MISMATCH"), null);
         String tagged = null;
         for (JsonNode model : tags.path("models")) if (matches(model.path("name").asText(""), generationModel) && model.path("digest").asText("").matches(DIGEST)) tagged = normalize(model.path("digest").asText());
-        if (tagged == null || !tagged.equals(generation.digest())) return new Result(new Summary(List.copyOf(models), models.size(), false, "MODEL_DIGEST_MISMATCH"), null);
+        if (tagged == null || !tagged.equals(generation.digest()) || (registeredDigest != null && !registeredDigest.equals(generation.digest()))) return new Result(new Summary(List.copyOf(models), models.size(), false, "MODEL_DIGEST_MISMATCH"), null);
         return new Result(new Summary(List.copyOf(models), models.size(), true, "OK"), new Verified(generation.digest()));
     }
     /** 측정 호출 직전 두 모델이 아직 상주하는지만 다시 확인합니다(상주하지 않으면 추론 호출 0 — 모델 로드 유발 방지). */

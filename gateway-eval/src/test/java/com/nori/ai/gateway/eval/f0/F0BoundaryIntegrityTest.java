@@ -88,6 +88,27 @@ class F0BoundaryIntegrityTest {
         }
     }
 
+    /** v4(thinking 전용 모델): 경계 상한은 답변(사고 제외) 토큰(answerTokens 마지막 값)에 적용하고 사고를 포함한 completionTokens 로 판정하지 않습니다. */
+    @Test void v4BoundaryLimitAppliesToAnswerTokensNotThinkingInclusiveCompletion() {
+        Map<String,Consumer<ObjectNode>> cases = new LinkedHashMap<>();
+        cases.put("PASS", a -> {});
+        cases.put("BOUNDARY_SUMMARY_MISMATCH:over", a -> a.set("answerTokens", Json.MAPPER.createArrayNode().add(LIMIT + 1)));
+        cases.put("BOUNDARY_SUMMARY_MISMATCH:uncountable", a -> a.set("answerTokens", Json.MAPPER.createArrayNode().addNull()));
+        cases.put("BOUNDARY_ATTEMPT_INVALID:missing", a -> a.remove("answerTokens"));
+        for (var entry : cases.entrySet()) {
+            Inputs input = new Inputs(true);
+            for (JsonNode c : input.boundary.path("cases")) for (JsonNode a : c.path("attempts")) ((ObjectNode)a).put("completionTokens", 900 + 60).set("answerTokens", Json.MAPPER.createArrayNode().add(60));
+            entry.getValue().accept(input.attempt());
+            ObjectNode block = Json.MAPPER.createObjectNode().put("schema", "f0-prereg-v4");
+            Prereg.Document v4 = new Prereg.Document(block, "c".repeat(40), Map.of(), "d".repeat(64), (ObjectNode)input.prereg.parameters().deepCopy());
+            F0Judgement.Verdict verdict = F0Judgement.judge(new F0Judgement.Results(input.files, Map.of()), v4, null, null, TOKENIZER_SHA, CASES_SHA, input.registered).verdicts().get(NORMAL);
+            String expected = entry.getKey().split(":")[0];
+            assertThat(expected.equals("PASS") ? verdict.result() : verdict.reasonCode()).as(entry.getKey()).isEqualTo(expected);
+            // 같은 입력을 v2 로 판정하면 사고 포함 completionTokens(960) > 192 라 기존 규칙대로 불일치입니다(v1~v3 판정 불변).
+            if (expected.equals("PASS")) assertThat(input.verdict().reasonCode()).isEqualTo("BOUNDARY_SUMMARY_MISMATCH");
+        }
+    }
+
     @Test void duplicateMissingAndOutOfRangeRoundsAreRejected() {
         for (int round : List.of(0, 2, 3)) {
             Inputs input = new Inputs(true); input.attempt().put("round", round);
