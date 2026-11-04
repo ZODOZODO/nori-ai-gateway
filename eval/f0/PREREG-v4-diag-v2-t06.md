@@ -1,10 +1,12 @@
 # F0 진단 사전등록 v4-diag-v2-t06 — 교체 추론 서버(qwen3:4b = Qwen3-4B-Thinking-2507): V2(v2 계약 프롬프트) · temperature 0.6
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = 7c8272f966dec4a0c4d33549adff31ee56808d61`(C22)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC)** 다. 이 등록의 회차는 `f0 report` 가 `diagnostic-report.md` 만 쓰고 F0 leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않는다(`--out`·`--rejudge`·`--spec-record-check` 는 `DIAGNOSTIC_NOT_GATE_ELIGIBLE`, exit 2). F0 게이트 PASS 근거가 될 수 없고, 문항·결과는 정식 분모·판정 밖이다(SPEC §16 F0, Plan P03 v4 ⑨).
 - 이 문서는 v1~v3 등록 문서(Jetson 회차, C1~C20)와 그 입력·결과·보고서·증거·capture 를 바꾸지 않는다. 골든 22문항·fixture v2·경계 9케이스·v2 메시지 입력·프롬프트는 바이트 그대로 참조만 한다(SHA 는 v3 등록값과 같음).
-- 초안 상태에서는 측정 명령·`f0 prereg-check` 가 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부된다(요청 0). 등록은 사용자 허용 시 로컬 C22(등록 대상·하네스·이 초안) → C23(`registrationStatus=REGISTERED`, `registeredCommit`=C22) 두 commit 으로만 한다.
+- 등록 근거: 사용자 결정 "C22(대상 파일·초안, ①·③ 산출물 포함) / C23(registrationStatus=REGISTERED + registeredCommit=C22) 2커밋만"(2026-11-04, 로컬 commit 두 개만 허용, push·`--force`·원격 publish 없음).
+- C22 `7c8272f966dec4a0c4d33549adff31ee56808d61` = v4 등록 대상·하네스 v4 진단 분기·v4 입력 audit·관련 시험·①·③ 산출물·Devreport 정확 30파일(이 문서는 그때 `registeredCommit=null`·UNCOMMITTED 초안 상태로 함께 커밋). C23 = v4 사전등록 6문서(`PREREG-v4-{diag-v2-t0,diag-i-t0,diag-v2-t06,diag-i-t06,regression-v2,regression-i}.md`)만 수정해 `registeredCommit`에 C22 SHA, `registrationStatus=REGISTERED`를 기록한 commit이다.
+- 이력: 2026-11-04 C22 전까지 이 문서는 미등록 초안이었고, 그 동안 측정 명령·`f0 prereg-check` 는 endpoint 호출 없이 `PREREG_NOT_COMMITTED`(exit 2)로 거부됐다(요청 0).
 - 아래 `inputs[].sha256`·`harnessDigest` 는 2026-11-04 작업 트리 실제 바이트로 계산했다. 하네스 코드가 바뀌면 다시 계산해야 하며, 불일치는 `PREREG_INPUT_CHANGED` 로 기계 거부된다.
 
 ## 1. 진단 설계
@@ -40,8 +42,8 @@
 {
   "schema": "f0-prereg-v4",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "7c8272f966dec4a0c4d33549adff31ee56808d61",
   "runtimeCaptureDir": "eval/f0/chat-template/v4-diag-v2-t06",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
