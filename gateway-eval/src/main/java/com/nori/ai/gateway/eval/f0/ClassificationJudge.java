@@ -98,13 +98,21 @@ public final class ClassificationJudge {
         return new Verdict(true, null, node.path("t").textValue(), Collections.unmodifiableMap(args), List.copyOf(steps));
     }
     /**
-     * 답변(사고 제외) 토큰 수 = usage.completion_tokens − usage.completion_tokens_details.reasoning_tokens. 사고 토큰이 completion 에 포함된다는
-     * OpenAI 호환 정의를 전제하며, Ollama 0.40.13 의 실제 보고 의미는 F0 진단 확인 항목입니다(SPEC §14.5 열린 항목 ⓒ — 확인 전 GATE 등록은 Prereg 가 거부).
-     * 사고 토큰 수 보고가 없거나, content 에 사고 표지가 섞였거나, 사고 토큰 수가 completion 보다 크면 셀 수 없으므로 null 입니다(호출자는 실패로 판정, fail-closed).
+     * v4 답변 토큰 계수 방법(등록 parameters.answerTokenMethod). 키 없음 = 방법 (a) USAGE_REASONING(C21~C23 등록 의미 그대로, 등록 값으로 쓰지 않음),
+     * LOCAL_TOKENIZER_PIN_V1 = 방법 (b) 답변 content 를 등록 tokenizer pin 으로 로컬 계수(2026-11-04 사용자 결정 — Ollama 0.40.13 usage 에 reasoning_tokens 없음).
+     */
+    public static final String ANSWER_METHOD_USAGE_REASONING = "USAGE_REASONING", ANSWER_METHOD_LOCAL_PIN = "LOCAL_TOKENIZER_PIN_V1";
+    /**
+     * 답변(사고 제외) 토큰 수. 응답에 로컬 계수(localTokens)가 있으면 — 측정 세션이 방법 (b) 등록에서만 계수기를 넘기므로 — 방법 (b) 답변 content 의 pin 토큰 수,
+     * 없으면 방법 (a) usage.completion_tokens − usage.completion_tokens_details.reasoning_tokens 입니다(OpenAI 호환 정의 전제, SPEC §14.5 열린 항목 ⓒ).
+     * 두 방법 모두 content 에 사고 표지가 섞였으면(답변에 사고가 포함) 셀 수 없으므로 null 입니다. (a) 는 사고 토큰 보고가 없거나 completion 보다 크면,
+     * (b) 는 로컬 계수가 null 이면 null 입니다(호출자는 실패로 판정, fail-closed).
      */
     static Integer answerTokens(OllamaChatClient.ChatResult result) {
         OllamaChatClient.ThinkingObservation thinking = result.thinking();
-        if (thinking == null || thinking.reasoningTokens() == null || thinking.contentThinkOpen() || thinking.contentThinkClose() || thinking.reasoningTokens() > result.completionTokens()) return null;
+        if (thinking == null || thinking.contentThinkOpen() || thinking.contentThinkClose()) return null;
+        if (result.localTokens() != null) return result.localTokens().answerTokens();
+        if (thinking.reasoningTokens() == null || thinking.reasoningTokens() > result.completionTokens()) return null;
         return result.completionTokens() - thinking.reasoningTokens();
     }
     private static Verdict invalid(String code) { return new Verdict(false, code, null, Map.of(), List.of()); }

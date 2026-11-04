@@ -61,6 +61,8 @@ public final class Prereg {
     public static final Set<String> RETRY_HINTS = Set.of(ClassificationJudge.STEPS_DETAIL_V1);
     /** v4 진단 등록이 허용하는 temperature(SPEC §16 F0: 정식 0, 진단에 0.6 비교 arm). */
     public static final Set<Double> V4_DIAGNOSTIC_TEMPERATURES = Set.of(0.0, 0.6);
+    /** v4 에서만 명시 opt-in 하는 답변 토큰 계수 방법. 키가 없으면 방법 (a)(C21~C23 등록 의미) 그대로이며 그 값은 등록 값으로 쓰지 않습니다. */
+    public static final Set<String> ANSWER_TOKEN_METHODS = Set.of(ClassificationJudge.ANSWER_METHOD_LOCAL_PIN);
     public record Document(JsonNode block, String registeredCommit, Map<String,String> inputs, String harnessDigest, JsonNode parameters) {
         /** qRef wire 계약(v2·v3·v4 공통). */
         public boolean versioned() { return Set.of("f0-prereg-v2", "f0-prereg-v3", "f0-prereg-v4").contains(block.path("schema").asText()); }
@@ -80,6 +82,10 @@ public final class Prereg {
         public JsonNode temperature() { return parameters.path("temperature"); }
         /** v4 등록 답변(사고 제외) 상한 — 초과·계수 불가는 그 시도 실패(SPEC §14.5 "답변 상한 초과 = 실패"). v1~v3 은 null(답변·사고를 나누지 않음). */
         public Integer answerLimit(MessageAssembler.Kind kind) { return v4() ? parameters.path("answerLimitTokens").path(kind == MessageAssembler.Kind.PLAN ? "plan" : "classify").intValue() : null; }
+        /** v4 답변 토큰 계수 방법. 키 없음 = 방법 (a) USAGE_REASONING(v1~v3 은 답변·사고를 나누지 않아 쓰지 않음). */
+        public String answerTokenMethod() { return parameters.path("answerTokenMethod").asText(ClassificationJudge.ANSWER_METHOD_USAGE_REASONING); }
+        /** 방법 (b) 등록이면 측정 세션이 답변·사고문 로컬 계수기를 띄웁니다. */
+        public boolean localAnswerCount() { return answerTokenMethod().equals(ClassificationJudge.ANSWER_METHOD_LOCAL_PIN); }
         public String input(String role) { return versioned() ? block.path("inputRoles").path(role).asText() : LEGACY_ROLES.get(role); }
         public String runtimeCaptureDir() { return versioned() ? block.path("runtimeCaptureDir").asText() : "eval/f0/chat-template"; }
         public int repeats() { return parameters.path("repeats").asInt(); }
@@ -149,6 +155,9 @@ public final class Prereg {
             || !p.path("promptSha256").path("classify").asText().equals(inputs.get(roles.get("classifyPrompt"))) || !p.path("promptSha256").path("plan").asText().equals(inputs.get(roles.get("planPrompt")))) throw new EvalException(2, "PREREG_INVALID");
         // 생성 모델 digest 는 v4 에서만 등록하며 v1~v3 에 같은 키가 있으면 기존 등록과 다른 검사로 오해될 수 있어 거부합니다.
         if (v4 ? !p.path("generationModelDigest").isTextual() || !p.path("generationModelDigest").asText().matches("[0-9a-f]{64}") : p.has("generationModelDigest")) throw new EvalException(2, "PREREG_INVALID");
+        // 답변 토큰 계수 방법은 v4 opt-in 전용이며, 방법 (b) 는 계수기 바이트를 등록 입력으로 결속해야 합니다(v1~v3 의 같은 키·미정의 값·비문자열·계수기 미등록 거부).
+        JsonNode answerMethod = p.path("answerTokenMethod");
+        if (!answerMethod.isMissingNode() && (!v4 || !answerMethod.isTextual() || !ANSWER_TOKEN_METHODS.contains(answerMethod.asText()) || !inputs.containsKey(AnswerTokenCounter.SCRIPT))) throw new EvalException(2, "PREREG_INVALID");
         // v4 정식(GATE) 등록은 사고 상한 T 확정(G-F0-TARGET) 전에는 만들 수 없습니다(SPEC §14.5 "확정 전 정식 측정 0").
         if (v4 && !block.path("purpose").asText().equals("DIAGNOSTIC")) throw new EvalException(2, "PREREG_INVALID");
         // v3 정식(GATE) 등록은 최종 프로토콜 R=5 만 허용합니다. v1/v2 등록과 DIAGNOSTIC 회차 수는 기존 규칙 그대로입니다.

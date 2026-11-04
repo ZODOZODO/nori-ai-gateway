@@ -4162,3 +4162,130 @@
 #### 10) 보존 확인
 
 - SPEC `bb91146a…d0de4`·Plan 불변, 기존 PREREG 24건·결과·capture·evidence·v1~v3 입력·pin(`eval/f0/chat-renderers-v1.json`, `eval/py/count_input_audit_v2.py`, Instruct tokenizer 쌍 등) 변경 0. 이 Dev report 앞 537,769 B 의 SHA 는 추가 전후 같다(`0868750a…99dd`). 원문 응답·secrets 출력 0.
+
+#### 로컬 C22/C23 등록·최종 확인 (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 허용 범위: 로컬 commit C22·C23 두 개뿐이며 push·amend·`--force`·원격 publish 는 하지 않았다.
+
+| commit | 전체 SHA | 시각 | 파일 |
+|---|---|---|---|
+| C22 | `7c8272f966dec4a0c4d33549adff31ee56808d61` | 2026-11-04 12:36:38 +0900 | 30파일, 759324 insertions(+), 26 deletions(-)(대부분 Thinking-2507 `tokenizer.json` 줄 수) |
+| C23 | `d5511c235673988f92f0a32c35c2c7dc9bf725ca` | 2026-11-04 12:37:09 +0900 | 6파일(`eval/f0/PREREG-v4-*.md`), 36 insertions(+), 24 deletions(-) |
+
+- C22 정확 30파일(파일 지정 `git add` 뒤 `git diff --cached --name-only` 30개, §12.30 7) 기대 목록과 diff 0, `git diff --cached --check` exit 0). 이 Devreport 의 C22 시점 바이트는 556,072 B, SHA `ad680c82a9d0de5e30525305a014194afb17b27713a63d723cded858412fa3e2`(C22 blob 과 같음)이며 앞 537,769 B SHA `0868750a…99dd` 는 §12.30 추가 전후 같았다. 기존 untracked 는 넣지 않았다.
+- C23: 6문서의 §0 제목·상태 문구를 C18·C20 방식(등록 근거·C22/C23 설명·이력)으로 바꾸고 기계 판독 블록의 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C22 SHA 만 바꿨다. JSON 검사(Python, 파싱 실패 시 원문 비출력): 6문서 모두 바뀐 최상위 키 `registeredCommit`·`registrationStatus` 2개뿐, 최상위 키 순서 동일. `git diff --check` exit 0.
+- C23 뒤 `f0 prereg-check`(endpoint 인자 없음, 모델 요청 0): 6문서 모두 `localMismatches=[]`·`PREREG_VERIFIED`(Gradle exit 0). 같은 뒤 `F0V4RegistrationDraftTest` 필터 실행 exit 0(4/4 — 등록 완료 문서가 실제 `Prereg.verify` 엄격 검증 통과).
+- C23 뒤 23커밋, staged 0. SPEC `bb91146a…d0de4` 불변. 측정(§12.30 8))은 실행하지 않았다. 이 소절은 commit 하지 않았다(작업 트리에만 추가 — 다음 커밋에 포함).
+
+#### v4 진단 1단계 실측 — `PREREG-v4-diag-v2-t0` run B 착수 전 중단 (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 승인 범위(2026-11-04 사용자): 등록 §2 의 1~8(run B)까지. usage-probe 에서 `reasoning_tokens` 미보고로 모든 시도가 계수 불가가 될 것이 명확하면 run B 전에 중단. run A·boundary-gen·다른 등록 미실행. 모델 load·pull·unload·재시작·설정 변경 0.
+- 회차 ID `20261104T034413Z-v2-t0`(측정 창 2026-11-04T03:44:13Z~03:47:26Z UTC), 터널 로컬 `127.0.0.1:11434` → 160 `127.0.0.1:11434`.
+
+| 단계 | 명령 | exit | 마지막 출력 |
+|---|---|---|---|
+| 1 | `spec-guard` | 0 | `specSha bb91146a…d0de4`, BUILD SUCCESSFUL |
+| 2 | `f0 prereg-check` | 0 | `PREREG_VERIFIED`(`localMismatches=[]`, harnessDigest `4c36e79e…e824`) |
+| 3 | `f0 preflight` | 0 | `F0_PREFLIGHT_OK 2` — `qwen3:4b` `359d7dd4…fae7` ctx 8192, `bge-m3:latest` `79076464…6bab` ctx 8192, 둘 다 상주 |
+| 4 | `f0 chat-template` | 0 | `F0_CHAT_TEMPLATE_CAPTURED`, template SHA `2d54db2b…97f9`(등록값 일치) |
+| 5 | `f0 token-golden` | 0 | `F0_TOKEN_GOLDEN_COMPLETED 13` |
+| 6 | 계수 동등성 게이트 | — | `TOKEN_GOLDEN_AUDIT_MATCH 13/13` |
+| 7 | `f0 usage-probe` | 0 | `F0_USAGE_PROBE_COMPLETED`, `equalOnCacheHit{usage:true, evalCount:true}`(G-USAGE 일치) |
+| 8 | `f0 run --path B` | 미실행 | 아래 중단 근거 |
+| 11 | `f0 preflight`(postflight) | 0 | `F0_PREFLIGHT_OK 2`, preflight 와 모델 목록(name·digest·context_length) 동일 |
+
+- §1.4 관측(token-golden 13행 + usage-probe 4행, 모두 `max_tokens:1`): 17/17 `finishReason=length`·`completionTokens=1`·`contentCodepoints=0`·`separateFields=["reasoning"]`·content 사고 표지 0·`reasoningTokens=null`. 판별: 사고문 분리 필드 = `reasoning`(분리), `max_tokens` 사고 포함 = **포함**, 사고 도중 상한 `finish_reason` = `length`, 방법 (a) `completion − reasoning_tokens` = **불가**(`reasoningTokens` 미보고).
+- 중단 근거: Ollama 0.40.13 `openai/openai.go` `Usage` 구조체(80~85행)에 `completion_tokens_details` 필드가 없고 `ToUsage`(264~273행)도 설정하지 않는다. 하네스 `ClassificationJudge.answerTokens`(105~108행)는 `reasoningTokens == null` 이면 null → `judge`(54~55행) `ANSWER_TOKENS_UNCOUNTABLE`. 따라서 run B 는 stop 시도 전부 계수 불가·length 시도는 `FINISH_LENGTH` 로 22문항 전부 재시도(44호출)·유효 0 이 확정적이므로(§1.4·§1.5 "재시도 전부" 경우) 사용자 지시대로 run B 를 시작하지 않았다. run B 지연 실측이 없어 §1.5 예상 시간 재계산은 하지 않았다.
+- 공유 서버: 측정 창 GIN 요청 78건 전부 loopback(NORI 터널), NORI 밖 출발 0건. run 결과가 없어 share-window 파일·`share-exclude` 는 만들지 않았다.
+- 서버 상태(전 03:43:56Z / 후 03:47:35Z): Ollama active·NRestarts 0·ActiveEnter 2026-11-03 04:10:45 UTC 동일, `ollama ps` 두 모델 100% GPU·CONTEXT 8192 동일, GPU 메모리 사용 4544→4548 MiB / 6144 MiB.
+- 생성 파일: `eval/f0/results/20261104T034413Z-v2-t0/{preflight.json,token-golden.jsonl,token-golden.run-binding.json,usage.json,usage.run-binding.json,postflight.json}`(gitignore 대상), `eval/f0/chat-template/v4-diag-v2-t0/{model-digest.txt,qwen3-4b.template,qwen3-4b.template.sha256,run-binding.json}`. 모델 응답·사고문·API 응답 원문 출력·저장 0. 하네스·등록 문서·SPEC·Plan·기존 결과 변경 0, commit·push 0. 이 소절 추가 전 Dev report 558,015 B SHA `102971ef…4668`.
+
+### 12.31 P03 v4 답변 토큰 계수 방법 (b) 구현·교차 확인·v4-b 진단·개발 회귀 재등록과 로컬 C24/C25 범위 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- **결론: 1단계 실측(`reasoningTokens` 17/17 null → 방법 (a) 불가)에 따라 사용자 결정 방법 (b)(답변 content 를 Thinking pin 으로 로컬 계수)와 교차 확인(로컬 사고 + 로컬 답변 대 서버 `completion_tokens` 차이 기록·보고)을 하네스 v4 에 opt-in(`parameters.answerTokenMethod = LOCAL_TOKENIZER_PIN_V1`)으로 구현했고, 기존 v4 6문서를 고치지 않고 대체 등록 6문서(`-b`)를 새로 작성했다. 무필터 시험 241/241·`test-evidence verify`·`spec-guard` 모두 exit 0. 모델 추론 호출·SSH·측정 0, 서버·SPEC·Plan·기존 PREREG(v1~v4 30건)·결과·evidence 변경 0. P03 미완료·기존 F0 FAIL 유지·P04 미착수.**
+- 착수 시 HEAD C23 `d5511c2`, SPEC `bb91146a…d0de4`(seq5), 이 Dev report 561,590 B `5bca9f35c7fc7c44174db57811dbc0756ab9d9f505ed26997e2f10ada130c659`(§12.30 끝 "로컬 C22/C23"·"v4 진단 1단계 실측" 소절 포함, 미커밋).
+- 사용자 결정(2026-11-04, 이 세션 입력): 방법 (b) — 답변 토큰 = 서버 응답 content(답변 부분)의 고정 tokenizer pin 로컬 계수, 원문 비저장(메모리에서 개수만). 교차 확인 — 같은 pin 으로 `reasoning` 필드도 계수해 `로컬(사고) + 로컬(답변)` 과 `completion_tokens` 의 차이를 시도마다 기록, 분포를 진단 보고서에. 크게 어긋나는 호출은 표시만·판정 불변, 기준값은 근거가 없어 등록 문서에 "관측 후 확정". 답변 상한 초과 = 실패(1회 재시도) 유지. C24/C25 허용(push·`--force` 금지).
+
+#### 1) 기존 계수 수단 조사와 재사용
+
+- Java 쪽에는 tokenizer 가 없다(의존성 Jackson 뿐, `gateway-eval/build.gradle.kts`). 지금까지의 pin 계수는 모두 Python `tokenizers` 0.23.3 스크립트(`count_tokens.py`·`count_tokens_qref_v2.py`·`count_input_audit_v2.py`·`count_input_audit_v4.py`)가 준비 단계에서 만든 표였고, 측정 중 Java 가 Python 을 부르는 경로는 없었다. 그래서 측정 중 답변 계수는 같은 엔진·같은 규칙(`encode(text, add_special_tokens=False)`)을 상주 Python 프로세스로 쓰고, Java BPE 재구현은 하지 않았다(같은 로직 중복 금지).
+- 신규 `eval/py/count_answer_tokens_v4.py`(SHA `139136b7893e949a70c48df7909efb482ac3a7497ef8e19934f9f21d78edf6bc`): pin 검사·인자 오류·SHA 함수(`Failure`·`Parser`·`read_pin`·`read_bytes`·`sha256_bytes`)는 `count_input_audit_v4.py` 를 파일 경로로 불러(`importlib`, `-I` 에서도 sys.path 변경 없음) 그대로 쓰고, 새 코드는 줄 규약(`READY <sha> <version>` → stdin 한 줄 `[답변|null, 사고문|null]` → stdout 한 줄 `[정수|null, 정수|null]`)과 짝 없는 surrogate = null 판정뿐이다. `count_input_audit_v4.py` 바이트는 바꾸지 않았다(v4 입력 audit 재사용 조건).
+
+#### 2) 하네스 구현(f0 패키지, v1~v3 요청 body·판정·결과 모양 불변)
+
+- `AnswerTokenCounter`(신규): 측정 세션당 `$AIGW_PYTHON -I -B eval/py/count_answer_tokens_v4.py --tokenizer <profile pin 쌍>` 을 한 번 띄우고 READY 의 tokenizer SHA 가 세션 pin 과 같을 때만 쓴다. 요청은 Jackson `ESCAPE_NON_ASCII` JSON 한 줄(US-ASCII 파이프)이라 한글·보조 평면·줄바꿈·짝 없는 surrogate 도 같은 문자열로 넘어간다. 실패 코드: 준비 = `AIGW_PYTHON_MISSING`·`ANSWER_COUNTER_UNAVAILABLE`(·`_EXIT_<n>`)·`ANSWER_COUNTER_TOKENIZER_MISMATCH`(exit 2), 측정 중 = `ANSWER_COUNTER_FAILED`(exit 5).
+- **원문 비저장 보장**: 문자열은 stdin 으로만 넘기고(파일·명령줄 인자 0 — 명령줄은 경로뿐), 계수기 stderr 는 `Redirect.DISCARD`, 예외 메시지는 고정 코드(+exit 코드)만, `-B` 로 계수기의 bytecode 캐시 쓰기도 막았다(없으면 `eval/py/__pycache__` 에 `.pyc` 가 생김을 scratchpad 사본으로 확인). 사고문 문자열은 `OllamaChatClient.chat` 안에서 계수기로만 넘어가고 메서드 밖으로 나가지 않는다(`ChatResult` 에는 개수만).
+- `OllamaChatClient`: `chat(…, temperature, AnswerTokenCounter)` 겹쳐쓰기(기존 6인자는 counter null 위임 — body 동일), `ChatResult.localTokens`(`LocalTokenCount{answerTokens, thinkingTokens, completionMinusLocal}`, 기존 4·5인자 생성자 유지). 사고문 = `thinkingCodepoints` 와 같은 규칙(THINKING_FIELDS 순서 첫 문자열 분리 필드). `completionMinusLocal` = `completion_tokens − (사고 + 답변)`, 한쪽 null 이면 null.
+- `ClassificationJudge.answerTokens`: content 사고 표지 → null(두 방법 공통), `localTokens` 가 있으면 방법 (b) 로컬 답변, 없으면 방법 (a) 그대로. 상한 초과 `ANSWER_LIMIT_EXCEEDED`·계수 불가 `ANSWER_TOKENS_UNCOUNTABLE`·재시도 요지 `USAGE_EXCEEDS_LIMIT`·1회 재시도 규칙 불변.
+- `Prereg`: `answerTokenMethod` 는 v4 opt-in 전용(`ANSWER_TOKEN_METHODS = {LOCAL_TOKENIZER_PIN_V1}`), 값이 있으면 `eval/py/count_answer_tokens_v4.py` 가 등록 inputs 에 있어야 한다(v1~v3 의 같은 키·미정의 값·비문자열·계수기 미등록 = `PREREG_INVALID`). `Document.answerTokenMethod()`(키 없음 = `USAGE_REASONING`)·`localAnswerCount()`. `RuntimeProfile.supportInputs` 는 바꾸지 않았다(기존 v4 문서가 계속 파싱되어 stale 로만 거부되도록).
+- `MeasurementSession`: `Context` 에 `AnswerTokenCounter.Launcher`(운영 `EvalCli` = `AnswerTokenCounter::python`), 방법 (b) 등록이면 PREREG·SPEC 검사 뒤·preflight 전(endpoint 호출 0·run-binding 작성 전)에 계수기를 띄우고 v4 chat 에 넘긴다.
+- `F0Measurements`: 방법 (b) 등록만 v4 행에 `localTokenCounts[]`(시도별), token-golden·usage-probe 의 v4 계수 행에 `localTokenCount`. `answerTokens` 열은 (b) 에서 로컬 답변 계수다(F0Judgement 경계 판정이 그대로 사용).
+- `F0ReportWriter`: 방법 (b) 등록만 "v4 답변 토큰 로컬 계수 교차 확인" 절 — 출처(A·B·boundary)×시도(초회·재시도)·전체의 시도 수, 답변 계수 불가, 사고 계수 없음, 차이 계산 수, 차이 min/p50/p95/max(nearest-rank), 0 아닌 차이 건수, 차이 값=건수 전체. 어긋남 표시 기준값은 정하지 않았다(등록 §1.5 "관측 후 확정").
+
+#### 3) 방법 (a) 코드 경로 처리 — 유지(기본값, 등록 값 아님)
+
+- 근거: ①v1~v3 은 `answerLimit` 이 null 이라 (a)·(b) 어느 쪽도 지나지 않는다(판정 불변). ②C21~C23 의 v4 동작(키 없는 v4 등록 = completion − reasoning_tokens)을 그대로 두어야 기존 v4 6문서가 의미 그대로 파싱되고 `verifyHistorical`(등록 commit 하네스로 다시 계산한 역사 신원)이 유지된다. ③이 레포의 opt-in 관례(`responseFormat`·`contextProjection`·`retryHint` — 키 없음 = 기존 동작, 그 값은 등록 값으로 쓰지 않음)와 같다. (a) 경로는 기존 줄 그대로이며 새로 더한 코드는 (b) 분기 1줄과 표지 검사 순서 정리뿐이다(조건 집합 동일 — 기존 `F0V4RuntimeProfileTest` (a) 시험 무수정 통과).
+- 실제로 (a) 는 이 서버에서 계수 불가가 확정이므로(1단계) 새 등록은 모두 (b) 를 명시한다.
+
+#### 4) v4 입력 audit 재사용 확인
+
+- 현재 하네스로 Java `f0 input-audit-render --runtime-profile INFER_V4 …`(C22 와 같은 4명령) → `count_input_audit_v4.py` 를 scratchpad 에 다시 만들어 `cmp`: 렌더 입력 jsonl 4개·계수 표 JSON 4개 모두 **바이트 동일**(651/717/843/933행, `OVER_BUDGET 0`). 하네스 변경이 응답 처리(계수·기록·보고)뿐이고 메시지 조립·렌더러·예산·재시도 요지 집합·입력 계수기를 바꾸지 않았기 때문이다. 그래서 기존 4파일(`eval/f0/v4/input-audit-v4-{v2,i,regression-v2,regression-i}.json`, SHA `65f54494…`·`ee16e33d…`·`660780ba…`·`5d2ada83…`)을 새 등록이 그대로 참조한다. 렌더 입력(원문 포함)은 scratchpad 에만 두었다.
+
+#### 5) 새 등록 6문서(`registrationStatus=UNCOMMITTED`, `registeredCommit=null`)
+
+| 등록 | 대체 대상 | arm | temperature | 골든 | harnessDigest | parameterManifestSha256 |
+|---|---|---|---|---|---|---|
+| `eval/f0/PREREG-v4-diag-v2-t0-b.md`(공통 설계 §1.1~§1.9) | `PREREG-v4-diag-v2-t0` | V2 | 0 | 22 | `91580fb7…eae35` | `5fbc27fe…09a42` |
+| `eval/f0/PREREG-v4-diag-i-t0-b.md` | `PREREG-v4-diag-i-t0` | I | 0 | 22 | `7f64c9b8…e86080` | `cc8885b3…0a13a` |
+| `eval/f0/PREREG-v4-diag-v2-t06-b.md` | `PREREG-v4-diag-v2-t06` | V2 | 0.6 | 22 | `91580fb7…eae35` | `ed9a5c8e…4719c` |
+| `eval/f0/PREREG-v4-diag-i-t06-b.md` | `PREREG-v4-diag-i-t06` | I | 0.6 | 22 | `7f64c9b8…e86080` | `5d93f751…939a4` |
+| `eval/f0/PREREG-v4-regression-v2-b.md` | `PREREG-v4-regression-v2` | V2 | 0 | 30 | `2db16e2e…324bf0` | `5fbc27fe…09a42` |
+| `eval/f0/PREREG-v4-regression-i-b.md` | `PREREG-v4-regression-i` | I | 0 | 30 | `d3d726ef…b7f917` | `cc8885b3…0a13a` |
+
+- 기존 v4 등록과의 차이(시험으로 검사): inputs 는 `eval/py/count_answer_tokens_v4.py` 1개 추가뿐, `inputRoles` 동일, parameters 는 `answerTokenMethod` 1키 추가뿐, `runtimeCaptureDir` = `eval/f0/chat-template/v4-<id>-b`(고유). 이름의 `-b` = 계수 방법 (b) 재등록(v3 후보 문자 접미 관례, 경로 B 와 무관).
+- 공통 설계 갱신: §1.2 1단계 관측 사실(token-golden 13/13, 17/17 `reasoning` 분리·`max_tokens` 사고 포함·`length`·`reasoningTokens` null, G-USAGE 일치, preflight=postflight, NORI 밖 출발 0), §1.5 방법 (b)·교차 확인 정의·원문 비저장 경로·기준값 "관측 후 확정", §1.6 판별 기준(방법 (a) 불가 확정, (b) 사용 가능 = `answerTokens` null 0건, 차이가 전 시도 같은 값 c 이면 "completion = 사고 + 답변 + c"), §1.7 호출 수·시간(같은 근거 재기재 — 최소 332·최대 664 + 계수 38, 최악값 A 55.3~110.7시간·B 38.6~77.2시간·가정값 3.7~7.4시간; (a) 에서 확정적이던 "재시도 전부"는 (b) 에서 실제 실패만), §1.8 계수기 준비 실패(요청 0·재실행)와 측정 중 계수기 오류(exit 5·새 회차 ID), §1.9·§2 0단계 `$env:AIGW_PYTHON` 과 `tokenizers` 0.23.3 확인.
+- 계수 호출(token-golden·usage-probe)은 1단계에서 이미 실행했지만 새 등록의 회차 결속·동등성 게이트(13/13)를 위해 `diag-v2-t0-b` §2 에 다시 둔다(38회, 최악값 B 약 5분).
+
+#### 6) 시험(`AIGW_SPEC_FILE`=정본 SPEC, `DEBUG`=빈 값, Gradle 동시 실행 0, 순차)
+
+- 신규 `F0V4AnswerTokenCountTest` 6건: ①판정 — 로컬 답변 192 유효·193 `ANSWER_LIMIT_EXCEEDED`·null/표지 = 계수 불가, 로컬 계수 없는 응답은 방법 (a) 그대로, `LocalTokenCount.of` 차이 규칙 ②등록 opt-in — 계수기 미등록·`USAGE_REASONING` 값·미정의 값·비문자열·v3 키 = `PREREG_INVALID` ③계수기 프로세스 — stdin 한 줄 왕복(한글·🙂·줄바꿈·따옴표, 시험 프로세스는 비 ASCII 바이트를 받으면 exit 9), READY SHA 불일치·READY 없음(`_EXIT_4`)·실행 파일 없음·`AIGW_PYTHON` 없음, 측정 중 사망 = exit 5 `ANSWER_COUNTER_FAILED`(메시지 원문 없음) ④run B — 시도별 `localTokenCounts`(답변 = content 개수, 사고 = 사고문 개수, 차이 = 주입 상수 1), 결과 디렉터리 밖 새 파일 0, 계수기 명령줄에 sentinel 없음, 보고서 절 `1/1/1/1`·`1=N`, 결과·출력 sentinel 0, 같은 응답의 방법 (a) 등록과 초회 요청 바이트 동일·(a) 결과에 새 열·절 없음 ⑤로컬 답변 > 192 = 실패·1회 재시도(초회만 초과 → OK, 둘 다 초과 → INVALID·2호출), 사고 길이는 상한 밖 ⑥계수기 준비 실패 = endpoint 요청 0(exit 2), 측정 중 사망 = 부분 결과 `complete=false`·`abortReason=ANSWER_COUNTER_FAILED`. 계수기는 같은 줄 규약의 시험 프로세스 `FakeAnswerCounter`(코드포인트 계수 — 같은 JVM·시험 classpath)다.
+- 갱신 `F0V4RegistrationDraftTest`(4→5건): 현재 등록 = `-b` 6문서(방법 (b)·계수기 입력 검사 추가), 신규 과거 등록 시험 — 기존 v4 6문서는 입력 바이트 동일·`verifyHistorical` preregCommit = C23·`localMismatches=["harnessDigest"]`·`verify`=`PREREG_INPUT_CHANGED`·대체 등록과 inputs(+계수기 1)·parameters(+1키) 차이만. `F0TestRoot` 는 `Context` 에 launcher 를 넘기도록 1줄.
+- Python(Gradle 밖, 수동 `<venv python> -I -B -m unittest discover -s eval/py/tests`): 신규 `test_count_answer_tokens_v4.py` 6건 — **실제 Thinking pin 으로 알려진 문자열 대조**(SPEC §14.5 과거 예시 57·53토큰 = `count_tokens.py` CALIBRATION 값, `</think>` 1, 빈 문자열 0), Java 와 같은 `\u` 이스케이프 줄의 한글·보조 평면 계수 동일·짝 없는 surrogate null, 형식 오류 고정 코드·원문 비노출, `serve` 줄 규약, 실제 프로세스 실행(작업 디렉터리 새 파일 0·stderr 빈 값), pin 불일치 exit 3. 전체 26/26 OK.
+- 수동 Java→실제 Python 왕복(scratchpad `Smoke.java`, 모델 호출 0): `Counts[57, 53]`, `</think>` 1, 한글+🙂 11·짝 없는 surrogate null, 이스케이프 문자열 13 — 같은 문자열의 Python 직접 계수와 일치, 잘못된 pin → `ANSWER_COUNTER_TOKENIZER_MISMATCH`, env 없음 → `AIGW_PYTHON_MISSING`, 없는 실행 파일 → `ANSWER_COUNTER_UNAVAILABLE`.
+- 변이 확인: ①판정에서 로컬 계수 무시 ②차이에서 사고 제외 ③ASCII 이스케이프 제거 ④READY SHA 검사 제거 ⑤`localTokenCounts` 기록 제거 ⑥계수기 등록 필수 제거 — 6변이를 함께 넣은 필터 실행에서 `F0V4AnswerTokenCountTest` 6 중 6 FAILED → 원본 복원 `cmp` 일치.
+
+| 명령 | exit | 결과 |
+|---|---|---|
+| 필터 `F0V4AnswerTokenCountTest`·`F0V4RuntimeProfileTest`·`F0V4DiagnosticObservationTest` | 0 | XML 6/6·10/10·5/5, `BUILD SUCCESSFUL in 27s` |
+| 같은 필터(`F0V4AnswerTokenCountTest`) + 6변이 | 1 | `6 tests completed, 6 failed`(의도) → 복원 |
+| 필터 `F0V4RegistrationDraftTest`·`F0V3RegistrationDraftTest` | 0 | XML 5/5·8/8, `BUILD SUCCESSFUL in 2m 24s` |
+| `:gateway-eval:run --args="spec-guard"` | 0 | `specSha`=`bb91146a…d0de4`, `specInputOrigin`=`LOCAL_FILE`, `BUILD SUCCESSFUL in 2s` |
+| 무필터 `:gateway-eval:test --console=plain --rerun-tasks` | 0 | `BUILD SUCCESSFUL in 5m 58s`, `6 actionable tasks: 6 executed`. XML 독립 집계 **241/241 PASS·48클래스·failures/errors/skipped 0**(§12.30 234 + 신규 6 + 과거 v4 등록 1) |
+| `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 3s` |
+
+- 시험 신원(`gateway-eval/build/aigw-otr/test/run-binding.json`): `runId=9a9b3e23-6ea1-4674-9c87-07b1af190e97`, `inputFingerprint=a2965658f38c49796232a032c9ad23228fc964c69aa846da6d87edd7e130cff3`, `specSha=bb91146a…d0de4`. stub·로컬 시험이며 실제 모델 F0 합격이 아니다.
+
+#### 7) 사전등록 상태(`f0 prereg-check`, endpoint 인자 없음, 모델 요청 0)
+
+- 새 6문서: 모두 `localMismatches=[]`, 결과 `PREREG_NOT_COMMITTED`(초안 — 정상). 기존 v4 6문서: 모두 `localMismatches=["harnessDigest"]`·`PREREG_INPUT_CHANGED`(하네스 변경으로 stale — 정상, 문서 수정 0). v1~v3 24건은 §12.30 과 같은 stale 상태 그대로.
+
+#### 8) 커밋 범위(사용자 허용: 로컬 C24/C25 두 개, push·`--force` 없음)
+
+- C24(정확 21파일): 수정 10 = 이 Dev report(§12.30 끝 미커밋 두 소절·이 절 포함, C22 관례), `gateway-eval/src/main/java/com/nori/ai/gateway/eval/EvalCli.java`, `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/{ClassificationJudge,F0Measurements,F0ReportWriter,MeasurementSession,OllamaChatClient,Prereg}.java`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/{F0TestRoot,F0V4RegistrationDraftTest}.java`. 신규 11 = `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0/AnswerTokenCounter.java`, `eval/py/count_answer_tokens_v4.py`, `eval/py/tests/test_count_answer_tokens_v4.py`, `eval/f0/PREREG-v4-{diag-v2-t0,diag-i-t0,diag-v2-t06,diag-i-t06,regression-v2,regression-i}-b.md`(초안), `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/{F0V4AnswerTokenCountTest,FakeAnswerCounter}.java`. 기존 untracked(`docs/gates/f0/p03-run-20261029T234506Z.md`, `eval/f0/chat-template/`(1단계 `v4-diag-v2-t0` 포함), `eval/py/__pycache__/`, `eval/py/tests/__pycache__/`, `evidence/F0/`)는 넣지 않는다.
+- C25(정확 6파일): `-b` 6문서의 §0 제목·상태 문구(C23 방식)와 기계 판독 블록 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C24 SHA 만.
+- 이 절 추가 전 561,590 B 의 SHA(`5bca9f35…c659`)는 추가 후 앞 561,590 B 에서 같아야 한다(커밋 직전 확인). 커밋 해시·확인 결과는 커밋 뒤 이 절 끝 "로컬 C24/C25" 소절에 작업 트리에만 기록한다(관례 — 다음 커밋에 포함).
+
+#### 9) 측정 실행 순서(C25 뒤, 사용자 승인 후, 이 세션은 실행하지 않음)
+
+- 진단: `PREREG-v4-diag-v2-t0-b` §2(0 계수기 환경 → spec-guard → prereg-check → preflight → chat-template(template SHA 확인) → token-golden → 동등성 게이트 13/13 → usage-probe → run B(예상 시간 재계산) → run A → boundary-gen → postflight → share-window 작성 → share-exclude → report) → `diag-i-t0-b` → `diag-v2-t06-b` → `diag-i-t06-b`(각 문서 §2, 같은 `$runId`). 회귀 2문서는 Plan ⑧ 뒤 각 문서 1절 착수 조건 충족 시만.
+
+#### 10) 위험·미확정
+
+- 교차 확인 차이의 실제 값(특수 토큰 상수 여부)은 미관측이다. 서버 `completion_tokens` 가 사고 분리 경계를 어떻게 세는지(Ollama thinking parser 가 `</think>` 를 사고·답변 어느 쪽에서도 빼는지)는 소스로 확인하지 않았고, 진단 분포로 본다.
+- 방법 (b) 는 서버가 생성한 토큰열 자체가 아니라 응답 문자열의 재토큰화다. 같은 문자열이 다른 토큰열로 생성됐을 수 있어(BPE 비정규 분할) 서버 답변 토큰과 1:1 일치를 주장하지 않는다 — 교차 확인 차이 분포가 그 크기의 관측 근거다.
+- 측정 PC 에 `AIGW_PYTHON`(requirements 설치 venv)이 필요해졌다. 없으면 측정 명령은 endpoint 호출 전에 exit 2 로 멈춘다.
+- 기존 위험(§12.30 9)) 그대로: properties 순서 판별 한계, I arm ctx 여유 13 토큰(동등성 게이트로 확인), GIN 로그 시각 의미, Modelfile 기본 `top_k`/`top_p` 적용, 새 장비 처리 속도 미측정.
+
+#### 11) 보존 확인
+
+- SPEC `bb91146a…d0de4`·Plan 불변, 기존 PREREG 30건(v1·v2·v3 22·v4 6)·결과(1단계 `20261104T034413Z-v2-t0` 포함)·capture·evidence·v1~v4 입력·pin·`count_input_audit_v{2,4}.py`·v4 audit 4파일 변경 0. 이 Dev report 앞 561,590 B 의 SHA 는 추가 전후 같다(`5bca9f35…c659`). 원문 응답·사고문·secrets 출력 0.

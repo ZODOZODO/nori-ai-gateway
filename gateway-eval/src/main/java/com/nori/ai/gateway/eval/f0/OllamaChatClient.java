@@ -19,10 +19,25 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class OllamaChatClient {
     public static final Set<String> PATHS = Set.of("/v1/chat/completions", "/api/ps", "/api/tags", "/api/generate", "/api/show");
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
-    /** 응답 본문(content)은 판정용으로 메모리에만 두며 toString 으로도 노출하지 않는다. thinking 은 /v1/chat/completions 응답에서만 만들고 그 밖 경로는 null 이다. */
-    public record ChatResult(String content, String finishReason, int promptTokens, int completionTokens, ThinkingObservation thinking) {
-        public ChatResult(String content, String finishReason, int promptTokens, int completionTokens) { this(content, finishReason, promptTokens, completionTokens, null); }
+    /**
+     * 응답 본문(content)은 판정용으로 메모리에만 두며 toString 으로도 노출하지 않는다. thinking 은 /v1/chat/completions 응답에서만 만들고 그 밖 경로는 null 이다.
+     * localTokens 는 계수기(답변 토큰 계수 방법 b)를 넘긴 호출에서만 만들고 그 밖은 null 이다.
+     */
+    public record ChatResult(String content, String finishReason, int promptTokens, int completionTokens, ThinkingObservation thinking, LocalTokenCount localTokens) {
+        public ChatResult(String content, String finishReason, int promptTokens, int completionTokens) { this(content, finishReason, promptTokens, completionTokens, null, null); }
+        public ChatResult(String content, String finishReason, int promptTokens, int completionTokens, ThinkingObservation thinking) { this(content, finishReason, promptTokens, completionTokens, thinking, null); }
         @Override public String toString() { return "ChatResult[finishReason=" + finishReason + ", completionTokens=" + completionTokens + "]"; }
+    }
+    /**
+     * 답변 토큰 계수 방법 (b)의 시도별 로컬 계수(원문 없음): answerTokens = 답변 content 의 pin 토큰 수, thinkingTokens = 사고문(THINKING_FIELDS 순서 첫 문자열
+     * 분리 필드)의 pin 토큰 수(분리 필드가 없거나 셀 수 없으면 null), completionMinusLocal = usage.completion_tokens − (thinkingTokens + answerTokens)
+     * (둘 중 하나라도 null 이면 null) — `</think>` 같은 특수 토큰 상수를 포함한 서버 계수와의 차이 교차 확인 값이며 판정에 쓰지 않습니다.
+     */
+    public record LocalTokenCount(Integer answerTokens, Integer thinkingTokens, Integer completionMinusLocal) {
+        static LocalTokenCount of(AnswerTokenCounter.Counts counts, int completionTokens) {
+            Integer difference = counts.answerTokens() == null || counts.thinkingTokens() == null ? null : completionTokens - counts.thinkingTokens() - counts.answerTokens();
+            return new LocalTokenCount(counts.answerTokens(), counts.thinkingTokens(), difference);
+        }
     }
     /** 사고문을 따로 담을 수 있는 message 필드 후보. Ollama 0.40.13 의 실제 응답 형태는 미확인이라 어느 것이 오는지 이름만 기록한다. */
     public static final List<String> THINKING_FIELDS = List.of("reasoning", "reasoning_content", "thinking");
@@ -82,6 +97,13 @@ public final class OllamaChatClient {
     }
     /** temperature 는 v1~v3 고정 0, v4 는 등록값(Prereg.Document.temperature) 입니다. 그 밖 body 는 위와 같습니다. */
     public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, ResponseSchema.Format responseFormat, JsonNode temperature) {
+        return chat(gate, model, messages, maxTokens, responseFormat, temperature, null);
+    }
+    /**
+     * counter 가 있으면(v4 답변 토큰 계수 방법 b) 응답의 답변 content 와 사고문을 이 메서드 안에서 계수기에 넘겨 개수만 ChatResult.localTokens 에 담습니다.
+     * 사고문 문자열은 이 메서드 밖으로 나가지 않습니다. 요청 body 는 counter 와 무관하게 같습니다.
+     */
+    public ChatResult chat(Preflight.Verified gate, String model, List<Map<String,String>> messages, int maxTokens, ResponseSchema.Format responseFormat, JsonNode temperature, AnswerTokenCounter counter) {
         Objects.requireNonNull(gate, "preflight");
         Map<String,Object> body = new LinkedHashMap<>();
         body.put("model", model); body.put("messages", messages); body.put("temperature", temperature); body.put("max_tokens", maxTokens); body.put("stream", false);
@@ -94,7 +116,14 @@ public final class OllamaChatClient {
         JsonNode choice = response.path("choices").path(0), usage = response.path("usage");
         if (!choice.path("message").path("content").isTextual() || !choice.path("finish_reason").isTextual() || !isCount(usage.path("completion_tokens")) || !isCount(usage.path("prompt_tokens")) || response.path("choices").size() != 1) throw new EvalException(5, "ENDPOINT_RESPONSE_INVALID");
         String content = choice.path("message").path("content").textValue();
-        return new ChatResult(content, choice.path("finish_reason").textValue(), usage.path("prompt_tokens").intValue(), usage.path("completion_tokens").intValue(), ThinkingObservation.of(choice.path("message"), usage, content));
+        int completion = usage.path("completion_tokens").intValue();
+        LocalTokenCount local = counter == null ? null : LocalTokenCount.of(counter.count(content, thinkingText(choice.path("message"))), completion);
+        return new ChatResult(content, choice.path("finish_reason").textValue(), usage.path("prompt_tokens").intValue(), completion, ThinkingObservation.of(choice.path("message"), usage, content), local);
+    }
+    /** ThinkingObservation.thinkingCodepoints 와 같은 규칙의 사고문: THINKING_FIELDS 순서로 첫 문자열 분리 필드(없으면 null). */
+    private static String thinkingText(JsonNode message) {
+        for (String name : THINKING_FIELDS) if (message.path(name).isTextual()) return message.get(name).textValue();
+        return null;
     }
     /** 토큰 수·context 길이: JSON 정수 리터럴이고 int 로 손실 없이 표현되며 0 이상일 때만(128.9·128.0·음수·overflow·문자열 거부). */
     static boolean isCount(JsonNode node) { return node.isIntegralNumber() && node.canConvertToInt() && node.intValue() >= 0; }

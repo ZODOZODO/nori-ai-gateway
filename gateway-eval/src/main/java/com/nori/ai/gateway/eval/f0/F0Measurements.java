@@ -86,6 +86,7 @@ public final class F0Measurements {
         private final List<Integer> audited = new ArrayList<>(); private final List<ObjectNode> diagnosed = new ArrayList<>();
         private final List<OllamaChatClient.ThinkingObservation> thinking = new ArrayList<>();
         private final List<Integer> answers = new ArrayList<>(); private final List<CallWindow> windows = new ArrayList<>(); private final List<List<String>> keyOrders = new ArrayList<>();
+        private final List<OllamaChatClient.LocalTokenCount> locals = new ArrayList<>();
         Attempts(MeasurementSession session, MessageAssembler.Kind kind, QRefContext references, int maxTokens, JsonNode expected, String question, JsonNode context, RegistryFixture fixture) {
             this.session = session; this.kind = kind; this.references = references; this.maxTokens = maxTokens; this.expected = expected; this.question = question; this.context = context; this.fixture = fixture;
             this.responseFormat = ResponseSchema.forPolicy(session.prereg().document().responseFormat(), kind, references);
@@ -95,7 +96,7 @@ public final class F0Measurements {
             java.time.Instant sentAt = session.clock().instant(); MeasurementSession.Sent sent;
             try { sent = session.chat(messages, inputLimit, maxTokens, responseFormat); }
             finally { windows.add(new CallWindow(sentAt.toString(), session.clock().instant().toString())); }
-            audited.add(sent.auditInputTokens()); thinking.add(sent.result().thinking()); answers.add(ClassificationJudge.answerTokens(sent.result())); keyOrders.add(outputKeyOrder(sent.result().content()));
+            audited.add(sent.auditInputTokens()); thinking.add(sent.result().thinking()); answers.add(ClassificationJudge.answerTokens(sent.result())); keyOrders.add(outputKeyOrder(sent.result().content())); locals.add(sent.result().localTokens());
             if (references != null) diagnosed.add(AttemptDiagnostics.diagnose(sent.result(), maxTokens, kind, references, expected, question, context, context.path("timezone").asText(), fixture));
             return sent.result();
         }
@@ -110,6 +111,8 @@ public final class F0Measurements {
             if (session.prereg().document().v4()) {
                 row.set("thinkingObservations", Json.MAPPER.valueToTree(thinking)); row.set("answerTokens", Json.MAPPER.valueToTree(answers)); row.set("callWindows", Json.MAPPER.valueToTree(windows));
                 row.set("outputKeyOrders", Json.MAPPER.valueToTree(keyOrders));
+                // 답변 토큰 계수 방법 (b) 등록만 시도별 로컬 계수(답변·사고문 pin 토큰 수와 서버 completion 대비 차이)를 남깁니다(answerTokens 는 그 답변 계수).
+                if (session.prereg().document().localAnswerCount()) row.set("localTokenCounts", Json.MAPPER.valueToTree(locals));
             }
         }
     }
@@ -242,6 +245,7 @@ public final class F0Measurements {
         OllamaChatClient.ChatResult chat = sent.result();
         row.put("finishReason", ClassificationJudge.sanitize(chat.finishReason())); row.put("completionTokens", chat.completionTokens()); row.set("thinking", Json.MAPPER.valueToTree(chat.thinking()));
         row.put("auditInputTokens", sent.auditInputTokens());
+        if (session.prereg().document().localAnswerCount()) row.set("localTokenCount", Json.MAPPER.valueToTree(chat.localTokens()));
     }
     private static void writeText(Path path, String text) {
         try { Files.createDirectories(path.toAbsolutePath().getParent()); Files.write(path, text.getBytes(StandardCharsets.UTF_8)); }

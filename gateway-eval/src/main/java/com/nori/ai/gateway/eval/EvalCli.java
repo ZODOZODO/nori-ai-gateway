@@ -1,6 +1,7 @@
 package com.nori.ai.gateway.eval;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nori.ai.gateway.eval.f0.AnswerTokenCounter;
 import com.nori.ai.gateway.eval.f0.F0RunnerCli;
 import com.nori.ai.gateway.eval.f0.GitReader;
 import com.nori.ai.gateway.eval.f0.MeasurementSession;
@@ -29,7 +30,7 @@ public final class EvalCli {
     private void dispatch(String[] arguments) {
         if (arguments.length == 0) throw new EvalException(2, "UNKNOWN_COMMAND");
         // F0 하네스·F3 profile 은 자체 플래그를 쓰므로 공통 인자 해석 전에 분기합니다.
-        if (arguments[0].equals("f0")) { new F0RunnerCli(new MeasurementSession.Context(root, env, GitReader.process(), Clock.systemUTC()), out).execute(arguments); return; }
+        if (arguments[0].equals("f0")) { new F0RunnerCli(new MeasurementSession.Context(root, env, GitReader.process(), Clock.systemUTC(), AnswerTokenCounter::python), out).execute(arguments); return; }
         if (arguments[0].equals("f3")) { EmbeddingProfile.execute(arguments, root, out); return; }
         String command = arguments[0]; boolean nested = Set.of("spec-input", "test-evidence", "record", "perf", "f0", "f3").contains(command);
         String operation = nested && arguments.length > 1 ? arguments[1] : "";

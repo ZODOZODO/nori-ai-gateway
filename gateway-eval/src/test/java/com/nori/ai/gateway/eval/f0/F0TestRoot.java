@@ -17,6 +17,8 @@ final class F0TestRoot {
     final Path root, spec, actual = Path.of(System.getProperty("aigw.rootDir"));
     final FakeGit git = new FakeGit();
     final Map<String,String> env = new HashMap<>();
+    /** 답변 토큰 계수 방법 (b) 등록의 계수기 실행 방법(운영 = python). 방법 (b) 세션 시험만 같은 줄 규약의 시험 프로세스로 바꿉니다. */
+    AnswerTokenCounter.Launcher answerCounter = AnswerTokenCounter::python;
     String lastError;
     final ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -53,7 +55,7 @@ final class F0TestRoot {
         p.putObject("latencyBudgetMsByT").put("UNS", 15000).put("LQ", 30000).put("KQ", 30000).put("GQ", 30000).put("INC", 90000);
         write(Prereg.DEFAULT_PATH, "# PREREG 시험 fixture\n\n```json\n" + Json.canonicalString(block) + "\n```\n");
     }
-    MeasurementSession.Context context() { return new MeasurementSession.Context(root, env, git, Clock.systemUTC()); }
+    MeasurementSession.Context context() { return new MeasurementSession.Context(root, env, git, Clock.systemUTC(), answerCounter); }
     /** EvalCli 와 같은 예외→exit 코드 변환(원문 없이 고정 코드만). */
     int exec(String... args) {
         String[] full = new String[args.length + 1]; full[0] = "f0"; System.arraycopy(args, 0, full, 1, args.length);

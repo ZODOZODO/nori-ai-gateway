@@ -11,8 +11,11 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * 레포의 실제 v4 사전등록 6문서(P03 v4 ⑥ — 진단 4: 프롬프트 arm V2·I × temperature 0·0.6, 개발 회귀 2: V2·I × 0)를 확인합니다(endpoint 호출 0, 측정 허가 아님).
- * 등록 수명 상태는 초안(UNCOMMITTED/null — verify 가 PREREG_NOT_COMMITTED)과 등록 완료(REGISTERED/40자리 hex — 실제 Prereg.verify 통과) 두 가지만 허용합니다.
+ * 레포의 실제 v4 사전등록 문서를 확인합니다(endpoint 호출 0, 측정 허가 아님).
+ * - 현재 등록 6문서(-b, 답변 토큰 계수 방법 b — 진단 4: 프롬프트 arm V2·I × temperature 0·0.6, 개발 회귀 2: V2·I × 0): 등록 수명 상태는 초안(UNCOMMITTED/null —
+ *   verify 가 PREREG_NOT_COMMITTED)과 등록 완료(REGISTERED/40자리 hex — 실제 Prereg.verify 통과) 두 가지만 허용합니다.
+ * - 과거 등록 6문서(C22/C23, 방법 a): 등록 입력 바이트는 현재 작업 트리와 같고 harnessDigest 는 등록 commit 트리로 다시 계산한 역사 신원과 같습니다.
+ *   방법 (b) 하네스 변경으로 stale 이며 Prereg.verify 가 PREREG_INPUT_CHANGED 로 신규 측정을 거부해야 합니다(등록 문서는 고치지 않음).
  */
 class F0V4RegistrationDraftTest {
     static final Path ROOT = Path.of(System.getProperty("aigw.rootDir"));
@@ -22,14 +25,19 @@ class F0V4RegistrationDraftTest {
     static final Arm V2 = new Arm("eval/f0/v2/prompts/classify-v2.txt", "eval/f0/v2/prompts/plan-v2.txt", "NONE", MessageAssembler.FULL, ClassificationJudge.RETRY_HINT_NONE);
     static final Arm I = new Arm("eval/f0/v3/prompts/classify-v3-f.txt", "eval/f0/v3/prompts/plan-v3-i.txt", ResponseSchema.POLICY, MessageAssembler.PRESENCE_V1, ClassificationJudge.STEPS_DETAIL_V1);
     record Registration(Arm arm, double temperature, String golden, String audit) {}
-    static final Map<String,Registration> DOCS = new LinkedHashMap<>();
+    /** 과거 v4 등록(방법 a)의 등록 대상·하네스 commit 과 registeredCommit 기록 commit(과거 사실 고정값). */
+    static final String C22 = "7c8272f966dec4a0c4d33549adff31ee56808d61", C23 = "d5511c235673988f92f0a32c35c2c7dc9bf725ca";
+    static final Map<String,Registration> DOCS = new LinkedHashMap<>(), HISTORICAL = new LinkedHashMap<>();
     static {
-        DOCS.put("eval/f0/PREREG-v4-diag-v2-t0.md", new Registration(V2, 0, GOLDEN, "eval/f0/v4/input-audit-v4-v2.json"));
-        DOCS.put("eval/f0/PREREG-v4-diag-i-t0.md", new Registration(I, 0, GOLDEN, "eval/f0/v4/input-audit-v4-i.json"));
-        DOCS.put("eval/f0/PREREG-v4-diag-v2-t06.md", new Registration(V2, 0.6, GOLDEN, "eval/f0/v4/input-audit-v4-v2.json"));
-        DOCS.put("eval/f0/PREREG-v4-diag-i-t06.md", new Registration(I, 0.6, GOLDEN, "eval/f0/v4/input-audit-v4-i.json"));
-        DOCS.put("eval/f0/PREREG-v4-regression-v2.md", new Registration(V2, 0, REGRESSION, "eval/f0/v4/input-audit-v4-regression-v2.json"));
-        DOCS.put("eval/f0/PREREG-v4-regression-i.md", new Registration(I, 0, REGRESSION, "eval/f0/v4/input-audit-v4-regression-i.json"));
+        for (String suffix : List.of("-b", "")) {
+            Map<String,Registration> target = suffix.isEmpty() ? HISTORICAL : DOCS;
+            target.put("eval/f0/PREREG-v4-diag-v2-t0" + suffix + ".md", new Registration(V2, 0, GOLDEN, "eval/f0/v4/input-audit-v4-v2.json"));
+            target.put("eval/f0/PREREG-v4-diag-i-t0" + suffix + ".md", new Registration(I, 0, GOLDEN, "eval/f0/v4/input-audit-v4-i.json"));
+            target.put("eval/f0/PREREG-v4-diag-v2-t06" + suffix + ".md", new Registration(V2, 0.6, GOLDEN, "eval/f0/v4/input-audit-v4-v2.json"));
+            target.put("eval/f0/PREREG-v4-diag-i-t06" + suffix + ".md", new Registration(I, 0.6, GOLDEN, "eval/f0/v4/input-audit-v4-i.json"));
+            target.put("eval/f0/PREREG-v4-regression-v2" + suffix + ".md", new Registration(V2, 0, REGRESSION, "eval/f0/v4/input-audit-v4-regression-v2.json"));
+            target.put("eval/f0/PREREG-v4-regression-i" + suffix + ".md", new Registration(I, 0, REGRESSION, "eval/f0/v4/input-audit-v4-regression-i.json"));
+        }
     }
     static Prereg.Document doc(String file) { return Prereg.parse(ROOT.resolve(file)); }
 
@@ -38,6 +46,7 @@ class F0V4RegistrationDraftTest {
         try (Stream<Path> files = Files.list(ROOT.resolve("eval/f0"))) {
             for (Path file : files.filter(p -> p.getFileName().toString().matches("PREREG-v3-.*\\.md")).toList()) captureDirs.add(Prereg.parse(file).runtimeCaptureDir());
         }
+        for (String file : HISTORICAL.keySet()) captureDirs.add(doc(file).runtimeCaptureDir());
         for (var entry : DOCS.entrySet()) {
             Prereg.Document d = doc(entry.getKey()); Registration r = entry.getValue(); String file = entry.getKey();
             assertThat(d.block().path("schema").asText()).as(file).isEqualTo("f0-prereg-v4"); assertThat(d.v4()).isTrue(); assertThat(d.diagnostic()).as(file).isTrue();
@@ -55,7 +64,9 @@ class F0V4RegistrationDraftTest {
             Map<String,String> roles = Map.of("golden", r.golden(), "classifyPrompt", r.arm().classify(), "planPrompt", r.arm().plan(), "chatRenderers", V4_REGISTRY, "inputAudit", r.audit(),
                 "fixture", "eval/golden/tc-registry-fixture-v2.json", "boundaryCases", "eval/f0/v2/output-boundary-cases.jsonl", "usageMessages", "eval/f0/v2/usage-probe-input-v2.jsonl", "tokenMessages", "eval/f0/v2/token-golden-input-v2.jsonl");
             roles.forEach((role, path) -> assertThat(d.input(role)).as(file + " " + role).isEqualTo(path));
-            assertThat(d.inputs().keySet()).as(file).contains("eval/py/count_input_audit_v4.py").doesNotContain("eval/py/count_input_audit_v2.py", MeasurementSession.TOKENIZER_FILE);
+            assertThat(d.inputs().keySet()).as(file).contains("eval/py/count_input_audit_v4.py", AnswerTokenCounter.SCRIPT).doesNotContain("eval/py/count_input_audit_v2.py", MeasurementSession.TOKENIZER_FILE);
+            // 답변 토큰 계수 방법 (b): 답변 content 를 등록 tokenizer pin 으로 로컬 계수합니다(2026-11-04 사용자 결정).
+            assertThat(d.answerTokenMethod()).as(file).isEqualTo(ClassificationJudge.ANSWER_METHOD_LOCAL_PIN); assertThat(d.localAnswerCount()).as(file).isTrue();
             assertThat(Prereg.localMismatches(ROOT, d)).as(file).isEmpty();
             assertThat(captureDirs.add(d.runtimeCaptureDir())).as(file + " 고유 capture 경로").isTrue();
             if (d.registeredCommit() == null) assertThatThrownBy(() -> Prereg.verify(ROOT, ROOT.resolve(file), GitReader.process())).as(file)
@@ -66,11 +77,35 @@ class F0V4RegistrationDraftTest {
 
     @Test void temperaturePairsDifferOnlyInTemperature() {
         for (String arm : List.of("v2", "i")) {
-            Prereg.Document cold = doc("eval/f0/PREREG-v4-diag-" + arm + "-t0.md"), warm = doc("eval/f0/PREREG-v4-diag-" + arm + "-t06.md");
+            Prereg.Document cold = doc("eval/f0/PREREG-v4-diag-" + arm + "-t0-b.md"), warm = doc("eval/f0/PREREG-v4-diag-" + arm + "-t06-b.md");
             assertThat(warm.inputs()).isEqualTo(cold.inputs()); assertThat(warm.block().path("inputRoles")).isEqualTo(cold.block().path("inputRoles")); assertThat(warm.harnessDigest()).isEqualTo(cold.harnessDigest());
             ObjectNode a = cold.parameters().deepCopy(), b = warm.parameters().deepCopy(); a.remove("temperature"); b.remove("temperature");
             assertThat(b).isEqualTo(a);
             assertThat(cold.temperature().asDouble()).isZero(); assertThat(warm.temperature().asDouble()).isEqualTo(0.6);
+        }
+    }
+
+    @Test void historicalMethodARegistrationsKeepTheirRegisteredIdentityAndAreStaleUnderTheMethodBHarness() {
+        GitReader git = GitReader.process();
+        for (var entry : HISTORICAL.entrySet()) {
+            String file = entry.getKey(); Prereg.Document d = doc(file); Registration r = entry.getValue();
+            assertThat(d.v4()).as(file).isTrue(); assertThat(d.block().path("registrationStatus").asText()).as(file).isEqualTo("REGISTERED"); assertThat(d.registeredCommit()).as(file).isEqualTo(C22);
+            assertThat(d.temperature().asDouble()).as(file).isEqualTo(r.temperature()); assertThat(d.input("inputAudit")).as(file).isEqualTo(r.audit());
+            // 방법 (a) 등록은 계수 방법 키가 없고(의미 그대로) 계수기를 등록하지 않았습니다.
+            assertThat(d.parameters().has("answerTokenMethod")).as(file).isFalse(); assertThat(d.localAnswerCount()).as(file).isFalse(); assertThat(d.inputs()).as(file).doesNotContainKey(AnswerTokenCounter.SCRIPT);
+            List<String> inputMismatches = new ArrayList<>(Prereg.localMismatches(ROOT, d)); inputMismatches.remove("harnessDigest");
+            assertThat(inputMismatches).as(file).isEmpty();
+            assertThat(Prereg.verifyHistorical(ROOT, ROOT.resolve(file), git, d).preregCommit()).as(file).isEqualTo(C23);
+            assertThat(HarnessDigest.compute(ROOT, d)).as(file).isNotEqualTo(d.harnessDigest());
+            assertThat(Prereg.localMismatches(ROOT, d)).as(file).containsExactly("harnessDigest");
+            assertThatThrownBy(() -> Prereg.verify(ROOT, ROOT.resolve(file), git)).as(file).isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("PREREG_INPUT_CHANGED"));
+            // 대체 등록(-b)과 입력 audit·역할·arm 이 같고 계수 방법·계수기 입력만 다릅니다.
+            Prereg.Document replacement = doc(file.replace(".md", "-b.md"));
+            assertThat(replacement.block().path("inputRoles")).as(file).isEqualTo(d.block().path("inputRoles"));
+            Map<String,String> added = new LinkedHashMap<>(replacement.inputs()); d.inputs().forEach((path, sha) -> assertThat(added.remove(path)).as(file + " " + path).isEqualTo(sha));
+            assertThat(added.keySet()).as(file).containsExactly(AnswerTokenCounter.SCRIPT);
+            ObjectNode before = d.parameters().deepCopy(), after = replacement.parameters().deepCopy(); after.remove("answerTokenMethod");
+            assertThat(after).as(file).isEqualTo(before);
         }
     }
 

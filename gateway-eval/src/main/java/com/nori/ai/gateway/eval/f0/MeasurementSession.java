@@ -23,7 +23,8 @@ public final class MeasurementSession {
         public Map<String,String> manifest() { return new TreeMap<>(Map.of("modelDigest", modelDigest, "templateSha256", templateSha256, "tokenizerSha256", tokenizerSha256)); }
         public String sha256() { return Json.sha(Json.canonical(Json.MAPPER.valueToTree(manifest()))); }
     }
-    public record Context(Path root, Map<String,String> env, GitReader git, Clock clock) {}
+    /** answerCounter = 답변 토큰 계수 방법 (b) 등록에서 계수기를 띄우는 방법(운영 = AnswerTokenCounter::python). */
+    public record Context(Path root, Map<String,String> env, GitReader git, Clock clock, AnswerTokenCounter.Launcher answerCounter) {}
     private final OllamaChatClient client;
     private final Preflight.Verified verified;
     private final Prereg.State prereg;
@@ -32,11 +33,12 @@ public final class MeasurementSession {
     private final String template;
     private final InputAudit audit;
     private final Clock clock;
+    private final AnswerTokenCounter counter;
     /** 응답과 그 호출의 사전 입력 계수(v1 은 audit 없음 = null). 실제 usage.prompt_tokens 와 따로 기록합니다. */
     public record Sent(OllamaChatClient.ChatResult result, Integer auditInputTokens) {}
 
-    private MeasurementSession(OllamaChatClient client, Preflight.Verified verified, Prereg.State prereg, Runtime runtime, ObjectNode binding, String template, InputAudit audit, Clock clock) {
-        this.client = client; this.verified = verified; this.prereg = prereg; this.runtime = runtime; this.binding = binding; this.template = template; this.audit = audit; this.clock = clock;
+    private MeasurementSession(OllamaChatClient client, Preflight.Verified verified, Prereg.State prereg, Runtime runtime, ObjectNode binding, String template, InputAudit audit, Clock clock, AnswerTokenCounter counter) {
+        this.client = client; this.verified = verified; this.prereg = prereg; this.runtime = runtime; this.binding = binding; this.template = template; this.audit = audit; this.clock = clock; this.counter = counter;
     }
     public static MeasurementSession start(Context context, String command, String endpoint, String runId, Path bindingPath, Consumer<Runtime> beforeBinding) {
         return start(context, context.root().resolve(Prereg.DEFAULT_PATH), command, endpoint, runId, bindingPath, beforeBinding);
@@ -45,6 +47,8 @@ public final class MeasurementSession {
         Prereg.State prereg = Prereg.verify(context.root(), preregPath, context.git());
         SpecBinding spec = new SpecGuard(context.env()).check(null, null, context.root().resolve("docs/gates/spec-baseline.md"));
         if (Files.exists(bindingPath)) throw new EvalException(2, "RUN_BINDING_EXISTS");
+        // 방법 (b) 등록은 endpoint 호출 전에 등록 tokenizer pin 으로 계수기를 띄우고 그 SHA 를 확인합니다(실패 = exit 2, 요청 0).
+        AnswerTokenCounter counter = prereg.document().localAnswerCount() ? context.answerCounter().start(context.root(), context.env(), prereg.document().profile(), tokenizerSha(context.root(), prereg.document().profile())) : null;
         OllamaChatClient client = new OllamaChatClient(endpoint, prereg.document().requestTimeout());
         Preflight.Result preflight = Preflight.run(client, prereg.document().generationModel(), prereg.document().embeddingModel(), prereg.document().contextTokens(), prereg.document().generationModelDigest());
         if (!preflight.summary().ok()) throw new EvalException(preflight.summary().reason().equals("MODEL_DIGEST_MISMATCH") ? 6 : 4, preflight.summary().reason());
@@ -62,7 +66,7 @@ public final class MeasurementSession {
         binding.set("parameterManifest", prereg.document().parameters()); binding.put("parameterManifestSha256", prereg.document().parameterManifestSha256());
         binding.put("registeredCommit", prereg.document().registeredCommit()); binding.put("preregCommit", prereg.preregCommit()); binding.put("preregCommitTime", prereg.preregCommitTime().toString());
         writeNew(bindingPath, Json.canonical(binding));
-        return new MeasurementSession(client, preflight.verified(), prereg, runtime, binding, template, audit, context.clock());
+        return new MeasurementSession(client, preflight.verified(), prereg, runtime, binding, template, audit, context.clock(), counter);
     }
     /** v1~v3(Jetson) 등록 tokenizer. */
     static String tokenizerSha(Path root) { return tokenizerSha(root, Prereg.RuntimeProfile.JETSON); }
@@ -94,11 +98,14 @@ public final class MeasurementSession {
     /** v2 는 사전 계수 표에 있고 예산 안인 메시지만 보냅니다(재시도 포함, 매 호출 직전). */
     public Integer audited(List<Map<String,String>> messages, int inputLimit, int maxTokens) { return audit == null ? null : audit.require(messages, inputLimit, maxTokens); }
     public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens) { return chat(messages, inputLimit, maxTokens, null); }
-    /** 분류·계획 호출. responseFormat 은 등록 parameters.responseFormat 이 NONE 이 아닐 때만 요청별로 만든 값입니다. v4 는 등록 temperature 를 보냅니다(v1~v3 은 기존 고정 0 body). */
+    /**
+     * 분류·계획 호출. responseFormat 은 등록 parameters.responseFormat 이 NONE 이 아닐 때만 요청별로 만든 값입니다. v4 는 등록 temperature 를 보냅니다(v1~v3 은 기존 고정 0 body).
+     * 방법 (b) 등록은 응답마다 답변·사고문을 로컬 계수합니다(요청 body 불변).
+     */
     public Sent chat(List<Map<String,String>> messages, int inputLimit, int maxTokens, ResponseSchema.Format responseFormat) {
         Integer counted = audited(messages, inputLimit, maxTokens);
         Prereg.Document document = prereg.document();
-        OllamaChatClient.ChatResult result = document.v4() ? client.chat(verified, document.generationModel(), messages, maxTokens, responseFormat, document.temperature())
+        OllamaChatClient.ChatResult result = document.v4() ? client.chat(verified, document.generationModel(), messages, maxTokens, responseFormat, document.temperature(), counter)
             : client.chat(verified, document.generationModel(), messages, maxTokens, responseFormat);
         return new Sent(result, counted);
     }

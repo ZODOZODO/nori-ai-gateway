@@ -157,6 +157,7 @@ public final class F0ReportWriter {
             counts.forEach((key, count) -> md.append("| ").append(source).append(" | ").append(key).append(" | ").append(count).append(" |\n"));
         }
         if (document.v4()) md.append(thinkingSection(loaded.results()));
+        if (document.v4() && document.localAnswerCount()) md.append(localCountSection(loaded.results()));
         MeasurementSession.writeNew(file, md.toString().getBytes(StandardCharsets.UTF_8));
         return "F0_DIAGNOSTIC_REPORT_WRITTEN";
     }
@@ -194,6 +195,41 @@ public final class F0ReportWriter {
             }
         }
         return md.toString();
+    }
+    /**
+     * 답변 토큰 계수 방법 (b) 교차 확인: 시도별 completionMinusLocal(= 서버 completion_tokens − (로컬 사고 + 로컬 답변)) 분포. `</think>` 같은 특수 토큰 상수가 있으면
+     * 0 이 아닌 같은 값으로 모입니다. 판정은 바꾸지 않으며 크게 어긋남 판정 기준값은 관측 뒤 정합니다(등록 §1.4) — 그래서 값=건수 전체를 함께 냅니다.
+     */
+    private static String localCountSection(F0Judgement.Results results) {
+        StringBuilder md = new StringBuilder("\n## v4 답변 토큰 로컬 계수 교차 확인(방법 b, 원문 없음, nearest-rank)\n\n- 차이 = 서버 `completion_tokens` − (로컬 사고 토큰 + 로컬 답변 토큰), 같은 tokenizer pin. 판정 불변, 어긋남 기준값은 관측 뒤 확정.\n\n"
+            + "| 출처 | 시도 | 시도 수 | 답변 계수 불가 | 사고 계수 없음 | 차이 계산 수 | 차이 min/p50/p95/max | 0 아닌 차이 | 차이 값=건수 |\n|---|---|---|---|---|---|---|---|---|\n");
+        List<Integer> all = new ArrayList<>(); int allCount = 0, allAnswerNull = 0, allThinkingNull = 0;
+        for (String source : List.of("A", "B", "boundary")) {
+            JsonNode node = results.get(source); if (node == null) continue;
+            List<JsonNode> rows = new ArrayList<>(); node.path("attempts").forEach(rows::add); node.path("cases").forEach(c -> c.path("attempts").forEach(rows::add));
+            for (int attempt = 0; attempt < 2; attempt++) {
+                int count = 0, answerNull = 0, thinkingNull = 0; List<Integer> differences = new ArrayList<>();
+                for (JsonNode row : rows) {
+                    JsonNode local = row.path("localTokenCounts").path(attempt);
+                    if (local.isMissingNode()) continue;
+                    count++;
+                    if (!local.path("answerTokens").isInt()) answerNull++;
+                    if (!local.path("thinkingTokens").isInt()) thinkingNull++;
+                    if (local.path("completionMinusLocal").isInt()) differences.add(local.path("completionMinusLocal").intValue());
+                }
+                if (count == 0) continue;
+                md.append(localCountRow(source, attempt == 0 ? "초회" : "재시도", count, answerNull, thinkingNull, differences));
+                all.addAll(differences); allCount += count; allAnswerNull += answerNull; allThinkingNull += thinkingNull;
+            }
+        }
+        if (allCount > 0) md.append(localCountRow("전체", "-", allCount, allAnswerNull, allThinkingNull, all));
+        return md.toString();
+    }
+    private static String localCountRow(String source, String attempt, int count, int answerNull, int thinkingNull, List<Integer> differences) {
+        Map<String,Integer> values = new TreeMap<>(Comparator.comparingInt(Integer::parseInt));
+        differences.forEach(d -> values.merge(String.valueOf(d), 1, Integer::sum));
+        return "| " + source + " | " + attempt + " | " + count + " | " + answerNull + " | " + thinkingNull + " | " + differences.size() + " | "
+            + (differences.isEmpty() ? "-" : Collections.min(differences) + "/" + distribution(differences)) + " | " + differences.stream().filter(d -> d != 0).count() + " | " + joined(values) + " |\n";
     }
     private static String distribution(List<Integer> values) {
         return values.isEmpty() ? "-" : MetricsAggregator.nearestRank(values, 50) + "/" + MetricsAggregator.nearestRank(values, 95) + "/" + Collections.max(values);
