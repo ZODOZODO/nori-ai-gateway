@@ -4289,3 +4289,363 @@
 #### 11) 보존 확인
 
 - SPEC `bb91146a…d0de4`·Plan 불변, 기존 PREREG 30건(v1·v2·v3 22·v4 6)·결과(1단계 `20261104T034413Z-v2-t0` 포함)·capture·evidence·v1~v4 입력·pin·`count_input_audit_v{2,4}.py`·v4 audit 4파일 변경 0. 이 Dev report 앞 561,590 B 의 SHA 는 추가 전후 같다(`5bca9f35…c659`). 원문 응답·사고문·secrets 출력 0.
+
+#### 로컬 C24/C25 등록·최종 확인 (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 허용 범위: 로컬 commit C24·C25 두 개뿐이며 push·amend·`--force`·원격 publish 는 하지 않았다.
+
+| commit | 전체 SHA | 시각 | 파일 |
+|---|---|---|---|
+| C24 | `e5f64b82bae0c678a327d327944bdeb96b282eb5` | 2026-11-04 13:35:23 +0900 | 21파일, 1519 insertions(+), 28 deletions(-) |
+| C25 | `f20518931a81946e8e5265a51fd7bca71bd72040` | 2026-11-04 13:35:59 +0900 | 6파일(`eval/f0/PREREG-v4-*-b.md`), 36 insertions(+), 24 deletions(-) |
+
+- C24 정확 21파일(파일 지정 `git add` 뒤 `git diff --cached --name-only` 21개, §12.31 8) 기대 목록과 diff 0, `git diff --cached --check` exit 0). 이 Devreport 의 C24 시점 바이트는 580,784 B, SHA `d6211ac49dbc4732029100a6f7f7a7c783b169a97f657e0a410aea05083ff1f0`(C24 blob 과 같음)이며 앞 561,590 B SHA `5bca9f35…c659` 는 §12.31 추가 전후 같았다. 기존 untracked 는 넣지 않았다.
+- C25: `-b` 6문서의 §0 제목·상태 문구를 C23 방식(등록 근거·C24/C25 설명·이력)으로 바꾸고 기계 판독 블록의 `registrationStatus` UNCOMMITTED→REGISTERED, `registeredCommit` null→C24 SHA 만 바꿨다. JSON 검사(Python, 파싱 실패 시 원문 비출력): 6문서 모두 바뀐 최상위 키 `registrationStatus`·`registeredCommit` 2개뿐, 최상위 키 순서 동일. `git diff --check` exit 0.
+- C25 뒤 `f0 prereg-check`(endpoint 인자 없음, 모델 요청 0): `-b` 6문서 모두 `localMismatches=[]`·`PREREG_VERIFIED`(Gradle exit 0). 기존 v4 6문서는 `localMismatches=["harnessDigest"]`·`PREREG_INPUT_CHANGED`(stale 유지). 같은 뒤 `F0V4RegistrationDraftTest` 필터 실행 exit 0(5/5 — 등록 완료 문서가 실제 `Prereg.verify` 엄격 검증 통과, 과거 v4 등록 역사 신원 확인).
+- C25 뒤 25커밋, staged 0. SPEC `bb91146a…d0de4` 불변. 측정(§12.31 9))은 실행하지 않았다. 이 소절은 commit 하지 않았다(작업 트리에만 추가 — 다음 커밋에 포함).
+
+#### v4-b 진단 1단계 실측 — `PREREG-v4-diag-v2-t0-b` run B 까지 (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 승인 범위(2026-11-04 사용자): 등록 §2 의 0~8(run B)까지와 postflight·측정 창 외부 요청 집계(share-window → share-exclude). run A·boundary-gen·나머지 진단 3건·회귀 2건 미실행. 모델 load·pull·unload·재시작·설정 변경 0.
+- 회차 ID `20261104T044320Z-diag-v2-t0-b`(측정 PC 시각 04:43:20Z~04:55:38Z, run B 04:45:30.9Z~04:55:05.3Z), 터널 로컬 `127.0.0.1:11434` → 160 `127.0.0.1:11434`(측정 뒤 본인 ssh 프로세스만 종료).
+
+| 단계 | 명령 | exit | 마지막 출력 |
+|---|---|---|---|
+| 0 | 계수기 환경 | 0 | `tokenizers` `0.23.3`, `AIGW_PYTHON` 존재 |
+| 1 | `spec-guard` | 0 | `specSha bb91146a…d0de4`, BUILD SUCCESSFUL |
+| 2 | `f0 prereg-check` | 0 | `PREREG_VERIFIED`(`localMismatches=[]`, harnessDigest `91580fb7…ae35`) |
+| 3 | `f0 preflight` | 0 | `F0_PREFLIGHT_OK 2` — `qwen3:4b` `359d7dd4…fae7` ctx 8192, `bge-m3:latest` `79076464…6bab` ctx 8192, 둘 다 상주 |
+| 4 | `f0 chat-template` | 0 | `F0_CHAT_TEMPLATE_CAPTURED`, template SHA `2d54db2b…97f9`(등록값 일치) |
+| 5 | `f0 token-golden` | 0 | `F0_TOKEN_GOLDEN_COMPLETED 13` |
+| 6 | 계수 동등성 게이트 | — | `TOKEN_GOLDEN_AUDIT_MATCH 13/13` |
+| 7 | `f0 usage-probe` | 0 | `F0_USAGE_PROBE_COMPLETED`, `equalOnCacheHit{usage:true, evalCount:true}` |
+| 8 | `f0 run --path B` | 0 | `F0_RUN_COMPLETED B`(Gradle 9분 46초) |
+| 11 | `f0 preflight`(postflight) | 0 | `F0_PREFLIGHT_OK 2`, preflight 와 모델 목록(name·digest·context_length) 동일 |
+| 12 | share-window 작성 | — | `docs/gates/f0/share-window-20261104T044320Z-diag-v2-t0-b.json`(`intervals=[]`) |
+| 13 | `f0 share-exclude` | 0 | B `samples 22`·`excluded 0`·p50 18223·p95 44882 ms |
+| 14 | `f0 report`(터널 종료 뒤, B 만 존재) | 0 | `F0_DIAGNOSTIC_REPORT_WRITTEN`(A·boundary 열은 `-`) |
+
+- `max_tokens:1` 계수 행 17개(token-golden 13 + usage-probe 4): 17/17 `finishReason=length`·`completionTokens=1`·`contentCodepoints=0`·`separateFields=["reasoning"]`·`reasoningTokens=null`·`localTokenCount{answerTokens 0, thinkingTokens 1, completionMinusLocal 0}`.
+- run B(22문항, 호출 22, 재시도 0): 유효 22/22(1차 유효 22, errorCode 0, finish 전부 `stop`, timeout 0), taskType 19/22, 인자 13/22, UNSUPPORTED 21/22. 호출 지연 p50 18.2 s·p95 44.9 s·max 74.7 s·min 9.4 s·합 574.0 s(nearest-rank). 로컬 사고 토큰 p50 1107·p95 2616·max 4082, 답변 토큰 p50 29·p95 77·max 77(상한 192 초과 0, 계수 불가 0), 서버 `completion_tokens` max 4154. `prompt_tokens` 대 audit 작음/큼 0/0. 출력 키 순서 `t,eqp,from,to,qRef` 22/22. 생성 처리량(completion 합 34,468 / 지연 합 574.0 s) 약 60.0 tok/s.
+- 교차 확인(방법 b): 차이 계산 22/22, `completion − (로컬 사고 + 로컬 답변)` min/p50/p95/max = 3/3/3/3, 0 아닌 차이 22건, 값 `3=22`. 계수 행(`max_tokens:1`)은 17/17 차이 0.
+- 공유 서버: 160 GIN 로그(서버 UTC 04:43:00~04:56:00) 127건 전부 loopback, NORI 밖 출발 0건 → 겹침 0, 제외 지연 표본 0.
+- GIN 줄 시각(§12.27 5) 열린 항목 11): run B 첫 5호출의 GIN 시각 간격이 하네스 호출 지연과 맞아 **완료 시각**으로 판단한다. 다만 같은 호출의 GIN 시각이 하네스 `receivedAt` 보다 약 5초 이르며(측정 PC 시계가 서버보다 약 5초 앞섬, 서버 `NTPSynchronized=yes`), 외부 구간이 생기면 겹침 판정 전에 이 시계 차를 다뤄야 한다(이번은 외부 0이라 영향 없음).
+- 서버 상태(전 04:43:03Z / 후 04:55:39Z): Ollama active·NRestarts 0·ActiveEnter 2026-11-03 04:10:45 UTC 동일, `ollama ps` 두 모델 100% GPU·CONTEXT 8192 동일, GPU 메모리 4548 MiB / 6144 MiB 동일.
+- 생성 파일: `eval/f0/results/20261104T044320Z-diag-v2-t0-b/{preflight.json,token-golden.jsonl,token-golden.run-binding.json,usage.json,usage.run-binding.json,B/f0-results.json,B/run-binding.json,postflight.json,diagnostic-report.md}`, `eval/f0/chat-template/v4-diag-v2-t0-b/`, `docs/gates/f0/share-window-20261104T044320Z-diag-v2-t0-b.json`. 모델 응답·사고문·API 응답 원문 출력·저장 0. 하네스·등록 문서·SPEC·Plan·기존 결과 변경 0, commit·push 0. 이 소절 추가 전 Dev report 582,817 B SHA `fba88005…0443`.
+
+#### v4-b 진단 4문서 실측 — `diag-v2-t0-b` 나머지(run A·boundary-gen)와 `diag-i-t0-b`·`diag-v2-t06-b`·`diag-i-t06-b` (2026-11-04, 독립 Claude Code Opus 5.5)
+
+- 승인 범위(2026-11-04 사용자 "진행"): `diag-v2-t0-b` §2 의 남은 9(run A)·10(boundary-gen)·11~14, 이어서 `diag-i-t0-b` → `diag-v2-t06-b` → `diag-i-t06-b` 각 §2 전체, 같은 `$runId=20261104T044320Z`. 회귀 2문서는 실행하지 않았다. 모델 load·pull·unload·재시작·설정 변경·sudo 0. 하네스·등록 문서·SPEC·Plan·기존 결과 변경 0, commit·push 0.
+- 터널: 문서마다 본인 ssh 프로세스(PID 5796 → 16904 → 9644 → 6616)를 띄우고 각 문서 report 직전에 그 PID 만 종료했다(§2 "터널 종료 뒤 report"). 각 문서 시작 전 0단계 계수기 환경 `tokenizers 0.23.3`·`AIGW_PYTHON` 존재 확인.
+- 시계: 측정 PC 가 서버보다 **4.45초 앞섬**(05:13Z 실측, ssh 왕복 0.44초). 등록 §1.9("하네스 시각도 UTC 라 변환하지 않는다")대로 share-window 구간은 서버 UTC 그대로 쓰고 보정하지 않았다. 보정 시 영향은 아래 공유 서버 항목에 따로 적는다.
+
+##### 1) `diag-v2-t0-b` 남은 단계 — 기존 파일 처리
+
+| 단계 | 처리 | exit | 마지막 출력 |
+|---|---|---|---|
+| 9 run A | §2 명령 그대로(05:13:49Z~05:26:25Z) | 0 | `F0_RUN_COMPLETED A` |
+| 10 boundary-gen | §2 명령 그대로(05:26:26Z~05:34:13Z) | 0 | `F0_BOUNDARY_COMPLETED 9` |
+| 11 postflight | 기존 `postflight.json` 이 있어 하네스 `preflight` 가 `OUTPUT_EXISTS`(`F0RunnerCli` 43행)로 거부하는 경로다. 덮어쓰지 않고 같은 회차 디렉터리에 **`postflight-2.json`** 으로 실행(결과 경로는 runId 디렉터리 강제 — 283~286행) | 0 | `F0_PREFLIGHT_OK 2`, `preflight.json`·`postflight.json` 과 바이트 동일 |
+| 12 share-window | 기존 파일(B 창)은 두고 **`docs/gates/f0/share-window-20261104T044320Z-diag-v2-t0-b-2.json`**(창 04:43:00~05:35:00Z, B·A·boundary 전체) 새로 작성 | — | GIN 200건 = loopback 199·외부 1, 구간 1개 |
+| 13 share-exclude | 새 구간 파일 지정 | 0 | A·B·boundary 제외 0 |
+| 14 report | §2 명령 그대로 | Java 2(Gradle 1) | **`REPORT_EXISTS`**(`F0ReportWriter` 105행). 기존 `diagnostic-report.md`(A·boundary 칸 비어 있음, SHA `899edfd6…3dde`)는 그대로이며 우회(삭제·다른 디렉터리 복사)하지 않았다 |
+
+- 따라서 `diag-v2-t0-b` 의 하네스 진단 보고서는 run B 만 담은 상태로 남는다. A·boundary 는 원시 결과(`A/f0-results.json`·`boundary/boundary-results.json`, run-binding 신원 동일)와 아래 집계로만 보고한다. 보고서 재생성은 기존 보고서 처리에 대한 사용자 결정이 필요하다.
+- §1.8 무효 규칙에 해당하는 사건(digest·context·상주 변화, 계수기 실패, endpoint 오류)은 없어 다음 문서로 진행했다.
+
+##### 2) 문서별 명령 exit
+
+| 문서 | prereg-check | preflight | chat-template(SHA `2d54db2b…97f9`) | run B | run A | boundary-gen | postflight(= preflight 바이트) | share-exclude | report |
+|---|---|---|---|---|---|---|---|---|---|
+| `diag-i-t0-b` | 0 `PREREG_VERIFIED` | 0 | 0 일치 | 0(05:36:55~05:47:47Z) | 0(~05:58:47Z) | 0(~06:19:04Z) | 0 동일 | 0 | 0 `F0_DIAGNOSTIC_REPORT_WRITTEN` |
+| `diag-v2-t06-b` | 0 | 0 | 0 일치 | 0(06:20:32~06:32:41Z) | 0(~06:47:41Z) | 0(~06:57:13Z) | 0 동일 | 0 | 0 |
+| `diag-i-t06-b` | 0 | 0 | 0 일치 | 0(06:58:38~07:10:35Z) | 0(~07:21:35Z) | 0(~07:37:24Z) | 0 동일 | 0 | 0 |
+
+##### 3) 경로별 결과(R=1, 지연 = 호출 단위 nearest-rank, 초)
+
+| 문서·경로 | 호출 | 재시도 문항 | 유효 | errorCode | t 정답 | 인자 정답 | 오답 eqp/from/to/q | Context 복사 시도 | 지연 p50/p95/max | timeout | 로컬 사고 p50/p95/max | 답변 max(상한 초과) | 교차 확인 차이 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| v2-t0 B | 22 | 0 | 22/22 | 0 | 19/22 | 13/22 | 3/8/8/0 | 2 | 18.2/44.9/74.7 | 0 | 1107/2616/4082 | 77(0) | 3=22 |
+| v2-t0 A | 22 | 0 | 22/22 | 0 | 22/22 | 13/22 | 3/8/8/0 | 2 | 24.7/81.2/84.1 | 0 | 1452/4360/4461 | 87(0) | 3=22 |
+| v2-t0 boundary | 9 | 0 | 9/9 | 0 | — | 1/9 통과 | — | 0 | 49.1/68.1/68.1 | 0 | 2617/3333/3333 | 98(0) | 3=9 |
+| i-t0 B | 22 | 0 | 22/22 | 0 | 22/22 | 22/22 | 0/0/0/0 | 0 | 22.8/53.9/69.5 | 0 | 1331/2994/3578 | 59(0) | 2=22 |
+| i-t0 A | 22 | 0 | 22/22 | 0 | 22/22 | 21/22 | 1/0/0/0 | 0 | 18.7/60.0/66.8 | 0 | 1036/3188/3516 | 69(0) | 1=3, 2=19 |
+| i-t0 boundary | 14 | 5 | 6/9 | `FINISH_LENGTH` 8 | — | 3/9 통과 | — | 0 | 97.6/113.8/113.8 | 0 | 5120/5120/5120 | 145(0) | 0=8, 2=6 |
+| v2-t06 B | 22 | 0 | 22/22 | 0 | 20/22 | 11/22 | 5/8/8/0 | 2 | 26.2/57.1/64.8 | 0 | 1580/3184/3595 | 77(0) | 3=22 |
+| v2-t06 A | 25 | 3 | 22/22(1차 19) | `STEPS_INVALID` 2, `FINISH_LENGTH` 1 | 21/22 | 13/22 | 3/7/7/0 | 2 | 24.1/82.8/95.6 | 0 | 1407/4436/5120 | 87(0) | 0=1, 3=24 |
+| v2-t06 boundary | 10 | 1 | 9/9 | `FINISH_LENGTH` 1 | — | 1/9 통과 | — | 0 | 52.8/111.5/111.5 | 0 | 2800/5120/5120 | 97(0) | 0=1, 3=9 |
+| i-t06 B | 23 | 1 | 22/22(1차 21) | `FINISH_LENGTH` 1 | 22/22 | 19/22 | 3/0/0/0 | 0 | 17.6/91.5/96.4 | 0 | 1012/4830/5120 | 66(0) | 0=1, 2=22 |
+| i-t06 A | 22 | 0 | 22/22 | 0 | 22/22 | 21/22 | 1/0/0/0 | 0 | 19.0/84.8/96.0 | 0 | 1058/4342/4880 | 70(0) | 2=22 |
+| i-t06 boundary | 11 | 2 | 9/9 | `FINISH_LENGTH` 2 | — | 4/9 통과 | — | 0 | 91.3/100.3/100.3 | 0 | 4542/5120/5120 | 145(0) | 0=2, 2=9 |
+
+- 전 시도 답변 계수 불가 0·사고 계수 없음 0, `prompt_tokens` 대 audit 작음/큼 0/0, finish `length` 시도는 전부 답변 0·로컬 사고 5,120 이며 교차 확인 차이 0 이다(사고 종료 표지 없음). 그 밖의 시도는 V2 arm 차이 3, I arm 차이 2(i-t0 A 3시도만 1)로 arm 별 상수에 모였다. 답변 상한(분류 192·계획 256) 초과 0.
+- 출력 키 순서: V2 B `t,eqp,from,to,qRef`, V2 A `t,eqp,from,to,qRef,steps`(프롬프트 표시 순서), I B `eqp,from,qRef,t,to`, I A `eqp,from,qRef,steps,t,to`(송신 정렬 순서). length 시도는 null.
+- 문항별 오답(t 오답은 기대→예측):
+  - v2-t0 B: G01 t INC→KQ+from·to, G04 t KQ→GQ, G16 t UNS→GQ+eqp, G08·G20 eqp·from·to(Context 복사), G09·G11·G12·G17·G22 from·to. A: G01·G09·G11·G12·G17·G22 from·to, G08·G20 eqp·from·to(Context 복사), G16 eqp. boundary 불통과: NORMAL-01 from·to, MAX 5건·ESCAPE 2건 eqp.
+  - i-t0 B: 없음. A: G03 eqp. boundary 불통과: MAX-MIXED·MAX-HANGUL·MAX-SUPPLEMENTARY eqp, MAX-DIGIT·ESCAPE-01·ESCAPE-CONTROL 무효(두 시도 모두 `FINISH_LENGTH`).
+  - v2-t06 B: G01 t INC→KQ+from·to, G18 t GQ→KQ, G03·G16·G21 eqp, G08·G20 eqp·from·to(Context 복사), G09·G11·G12·G17·G22 from·to. A: G17 t INC→UNS+from·to(초회 `FINISH_LENGTH` → 재시도), G01·G09·G11·G12·G22 from·to, G08 eqp·from·to(Context 복사), G20 eqp(Context 복사 시도), G16 eqp; 재시도 뒤 정답 G06·G19(`STEPS_INVALID`). boundary 불통과: NORMAL-01 from·to, MAX 5건·ESCAPE 2건 eqp(ESCAPE-CONTROL 초회 `FINISH_LENGTH`).
+  - i-t06 B: G03·G21 eqp, G15 eqp(초회 `FINISH_LENGTH`). A: G03 eqp. boundary 불통과: NORMAL-PRECISE from·to, MAX-MIXED·MAX-SUPPLEMENTARY·ESCAPE-01·ESCAPE-CONTROL eqp. 통과: NORMAL-01·MAX-HANGUL(재시도)·MAX-DIGIT·MAX-ASCII.
+- G08: V2 arm(t0·t06) A·B 모두 유효·t=INC 정답·eqp·from·to 오답(Context 복사). I arm(t0·t06) A·B 모두 유효·전 인자 정답.
+- Jetson 비교(같은 22문항·9케이스): v2 회차 `20261102T045749Z-a` B t 7/22·인자 10/22(무효 10, `QREF_INVALID`), A t 6/22·인자 11/22(무효 8), boundary 0/9, G08 A·B t=UNS. v3 i 회차 `20261103T060939Z-i` B t 20/22·인자 18/22, A t 21/22·인자 14/22·G08 INVALID(`STEPS_INVALID`×2), boundary 9/9.
+
+##### 4) 공유 서버·서버 상태
+
+- GIN(서버 UTC, 출발지 건수·외부 구간 시각만): v2-t0 04:43~05:35 200건(loopback 199·외부 1), i-t0 05:36~06:20 127건(외부 0), v2-t06 06:20~06:58 126건(외부 0), i-t06 06:58~07:38 125건(외부 0). share-exclude 제외 표본 4문서 전부 0.
+- 외부 1건은 서버 05:26:37.999~05:26:38.000Z(GIN 지연 약 1 ms)다. 등록 규칙(무변환)으로는 겹침 0이다. 다만 측정 PC 시계 4.45초 앞섬을 보정하면 이 요청은 v2-t0 boundary 첫 호출 NORMAL-01(PC 송신 05:26:42.17Z = 서버 약 05:26:37.7Z, 40.5초) 구간 안에 든다. 보정했다면 boundary 지연 표본 1건이 제외 대상이었다(판정 불변, 기록만).
+- 서버(05:13:14Z / 05:35:55Z / 06:19:52Z / 06:57:56Z / 07:38:13Z): Ollama active·NRestarts 0·ActiveEnter 2026-11-03 04:10:45 UTC 불변, `ollama ps` `qwen3:4b` 3.9 GB·`bge-m3:latest` 689 MB 둘 다 100% GPU·CONTEXT 8192, GPU 메모리 4548 / 6144 MiB 불변.
+
+##### 5) 생성 파일
+
+- `eval/f0/results/20261104T044320Z-diag-v2-t0-b/{A/,boundary/,postflight-2.json}`, `docs/gates/f0/share-window-20261104T044320Z-diag-v2-t0-b-2.json`.
+- 3문서마다 `eval/f0/results/20261104T044320Z-<tag>/{preflight.json,B/,A/,boundary/,postflight.json,diagnostic-report.md}`, `eval/f0/chat-template/v4-<tag>/`, `docs/gates/f0/share-window-20261104T044320Z-<tag>.json`(`<tag>` = `diag-i-t0-b`·`diag-v2-t06-b`·`diag-i-t06-b`).
+- 모델 응답·사고문·API 응답 원문 출력·저장 0(집계는 열거형·개수·지연만). 이 소절 추가 전 Dev report 587,203 B SHA `70629b66…afd8`.
+
+### 12.32 P03 v4 ⑧ 진단 결과 정리 — 응답 파싱 규칙·답변 토큰 계수 방법·예산 규칙·오답 목록 (2026-11-04, 독립 Claude Code Opus 5.5, root 검토 전)
+
+- 범위(2026-11-04 사용자 지시): Plan P03 v4 흐름 ⑧(같은 날 사용자 승인으로 개정된 흐름 — ⑧ = 진단 결과 정리: 응답 파싱 규칙·답변 토큰 계수 방법·예산 규칙 확정과 오답 목록 작성)을 **저장된 진단 결과만으로** 수행했다. 모델 호출·SSH·네트워크 0, Gradle 하네스 실행 0, `eval/f0/results`·PREREG·evidence·capture 파일 쓰기 0, commit 0. 사고 상한 T 는 제안하지 않는다(흐름 ⑫).
+- 입력(4 진단 × A·B·boundary, 하네스 `e5f64b8`, 회차 `20261104T044320Z-<tag>`): `diag-v2-t0-b/A/f0-results.json` `a1e9dd8c75411eaf…`, `diag-v2-t0-b/B/f0-results.json` `b34e869021c03ed0…`, `diag-v2-t0-b/boundary/boundary-results.json` `29d982780ef715e9…`, `diag-i-t0-b/A/f0-results.json` `77324aef21d09bb4…`, `diag-i-t0-b/B/f0-results.json` `30f266580e61e882…`, `diag-i-t0-b/boundary/boundary-results.json` `3edd8be37cc76572…`, `diag-v2-t06-b/A/f0-results.json` `da1dc54a7db0e7a5…`, `diag-v2-t06-b/B/f0-results.json` `46e487992027fbb2…`, `diag-v2-t06-b/boundary/boundary-results.json` `e4289dde7820e666…`, `diag-i-t06-b/A/f0-results.json` `874ca2f1a48b80bd…`, `diag-i-t06-b/B/f0-results.json` `160e011c36ef7f73…`, `diag-i-t06-b/boundary/boundary-results.json` `5c1cc431f0fb2aa8…`. 보조 입력: `diag-v2-t0-b/{usage.json,token-golden.jsonl}`, 4 진단의 `preflight.json`·`postflight.json`과 `diag-v2-t0-b/postflight-2.json`, 각 `diagnostic-report.md`, `eval/golden/tc-f0-v2.jsonl`, `eval/f0/v2/output-boundary-cases.jsonl`, `eval/golden/tc-registry-fixture-v2.json`. `diag-v2-t0-b/diagnostic-report.md` 는 B 만 담고 있어(§12.31 4문서 실측 1)) 이 소절의 A·boundary 수치는 원시 결과에서 다시 셌다.
+- 방법: 레포 밖 세션 scratchpad 의 Python 스크립트(`step8/step8_agg.py`·`step8_tables.py`·`match_golden_time.py`·`extra.py`, 경계 해시 재현은 같은 세션의 `boundary-rca/match_hashes_t.py`·`match_extra.py` 출력)로 모든 수를 파일에서 계산했다. 출력은 열거형·불리언·개수·해시 접두부만이며 질문·응답·사고문·인자 원문은 출력·저장하지 않았다. **시도 = 모델 호출 1회**(재시도 포함, 전체 224회). 백분위는 하네스와 같은 nearest-rank 이고 중앙값(통계)은 따로 적었다.
+
+#### 1) 응답 파싱 규칙(a)
+
+| 진단/경로 | 호출 | 분리 필드 | reasoning_tokens null | content `<think>` | content `</think>` | content 0 | content 0 중 finish=length | JSON OBJECT/PARSE_FAILED |
+|---|---|---|---|---|---|---|---|---|
+| i-t0/A | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| i-t0/B | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| i-t0/boundary | 14 | reasoning=14 | 14 | 0 | 0 | 8 | 8 | 6/8 |
+| i-t06/A | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| i-t06/B | 23 | reasoning=23 | 23 | 0 | 0 | 1 | 1 | 22/1 |
+| i-t06/boundary | 11 | reasoning=11 | 11 | 0 | 0 | 2 | 2 | 9/2 |
+| v2-t0/A | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| v2-t0/B | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| v2-t0/boundary | 9 | reasoning=9 | 9 | 0 | 0 | 0 | 0 | 9/0 |
+| v2-t06/A | 25 | reasoning=25 | 25 | 0 | 0 | 1 | 1 | 24/1 |
+| v2-t06/B | 22 | reasoning=22 | 22 | 0 | 0 | 0 | 0 | 22/0 |
+| v2-t06/boundary | 10 | reasoning=10 | 10 | 0 | 0 | 1 | 1 | 9/1 |
+| **합계** | 224 | reasoning=224 | 224 | 0 | 0 | 13 | 13 | 211/13 |
+
+- 사고문 위치: 전 224 시도의 `thinkingObservations[].separateFields` = `reasoning` 224/224(`reasoning_content`·`thinking` 0). 계수 행(`max_tokens:1`)도 token-golden 13행 `reasoning` 13/13, usage-probe 4호출 모두 `reasoning`.
+- content 혼입: `contentThinkOpen` 0/224, `contentThinkClose` 0/224.
+- usage 사고 토큰 보고: `reasoningTokens` null 224/224(계수 행 token-golden 13/13·usage-probe 4/4 도 null).
+- content 0 은 13 시도이고 13건 모두 `finish_reason=length`·JSON `PARSE_FAILED` 다. `stop` 211 시도는 JSON `OBJECT` 211/211.
+- **확정 규칙(제안): 답변 = `message.content` 만 JSON 파싱·답변 토큰 계수 대상으로 쓰고, 사고문은 별도 필드 `message.reasoning` 으로만 받아 답변에서 제외한다(비저장, 길이·토큰 수만 관측).** content 의 `<think>` 표지 제거 같은 보정은 관측상 필요 없다(0/224). 사고 토큰 수를 usage 에서 읽는 방법은 쓸 수 없다(null 224/224). 현재 하네스(`OllamaChatClient.THINKING_FIELDS` 첫 문자열 필드 = 사고, content = 답변)와 같은 규칙이다.
+
+#### 2) 답변 토큰 계수 방법 (b) `LOCAL_TOKENIZER_PIN_V1` 교차 확인
+
+| arm | 호출 | 답변 계수 불가 | 사고 계수 없음 | 차이 null | 하네스 answerTokens = 로컬 답변 | 차이 값=건수(전체) | stop 시도 | length 시도 | 교차 확인 어긋남(stop, arm 상수 아님) |
+|---|---|---|---|---|---|---|---|---|---|
+| V2 | 110 | 0 | 0 | 0 | 110/110 | 0=2; 3=108 | 3=108 | 0=2(답변 0 2건, 로컬 사고 5120=2) | 0: - |
+| I | 114 | 0 | 0 | 0 | 114/114 | 0=11; 1=3; 2=100 | 1=3; 2=100 | 0=11(답변 0 11건, 로컬 사고 5120=11) | 3: i-t0-b/A/G02#0 차이 1·답변 39·사고 2182, i-t0-b/A/G04#0 차이 1·답변 31·사고 724, i-t0-b/A/G21#0 차이 1·답변 32·사고 1209 |
+
+- 계수 불가 0/224(V2 0·I 0), 사고 계수 없음 0, 차이 null 0. 하네스 행 `answerTokens[]` 와 `localTokenCounts[].answerTokens` 는 224/224 같다.
+- 차이 = `completion_tokens − (로컬 사고 + 로컬 답변)`: `stop` 시도는 V2 arm `3` 108/108, I arm `2` 100/103·`1` 3/103. `length` 시도는 두 arm 모두 차이 `0`(V2 2·I 11) — 답변 0·로컬 사고 5,120(= `max_tokens`)이라 사고·답변 경계 특수 토큰이 생기지 않은 경우다. 계수 행 `max_tokens:1` 은 token-golden 13/13·usage-probe 4/4 이 차이 0.
+- 교차 확인 어긋남(`stop` 인데 arm 상수가 아님): 3건, 전부 `diag-i-t0-b` 경로 A(G02, G04, G21, 차이 1, 답변 39·31·32 토큰). 같은 문항의 `diag-i-t06-b` A 는 차이 2 다. 원인은 사고문·답변 원문을 저장하지 않아 판별할 수 없다(NOT DETERMINABLE). 세 시도 모두 답변 상한 256·192 와 거리가 커서 ±1 차이가 판정을 바꾸지 않는다.
+- V2 arm 3 과 I arm 2 의 상수 차이 원인(요청 `response_format` 유무·프롬프트·Context 투영이 함께 다름)도 원문 없이 분리할 수 없다(NOT DETERMINABLE). 관측 사실은 "arm 안에서는 `stop` 시도가 한 상수에 모인다(어긋남 3/211)" 이다.
+- **확정 방법(제안): 답변 토큰 수 = `message.content` 를 등록 tokenizer pin(`Qwen/Qwen3-4B-Thinking-2507` tokenizer.json, `encode(text, add_special_tokens=False)`)으로 센 개수(방법 b). content 가 없거나 짝 없는 surrogate 로 셀 수 없으면 계수 불가 = 그 시도 실패. 교차 확인 차이는 기록만 하고 판정에 쓰지 않는다.** 서버 usage 로 답변 토큰을 빼는 방법 (a) 는 `reasoning_tokens` 미보고로 불가(위 1)). SPEC §14.5 열린 항목 ⓒ 를 닫는 문안 초안은 SPEC 소유자 승인 대상으로 별도 작성했다(SPEC 변경 0).
+
+#### 3) 예산 규칙(c) — 관측 분포(T 제안 아님)
+
+| 진단/경로 | 호출 | 경로 답변 상한 | 답변 max | 상한 초과 | 192 초과 | FINISH_LENGTH(시도) | 로컬 사고 min/p50/중앙값/p95/max | > 4928 | stop 시도만 사고 p50/p95/max |
+|---|---|---|---|---|---|---|---|---|---|
+| i-t0/A | 22 | 256 | 69 | 0 | 0 | 0 | 503/1036/1122.5/3188/3516 | 0/22 | 1036/3188/3516 |
+| i-t0/B | 22 | 192 | 59 | 0 | 0 | 0 | 645/1331/1478.5/2994/3578 | 0/22 | 1331/2994/3578 |
+| i-t0/boundary | 14 | 192 | 145 | 0 | 0 | 8 (MAX-DIGIT#0, MAX-DIGIT#1, MAX-ASCII#0, MAX-SUPPLEMENTARY#0, ESCAPE-01#0, ESCAPE-01#1, ESCAPE-CONTROL#0, ESCAPE-CONTROL#1) | 1498/5120/5120/5120/5120 | 8/14 | 3249/4461/4461 |
+| i-t06/A | 22 | 256 | 70 | 0 | 0 | 0 | 469/1058/1080.5/4342/4880 | 0/22 | 1058/4342/4880 |
+| i-t06/B | 23 | 192 | 66 | 0 | 0 | 1 (G15#0) | 497/1012/1012/4830/5120 | 1/23 | 909/3316/4830 |
+| i-t06/boundary | 11 | 192 | 145 | 0 | 0 | 2 (MAX-HANGUL#0, MAX-SUPPLEMENTARY#0) | 2624/4542/4542/5120/5120 | 4/11 | 4082/4979/4979 |
+| v2-t0/A | 22 | 256 | 87 | 0 | 0 | 0 | 587/1452/1468.5/4360/4461 | 0/22 | 1452/4360/4461 |
+| v2-t0/B | 22 | 192 | 77 | 0 | 0 | 0 | 567/1107/1160/2616/4082 | 0/22 | 1107/2616/4082 |
+| v2-t0/boundary | 9 | 192 | 98 | 0 | 0 | 0 | 2282/2617/2617/3333/3333 | 0/9 | 2617/3333/3333 |
+| v2-t06/A | 25 | 256 | 87 | 0 | 0 | 1 (G17#0) | 730/1407/1407/4436/5120 | 1/25 | 1335/3879/4436 |
+| v2-t06/B | 22 | 192 | 77 | 0 | 0 | 0 | 631/1580/1640/3184/3595 | 0/22 | 1580/3184/3595 |
+| v2-t06/boundary | 10 | 192 | 97 | 0 | 0 | 1 (ESCAPE-CONTROL#0) | 1793/2800/2824/5120/5120 | 1/10 | 2800/3207/3207 |
+
+| arm/경로 | 호출 | 로컬 사고 min/p50/p95/max | > 4928 | FINISH_LENGTH |
+|---|---|---|---|---|
+| V2/A | 47 | 587/1452/4436/5120 | 1 | 1 |
+| V2/B | 44 | 567/1507/3184/4082 | 0 | 0 |
+| V2/boundary | 19 | 1793/2774/5120/5120 | 1 | 1 |
+| I/A | 44 | 469/1058/3655/4880 | 0 | 0 |
+| I/B | 45 | 497/1256/3578/5120 | 1 | 1 |
+| I/boundary | 25 | 1498/4896/5120/5120 | 12 | 10 |
+
+- 답변 상한 초과: 0/224(분류·경계 192, 계획 A 256 기준. A 도 192 기준 초과 0). 경로별 답변 max: A 87·B 77·boundary 145. 경계 145 는 정답 content(해시 `26db1d7e637f…`, I 키 순서)의 로컬 계수이며 SPEC §14.5 의 v2 준비 정적 공식 최장 wire 145 토큰과 수가 같다.
+- FINISH_LENGTH(시도): 전체 13 — 경로별 A 1·B 1·boundary 11, 진단별 v2-t0 0·i-t0 8·v2-t06 2·i-t06 3(위 표). 13/13 모두 답변 0·로컬 사고 5,120.
+- 로컬 사고 토큰 전체: n 224, min 469, p50 1711(중앙값 1720), p95 5120, max 5120. SPEC §14.5 표의 분류 ctx 상한 `T_cls ≤ 4,928` 을 넘는 시도는 15/224(경로별 A 1·B 1·boundary 13). 경로 A 는 계획 호출이라 SPEC 의 계획 ctx 상한 `T_pln ≤ 4,864` 도 따로 보면 넘는 시도가 2건이다(`v2-t06` G17 초회 5,120 length, `i-t06` G17 4,880 stop).
+- 규칙 확인: ①서버는 `max_tokens` 하나로 사고·답변·경계 특수 토큰을 함께 자른다(아래 4) 의 "max_tokens 사고 포함"). 사고를 따로 자르는 요청 수단은 이 진단에서 쓰지 않았고 관측되지 않았다. 따라서 사고 상한 T 는 요청 `max_tokens = 답변 상한 + T` 로만 걸리며, 사고가 이 합을 다 쓰면 답변 0·`length` = FINISH_LENGTH 실패(1회 재시도)가 된다(관측 13/13). ②`completion_tokens` 에는 사고·답변 외에 arm 상수(2 또는 3)가 들어가므로 요청 `max_tokens` 의 합에도 이 몫이 들어간다. ③답변 상한 판정(초과 = 실패)은 서버가 아니라 Gateway·하네스의 계수로만 걸린다. T 값 자체는 흐름 ⑫ 에서 제안한다.
+- 대조(사용자 제공 boundary 수치): 중앙값 i-t0 5,120·i-t06 4,542·v2-t0 2,617 과 4928 초과 8/14·4/11·0/9·1/10 은 위 계산과 같다. v2-t06 boundary 중앙값은 nearest-rank 2,800·통계 중앙값 2,824(n=10)로 계산되어 제공값 2,848 과 다르다.
+
+#### 4) Plan ⑥ 진단 항목 판별(d)
+
+| 항목 | 판정 | 근거(파일 / JSON 경로) |
+|---|---|---|
+| 사고문 분리 필드 | CONFIRMED — `message.reasoning` | 각 결과 `attempts[].thinkingObservations[].separateFields`(A·B), `cases[].attempts[].thinkingObservations[]`(boundary): `reasoning` 224/224; `token-golden.jsonl` `thinking.separateFields` 13/13 |
+| `max_tokens` 의 사고 포함 | CONFIRMED — 포함 | `length` 13 시도 모두 `localTokenCounts[].thinkingTokens` 5,120 = 요청 `maxTokens` 5,120·`answerTokens` 0(A·B 행은 `completionTokens[]` 도 5,120, boundary 는 마지막 호출 `completionTokens` 5,120 3케이스); `max_tokens:1` 계수 행 17/17 `completionTokens` 1·`thinkingTokens` 1·`answerTokens` 0(`token-golden.jsonl`·`usage.json` `calls[].localTokenCount`) |
+| usage `completion_tokens` 의 사고 포함 | CONFIRMED — 포함 | `localTokenCounts[].completionMinusLocal` ∈ {0,1,2,3} 224/224(사고 수백~5,120 토큰 대비 상수 차이) |
+| usage 사고 토큰 수(`reasoning_tokens`) | CONFIRMED — 미보고 | `thinkingObservations[].reasoningTokens` null 224/224; 계수 행 17/17 null |
+| 답변 토큰 계수 방법 | CONFIRMED(방법 b 계수 가능) | 위 2): 계수 불가 0/224, `stop` 시도 arm 상수 일치 208/211 |
+| 사고 중 상한 도달 `finish_reason` | CONFIRMED — `length`, content 0, JSON `PARSE_FAILED`, 하네스 errorCode `FINISH_LENGTH` | `finishReasons[]`·`attemptDiagnostics[].finish`=`LENGTH` 13, `thinkingObservations[].contentCodepoints`=0 13, `attemptDiagnostics[].json`=`PARSE_FAILED` 13; `diagnostic-report.md` "판정 errorCode=FINISH_LENGTH" 행 |
+| `response_format`+thinking — 서버 수락·사고 분리 유지 | CONFIRMED | I arm(`responseFormat=JSON_SCHEMA_V1`, `diagnostic-report.md` 5행) 114 시도: 결과 `complete=true`·`abortReason=null` 6/6 파일, `separateFields=reasoning` 114/114, `stop` 103 시도 JSON `OBJECT`·`keys=EXACT` 전부 |
+| `response_format`+thinking — 문법 제약이 사고 단계에 걸리는지 | NOT DETERMINABLE | 사고문 원문 비저장(길이·토큰 수만). I arm 도 사고 토큰 469~5,120 이 관측되어 사고가 생략되지는 않았다(위 3) 표) |
+| `response_format`+thinking — FINISH_LENGTH 에 대한 효과 | NOT DETERMINABLE(단일 요인 분리 불가) | FINISH_LENGTH I arm 11·V2 arm 2. 두 arm 은 프롬프트·Context 투영·`response_format` 이 함께 달라(PREREG-v4-diag-*-b 1절 표) 요인을 나눌 수 없다 |
+| properties 순서(`outputKeyOrders`) | CONFIRMED(관측) / 비정렬 순서 보존 여부 NOT MEASURED | `attempts[].outputKeyOrders[]`: I A `eqp,from,qRef,steps,t,to`=44; I B `eqp,from,qRef,t,to`=44; I B `null`=1; I boundary `eqp,from,qRef,t,to`=15; I boundary `null`=10; V2 A `null`=1; V2 A `t,eqp,from,to,qRef,steps`=46; V2 B `t,eqp,from,to,qRef`=44; V2 boundary `null`=1; V2 boundary `t,eqp,from,to,qRef`=18(null = length 시도). I arm 은 송신 schema properties 순서(canonical 정렬, `ResponseSchema` 20~21행)와 같고 V2 arm 은 프롬프트 표시 순서다. 정렬과 다른 순서로 보낸 schema 를 서버가 보존하는지는 v4 등록에 `JSON_SCHEMA_PLAN_ORDERED_V1` arm 이 없어 측정하지 않았다 |
+| `/api/ps` 필드 | CONFIRMED(허용 요약 필드) / 그 밖 원본 필드 NOT DETERMINABLE | 9 파일(`preflight.json`·`postflight.json` 4쌍 + `diag-v2-t0-b/postflight-2.json`) 모두 `{models[{name,digest,context_length}],residentCount,ok,reason}`, 바이트 SHA 접두부 `901c0c8f94c134be` 하나로 동일: `qwen3:4b` `359d7dd4bcda…` ctx 8192, `bge-m3:latest` `790764642607…` ctx 8192, residentCount 2. preflight 는 허용 필드만 저장하므로(Plan P03 `f0 preflight` 정의 — 허용 필드 요약만 출력·저장) 원본 `/api/ps` 의 다른 필드는 저장 결과로 알 수 없다 |
+| G-USAGE | CONFIRMED — 같음 | `diag-v2-t0-b/usage.json` `equalOnCacheHit` = usage `true`·evalCount `true`; `calls[]` U1/cold prompt 1056·eval 1056·audit 1056, U1/warm prompt 1056·eval 1056·audit 1056, U2/shared prompt 1038·eval 1038·audit 1038, U2/cold prompt 1038·eval 1038·audit 1038. 진단 run 224 시도도 `promptTokens[]` = `auditInputTokens[]` 224/224 |
+| prompt cache | 계수 영향 CONFIRMED(warm·공유 접두부에서 `prompt_tokens`·`prompt_eval_count` 감소 0) / 실제 캐시 적중·지연 이득 NOT DETERMINABLE | 같은 `usage.json` — `calls[]` 키는 `auditInputTokens, completionTokens, finishReason, id, localTokenCount, phase, promptEvalCount, promptTokens, thinking` 뿐이라 호출별 지연·적중 표지가 없다 |
+
+#### 5) 오답 목록(e)
+
+- 대상: 4 진단의 A·B 골든 행 중 실효 t 오답 또는 인자 오답 또는 무효(45행), boundary 케이스 중 불통과(27케이스) — 합계 72. 재시도 뒤 통과한 4건은 따로 적었다. A 의 실효 t 는 하네스 `predicted.effectiveT`(미등록·비활성 단계가 있으면 UNS, `PlanJudge` 30행)이며 재시도 뒤 마지막 시도 기준이다. boundary 의 `outputSha256` 은 마지막 시도의 content 해시다.
+- 유형별(한 행이 여러 유형에 들 수 있음):
+
+| 실패 유형 | 건수 | 대상(진단 경로 caseId) |
+|---|---|---|
+| F1 t 오분류 | 8 | v2-t0 B G01, v2-t0 B G04, v2-t0 B G16, v2-t0 boundary ESCAPE-01, v2-t0 boundary ESCAPE-CONTROL, v2-t06 A G17, v2-t06 B G01, v2-t06 B G18 |
+| F2 시간 형식 변형(초·오프셋 추가) | 26 | v2-t0 A G01, v2-t0 A G09, v2-t0 A G11, v2-t0 A G12, v2-t0 A G17, v2-t0 A G22, v2-t0 B G01, v2-t0 B G09, v2-t0 B G11, v2-t0 B G12, v2-t0 B G17, v2-t0 B G22, v2-t0 boundary NORMAL-01, v2-t06 A G01, v2-t06 A G09, v2-t06 A G11, v2-t06 A G12, v2-t06 A G17, v2-t06 A G22, v2-t06 B G01, v2-t06 B G09, v2-t06 B G11, v2-t06 B G12, v2-t06 B G17, v2-t06 B G22, v2-t06 boundary NORMAL-01 |
+| F2b 정밀 시각 → 분 단위 축약 | 1 | i-t06 boundary NORMAL-PRECISE |
+| F2c 기대 null 시간창에 값 출력 | 2 | v2-t0 B G20, v2-t06 B G20 |
+| F3 Context 값 복사 | 8 | v2-t0 A G08, v2-t0 A G20, v2-t0 B G08, v2-t0 B G20, v2-t06 A G08, v2-t06 A G20, v2-t06 B G08, v2-t06 B G20 |
+| F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | 7 | i-t0 A G03, v2-t06 B G03, v2-t06 B G21, i-t06 A G03, i-t06 B G03, i-t06 B G15, i-t06 B G21 |
+| F4b eqp 누락(기대 값 있음, 출력 null) | 4 | v2-t0 A G16, v2-t0 B G16, v2-t06 A G16, v2-t06 B G16 |
+| F5 경계 eqp 64cp → `EQP0001` | 20 | v2-t0 boundary MAX-MIXED, v2-t0 boundary MAX-HANGUL, v2-t0 boundary MAX-DIGIT, v2-t0 boundary MAX-ASCII, v2-t0 boundary MAX-SUPPLEMENTARY, v2-t0 boundary ESCAPE-01, v2-t0 boundary ESCAPE-CONTROL, i-t0 boundary MAX-MIXED, i-t0 boundary MAX-HANGUL, i-t0 boundary MAX-SUPPLEMENTARY, v2-t06 boundary MAX-MIXED, v2-t06 boundary MAX-HANGUL, v2-t06 boundary MAX-DIGIT, v2-t06 boundary MAX-ASCII, v2-t06 boundary MAX-SUPPLEMENTARY, v2-t06 boundary ESCAPE-01, v2-t06 boundary ESCAPE-CONTROL, i-t06 boundary MAX-MIXED, i-t06 boundary ESCAPE-01, i-t06 boundary ESCAPE-CONTROL |
+| F5b 경계 eqp 오답(내용 미재현) | 1 | i-t06 boundary MAX-SUPPLEMENTARY |
+| F6 사고 상한 소진(답변 0) | 3 | i-t0 boundary MAX-DIGIT, i-t0 boundary ESCAPE-01, i-t0 boundary ESCAPE-CONTROL |
+| F6r 초회 사고 상한 소진 → 재시도 | 5 | i-t0 boundary MAX-SUPPLEMENTARY, v2-t06 A G17, v2-t06 boundary ESCAPE-CONTROL, i-t06 B G15, i-t06 boundary MAX-SUPPLEMENTARY |
+
+- 해시 근거: boundary 는 `boundary-rca/match_hashes_t.out`(질문 부분 문자열 eqp 후보 × t × 시간 × qRef 직렬화 3,236,240 후보)과 `match_extra.out`, 골든 A·B 는 `step8/match_golden_time.out`(기대값 + 시간 접미 변형 후보)으로 저장 해시를 재현한 결과다. 정답 해시는 `output-boundary-cases.jsonl` 의 `expectedOutput` 을 arm 키 순서로 직렬화해 계산했다(MAX·ESCAPE 정답: I 순서 `26db1d7e637f…`, V2 순서 `7fc3cb729e31…` — V2 순서 정답은 한 번도 나오지 않았다). `e3b0c44298fc…` 는 빈 문자열 해시다.
+
+| # | 진단 | 경로 | caseId | 기대 t → 실효 t(원 t) | 오답 필드 | errorKinds | errorCodes | 재시도 | 실효 판정 | 실패 유형 | 해시 근거 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | v2-t0 | A | G01 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `e82664c62e3f` 미재현 |
+| 2 | v2-t0 | A | G08 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 3 | v2-t0 | A | G09 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `b1407006e560` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 4 | v2-t0 | A | G11 | LQ → LQ | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `f1761c4d9b38` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 5 | v2-t0 | A | G12 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `c484734ce737` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 6 | v2-t0 | A | G16 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4b eqp 누락(기대 값 있음, 출력 null) | - |
+| 7 | v2-t0 | A | G17 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `a3611bae245e` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 8 | v2-t0 | A | G20 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 9 | v2-t0 | A | G22 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `2fbb1236809c` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 10 | v2-t0 | B | G01 | INC → KQ | t·from·to | TASK_TYPE_MISMATCH,ARGUMENT_MISMATCH | - | 아니오 | OK, t 오답, 인자 오답, UNSUPPORTED 정답 | F1 t 오분류; F2 시간 형식 변형(초·오프셋 추가) | `f6c2926386f3` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 11 | v2-t0 | B | G04 | KQ → GQ | t | TASK_TYPE_MISMATCH | - | 아니오 | OK, t 오답, 인자 정답, UNSUPPORTED 정답 | F1 t 오분류 | - |
+| 12 | v2-t0 | B | G08 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 13 | v2-t0 | B | G09 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `8132a84619b6` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 14 | v2-t0 | B | G11 | LQ → LQ | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `58b4a150fe23` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 15 | v2-t0 | B | G12 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `fa3bf734de78` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 16 | v2-t0 | B | G16 | UNS → GQ | t·eqp | TASK_TYPE_MISMATCH,ARGUMENT_MISMATCH | - | 아니오 | OK, t 오답, 인자 오답, UNSUPPORTED 오답 | F1 t 오분류; F4b eqp 누락(기대 값 있음, 출력 null) | - |
+| 17 | v2-t0 | B | G17 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `c86c720f6f7d` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 18 | v2-t0 | B | G20 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사; F2c 기대 null 시간창에 값 출력 | - |
+| 19 | v2-t0 | B | G22 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `be30e9b5e125` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 20 | v2-t0 | boundary | NORMAL-01 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 76 → 불통과 | F2 시간 형식 변형(초·오프셋 추가) | `c86c720f6f7d` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 21 | v2-t0 | boundary | MAX-MIXED | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 22 | v2-t0 | boundary | MAX-HANGUL | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 23 | v2-t0 | boundary | MAX-DIGIT | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 24 | v2-t0 | boundary | MAX-ASCII | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 25 | v2-t0 | boundary | MAX-SUPPLEMENTARY | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 26 | v2-t0 | boundary | ESCAPE-01 | INC → t 오답 | eqp | TASK_TYPE_MISMATCH,ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 98 → 불통과 | F1 t 오분류; F5 경계 eqp 64cp → `EQP0001` | `794328a9b592` 재현: t=LQ eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 27 | v2-t0 | boundary | ESCAPE-CONTROL | INC → t 오답 | eqp | TASK_TYPE_MISMATCH,ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 98 → 불통과 | F1 t 오분류; F5 경계 eqp 64cp → `EQP0001` | `9c560d9472d3` 재현: t=KQ eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 28 | i-t0 | A | G03 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 29 | i-t0 | boundary | MAX-MIXED | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 30 | i-t0 | boundary | MAX-HANGUL | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 31 | i-t0 | boundary | MAX-DIGIT | INC → (무효) | 전 필드(무효) | INVALID_OUTPUT | FINISH_LENGTH,FINISH_LENGTH | 예 | INVALID/length, schemaValid=false, argsExact=false, 답변 0 → 불통과 | F6 사고 상한 소진(답변 0) | `e3b0c44298fc` = 빈 content |
+| 32 | i-t0 | boundary | MAX-SUPPLEMENTARY | INC → INC | eqp | ARGUMENT_MISMATCH | FINISH_LENGTH | 예 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001`; F6r 초회 사고 상한 소진 → 재시도 | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 33 | i-t0 | boundary | ESCAPE-01 | INC → (무효) | 전 필드(무효) | INVALID_OUTPUT | FINISH_LENGTH,FINISH_LENGTH | 예 | INVALID/length, schemaValid=false, argsExact=false, 답변 0 → 불통과 | F6 사고 상한 소진(답변 0) | `e3b0c44298fc` = 빈 content |
+| 34 | i-t0 | boundary | ESCAPE-CONTROL | INC → (무효) | 전 필드(무효) | INVALID_OUTPUT | FINISH_LENGTH,FINISH_LENGTH | 예 | INVALID/length, schemaValid=false, argsExact=false, 답변 0 → 불통과 | F6 사고 상한 소진(답변 0) | `e3b0c44298fc` = 빈 content |
+| 35 | v2-t06 | A | G01 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `e82664c62e3f` 미재현 |
+| 36 | v2-t06 | A | G08 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 37 | v2-t06 | A | G09 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `b1407006e560` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 38 | v2-t06 | A | G11 | LQ → LQ | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `f1761c4d9b38` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 39 | v2-t06 | A | G12 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `57bd258cdad0` 재현: from `:00` 추가·to `:00` 추가 |
+| 40 | v2-t06 | A | G16 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4b eqp 누락(기대 값 있음, 출력 null) | - |
+| 41 | v2-t06 | A | G17 | INC → UNS(원 t INC, 미등록 단계 1) | t·from·to | ARGUMENT_MISMATCH | FINISH_LENGTH | 예 | OK, t 오답, 인자 오답, UNSUPPORTED 오답 | F1 t 오분류; F2 시간 형식 변형(초·오프셋 추가); F6r 초회 사고 상한 소진 → 재시도 | `2941f123681a` 미재현 |
+| 42 | v2-t06 | A | G20 | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 43 | v2-t06 | A | G22 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `2c1b4b79e438` 재현: from `:00` 추가·to `:00` 추가 |
+| 44 | v2-t06 | B | G01 | INC → KQ | t·from·to | TASK_TYPE_MISMATCH,ARGUMENT_MISMATCH | - | 아니오 | OK, t 오답, 인자 오답, UNSUPPORTED 정답 | F1 t 오분류; F2 시간 형식 변형(초·오프셋 추가) | `4f095a440f6a` 재현: from `+09:00` 추가·to `+09:00` 추가 |
+| 45 | v2-t06 | B | G03 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 46 | v2-t06 | B | G08 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사 | - |
+| 47 | v2-t06 | B | G09 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `8132a84619b6` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 48 | v2-t06 | B | G11 | LQ → LQ | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `58b4a150fe23` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 49 | v2-t06 | B | G12 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `fa3bf734de78` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 50 | v2-t06 | B | G16 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4b eqp 누락(기대 값 있음, 출력 null) | - |
+| 51 | v2-t06 | B | G17 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `c86c720f6f7d` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 52 | v2-t06 | B | G18 | GQ → KQ | t | TASK_TYPE_MISMATCH | - | 아니오 | OK, t 오답, 인자 정답, UNSUPPORTED 정답 | F1 t 오분류 | - |
+| 53 | v2-t06 | B | G20 | INC → INC | eqp·from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F3 Context 값 복사; F2c 기대 null 시간창에 값 출력 | - |
+| 54 | v2-t06 | B | G21 | KQ → KQ | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 55 | v2-t06 | B | G22 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F2 시간 형식 변형(초·오프셋 추가) | `be30e9b5e125` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 56 | v2-t06 | boundary | NORMAL-01 | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 76 → 불통과 | F2 시간 형식 변형(초·오프셋 추가) | `c86c720f6f7d` 재현: from `:00+09:00` 추가·to `:00+09:00` 추가 |
+| 57 | v2-t06 | boundary | MAX-MIXED | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 58 | v2-t06 | boundary | MAX-HANGUL | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 59 | v2-t06 | boundary | MAX-DIGIT | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 60 | v2-t06 | boundary | MAX-ASCII | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 61 | v2-t06 | boundary | MAX-SUPPLEMENTARY | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 62 | v2-t06 | boundary | ESCAPE-01 | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 63 | v2-t06 | boundary | ESCAPE-CONTROL | INC → INC | eqp | ARGUMENT_MISMATCH | FINISH_LENGTH | 예 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001`; F6r 초회 사고 상한 소진 → 재시도 | `8d8e08e58b88` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 64 | i-t06 | A | G03 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 65 | i-t06 | B | G03 | UNS → UNS | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 66 | i-t06 | B | G15 | UNS → UNS | eqp | ARGUMENT_MISMATCH | FINISH_LENGTH | 예 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null); F6r 초회 사고 상한 소진 → 재시도 | - |
+| 67 | i-t06 | B | G21 | KQ → KQ | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK, t 정답, 인자 오답, UNSUPPORTED 정답 | F4 미등록 질문 문자열을 eqp 로 추출(기대 null) | - |
+| 68 | i-t06 | boundary | NORMAL-PRECISE | INC → INC | from·to | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 58 → 불통과 | F2b 정밀 시각 → 분 단위 축약 | `c5121ba69c9f` = NORMAL-01 정답(I 순서) |
+| 69 | i-t06 | boundary | MAX-MIXED | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 70 | i-t06 | boundary | MAX-SUPPLEMENTARY | INC → INC | eqp | ARGUMENT_MISMATCH | FINISH_LENGTH | 예 | OK/stop, schemaValid=true, argsExact=false, 답변 106 → 불통과 | F5b 경계 eqp 오답(내용 미재현); F6r 초회 사고 상한 소진 → 재시도 | `e5ab52289a48` 미재현 |
+| 71 | i-t06 | boundary | ESCAPE-01 | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+| 72 | i-t06 | boundary | ESCAPE-CONTROL | INC → INC | eqp | ARGUMENT_MISMATCH | - | 아니오 | OK/stop, schemaValid=true, argsExact=false, 답변 97 → 불통과 | F5 경계 eqp 64cp → `EQP0001` | `be5dc92fe2de` 재현: t=INC eqp=`EQP0001` fromLen=35 qRef=Q1 |
+
+- 재시도 뒤 통과:
+
+| 진단 | 경로 | caseId | errorCodes | 재시도 뒤 | 해시 근거 |
+|---|---|---|---|---|---|
+| i-t0 | boundary | MAX-ASCII | FINISH_LENGTH | 통과(정답) | `26db1d7e637f` = 정답 |
+| v2-t06 | A | G06 | STEPS_INVALID | 통과(정답) | - |
+| v2-t06 | A | G19 | STEPS_INVALID | 통과(정답) | - |
+| i-t06 | boundary | MAX-HANGUL | FINISH_LENGTH | 통과(정답) | `26db1d7e637f` = 정답 |
+
+- 요약: ①V2 arm 의 골든 오답 대부분은 시간 형식(분 단위 기대값에 `:00+09:00`·`+09:00`·`:00` 를 붙임 — 해시 재현)과 Context 값 복사(G08·G20)이며, 같은 문항이 I arm 에서는 정답이다. ②I arm 의 골든 오답은 기대 null 인 eqp 에 질문 속 미등록 문자열을 넣은 경우(G03·G15·G21)뿐이다. ③경계 MAX·ESCAPE 불통과는 무효 3건(i-t0, 두 시도 모두 사고 상한 소진)을 빼면 모두 eqp 오답이며, 21건 중 20건이 64 codepoint eqp 대신 질문 안의 `EQP0001` 을 쓴 content 로 해시 재현됐다(나머지 1건 `e5ab52289a48…` 은 미재현). ④t 오분류는 V2 arm 에서만 났다(골든 6행·경계 2케이스).
+
+#### 6) F0 gate 5 leaf 지시적 대응(진단 = 게이트 증거 아님)
+
+- 아래는 진단 결과에 정식 판정 규칙(`F0Judgement`)의 생성 부분을 그대로 적용해 본 **지시적 대응**이다. 진단 등록은 `DIAGNOSTIC_NOT_GATE_ELIGIBLE` 이라 gate 입력이 될 수 없다. 또 진단 회차에는 `official-count.json`·`gguf-count.json` 이 없어(4 진단 모두 부재 확인) 정식 판정이었다면 AC-37-OUT-* 는 계수 입력 부재로 `NOT_RUN`(`OUT_INPUT_MISSING`)이 된다. 표의 OUT 열은 계수 조건을 뺀 생성 조건(케이스별 `passRounds = totalRounds`)만 본 것이다.
+
+| 진단 | AC-37-CMP(하네스 규칙) | AC-37-OUT-NORMAL | AC-37-OUT-MAX | AC-37-OUT-ESCAPE | AC-38-F0 | 정식이었다면 FAIL 될 leaf |
+|---|---|---|---|---|---|---|
+| v2-t0 | PASS 기록·결정 `KEEP_B`(A t/인자/UNS 22/13/22, B 19/13/21, A 기대 t별 p95 예산 이내 false) | 불통과 — 생성 1/2 케이스(재시도 0) | 불통과 — 생성 0/5 케이스(재시도 0) | 불통과 — 생성 0/2 케이스(재시도 0) | PASS(표본 2, INC 2, workflow 2, UNS 0) | AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE |
+| i-t0 | PASS 기록·결정 `KEEP_B`(A t/인자/UNS 22/21/22, B 22/22/22, A 기대 t별 p95 예산 이내 false) | 통과 — 생성 2/2 케이스(재시도 0) | 불통과 — 생성 1/5 케이스(재시도 3) | 불통과 — 생성 0/2 케이스(재시도 2) | PASS(표본 2, INC 2, workflow 2, UNS 0) | AC-37-OUT-MAX, AC-37-OUT-ESCAPE |
+| v2-t06 | PASS 기록·결정 `KEEP_B`(A t/인자/UNS 21/13/21, B 20/11/22, A 기대 t별 p95 예산 이내 false) | 불통과 — 생성 1/2 케이스(재시도 0) | 불통과 — 생성 0/5 케이스(재시도 0) | 불통과 — 생성 0/2 케이스(재시도 1) | PASS(표본 2, INC 2, workflow 2, UNS 0) | AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE |
+| i-t06 | PASS 기록·결정 `KEEP_B`(A t/인자/UNS 22/21/22, B 22/19/22, A 기대 t별 p95 예산 이내 false) | 불통과 — 생성 1/2 케이스(재시도 0) | 불통과 — 생성 3/5 케이스(재시도 2) | 불통과 — 생성 0/2 케이스(재시도 0) | PASS(표본 2, INC 2, workflow 2, UNS 0) | AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE |
+
+- AC-37-CMP 는 하네스 규칙상 A·B 회차가 완결되면 PASS(결정 기록)이며 4 진단 모두 `KEEP_B` 다. A 가 잠정 후보가 되지 못한 이유 중 하나인 기대 t 별 p95 지연 예산(PREREG `latencyBudgetMsByT` UNS 15,000·LQ/KQ/GQ 30,000·INC 90,000 ms)은 아래와 같이 4 진단 모두 넘는 t 가 있다(B 도 참고로 적음).
+
+| 진단/경로 | GQ | INC | KQ | LQ | UNS |
+|---|---|---|---|---|---|
+| v2-t0/A | 59038 | 84118 | 24983 | 44375 | 22660 |
+| v2-t0/B | 10529 | 74666 | 17050 | 33760 | 44882 |
+| i-t0/A | 18624 | 66789 | 21845 | 39849 | 25433 |
+| i-t0/B | 15754 | 69547 | 32609 | 53928 | 30464 |
+| v2-t06/A | 64419 | 167296 | 38321 | 46256 | 25691 |
+| v2-t06/B | 18250 | 64781 | 28873 | 32425 | 46580 |
+| i-t06/A | 15205 | 96051 | 25766 | 43563 | 19838 |
+| i-t06/B | 10744 | 60471 | 17561 | 55844 | 187895 |
+
+- AC-38-F0(G08, 카테고리 `AC38_CROSS_SYSTEM_NAME`)는 4 진단 모두 A·B 실효 t=INC·workflow 일치·UNS 0 으로 PASS 조건을 만족한다. 다만 V2 arm 의 G08 은 인자(eqp·from·to)가 Context 복사로 오답이다(AC-38 판정 대상 아님).
+- 계수 입력까지 갖춘 정식 회차에서 같은 생성 결과가 나왔다면: 4 진단 모두 AC-37-OUT-MAX·AC-37-OUT-ESCAPE FAIL, AC-37-OUT-NORMAL 은 `i-t0` 만 생성 통과(나머지 3 FAIL), AC-37-CMP·AC-38-F0 는 PASS — F0 exit(5 leaf 모두 PASS) 불충족.
+
+#### 7) 판별 불가·미측정 정리와 다음 단계
+
+- NOT DETERMINABLE: 교차 확인 차이 1(3건)과 arm 상수 3/2 의 원인, 문법 제약이 사고 단계에 걸리는지, `response_format` 단독 효과, `/api/ps` 원본의 다른 필드, prompt cache 실제 적중·지연 이득, 미재현 해시 3종(`e82664c62e3f…` A G01 — 두 V2 진단 공통, `2941f123681a…` v2-t06 A G17, `e5ab52289a48…` i-t06 MAX-SUPPLEMENTARY) — 모두 원문 비저장 때문이다.
+- NOT MEASURED: 비정렬 schema properties 순서 보존(v4 등록에 순서 유지 arm 없음), 진단 회차의 공식·GGUF 출력 계수(경계 OUT leaf 계수 조건).
+- 다음 단계는 개정 흐름 ⑨(오답 원인 분석 → 프롬프트 수정 제안 → 사용자 승인 → 새 진단 등록)다. 생성 모델 변경 0·경계/골든 케이스 변경 0(eqp 64 codepoint = `nori-tc-common` `TcEqpEntity.java:56` `length = 64`)은 같은 날 사용자 결정으로 고정이다.
+
+#### 8) 보존 확인
+
+- 이 소절은 append 만 했다. 이 소절 추가 전 Dev report 596,642 B SHA `afb56331…675d`. 결과·PREREG·evidence·capture·하네스·SPEC 변경 0, commit·push 0. 같은 날 Plan P03 v4 흐름 개정(⑧~⑮ 재번호·반복 규칙, Plan 은 gitignore 대상)은 별도 반영했다.
+
+
+### 12.33 P03 v4 ⑨ 후반 — 승인 classify-v4-a·재진단 4문서 C26/C27 등록 준비 (2026-11-05, Codex)
+
+- 사용자 승인(2026-11-05)에 따라 새 후보 C(classify-v4-a / 기존 plan-v3-i)와 불변 V2 대조를 각각 temperature 0·0.6, R=1 DIAGNOSTIC으로 등록한다. 목적은 P03 ⑩ 연습 재시험이며 F0 gate 증거를 만들지 않는다. Spec·Plan·하네스 코드·기존 등록·입력·결과·capture·evidence는 변경하지 않는다.
+- 승인 파일을 `eval/f0/v4/prompts/classify-v4-a.txt`에 바이트 동일 복사했다. SHA-256 `3dc53407afa595caf0248070a550a712cd74a1ad7ddc0ea70c70bf6336790b46`. 토큰 수 898(기존 906); plan-v3-i 유지. 후보 설정은 PRESENCE_V1·JSON_SCHEMA_V1·STEPS_DETAIL_V1, V2 대조는 기존 FULL·NONE·힌트 키 없음이다. 예산·상한·fixture·golden 22·boundary 9·LOCAL_TOKENIZER_PIN_V1은 기존 -b 그대로다.
+- 신규 `eval/f0/v4/input-audit-v4-c.json`: Java input-audit-render(INFER_V4) → venv Python -B count_input_audit_v4.py. 출력 `F0_INPUT_AUDIT_RENDERED 717`, `INPUT_AUDIT_WRITTEN 717 OVER_BUDGET 0`. 최대 입력 3,051 ≤ 3,072, 최대 입력+max_tokens 8,171 ≤ 8,192. SHA-256 `dc1a7a36240796f54573aa51f848161bacfc23fb96c5e78e4bee09876388f4cf`. A 초회/재시도 1943/1978, B 1384/1418, boundary 3017/3051, usage 1370, token 2795. V2 audit는 기존 파일 재사용, 덮어쓰기 0.
+- 새 문서: `eval/f0/PREREG-v4-diag-c-t0.md`, `PREREG-v4-diag-c-t06.md`, `PREREG-v4-diag-v2-t0-c.md`, `PREREG-v4-diag-v2-t06-c.md`. 기존 문서와 비교해 후보의 classify 경로·SHA·audit 경로·SHA 및 그 입력을 반영한 harnessDigest, 새 capture 경로·등록 메타데이터만 바뀐다. V2의 inputs·parameters·harnessDigest는 기존 -b와 동일하다. 후보 harnessDigest `ed88cf6c6977934e4fad9b91b0e2b4336ad72a4139774472bfe367ca34792927`, V2 `91580fb716f40189d4c609a32a44f86a1349a9b420be12e6fe1fca14b59eae35`.
+- 하네스 확인: F0RunnerCli.run/boundary-gen은 CLI --prompt를 PREREG inputRoles의 planPrompt/classifyPrompt와 대조한 뒤 MessageAssembler.load로 로드한다. Prereg.parse는 promptSha256와 inputs SHA의 일치를, Prereg.verify는 실제 바이트·등록 commit·harnessDigest를 검증한다. MeasurementSession.start는 이 검증 뒤 preflight와 계수기 pin을 확인한다. 경로·SHA를 하네스에 하드코딩해 바꾸는 작업은 필요 없었다.
+- C26 전 실제 검증: `.\gradlew.bat :gateway-eval:test --console=plain`은 241건 중 240 PASS·1 FAIL·errors/skipped 0, `BUILD FAILED in 6m 3s`, `6 actionable tasks: 2 executed, 4 up-to-date`. 원인은 작업 시작 시 추가한 새 미추적 prompt가 기존 등록의 Prereg.verify에서 `PREREG_WORKTREE_DIRTY`를 발생시킨 것이다(F0V4RegistrationDraftTest.java:74). 제가 추가한 파일을 허용 scratch로 잠시 옮겨 eval/f0의 기존 등록 작업 트리를 복원한 뒤, `.\gradlew.bat :gateway-eval:test --tests '*F0V4RegistrationDraftTest.draftsBindArmTemperatureRuntimeAndBudgetAndMatchTheWorkingTree' --console=plain`으로 실패한 1건만 재검증했다: 1/1 PASS, `BUILD SUCCESSFUL in 29s`, `6 actionable tasks: 2 executed, 4 up-to-date`. 그 후 prompt를 복원했다. 전체 재실행을 통과했다고 표현하지 않으며, 하네스·테스트 코드 변경은 없다.
+- C24/C25의 선례(§12.31 로컬 등록 소절)에 따라 C26에는 기존 미커밋 devreport 꼬리를 그대로 포함한다. 기존 §12.32(⑧ 정리) 및 이전 C25 뒤 꼬리의 내용·순서는 바꾸지 않았다. 추가 전 devreport 639,673 B SHA `bf2a3a1d0a07deb06fb3fe79e117b56141b34d571b67ca4317562d731e836d53`, 이 앞부분의 바이트 동일성을 확인했다. 새 등록 준비 소절만 append한다. 실행 결과는 별도 한 소절을 append하고 커밋하지 않는다.
+- C26 대상은 새 prompt 1·새 audit 1·PREREG 초안 4·이 devreport 1, 총 7파일이다. C27은 네 PREREG의 registrationStatus·registeredCommit 기록만 담당한다. 기존 untracked는 포함하지 않는다. push·force·amend 없음.
+- 실행은 C26/C27 뒤 prereg-check 4건 통과 → c-t0 → c-t06 → v2-t0-c → v2-t06-c. preflight 실패 시 복구 없이 중단한다. 측정/사고 원문 출력·저장 금지, JSON 파싱 오류는 `parse failed`만 출력한다. scratch는 사용자 지정 step9/run에만 둔다.
