@@ -1,6 +1,6 @@
 # F0 진단 사전등록 v4-diag-v2-t06-c — 교체 추론 서버(qwen3:4b = Qwen3-4B-Thinking-2507): V2(기존 classify-v2 / plan-v2 대조) · temperature 0.6 · 답변 토큰 계수 방법 (b)
 
-## 0. 등록 상태 — **미등록 초안(UNCOMMITTED), `registeredCommit = null`**
+## 0. 등록 상태 — **등록 완료(REGISTERED), `registeredCommit = c25951e326f9b9c8babaab1b8c62dc1f58164b69`(C26)**
 
 - 목적은 **진단(purpose=DIAGNOSTIC)** 이다. `f0 report`는 `diagnostic-report.md`만 쓰며 F0 leaf 증거·RUN PARENT·§14.5 제안서를 만들지 않는다. 진단은 정식 분모·판정 밖이고 F0 게이트 PASS 근거가 아니다(`--out`·`--rejudge`·`--spec-record-check` = `DIAGNOSTIC_NOT_GATE_ELIGIBLE`, exit 2).
 - 비교 기준은 `PREREG-v4-diag-v2-t06-b.md`(C24/C25)다. 2026-11-05 사용자 승인에 따른 P03 ⑨ 후반·⑩ 재진단이며, 기존 등록·입력·결과·증거·capture는 수정하지 않는다. 하네스 코드 변경 0이며 기존 -b 등록은 stale로 만들지 않는다.
@@ -42,8 +42,8 @@
 {
   "schema": "f0-prereg-v4",
   "purpose": "DIAGNOSTIC",
-  "registrationStatus": "UNCOMMITTED",
-  "registeredCommit": null,
+  "registrationStatus": "REGISTERED",
+  "registeredCommit": "c25951e326f9b9c8babaab1b8c62dc1f58164b69",
   "runtimeCaptureDir": "eval/f0/chat-template/v4-diag-v2-t06-c",
   "inputRoles": {
     "golden": "eval/golden/tc-f0-v2.jsonl",
