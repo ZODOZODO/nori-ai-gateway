@@ -28,7 +28,7 @@ fun classpathItem(file: File): Any = if (file.isDirectory) file.walkTopDown().fi
 fun aigwInputComponents(test: Test): Map<String, Any?> {
     val properties = test.systemProperties.filterKeys { it.startsWith("aigw.") }
         .filterKeys { it !in setOf("aigw.rootDir", "aigw.specPath", "aigw.evalClasspath", "aigw.harness.classpath", "aigw.harness.javaExe") }
-        .mapValues { (key, value) -> if (key == "aigw.runtimeClasspathFile") fileSha(rootProject.file(value.toString())) else value.toString() }
+        .mapValues { (key, value) -> if (key in setOf("aigw.runtimeClasspathFile", "aigw.tokenizerFile")) fileSha(rootProject.file(value.toString())) else value.toString() }
     return mapOf(
         "classpath" to test.classpath.files.map { classpathItem(it) },
         "specSha" to (specFile()?.let { fileSha(it) } ?: "MISSING"),
@@ -44,11 +44,48 @@ val requiredTests = mutableSetOf<String>()
 
 subprojects {
     apply(plugin = "java")
-    repositories { mavenCentral() }
+    repositories {
+        mavenCentral()
+        if (project.path != ":gateway-eval") {
+            exclusiveContent {
+                forRepository {
+                    maven {
+                        name = "NoriObjectStorage"
+                        url = uri("https://gitlab.com/api/v4/projects/83704008/packages/maven")
+                        credentials(org.gradle.api.credentials.HttpHeaderCredentials::class) {
+                            name = providers.environmentVariable("GITLAB_AUTH_HEADER").orElse("Private-Token").get()
+                            value = providers.gradleProperty("gitlabToken").orElse(providers.environmentVariable("GITLAB_TOKEN")).orNull
+                        }
+                        authentication { create<org.gradle.authentication.http.HttpHeaderAuthentication>("header") }
+                    }
+                }
+                filter { includeGroup("com.nori") }
+            }
+        }
+    }
     extensions.configure<JavaPluginExtension> { toolchain.languageVersion = JavaLanguageVersion.of(21) }
     dependencies {
-        add("implementation", platform("org.springframework.boot:spring-boot-dependencies:4.0.7"))
+        add("implementation", platform(rootProject.libs.spring.boot.bom))
         add("testRuntimeOnly", "org.junit.platform:junit-platform-reporting")
+        if (project.path != ":gateway-eval") {
+            add("testImplementation", rootProject.libs.junit.jupiter)
+            add("testImplementation", rootProject.libs.assertj)
+            add("testImplementation", enforcedPlatform(rootProject.libs.testcontainers.bom))
+            add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
+        }
+    }
+    if (project.name in setOf("gateway-core", "gateway-persistence", "gateway-integration", "gateway-tc-mock", "gateway-app", "gateway-acceptance")) {
+        val integration = extensions.getByType<SourceSetContainer>().create("integrationTest")
+        val main = extensions.getByType<SourceSetContainer>()["main"]
+        integration.compileClasspath += main.output
+        integration.runtimeClasspath += main.output
+        configurations[integration.implementationConfigurationName].extendsFrom(configurations["testImplementation"])
+        configurations[integration.runtimeOnlyConfigurationName].extendsFrom(configurations["testRuntimeOnly"])
+        tasks.register<Test>("integrationTest") {
+            testClassesDirs = integration.output.classesDirs
+            classpath = integration.runtimeClasspath
+            systemProperty("aigw.requireDocker", providers.gradleProperty("aigw.requireDocker").orElse("false").get())
+        }
     }
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
@@ -96,6 +133,8 @@ subprojects {
         val extraction = tasks.register<JavaExec>("${name}LeafEvidence") {
             workingDir = rootDir
             mainClass = "com.nori.ai.gateway.eval.EvalCli"
+            val app = rootProject.findProject(":gateway-app")
+            if (app != null) dependsOn(":gateway-app:writeRuntimeClasspath")
             val eval = rootProject.findProject(":gateway-eval")
             if (eval != null) {
                 classpath = eval.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
@@ -103,6 +142,15 @@ subprojects {
                 classpath = files(providers.gradleProperty("aigw.evalClasspath").get().split(File.pathSeparator))
             }
             doFirst {
+                // 선언된 환경값 대신 현재 레포의 실제 HEAD를 증거에 결속합니다. 비 Git fixture는 기존 동작을 유지합니다.
+                if (rootProject.file(".git").exists()) {
+                    val head = providers.exec {
+                        workingDir(rootDir)
+                        commandLine("git", "rev-parse", "HEAD")
+                    }.standardOutput.asText.get().trim()
+                    if (!head.matches(Regex("[0-9a-f]{40}"))) throw GradleException("GIT_IDENTITY_INVALID")
+                    environment("AIGW_GIT_SHA", head)
+                }
                 val arguments = mutableListOf("leaf-extract", "--otr-dir", otr.get().asFile.absolutePath,
                     "--task", testTask.path, "--module", project.path,
                     "--baseline", rootProject.file("docs/gates/spec-baseline.md").absolutePath,
@@ -110,6 +158,7 @@ subprojects {
                     "--out", evidence.get().asFile.absolutePath,
                     "--current-fingerprint", aigwInputFingerprint(testTask))
                 specFile()?.let { arguments.addAll(listOf("--spec", it.absolutePath)) }
+                if (app != null) arguments.addAll(listOf("--runtime-classpath-file", app.layout.buildDirectory.file("aigw/runtime-classpath.txt").get().asFile.absolutePath))
                 if (testTask.path in requiredTests) arguments.add("--require-executed")
                 setArgs(arguments)
             }

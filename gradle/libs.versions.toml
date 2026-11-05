@@ -1,5 +1,35 @@
+[versions]
+springBoot = "4.0.7"
+springAi = "2.0.2"
+testcontainers = "2.0.3"
+djlTokenizers = "0.40.0"
+archunit = "1.5.1"
+jsonSchemaValidator = "3.0.9"
+protobuf = "4.33.2"
+protobufPlugin = "0.10.0"
+nimbusJoseJwt = "10.5"
+awsSdk = "2.46.17"
+otelLogback = "2.33.1-alpha"
+openaiJava = "4.80.0"
+
 [libraries]
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "springAi" }
+spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+djl-tokenizers = { module = "ai.djl.huggingface:tokenizers", version.ref = "djlTokenizers" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "jsonSchemaValidator" }
+protobuf = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
+awssdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awsSdk" }
+nori-storage-starter = { module = "com.nori:nori-object-storage-s3-starter", version = "0.0.1-SNAPSHOT" }
+otel-logback = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otelLogback" }
+openai-java-okhttp = { module = "com.openai:openai-java-client-okhttp", version.ref = "openaiJava" }
 junit-bom = { module = "org.junit:junit-bom" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 assertj = { module = "org.assertj:assertj-core" }
 jackson = { module = "com.fasterxml.jackson.core:jackson-databind" }
+
+[plugins]
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }

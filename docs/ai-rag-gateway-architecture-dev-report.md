@@ -5218,3 +5218,233 @@ BUILD SUCCESSFUL in 7m 1s
 - 현재 scratch의 spec-before.md와 바이트 비교하여 변경은 1223줄 하나뿐이며 총 줄 수·고정 1203/1207/1208/1666줄·UTF-8 LF·Plan 해시 불변을 확인했다. 기존 Dev report 전체 바이트를 보존하고 이 절만 끝에 추가했다.
 - AIGW_SPEC_FILE을 실제 SPEC 절대 경로로 지정하고 `.\gradlew.bat :gateway-eval:test --offline --console=plain`을 이번 보정에서 1회 실행했다: exit=0, JUnit XML 48개, tests=241, failures=0, errors=0, skipped=0. 로그·종료 코드는 현재 scratch의 gateway-eval-final-test.log·gateway-eval-final-test-exit.txt, 검증은 verification.json에 기록한다.
 - §12.37.1의 최초 실패 및 후속 실행 이력은 그대로 보존했다. 실제 통합·모델 시험은 실행하지 않았으며 P04/F1 구현·코드·테스트 변경은 하지 않았다.
+
+
+## P04 — 2026-11-05 사전 게이트 차단 (구현·검증 미완료)
+
+P04 상태: BLOCKED / 구현 미완료 / 검증 미완료. P05 미착수.
+
+확인된 선행조건:
+- 세션 run.log 시작 정보: model=gpt-6.1-sol, reasoning effort=medium. 하위 에이전트 사용 없음.
+- SPEC 실제 SHA256=136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3. 기준선 마지막 seq=6.
+- AIGW_SPEC_FILE을 실제 승인 파일로 설정한 spec-guard exit 0, FILE_HASHED/LOCAL_FILE. F0 PASS를 선행조건으로 요구하지 않음.
+- Boot BOM 4.0.7, Spring AI BOM/openai 2.0.2, Testcontainers BOM 2.0.3의 정확한 Maven Central POM GET 모두 HTTP 200. 이는 artifact 존재·접근 확인이며 조합 호환 PASS가 아님.
+- 공식 Spring AI v2.0.2 release 페이지 존재 확인. 수동 생성 API ⓐ~ⓕ의 tagged source/compile 검증은 미실행이며 확인 완료로 주장하지 않음.
+
+차단 1 — 수정 허용 범위와 필수 finalizer 계약 충돌:
+- 승인 Plan P04(442행)는 모든 LeafEvidence finalizer에 writeRuntimeClasspath 의존과 --runtime-classpath-file <실제 출력 절대 경로>를 추가하도록 요구함.
+- 실제 build.gradle.kts의 Test → JavaExec leaf-extract → EvalCli.dispatch → Args.only → OtrLeafExtractor.extract 호출을 확인함.
+- gateway-eval/.../EvalCli.java:55~57의 leaf-extract 허용 인자·호출에는 --runtime-classpath-file이 없음. Args.java:18의 only가 알 수 없는 인자를 INVALID_ARGUMENTS로 거부함.
+- OtrLeafExtractor.java:22~23의 extract 인자에도 runtime 파일 입력이 없음. 55~57행은 AIGW_RUNTIME_CLASSPATH_SHA256의 64자리 문자열만 받아 identity에 넣으며 파일 실제 바이트를 검증·해시하지 않음.
+- 실제 재현: :gateway-eval:run --args="leaf-extract --runtime-classpath-file <scratch>/runtime-not-created.txt --out <scratch>/rejected-evidence.json" → CLI exit 2 INVALID_ARGUMENTS / Gradle exit 1. 허용 인자 검사에서 거부되므로 출력·기존 증거 쓰기 0.
+- 따라서 root build에 Plan대로 인자를 추가하면 각 Test의 finalizer가 실패함. 환경변수 SHA만 전달하는 우회는 승인된 파일 입력 계약을 충족하지 않음.
+- 올바른 파일 입력 지원에는 gateway-eval CLI/추출기와 관련 회귀 시험 수정이 필요하지만 사용자는 gateway-eval 수정을 명시 금지함. 문구 오타가 아닌 기능·범위 충돌이므로 구현을 중단함.
+
+차단 2 — starter 인증 공급 미충족:
+- 읽기 전용 nori-object-storage/build.gradle.kts의 publication 좌표=com.nori:nori-object-storage-s3-starter:0.0.1-SNAPSHOT, GitLab Maven URL=https://gitlab.com/api/v4/projects/<projectId>/packages/maven, Job-Token(CI_JOB_TOKEN) 또는 Private-Token(gitlabToken/GITLAB_TOKEN)을 확인함.
+- Plan G-STACK의 projectId=83704008에 대해 기존 Gradle providers/env 경로만 이용한 GET을 실행함. credentialSource=none, HTTP 401. 비밀 파일을 읽거나 인증값을 출력하지 않음. 이 응답만으로 artifact 부재나 Boot 4 비호환을 단정하지 않음.
+- 전역 설정 변경, 로컬 fake publish, composite/source 대체, 다른 private 좌표 사용 없음. 승인된 안전한 자격증명 공급 전에는 starter 다운로드·Boot 4 실제 기동 확인 불가.
+
+대안과 영향:
+1. P04 쓰기 범위를 EvalCli·OtrLeafExtractor 및 직접 관련 회귀 시험에 한정해 명시적으로 확장하고, 기존 승인된 자격증명 공급 경로를 운영자가 준비: Plan 파일 입력 계약과 기존 증거 불변·fail-closed를 유지하며 재개 가능. SPEC/Plan 정책·버전 변경은 필요하지 않음. 기존 env 경로의 보존 여부는 수정 승인 시 명시해야 함.
+2. gateway-eval 금지를 유지하고 Plan을 환경변수 SHA 방식으로 개정·승인: 현재 선언값만 신뢰하는 경로와 파일 바이트 결속 차이를 재설계해야 하며, 승인된 finalizer 계약 변경과 검토가 필요함. 이번 세션에서 선택·시행하지 않음.
+권고(하나): 대안 1. 이미 명시된 실제 파일 해시 계약을 구현하고 기존 fingerprint/증거 의미를 보존할 수 있어 계약 변경보다 영향이 작음. 허용 범위 승인과 안전한 starter 인증 공급을 받은 뒤 P04를 재개해야 함. 토큰을 대화에 붙여넣지 않음.
+
+실제 실행 명령·결과(모든 Gradle 호출에 -p C:/workspace_nori/nori-ai-gateway 사용):
+1. AIGW_SPEC_FILE=<승인 SPEC>; gradlew.bat :gateway-eval:run --args="spec-guard" → exit 0. scratch/spec-guard.log 및 .exit.txt.
+2. AIGW_SPEC_FILE=<승인 SPEC>; gradlew.bat :gateway-eval:run --args="leaf-extract --runtime-classpath-file <scratch>/runtime-not-created.txt --out <scratch>/rejected-evidence.json" → Gradle exit 1, 내부 CLI exit 2 INVALID_ARGUMENTS(차단 재현). scratch/runtime-argument-reproduction.log 및 .exit.txt.
+3. AIGW_SPEC_FILE=<승인 SPEC>; gradlew.bat :gateway-eval:run --args="spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" → exit 0. scratch/spec-guard-exact.log 및 .exit.txt.
+4. C:/workspace_nori/.venvs/aigw-eval/Scripts/python.exe -B -X utf8 preflight_access.py → exit 0; HTTP/POM SHA 증거=scratch/artifact-access.json, scratch/*.pom. GET 성공을 빌드 PASS로 세지 않음.
+5. AIGW_SPEC_FILE=<승인 SPEC>; gradlew.bat -I <scratch>/registry-preflight.init.gradle.kts p04RegistryAccessProbe → Gradle exit 0이나 실제 HTTP 401, 인증 공급 미충족. scratch/registry-preflight.log 및 .exit.txt. 이 task는 읽기 전용 진단이며 검증 PASS가 아님.
+
+미실행 검증과 사유:
+- Plan P04 ① build ② app integrationTest(StackSmokeIT/AppContextWiringIT) ③ integration integrationTest(TokenizerNativeSmokeIT) ④ app test(RuntimeClasspathCleanTest) ⑤ syncRuntimeClasspathEvidence: 구현 전 필수 계약·범위 충돌로 중단. 모듈·시험·producer를 허위로 만들지 않음.
+- 관련 test-evidence verify는 Test task를 실행하지 않았으므로 미실행. P04 새 XML/OTR/실행 시험 수=0(NOT_RUN). 기존 XML/OTR을 P04 결과로 재사용하지 않음.
+- clean checkout build, starter Boot 4 호환, Spring AI 수동 생성, DJL native 오프라인 로컬/컨테이너, OTLP logs, 모듈 방향/빈 wiring/runtime 청결: 모두 NOT_RUN.
+- Docker 이미지 pull/기동·실모델/API 호출 없음. JDK/Docker 이전 root 점검 결과를 새 실행 결과로 주장하지 않음.
+
+실제 저장소 변경(문서만):
+- docs/gates/f1/stack-compat.md: G-STACK 차단·확인 범위·미검증·재개 조건 기록.
+- docs/ai-rag-gateway-architecture-dev-report.md: 기존 바이트를 보존하고 P04 절만 추가.
+- 구현 소스/빌드/catalog/gateway-eval 및 다른 레포 수정 0. runtime-classpath.txt는 producer 미구현이므로 생성하지 않음.
+SPEC/Plan 대비 차이: 필수 파일 인자 기능이 현행 eval에 부재하나 eval 수정 금지여서 P04 구현을 시작하지 못함. 승인된 계약·정책·버전은 변경하지 않음.
+영향 범위: 보고 문서만. P04 완료·G-STACK PASS·P05 착수 근거로 사용할 수 없음.
+
+보존 검사: before.json의 protected 483개와 SPEC·Plan·baseline·approval6 해시 일치. Dev report 기존 바이트 prefix 보존. 기존 untracked 진단 파일을 삭제·stash하지 않음.
+
+P04 출처 정정: 위의 “사용자는 gateway-eval 수정을 명시 금지함” 및 “eval 수정 금지”는 사용자의 최신 지시에서 새로 명시한 금지가 아니라, 승인 Plan P04 allowed_writes(438행)의 gateway-eval 제외와 442행의 --runtime-classpath-file 필수 전달 간 수정 허용 범위·필수 인터페이스 충돌을 뜻함. 기존 사용자 SDD 9.4의 충돌 시 중단 규칙이 적용되며, 기존 증거와 BLOCKED·구현/검증 미완료·P05 미착수 상태는 유지함.
+
+
+### P04 재개 보고 (2026-11-05, 파일 입력·인증·스택 검증)
+
+상태: 구현·로컬 기술 검사 통과, clean git checkout 검증·부모 독립 검증 대기. P04 최종 완료 선언 없음, P05 미착수.
+
+변경 이유: 승인된 P04 필수 --runtime-classpath-file 계약을 CLI/추출기에 구현하고 실제 파일 바이트를 증거 identity에 결속했다. 기존 overload·F0 무파일 동작은 보존하며 명시 파일 실패의 환경 SHA fallback을 금지했다. 2026-11-05 사용자 승인으로 기존 ignored Plan 438행 allowed_writes만 정확한 5개 Eval 소스/시험 파일로 확장했다. 그 밖 SPEC/Plan 계약 차이는 없다.
+
+기존 자격증명의 Private-Token 401은 Bearer 방식으로 해결했다(같은 gitlab.com 사용자 API·정확한 metadata 모두 200). 값은 CLI에서 메모리로 캡처하고 자식 환경에만 전달했다. 7모듈·분리 IT·명시 @Import·Spring-free core·runtime producer/finalizer/fingerprint·정적 규칙·실제 PG/모델 생성·starter/OTLP/DJL 검사를 구현했다. Boot 4 Kafka 자동구성 부재는 starter 의존성으로 해결했고 TC는 2.0.3으로 고정했다. 실추론·embedding·클라우드 호출은 없다.
+
+실제 변경 파일:
+
+- `build.gradle.kts`
+- `docs/ai-rag-gateway-architecture-dev-report.md`
+- `docs/gates/f1/runtime-classpath.txt`
+- `docs/gates/f1/stack-compat.md`
+- `gateway-acceptance/build.gradle.kts`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/package-info.java`
+- `gateway-app/build.gradle.kts`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackContextSupport.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackSmokeIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/AiGatewayApplication.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/GatewayAppModuleConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/CoreBeansConfiguration.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/ArchitectureRulesTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/CoreSystemBranchGuardTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/ModuleConfigurationCompletenessTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/RuntimeClasspathCleanTest.java`
+- `gateway-core/build.gradle.kts`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/package-info.java`
+- `gateway-eval/src/main/java/com/nori/ai/gateway/eval/EvalCli.java`
+- `gateway-eval/src/main/java/com/nori/ai/gateway/eval/report/OtrLeafExtractor.java`
+- `gateway-eval/src/test/java/com/nori/ai/gateway/eval/RuntimeClasspathFileTest.java`
+- `gateway-eval/src/test/java/com/nori/ai/gateway/eval/RuntimeClasspathFinalizerFunctionalTest.java`
+- `gateway-eval/src/test/java/com/nori/ai/gateway/eval/TestKitSupport.java`
+- `gateway-integration/build.gradle.kts`
+- `gateway-integration/src/integrationTest/java/com/nori/ai/gateway/integration/tokenizer/TokenizerNativeSmokeIT.java`
+- `gateway-integration/src/integrationTest/java/com/nori/ai/gateway/integration/tokenizer/TokenizerOfflineProbe.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/IntegrationModuleConfiguration.java`
+- `gateway-integration/src/testFixtures/java/com/nori/ai/gateway/integration/testing/DockerRequiredExtension.java`
+- `gateway-persistence/build.gradle.kts`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/PersistenceModuleConfiguration.java`
+- `gateway-tc-mock/build.gradle.kts`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/TcMockModuleConfiguration.java`
+- `gradle/libs.versions.toml`
+- `settings.gradle.kts`
+- 외부 ignored Plan: `C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture-plan.md`(P04 allowed_writes 한 줄만).
+
+검증(각 명령의 정확한 argv·exit·XML/OTR 수·실패 이력은 `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p04-resume/result.json`, 상세 명령은 docs/gates/f1/stack-compat.md의 최신 재개 절):
+
+| 실행 label | exit | 결과 |
+|---|---:|---|
+| `spec-guard` | 0 | 시험 task 없음 |
+| `focused` | 0 | :gateway-eval:test: EXECUTED, tests=14, failures=0, errors=0, skipped=0, XML=3, OTR=1 |
+| `focused-verify-final` | 0 | 시험 task 없음 |
+| `eval-regression` | 0 | :gateway-eval:test: EXECUTED, tests=248, failures=0, errors=0, skipped=0, XML=49, OTR=1 |
+| `eval-regression-verify` | 0 | 시험 task 없음 |
+| `focused-p04` | 0 | :gateway-eval:test: EXECUTED, tests=15, failures=0, errors=0, skipped=0, XML=4, OTR=1 |
+| `focused-p04-verify` | 0 | 시험 task 없음 |
+| `p04-clean` | 0 | 시험 task 없음 |
+| `p04-build` | 0 | :gateway-app:test: EXECUTED, tests=4, failures=0, errors=0, skipped=0, XML=4, OTR=1; :gateway-eval:test: EXECUTED, tests=249, failures=0, errors=0, skipped=0, XML=50, OTR=1 |
+| `p04-build-verify` | 0 | 시험 task 없음 |
+| `p04-stack-4` | 0 | :gateway-app:integrationTest: EXECUTED, tests=3, failures=0, errors=0, skipped=0, XML=2, OTR=1 |
+| `p04-stack-4-verify` | 0 | 시험 task 없음 |
+| `p04-tokenizer` | 0 | :gateway-integration:integrationTest: EXECUTED, tests=1, failures=0, errors=0, skipped=0, XML=1, OTR=1 |
+| `p04-tokenizer-verify` | 0 | 시험 task 없음 |
+| `p04-runtime` | 0 | :gateway-app:test: EXECUTED, tests=1, failures=0, errors=0, skipped=0, XML=1, OTR=1 |
+| `p04-runtime-verify` | 0 | 시험 task 없음 |
+| `p04-sync` | 0 | 시험 task 없음 |
+| `p04-final-build` | 0 | :gateway-app:test: EXECUTED, tests=4, failures=0, errors=0, skipped=0, XML=4, OTR=1; :gateway-eval:test: UP-TO-DATE, tests=249, failures=0, errors=0, skipped=0, XML=50, OTR=1 |
+| `p04-final-build-verify` | 0 | 시험 task 없음 |
+
+보존: SPEC/baseline/approval6 및 protected 483개 불변, Plan은 승인 범위 한 줄뿐, Dev report 기존 바이트 prefix 보존. runtime 실제 출력/사본 SHA=29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e. 기존 raw report·PREREG·BLOCKED 이력은 수정하지 않았다. 비밀값 검사 결과는 scratch/secret-leak-check.json에 기록했다.
+
+미검증·위험: clean git checkout build와 부모 독립 확인은 남았다(기존 untracked 진단 자료 보존). SDK 요청 재시도/로그/실제 inference 계약시험·배포·운영 설정·P05 이후 기능은 이번 범위가 아니다. SDK·Spring AI API ⓐ~ⓕ와 OTLP 클래스 경로, DJL native SHA/라이선스/OS/arch는 stack-compat.md 최신 절에 근거와 한계를 구분했다. 현재 외부 starter 인증 공급 차단은 없다.
+
+
+#### P04 재개 필수 명령의 정확한 argv
+
+각 명령은 AIGW_SPEC_FILE=C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md를 명시한 별도 프로세스에서 실행했다. 아래 argv를 PowerShell 인용 형태로 표시했다. 인증값은 argv에 없고 기존 자격증명을 자식 환경에서만 공급했다.
+
+- `p04-final-build`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' 'build' '--no-daemon' '--console=plain'`
+- `p04-final-build-verify`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' ':gateway-eval:run' '--args=test-evidence verify --tasks :gateway-app:test,:gateway-eval:test' '--no-daemon' '--console=plain'`
+- `p04-stack-4`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' ':gateway-app:integrationTest' '-Paigw.requireDocker=true' '--tests' '*StackSmokeIT' '--tests' '*AppContextWiringIT' '--no-daemon' '--console=plain'`
+- `p04-stack-4-verify`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' '-I' 'C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-resume\stack-filter.init.gradle.kts' '-Paigw.requireDocker=true' ':gateway-eval:run' '--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker' '--no-daemon' '--console=plain'`
+- `p04-tokenizer`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' ':gateway-integration:integrationTest' '-Paigw.requireDocker=true' '--tests' '*TokenizerNativeSmokeIT' '--no-daemon' '--console=plain'`
+- `p04-tokenizer-verify`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' '-I' 'C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-resume\tokenizer-filter.init.gradle.kts' '-Paigw.requireDocker=true' ':gateway-eval:run' '--args=test-evidence verify --tasks :gateway-integration:integrationTest --require-docker' '--no-daemon' '--console=plain'`
+- `p04-runtime`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' ':gateway-app:test' '--tests' '*RuntimeClasspathCleanTest' '--no-daemon' '--console=plain'`
+- `p04-runtime-verify`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' '-I' 'C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-resume\runtime-filter.init.gradle.kts' ':gateway-eval:run' '--args=test-evidence verify --tasks :gateway-app:test' '--no-daemon' '--console=plain'`
+- `p04-sync`(exit 0): `& 'C:\workspace_nori\nori-ai-gateway\gradlew.bat' '-p' 'C:\workspace_nori\nori-ai-gateway' ':gateway-app:syncRuntimeClasspathEvidence' '--no-daemon' '--console=plain'`
+
+## 2026-11-05 P04 root-review correction (append-only)
+
+- `GatewayAppModuleConfiguration`을 승인 Plan 정본인 `app/config` 경로와 package로 옮기고 앱·시험 import를 맞췄다.
+- 앱 `integrationTestImplementation`에만 기존 pin Nimbus 10.5, protobuf 4.33.2, networknt 3.0.9를 연결했다. 기존 StackSmokeIT에서 Boot 컨텍스트와 같은 JVM의 실제 CodeSource JAR 파일명을 assert하고, 더미 HS256 서명/정상·오서명 검증, protobuf StringValue 직렬화 왕복, Draft 2020-12 schema의 정상·타입 오류 검증을 실행했다. 제품 인증·schema 기능과 제품 의존성은 추가하지 않았다.
+- core 분기 guard는 AST의 조건식·case label과 명시/와일드카드 static import를 함께 검사한다. TC/WM/HRM 각각의 static import·qualified·문자열·switch/switch expression 음성 fixture 및 주석·데이터·enum 양성 fixture를 추가했다.
+- 루트 finalizer가 실제 root의 `git rev-parse HEAD`를 자식 Eval 환경으로 공급한다. 잘못된 AIGW_GIT_SHA를 실제 Git 신원으로 대체하는 TestKit 회귀를 추가했다. 비 Git/no-app 동작과 extractor 정책은 유지했고 전체 Eval 회귀로 확인했다.
+- producer artifacts를 `@InputFiles` + `@PathSensitive(NAME_ONLY)`로 선언하여 원시 JAR SHA 출력과 입력 추적을 일치시켰다. 기존 의존·출력 계약은 유지했다. 원시 SHA를 쓰는 task에 ZIP 타임스탬프·순서를 무시하는 `@Classpath`는 맞지 않는다([Gradle 9.2.1 공식 API](https://docs.gradle.org/9.2.1/javadoc/org/gradle/api/tasks/Classpath.html)).
+
+변경 파일: `build.gradle.kts`, `gateway-app/build.gradle.kts`, `gateway-app/src/main/java/com/nori/ai/gateway/app/AiGatewayApplication.java`, `gateway-app/src/main/java/com/nori/ai/gateway/app/config/GatewayAppModuleConfiguration.java`, `gateway-app/src/test/java/com/nori/ai/gateway/app/ModuleConfigurationCompletenessTest.java`, `gateway-app/src/test/java/com/nori/ai/gateway/app/CoreSystemBranchGuardTest.java`, `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackSmokeIT.java`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/RuntimeClasspathFinalizerFunctionalTest.java`, `docs/gates/f1/stack-compat.md`, `docs/ai-rag-gateway-architecture-dev-report.md`; 옛 app/GatewayAppModuleConfiguration.java는 이동으로 제거했다. docs/gates/f1/runtime-classpath.txt는 생성 task로 동기화했으며 최종 바이트는 기존과 동일하다. 영향은 P04 구성·빌드 증거·해당 시험이며 제품 런타임 기능 확장은 없다.
+
+실제 writeRuntimeClasspath task를 scratch init script로만 override했다. 엔트리 내용 동일·ZIP 타임스탬프만 변경한 JAR 원시 SHA는 `ca0ff48691795e06a1044367bdcf0b15f29315bb5e0cea52afe4e41b8cbbd3ee` → `0afde1e17f811b48a33666e84b0d5e28098586d5f8a02bfc43cec97d8c777ee5`. 두 호출 모두 exit 0/EXECUTED였고 두 번째 출력은 새 SHA를 포함하고 옛 SHA를 포함하지 않았다. 의존 캐시·실제 제품 JAR는 수정하지 않았다. 이후 정상 producer와 sync를 실행했으며 실제 출력과 docs 사본의 바이트가 같고 SHA는 `29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`다. 상세 값은 scratch/raw-jar-regression.json에 있다.
+
+DJL 0.40.0 JAR SHA=`569b1fa597e362ac11cd527e5deacd52cd827c8f5133a573572e2cd7051c5768`와 기존 기록의 native 바이너리 전체 SHA가 일치한다. 기존 Apache-2.0·native/DLL 라이선스 한계와 pin을 유지한다. tokenizer SHA=`aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4`. native 소스는 수정하지 않았다. 사용자 정의 입력 fingerprint는 종전과 동일(`53b5cc5316445a72b2d082456b475f0654f47add373034d6f2c5915e66ef5064`)이나 이번 필수 명령에서 Gradle이 EXECUTED로 처리하여 Windows와 network=none Linux amd64 컨테이너의 offline load+encode를 실제 다시 통과했다(강제 rerun 옵션·추가 반복 없음). 현재 이미지 digest는 이전과 같아 기존 glibc 2.35 확인 근거도 유지된다. 이전 원시 결과를 새 실행이라고 쓰지 않았으며 새 XML/OTR를 별도 보관했다.
+
+모든 이번 단위/IT 요약은 실제 HEAD `a72b1b79dd8995c2da5542ff7064c54773727230`, 해당 입력 fingerprint, 실제 producer 출력 SHA `29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`와 일치한다. 작업 트리는 수정·untracked 파일이 있는 dirty 상태이며 HEAD만으로 미커밋 변경의 배포 신원을 주장하지 않는다.
+
+모든 Gradle 호출은 명시적 `AIGW_SPEC_FILE=C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md`, `--no-daemon --console=plain`을 사용했다. glab 기존 host token은 메모리에서 조회하여 Authorization Bearer를 자식 환경으로만 전달하고 로그에서 원시 값을 마스킹했다. 각 Test 명령 바로 다음 별도 verifier는 동일 --tests/includeTags/aigw.requireDocker 조건을 임시 init script로 재현했다. 원시 XML/OTR와 정확한 argv·exit는 이 scratch의 각 label 파일에 있다.
+
+| scratch label | exit | 실제 시험 결과 |
+|---|---:|---|
+| `focused-eval` | 0 | :gateway-eval:test: EXECUTED, XML=1, OTR=1, tests=1, failures=0, errors=0, skipped=0 |
+| `focused-eval-verify` | 0 | Test task 없음 |
+| `app-unit` | 0 | :gateway-app:test: EXECUTED, XML=4, OTR=1, tests=6, failures=0, errors=0, skipped=0 |
+| `app-unit-verify` | 0 | Test task 없음 |
+| `app-stack` | 0 | :gateway-app:integrationTest: EXECUTED, XML=2, OTR=1, tests=3, failures=0, errors=0, skipped=0 |
+| `app-stack-verify` | 0 | Test task 없음 |
+| `raw-jar-first` | 0 | Test task 없음 |
+| `raw-jar-changed-timestamp` | 0 | Test task 없음 |
+| `spec-guard` | 0 | Test task 없음 |
+| `native-current` | 0 | :gateway-integration:integrationTest: EXECUTED, XML=1, OTR=1, tests=1, failures=0, errors=0, skipped=0 |
+| `native-current-verify` | 0 | Test task 없음 |
+| `local-clean` | 0 | Test task 없음 |
+| `local-clean-build` | 0 | :gateway-app:test: EXECUTED, XML=4, OTR=1, tests=6, failures=0, errors=0, skipped=0; :gateway-eval:test: EXECUTED, XML=50, OTR=1, tests=249, failures=0, errors=0, skipped=0 |
+| `local-clean-build-verify` | 0 | Test task 없음 |
+| `runtime-clean` | 0 | :gateway-app:test: EXECUTED, XML=1, OTR=1, tests=1, failures=0, errors=0, skipped=0 |
+| `runtime-clean-verify` | 0 | Test task 없음 |
+| `final-sync` | 0 | Test task 없음 |
+
+정확한 실행 명령(각각 별도 프로세스):
+
+- `focused-eval`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:test --tests *RuntimeClasspathFinalizerFunctionalTest --no-daemon --console=plain`
+- `focused-eval-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\eval-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-eval:test" --no-daemon --console=plain`
+- `app-unit`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain`
+- `app-unit-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain`
+- `app-stack`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *StackSmokeIT --tests *AppContextWiringIT --no-daemon --console=plain`
+- `app-stack-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\stack-filter.init.gradle.kts -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain`
+- `raw-jar-first`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\review-artifact.init.gradle :gateway-app:writeRuntimeClasspath --no-daemon --console=plain`
+- `raw-jar-changed-timestamp`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\review-artifact.init.gradle :gateway-app:writeRuntimeClasspath --no-daemon --console=plain`
+- `spec-guard`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" --no-daemon --console=plain`
+- `native-current`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-integration:integrationTest -Paigw.requireDocker=true --tests *TokenizerNativeSmokeIT --no-daemon --console=plain`
+- `native-current-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\tokenizer-filter.init.gradle.kts -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-integration:integrationTest --require-docker" --no-daemon --console=plain`
+- `local-clean`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway clean --no-daemon --console=plain`
+- `local-clean-build`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway build --no-daemon --console=plain`
+- `local-clean-build-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test,:gateway-eval:test" --no-daemon --console=plain`
+- `runtime-clean`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --tests *RuntimeClasspathCleanTest --no-daemon --console=plain`
+- `runtime-clean-verify`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-review-fix\runtime-filter.init.gradle.kts :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain`
+- `final-sync`: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:syncRuntimeClasspathEvidence --no-daemon --console=plain`
+
+P04 검토 수정의 로컬 검증은 통과했지만, 사용자 승인 전 commit 금지라는 원래 인계 조건에 따라 커밋·staging·push·checkout을 하지 않았다. 따라서 이번 clean 후 build는 로컬 N8 producer/전체 Eval 회귀 증거이며 **깨끗한 Git checkout build는 미검증**이다. 부모의 독립 검토도 대기 중이다. P04 최종 완료는 선언하지 않으며 P05는 시작하지 않았다. SPEC/Plan 계약 변경은 없고 기존 승인 scope line은 그대로 유지했다. 서버·SSH·K8s·배포·설정/재시작·모델 호출은 수행하지 않았다.
+
+### 2026-11-05 P04 최종 감독 검증 결론
+
+- 부모가 최종 코드와 원시 증거를 직접 독립 검증하여 **로컬 P04 코드·검증 PASSED**로 확정했다. 고유 시험 259건(Eval 249 + 앱 단위 6 + 앱 IT 3 + native IT 1), 실패·오류·건너뜀 0건이다. 각 XML 집계, OTR 바이트, record contentSHA, binding component hash, fingerprint/runId, 실제 HEAD와 runtime hash가 일치했다.
+- 실제 runtime JAR 186행과 native 바이너리 해시, 문서 사본의 바이트 일치를 독립 확인했다(runtime SHA256=`29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`). 부모가 실제 producer의 원시 JAR 바이트·타임스탬프 변경을 재시험하여 두 실행 모두 EXECUTED이고 각각 새 SHA를 정확히 반영함을 확인했다. 현재 단위 출력과 동일한 앱 runtime filter를 적용한 공식 `test-evidence verify`도 부모가 별도 실행하여 exit 0 / `TEST_EVIDENCE_VERIFIED`를 확인했다.
+- 이전 ‘부모 독립 검토 대기’는 당시 이력이며 현재는 통과했다. 보호 파일 483개, Spec·baseline·승인 문서, 기존 보고서 prefix와 정본 구성 경로도 부모가 확인했다. 실제 HEAD는 `a72b1b79dd8995c2da5542ff7064c54773727230`이며 미커밋 소스가 있는 dirty 작업 트리를 배포 신원으로 간주하지 않는다.
+- 원래 인계 조건인 ‘사용자 승인 후에만 커밋’(`commits only after user approval`)을 유지한다. **남은 완료 조건은 사용자 승인 후 커밋 및 해당 커밋의 clean Git checkout 빌드 검증**이다. 그때까지 P04 최종 완료는 보류하며 P05는 미착수다. 이번 작업은 문서 끝 추가만 수행했으며 빌드·시험을 재실행하지 않았다.
+
+
+부모의 최종 단위 증거 verifier 정확한 argv (`root-final-validation/root-unit-evidence.json`; exit 0):
+
+```json
+[
+    "C:\\workspace_nori\\nori-ai-gateway\\gradlew.bat",
+    "-p",
+    "C:\\workspace_nori\\nori-ai-gateway",
+    "-I",
+    "C:\\Users\\DongGeon\\AppData\\Local\\Temp\\claude\\468c18f2647c2504\\2a367916-708b-4d0e-8a9d-62501d362a92\\scratchpad\\p04-review-fix\\root-final-validation\\runtime-filter.init.gradle.kts",
+    ":gateway-eval:run",
+    "--args=test-evidence verify --tasks :gateway-app:test,:gateway-eval:test",
+    "--no-daemon",
+    "--console=plain"
+]
+```

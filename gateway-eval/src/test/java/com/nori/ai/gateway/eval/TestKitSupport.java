@@ -16,6 +16,8 @@ final class TestKitSupport {
         this.root=root;fixture=new TestSupport(root);env=sanitizedEnv();env.put("AIGW_SPEC_FILE",fixture.spec.toString());
         Path actualRoot=Path.of(System.getProperty("aigw.rootDir"));
         Files.copy(actualRoot.resolve("build.gradle.kts"),root.resolve("build.gradle.kts"));
+        Files.createDirectories(root.resolve("gradle"));
+        Files.copy(actualRoot.resolve("gradle/libs.versions.toml"),root.resolve("gradle/libs.versions.toml"));
         write("settings.gradle.kts","rootProject.name=\"guard-fixture\"\ninclude(\"gateway-eval\",\"sub\",\"placeholder\")\nbuildCache { local { directory = rootDir.resolve(\"cache\") } }\n");
         write("gradle.properties","org.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m\norg.gradle.workers.max=1\n");
         Files.createDirectories(root.resolve("placeholder"));
