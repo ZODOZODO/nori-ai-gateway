@@ -53,8 +53,9 @@ public final class EvalCli {
                 }
             }
             case "leaf-extract" -> {
-                args.only("--otr-dir", "--task", "--module", "--baseline", "--spec", "--out", "--current-fingerprint", "--require-executed", "--catalog");
-                new OtrLeafExtractor().extract(path(args.required("--otr-dir")), args.required("--task"), args.required("--module"), baseline, spec(args), path(args.required("--out")), args.required("--current-fingerprint"), args.flag("--require-executed"), catalog(args), env);
+                args.only("--otr-dir", "--task", "--module", "--baseline", "--spec", "--out", "--current-fingerprint", "--require-executed", "--catalog", "--runtime-classpath-file");
+                Path runtimeClasspathFile = args.optional("--runtime-classpath-file") == null ? null : path(args.required("--runtime-classpath-file"));
+                new OtrLeafExtractor().extract(path(args.required("--otr-dir")), args.required("--task"), args.required("--module"), baseline, spec(args), path(args.required("--out")), args.required("--current-fingerprint"), args.flag("--require-executed"), catalog(args), env, runtimeClasspathFile);
             }
             case "test-evidence" -> {
                 if (!operation.equals("verify")) throw new EvalException(2, "UNKNOWN_COMMAND");

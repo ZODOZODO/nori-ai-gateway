@@ -21,7 +21,17 @@ public final class OtrLeafExtractor {
     }
     public ObjectNode extract(Path directory, String task, String module, Path baseline, String spec,
                               Path output, String currentFingerprint, boolean requireExecuted, LeafCatalog catalog, Map<String,String> env) {
+        return extract(directory, task, module, baseline, spec, output, currentFingerprint, requireExecuted, catalog, env, null);
+    }
+    public ObjectNode extract(Path directory, String task, String module, Path baseline, String spec,
+                              Path output, String currentFingerprint, boolean requireExecuted, LeafCatalog catalog, Map<String,String> env, Path runtimeClasspathFile) {
         try { Files.deleteIfExists(output); } catch (IOException e) { throw new EvalException(5, "OUTPUT_CLEANUP_FAILED"); }
+        String runtime = env.get("AIGW_RUNTIME_CLASSPATH_SHA256");
+        // 명시한 파일을 읽지 못하면 선언된 환경변수 해시로 증거를 만들지 않습니다.
+        if (runtimeClasspathFile != null) {
+            if (!Files.isRegularFile(runtimeClasspathFile) || !Files.isReadable(runtimeClasspathFile)) throw new EvalException(2, "INPUT_MISSING");
+            runtime = Json.sha(Json.bytes(runtimeClasspathFile));
+        }
         SpecBinding binding = new SpecGuard(env).check(spec, null, baseline);
         Path bindingFile = directory.resolve("run-binding.json");
         if (!Files.isRegularFile(bindingFile)) { if (requireExecuted) throw new EvalException(4, "NO_TESTS_EXECUTED"); return null; }
@@ -54,7 +64,7 @@ public final class OtrLeafExtractor {
         if (requireExecuted && executed == 0) throw new EvalException(4, "NO_TESTS_EXECUTED");
         Map<String,Object> identity = new LinkedHashMap<>(); identity.put("gitSha", null); identity.put("inputFingerprint", run.path("inputFingerprint").asText()); identity.put("runtimeClasspathSha256", null);
         String git = env.get("AIGW_GIT_SHA"); if (git != null && git.matches("[0-9a-f]{40}")) identity.put("gitSha", git);
-        String runtime = env.get("AIGW_RUNTIME_CLASSPATH_SHA256"); if (runtime != null && runtime.matches("[0-9a-f]{64}")) identity.put("runtimeClasspathSha256", runtime);
+        if (runtime != null && runtime.matches("[0-9a-f]{64}")) identity.put("runtimeClasspathSha256", runtime);
         List<ObjectNode> records = new ArrayList<>();
         for (var entry : outcomes.entrySet()) {
             String[] parts = entry.getKey().split("/", 3);
