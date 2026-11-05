@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "purpose": {
+      "enum": [
+        "lint",
+        "deploy"
+      ]
+    },
+    "profile": {
+      "enum": [
+        "main",
+        "restore"
+      ]
+    },
+    "execChartSha": {
+      "type": "object",
+      "required": [
+        "value",
+        "approvalRef"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "approvalRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "pgImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*-pg18(-[A-Za-z0-9_.-]+)?$"
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "digest": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "required": [
+        "tag",
+        "digest"
+      ]
+    },
+    "pvcSizeGi": {
+      "type": "object",
+      "required": [
+        "value",
+        "approvalRef"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "approvalRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "restore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pvcSizeGi": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "enum": [
+                "s3",
+                "sftp"
+              ]
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "destination": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "ageRecipient": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "retentionDays": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "const": 7
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "schedule": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "seaweed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "s3Endpoint": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "pattern": "^https?://[^/@?#]+(:[0-9]+)?/?$"
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "corpusInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keysFile": {
+          "type": "object",
+          "required": [
+            "value",
+            "approvalRef"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "purpose",
+    "profile",
+    "execChartSha",
+    "pgImage"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "deploy"
+          },
+          "profile": {
+            "const": "main"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "pvcSizeGi"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "deploy"
+          },
+          "profile": {
+            "const": "restore"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "restore"
+        ],
+        "properties": {
+          "restore": {
+            "required": [
+              "pvcSizeGi"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

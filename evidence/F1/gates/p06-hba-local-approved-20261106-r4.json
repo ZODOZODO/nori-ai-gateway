@@ -1,0 +1,1138 @@
+{
+  "status": "LOCAL_VALIDATED",
+  "scope": "LOCAL_ONLY",
+  "image": "pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2",
+  "imageDigest": "sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2",
+  "operationalGates": "BLOCKED/NOT_RUN",
+  "phaseComplete": false,
+  "p07Started": false,
+  "limitation": "공식 로컬 candidate이며 Harbor 승인 이미지·운영 수용 증거가 아닙니다.",
+  "checks": [
+    {
+      "name": "render-ai-gateway-db-enabled",
+      "status": "PASS",
+      "resources": 6,
+      "backupCronJobs": 0
+    },
+    {
+      "name": "render-ai-gateway-db-disabled",
+      "status": "PASS",
+      "resources": 6,
+      "backupCronJobs": 0
+    },
+    {
+      "name": "disabled-overlay-preserved-ai-gateway-db",
+      "status": "PASS"
+    },
+    {
+      "name": "render-ai-gateway-db-restore-disabled",
+      "status": "PASS",
+      "resources": 6,
+      "backupCronJobs": 0
+    },
+    {
+      "name": "disabled-overlay-preserved-ai-gateway-db-restore",
+      "status": "PASS"
+    },
+    {
+      "name": "render-ai-gateway-db-restore-enabled",
+      "status": "PASS",
+      "resources": 6,
+      "backupCronJobs": 0
+    },
+    {
+      "name": "release-policy-identical",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-pgdata-start",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-true",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-true",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-no-gw-schema",
+      "status": "PASS"
+    },
+    {
+      "name": "pg18-vector",
+      "status": "PASS"
+    },
+    {
+      "name": "pg-trgm-available-unused",
+      "status": "PASS"
+    },
+    {
+      "name": "acceptance-role-attributes",
+      "status": "PASS"
+    },
+    {
+      "name": "acceptance-membership",
+      "status": "PASS"
+    },
+    {
+      "name": "target-no-create-temp",
+      "status": "PASS"
+    },
+    {
+      "name": "readonly-default-defense-only",
+      "status": "PASS"
+    },
+    {
+      "name": "public-and-other-db-acl-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-live-policy",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-target-read-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-wrong-password-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-outside-postgres-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-p06_outside-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-template1-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-target-read-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-wrong-password-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-outside-postgres-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-p06_outside-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-template1-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-target-read-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-wrong-password-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "fresh-outside-postgres-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-p06_outside-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-outside-template1-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "fresh-permission-insert",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-update",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-delete",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-truncate",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-create",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-create-schema",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-alter",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-drop",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fresh-permission-temp",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "connection-limit-two-actual",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "admin-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "migrator-schema-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "original-policy-control-start",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "admin-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "migrator-schema-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-original-equal",
+      "status": "PASS"
+    },
+    {
+      "name": "server-default-settings-preserved",
+      "status": "PASS",
+      "changedSettingNames": [
+        "hba_file"
+      ]
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "existing-pgdata-overlay-start",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-live-policy",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-target-read-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-wrong-password-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-outside-postgres-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-p06_outside-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-template1-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-target-read-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-wrong-password-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-outside-postgres-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-p06_outside-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-template1-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-target-read-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-wrong-password-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "restart-outside-postgres-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-p06_outside-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-outside-template1-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "restart-permission-insert",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-update",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-delete",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-truncate",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-create",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-create-schema",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-alter",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-drop",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "restart-permission-temp",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "other-role-login-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-postgres-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_app-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_migrator-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-login-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "other-role-auth-result-aigw_backup-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "admin-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "migrator-schema-maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "existing-pgdata-auth-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "timeout-unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-false",
+      "status": "PASS"
+    },
+    {
+      "name": "disabled-role-absent",
+      "status": "PASS"
+    },
+    {
+      "name": "disabled-role-reconnect-denied",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-false",
+      "status": "PASS"
+    },
+    {
+      "name": "disabled-role-absent",
+      "status": "PASS"
+    },
+    {
+      "name": "disabled-role-reconnect-denied",
+      "status": "PASS"
+    },
+    {
+      "name": "bootstrap-true",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-live-policy",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-target-read-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-wrong-password-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-outside-postgres-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-p06_outside-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-template1-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-target-read-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-wrong-password-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-outside-postgres-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-p06_outside-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-template1-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-target-read-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-wrong-password-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "reenabled-outside-postgres-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-p06_outside-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-outside-template1-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "reenabled-permission-insert",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-update",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-delete",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-truncate",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-create",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-create-schema",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-alter",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-drop",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "reenabled-permission-temp",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "fixture-unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "outside-admin-read-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "original-hba-bytes-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "missing-overlay-file-start-fails",
+      "status": "PASS",
+      "exit": 1,
+      "fallbackStarted": false
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "invalid-syntax-start-fails",
+      "status": "PASS",
+      "exit": 1,
+      "fallbackStarted": false
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "missing-original-include-start-fails",
+      "status": "PASS",
+      "exit": 1,
+      "fallbackStarted": false
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    },
+    {
+      "name": "valid-policy-recovery-start",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-live-policy",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-target-read-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-wrong-password-127.0.0.1",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-outside-postgres-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-p06_outside-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-template1-127.0.0.1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-target-read-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-wrong-password-/var/run/postgresql",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-outside-postgres-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-p06_outside-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-template1-/var/run/postgresql",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-target-read-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-wrong-password-::1",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-outside-postgres-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-p06_outside-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-outside-template1-::1",
+      "status": "PASS",
+      "exit": 2,
+      "reason": "HBA_REJECT"
+    },
+    {
+      "name": "recovery-permission-insert",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-update",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-delete",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-truncate",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-create",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-create-schema",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-alter",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-drop",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-permission-temp",
+      "status": "PASS",
+      "sqlstate": "42501",
+      "exit": 3
+    },
+    {
+      "name": "recovery-original-hba-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "recovery-server-defaults-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "isolation-and-readonly-mount",
+      "status": "PASS"
+    },
+    {
+      "name": "credentials-not-in-temporary-files",
+      "status": "PASS"
+    },
+    {
+      "name": "credentials-not-in-captured-output",
+      "status": "PASS"
+    },
+    {
+      "name": "cleanup-container-owner",
+      "status": "PASS"
+    }
+  ],
+  "cleanup": {
+    "containerRemoved": true,
+    "volumeRemoved": true,
+    "temporaryDirectoryRemoved": true
+  },
+  "hbaOverlaySha256": "1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22",
+  "toolsImage": "sha256:aa75a3bbab72c9c0be4e0dada6d7c41cc944fd9b74e8f090683884ee7e22d892",
+  "originalHbaBeforeSha256": "31f65ccbe621d83a6ac98fad2428bc075a05a566a32bc869da7313b9e34a7349",
+  "postgresVersion": "PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+  "extensions": [
+    {
+      "extname": "plpgsql",
+      "extversion": "1.0"
+    },
+    {
+      "extname": "vector",
+      "extversion": "0.8.7"
+    }
+  ],
+  "ipv6": {
+    "status": "PASS",
+    "reason": "LOOPBACK_AVAILABLE"
+  },
+  "hba": {
+    "status": "PASS",
+    "hbaOverlaySha256": "1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22",
+    "originalHbaPath": "/var/lib/postgresql/18/docker/pg_hba.conf",
+    "originalHbaSha256": "31f65ccbe621d83a6ac98fad2428bc075a05a566a32bc869da7313b9e34a7349",
+    "rulesValid": true
+  },
+  "otherRoleAuthentication": [
+    {
+      "role": "postgres",
+      "host": "127.0.0.1",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "postgres",
+      "host": "127.0.0.1",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "postgres",
+      "host": "/var/run/postgresql",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "postgres",
+      "host": "/var/run/postgresql",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_app",
+      "host": "127.0.0.1",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_app",
+      "host": "127.0.0.1",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_app",
+      "host": "/var/run/postgresql",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_app",
+      "host": "/var/run/postgresql",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_migrator",
+      "host": "127.0.0.1",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_migrator",
+      "host": "127.0.0.1",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_migrator",
+      "host": "/var/run/postgresql",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_migrator",
+      "host": "/var/run/postgresql",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_backup",
+      "host": "127.0.0.1",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_backup",
+      "host": "127.0.0.1",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_backup",
+      "host": "/var/run/postgresql",
+      "wrongPassword": false,
+      "allowed": true,
+      "matchesOriginal": true
+    },
+    {
+      "role": "aigw_backup",
+      "host": "/var/run/postgresql",
+      "wrongPassword": true,
+      "allowed": true,
+      "matchesOriginal": true
+    }
+  ],
+  "originalHbaAfterSha256": "31f65ccbe621d83a6ac98fad2428bc075a05a566a32bc869da7313b9e34a7349"
+}

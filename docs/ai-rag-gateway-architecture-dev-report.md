@@ -5597,3 +5597,230 @@ Plan §4.2와 실제 OtrLeafExtractor의 단계 누락 시 F0 기본값 처리�
 SPEC·baseline·approval6·보호 483개와 기존 F0·실패·controlled-stop 증거를 보존했다. 기존 보고서 전체 prefix는 바이트 단위로 보존하며 마감 전 길이·해시와 마감 후 증명은 `p05-close/preflight.json`, `p05-close/result.json`에 기록한다. 최초 P05 CLI는 최종 산출물 작성 후 응답 재시도 중 부모가 중단한 exit 1이며 자연 종료 성공으로 해석하지 않는다. 최종 PASS 근거는 실제 review-fix·metadata-fix 결과와 부모의 직접 검증이다. 로컬 커밋의 Git blob을 승인 소스 해시와 대조하며 미래 커밋 SHA에서 시험을 실행했다고 주장하지 않는다.
 
 이 마감은 소스 변경이 없어 시험·fresh gate·전체 Eval 249·clean checkout을 재실행하지 않는다. P04의 실제 fresh clone 검증 이력은 유지한다. 실제 Source·TC·LLM·K8s 및 후속 phase 기능은 미실행이며 미래 검증 책임으로 남는다. P06 구현, push·MR·배포·SSH·서비스/운영 설정·전역 인증 변경은 하지 않는다. 미해결 사용자 결정 차단 사유는 없다. 실제 로컬 커밋 SHA·후속 무결성 확인은 `p05-close/result.json`을 기준으로 한다.
+
+
+## P06 독립 CLI 구현·로컬 검증 (2026-11-05)
+
+상태: 로컬 준비 구현·검증 완료, P06 운영 게이트 미완료·승인 계약 충돌 BLOCKED. 부모 직접 검증 전이며 P07·커밋·push·MR·배포는 실행하지 않았습니다. 실행 세션 01a1abbf-cfa3-7d62-9898-5fb09bc23680은 gpt-6.1-sol / medium 독립 Codex CLI이며 하위 에이전트는 0입니다. P05 부모 승인·검토 산출물 12개 해시와 로컬 커밋 b028c81372f6d3f1aa5e7bfee32e94ae1e12df16을 먼저 확인했습니다.
+
+### 변경 내용·영향
+
+두 release 전용 DB 차트, 단일 bootstrap SQL, 승인 입력 schema/fixture, 읽기 전용 exec clone·Helm 실행 경로, 런타임 Secret 검사/회전 절차, 승인 key별 메타데이터 집계와 대기 게이트 문서를 구현했습니다. DB 이름·인스턴스 label·PVC·Ingress target을 release별로 분리하며 PG18 data mount와 PVC Retain을 적용했습니다. 비밀번호는 Secret env/psql getenv와 stdin 파이프만 사용합니다. app/migrator/backup DML과 gw 스키마는 P07 책임으로 남겼습니다. 앱 차트·CronJob·CI·P05 코드/테스트/기존 pin은 변경하지 않았습니다.
+
+실제 변경 파일(해시는 scratch result.json의 양 레포 changedFiles에 기록):
+
+- `ai:docs/gates/f1/backup-destination.md`
+- `ai:docs/gates/f1/corpus-inventory.md`
+- `ai:docs/gates/f1/exec-chart-ref.md`
+- `ai:docs/gates/f1/postgres-image.md`
+- `ai:docs/gates/f1/pvc-capacity.md`
+- `ai:docs/gates/f1/pvc-protection.md`
+- `ai:docs/runbooks/aigw-runtime-credentials.md`
+- `ai:evidence/F1/gates/p06-local-verification.json`
+- `ai:ops/deploy/aigw-helm.sh`
+- `ai:ops/deploy/read-exec.py`
+- `ai:ops/deploy/requirements.txt`
+- `ai:ops/deploy/runconfig.py`
+- `ai:ops/gates/aigw-runtime-credentials-selftest.sh`
+- `ai:ops/gates/aigw-runtime-credentials.sh`
+- `ai:ops/postgres/bootstrap.sql`
+- `ai:ops/runconfig/README.md`
+- `ai:ops/runconfig/fixtures/LINT-ONLY.md`
+- `ai:ops/runconfig/fixtures/lint-verify.json`
+- `ai:ops/runconfig/negative-missing-pvc.json`
+- `ai:ops/runconfig/verify.schema.json`
+- `ai:ops/seaweedfs/bin/corpus-inventory.sh`
+- `exec:deploy/helm/ai-gateway/db-chart/Chart.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/_helpers.tpl`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/bootstrap-configmap.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/bootstrap-job.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/networkpolicy.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/service.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/templates/statefulset.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/values-restore.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/values-verify.yaml`
+- `exec:deploy/helm/ai-gateway/db-chart/values.yaml`
+- `ai:docs/ai-rag-gateway-architecture-dev-report.md`는 기존 780935바이트 뒤에 이 절만 추가합니다.
+
+### 실제 검증·명령
+
+- 수정 전 secure runner: `C:/workspace_nori/.venvs/aigw-eval/Scripts/python.exe ../p05-root-fix/run_gradle.py p06-spec-guard-actual :gateway-eval:run "--args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" --secure-auth` → exit 0. AIGW_SPEC_FILE도 원본 절대 경로로 명시되었습니다. 처음 `spec-guard`를 Gradle task로 호출한 시도는 task 없음으로 exit 1이었고 실제 EvalCli 진입점으로 바로잡았습니다.
+- scratch `tools.Dockerfile`로 일회용 로컬 도구 이미지를 빌드했습니다. 기반은 python 3.12.10-slim-bookworm digest fd95fa221297a88e1cf49c55ec1828edd7c5a428187e67b5d1805692d11588db와 alpine/helm digest ee6fe3e96d9f8ea8dd1af9ecd7bbb3e233616a25f145392376f020fd2a51eb33입니다. 도구 이미지 ID는 aa75a3bbab72c9c0be4e0dada6d7c41cc944fd9b74e8f090683884ee7e22d892입니다. 전역 설치는 하지 않았습니다. Linux bash 5.2.15, Helm v4.2.2+gb05881c, Python 3.12.10, Git 2.39.5, OpenSSL 3.0.22이며 Python 의존은 ops/deploy/requirements.txt의 고정 버전과 일치합니다.
+- `docker run --rm --network none --mount type=bind,source=C:/workspace_nori/nori-ai-gateway,target=/ai,readonly --mount type=bind,source=C:/workspace_nori/nori-tc-exec,target=/nori-tc-exec,readonly --mount type=bind,source=<P06 scratch>,target=/scratch aigw-p06-tools:local python3 -B /scratch/local_tests.py` → exit 0, 27개 실행 검사. 실제 main/restore Helm lint·render, parsed name/instance/selector/PVC retention/PGDATA/Secret env/backup CronJob 0, missing persistence 정확 음성 code, 잘못된 release·replicas·PG17·restore backup 거부, shell syntax, 입력/profile/승인 경계와 selftest를 확인했습니다. fake helm은 사용하지 않았습니다.
+- 같은 Docker 옵션으로 `python3 -B /scratch/regression_tests.py` → exit 0, 변경한 경계의 16개 회귀 검사(앞 검사와 중복 포함). 최종 schema·누락 key/ref·대기 승인 거부, 자격 selftest와 CI/운영자 ASKPASS·401/403·잘못된 SHA·종료 후 helper 제거·sentinel 비노출, inventory의 owner 미승인/밖 파일 거부 및 AWS stub 집계를 확인했습니다. 개별 정확 argv·기대/실제 exit는 scratch local-tests.json·regression-tests.json과 evidence/F1/gates/p06-local-verification.json에 있습니다. AWS/kubectl/git 보안 경계는 stub이며 실제 Source/Secret/사내 GitLab 인증 시험이 아닙니다.
+- `C:/workspace_nori/.venvs/aigw-eval/Scripts/python.exe -I sql_probe.py` → exit 0. 네트워크 없는 일회용 공개 pgvector PG18 Docker에서 bootstrap true 2회·false 2회, vector:0.8.7 설치, 사용자 gw 스키마 0, app CREATE 거부/migrator CREATE 허용, acceptance 연결 한도2·기본 read-only, 비밀번호 따옴표/역슬래시 안전 quoting과 실제 TCP 로그인, false 역할 DROP 멱등, 기본 서버 로그의 password 비노출을 확인했습니다. 첫 준비 시험은 공식 이미지 초기화 중 임시 서버를 readiness로 오인해 실패했으며 실제 ai_gateway TCP SELECT 성공을 기다리도록 시험 준비 코드를 수정했습니다. 이후 통과했습니다. 컨테이너·익명 볼륨은 제거했습니다. 공개 이미지의 로컬 시험 digest는 Harbor 승인 pin이 아닙니다.
+- 양 레포 `git diff --check`와 후보 UTF-8/LF/깨진 문자·후보 Python cache 부재를 확인했습니다. 보호 파일 483개, SPEC/기준선/승인6, 기존 report prefix는 바이트 해시로 대조했습니다. 정확 최종 결과·양 레포 HEAD/status/변경 hash는 scratch result.json에 기록합니다.
+
+### Spec/Plan 차이·실제 중단 조건
+
+승인 Spec/Plan의 확정 계약과 체크박스를 변경하지 않았습니다. 필수 pg_read_all_data를 다른 역할로 교체하거나 다른 DB의 PUBLIC 정책을 임의로 회수하지 않았습니다. 하지만 이 역할의 “이 DB 밖 권한0/쓰기DDL0”이라는 문구가 실제 PG18 동작과 충돌합니다. 기존 postgres DB CONNECT/TEMPORARY=true, 별도 테스트 DB의 SELECT 성공(exit0), read-only 기본값 off 변경 후 CREATE TEMP TABLE/INSERT 성공(exit0)을 재현했습니다. ai_gateway 자체의 CREATE/TEMPORARY=false 및 영구 DDL 실패(exit3)도 구분했습니다. 로컬 기능 PASS를 해당 보안 계약 PASS로 처리하지 않습니다. [PG18 predefined roles](https://www.postgresql.org/docs/18/predefined-roles.html), [privileges](https://www.postgresql.org/docs/18/ddl-priv.html), [client defaults](https://www.postgresql.org/docs/18/runtime-config-client.html)가 근거이며 sql-probe.json과 postgres-image.md에 상세 재현을 기록합니다.
+
+부모 결정 선택지는 A: pg_read_all_data 유지 + 역할별 pg_hba로 실제 ai_gateway 외 연결 거부를 계약에 추가하고 문구 판정 범위를 명시, B: predefined role 요구 제거 + ai_gateway 한정 P07 SELECT/default privileges + 다른 DB PUBLIC CONNECT/TEMPORARY 정책까지 재설계입니다. 권장안은 A의 명시적 Plan 보정입니다. 기존 전용 인스턴스·필수 role을 유지하면서 다른 역할의 기본 정책을 바꾸지 않고 외부 DB 접근을 차단하기 때문입니다. A는 SQL ACL 자체를 0으로 만들지는 않으므로 literal ACL0이 필수라면 부모가 B 수준의 결정을 해야 합니다. 이 판단을 구현자가 임의 확정하지 않았고 실제 pg_hba 설정도 바꾸지 않았습니다.
+
+별도의 실제 외부 입력 누락: 운영자 승인 Harbor 이미지/digest·probe, owner 승인 corpus 범위·읽기 identity/endpoint, 용량·부하 가정·노드별 현재 여유·GiB 승인, 백업 목적지/암호화/권한 승인, PV bind/Retain 운영 실행, 승인 병합 exec SHA·inbound 읽기 확인 및 실제 runtime/verify Secret이 없습니다. 관련 문서는 BLOCKED/NOT_RUN입니다. 따라서 P06 전체 완료/F1 exit/P07 착수는 주장할 수 없습니다. P07은 특히 확정 이미지 digest를 선행으로 요구합니다. 값·승인을 새로 만들거나 배포할 권한을 요청하지 않고 이 근거를 부모에게 반환합니다.
+
+미실행: 실제 Harbor·K8s·Secret·PV patch·Helm deploy·백업/restore·사내 exec clone·Source/model API·SSH·추론서버/전역 설정 변경, P07, F0 재측정, 전체 Eval249/Core/app Java 재시험. shell/chart 변경이므로 승인된 최소 검증과 spec-guard만 수행했습니다. rotate-db는 안전한 대상 선택·오류 전파와 runbook을 구현하고 구문 검사했으나 실제 회전/복구는 실행하지 않았습니다. 운영 gate 증거 JSON·가짜 승인 runconfig·새 audit/Spec/Plan은 만들지 않았습니다.
+
+
+## P06 일반 검토 결함 보정 (20261105T133526738290Z-a9fbf721)
+
+상태: 일반 코드 보정과 로컬 검증만 완료했습니다. 부모 직접 검증 전이며 P06/F1 완료·P07 착수·운영 게이트 PASS가 아닙니다. 커밋·push·MR·운영 K8s/Secret/SSH/Harbor/서버/전역 설정 변경은 없습니다.
+
+변경 파일과 이유:
+
+- `ops/deploy/runconfig.py`: load는 JSON 객체를 요구하고 validate는 purpose/profile 존재·형식을 의미 검사 전에 확인합니다. lint 더미의 사업 SHA 결속만 제외하고 deploy 승인값 비교는 유지합니다. schema 통과한 양의 정수 GiB를 int로 정규화하여 main/restore 모두 1.0 → 1Gi로 렌더합니다. 분수 절삭 경로는 없습니다. inventory도 같은 load를 재사용합니다.
+- `ops/deploy/aigw-helm.sh`: 자격 check에 자신의 --runconfig를 AIGW_RUNCONFIG로 전달하여 상속된 다른 파일이 승인 기준을 바꾸지 못하게 합니다. clone·checkout·rev-parse CLI SHA 대조는 유지합니다.
+- `ops/deploy/read-exec.py`: 착수 소스는 이미 Git stdout/stderr를 subprocess 메모리에만 캡처했고 git.log 경로가 없었습니다. 이 경로를 보존하며 자식의 모든 GIT_TRACE 계열과 GIT_CURL_VERBOSE 환경을 제거했습니다. 원문 오류·자격을 파일/로그/argv에 쓰지 않습니다.
+- `ops/gates/aigw-runtime-credentials.sh`: F1~F4는 승인된 backup.type만 읽어 목적지 유형별 필드를 요구합니다. RESTORE는 백업 입력을 읽지 않습니다. rotate는 모든 소유 release hook의 terminal/active 상태를 Secret 변경 전에 검사하고, 메모리 template으로 일반 delete --wait=true → create → 완료 대기를 수행합니다. 양쪽 DB hook이 모두 완료된 후에만 해당 앱을 재시작하며 실패 시 RECOVERY_REQUIRED를 반환합니다. SQL·PG 인증 정책은 변경하지 않았습니다.
+- 기존 `ops/gates/aigw-runtime-credentials-selftest.sh`, 최소 `ops/deploy/runconfig-selftest.py`: 임시 작업 사본에서만 synthetic 승인 marker를 만들고, SHA·JSON·GiB·단계/유형별 자격·활성 hook 무변경·회전 순서·실패 후 앱 재시작 0·오류 발생 중 sentinel 파일 0을 검증합니다.
+- 기존 `docs/runbooks/aigw-runtime-credentials.md`, `ops/runconfig/README.md`: 실제 입력·검증 명령·회전 선행과 부분 실패 복구를 명시했습니다. 새 로컬 증거는 `evidence/F1/gates/p06-review-local-20261105T133526738290Z-a9fbf721.json`입니다. 이 보고서는 기존 790589바이트 뒤에만 추가했습니다.
+
+실제 명령·결과:
+
+- 수정 전 secure runner `../p05-root-fix/run_gradle.py p06-review-spec-guard-actual :gateway-eval:run "--args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" --secure-auth` → exit 0. AIGW_SPEC_FILE 명시, host glab 토큰은 메모리에서 child Bearer 환경으로만 전달했습니다. 앞선 잘못된 Gradle task spec-guard 시도는 exit 1이었으며 실제 EvalCli 명령으로 바로잡은 뒤 편집했습니다. 원시 토큰 출력·파일은 없습니다.
+- `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p06-root-fix\verify.py` → 각 docker run --rm --network none, 도구 이미지 고정, 양 레포 readonly mount. 실제 존재한 P06 local_tests.py/regression_tests.py를 이 scratch로 복사하여 실행했습니다. 요청에 언급된 p06/linux_verify.py는 해당 디렉터리에 없었습니다. 기존 파일·결과·로그는 덮어쓰지 않았습니다.
+- local_tests.py → exit 0, 27개 실행 검사: 실제 Helm main/restore lint·render·name/selector/Retain·backup0, 정확 missingPVC 음성, invalidrelease/replicas/PG17, purpose/profile/승인 경계, 기존 inventory 선행 거부와 자격 selftest.
+- regression_tests.py → exit 0, 16개 실행 검사: 대기 승인·누락·schema, inventory AWS head-only 승인 범위/집계/원시 key0, 자격 selftest와 구문 검사.
+- 기존 credentials selftest 최종 별도 실행 → exit 0, 59건. kubectl/git은 stub이며 실제 Helm lint/template을 사용한 다른 CLI SHA+더미0 양성도 포함합니다. 실행 중 403 stderr flush 후 모든 임시 regular file을 검사한 완료 표식을 부모 시험이 확인합니다. helper0700·env-only·종료 후 제거·sentinel argv/stdout/stderr/file0, 모든 stage 누락13, S3/SFTP 혼용 거부13, 활성/nonterminal/두번째 release 활성 hook의 Secret 쓰기0, 양 release/세 역할 회전 순서와 wait 실패 시 앱 restart0을 검사합니다.
+- runconfig-selftest.py → exit 0, 25건. malformed/null/number/string/array 고정 오류2, 필수 최상위 누락, profile/승인 SHA 충돌, main/restore의 실제 Helm 1.0 → 1Gi 양성 및 1.1/0/-1 거부를 포함합니다. 검사 수는 서로 중복되므로 합계를 독립 고유 시험 수로 해석하지 않습니다.
+- 개별 argv·exit·stdout/stderr 경로는 이 scratch verification.json과 새 로컬 증거에 기록했습니다. 양 레포 diff --check, UTF-8/LF, 보호483·SPEC/기준선/승인6·Plan/SQL·원래 P06 증거·보고서 prefix 보존은 result.json의 실제 최종 대조 결과를 따릅니다.
+
+남은 범위: 부모의 SQL/HBA 선택 실험 결과와 사용자 결정 대기는 그대로입니다. HBA overlay·pg_read_all_data 정책·SQL·Spec·Plan·운영 입력은 수정하지 않았습니다. 실제 Harbor/K8s/Secret/사내 clone/배포·백업·restore·SSH·모델/Source API·SQL 운영 시험과 Java/Eval249 재실행은 하지 않았습니다. 실제 승인 입력과 운영 게이트는 계속 미확보이며 부모가 직접 검증·사용자 결정 보고를 진행해야 합니다.
+
+## P06 최종 root Validate·사용자 결정 보고 (2026-11-05, 문서 검토)
+
+상태: **PROPOSED / USER_DECISION_PENDING**. 로컬 준비는 부모 root가 직접 재실행·검토했으나 검증 계정 계약은 **FAIL/BLOCKED**, 실제 운영 게이트는 **NOT_RUN**입니다. **P06 미완료, 현 Plan의 P07 선행조건 BLOCKED, P07 미착수**를 유지합니다. 이 절의 작성자는 보존된 실제 증거와 정본 Plan/Spec·관련 소스를 독립 대조했으며 테스트·빌드·SQL 실험을 다시 실행하지 않았습니다. 제안은 승인·구현·배포가 아닙니다.
+
+### 변경 범위와 실제 검증 근거
+
+P04 완료·커밋, P05 root 검증 Core36+app13+Docker IT1=고유50 및 83파일 커밋 `b028c81372f6d3f1aa5e7bfee32e94ae1e12df16`을 유지합니다(`scratchpad/p05-close/root-commit-verification.json`). P05 소스 바이트를 보존했습니다. P06 후보는 부모 `scratchpad/p06/root-reviewed-candidates.json`의 AI24·exec10파일이며 이번 문서 검토가 코드를 수정한 것은 아닙니다.
+
+- DB 준비: `ops/postgres/bootstrap.sql:16`·`:24`~`:27`, exec `deploy/helm/ai-gateway/db-chart/templates/statefulset.yaml:12`·`:31`, `networkpolicy.yaml:16`, `bootstrap-job.yaml:18`·`:36`에서 역할·PG18 데이터 경로·Retain·release별 선택자·Secret 참조를 확인했습니다. 차트10파일과 인벤토리 도구·게이트6문서·runconfig/schema/fixture·배포/자격 도구는 기존 P06 변경군입니다. 실제 운영 승인을 추가하지 않았습니다.
+- 일반 결함 보정: `ops/deploy/runconfig.py:36`·`:68`·`:106`은 잘못된 JSON/필수 키/승인 SHA 검사를 분리하고 유효한 정수형 JSON `1.0`을 `1Gi`로 정규화합니다. lint 더미 SHA의 잘못된 결속만 제거했으며 deploy 승인 SHA와 실제 clone/checkout 신원 검사는 유지합니다(`ops/deploy/read-exec.py:26`). Git trace 파일 환경은 제거하고 원시 오류는 메모리에서만 다룹니다(`read-exec.py:11`).
+- 자격/회전 보정: `ops/gates/aigw-runtime-credentials.sh:27`·`:38`은 승인 backup.type별 S3/SFTP 필드를 요구합니다. `:100`에서 모든 대상 hook의 종료 상태를 먼저 확인하여 busy이면 Secret 쓰기0, `:115`~`:117`에서 강제 교체 없이 종료 Job 삭제·재생성·완료 대기, 양 DB 성공 뒤 `:125`에서 앱 재시작, 부분 실패는 RECOVERY_REQUIRED로 전파합니다. 관련 selftest와 runconfig-selftest가 이를 검증합니다.
+
+| 대조한 실제 증거(모두 scratchpad 기준) | 결과와 판정 범위 |
+|---|---|
+| `p06/root-final-checks-v2/result.json`, `command-1.log`~`command-4.log` | 부모가 main·restore 실제 Helm lint, 정확한 missingPVC 음성, 자격 selftest의 필수4명령을 직접 재실행하여 모두 exit0. 각 release 렌더5리소스에서 이름·db-target/db-instance·PVC Retain·PG18 경로·Secret 참조·backup CronJob0 확인 |
+| `p06/root-final-runconfig-selftest.log` | 부모 직접 실행25검사 PASS: 실제 Helm main/restore 1.0 양성·분수/0/음수 음성, malformed JSON·schema·profile·SHA guard 포함 |
+| `p06/root-extra-probes-v2.json` | 부모 별도 검사: 1.0→1Gi, 승인 SFTP에 S3 필드만 있을 때 MISSING·exit13 |
+| `p06/result.json`, `p06-root-fix/result.json`·`final.md` | 초기27·16 및 보정59·25의 로컬 검증 이력. 중복되므로 고유 시험 수로 합산하지 않음. 수정 전후 증거를 덮어쓰지 않음 |
+| `p06/root-sql-probe.json:32`, `p06/root-hba-option-probe.json:49` | 부모가 별도 임시 PG18에서 승인 SQL의 계약 충돌 및 미승인 HBA 제안의 동작을 각각 직접 재현. 아래 결정 근거 |
+
+부모 최초 자격 selftest는 Docker에서 exec를 `/exec`에 마운트한 환경과 기본 sibling `/nori-tc-exec` 경로가 달라 실패했습니다(`p06/root-final-checks/command-4.log` 보존). 기존 지원 변수 `AIGW_SELFTEST_EXEC_DIR=/exec`를 지정하고 필수4명령 전체를 다시 실행한 v2가 성공 증거입니다. 소스 실패를 숨기거나 시험을 제외한 것이 아닙니다. 지원 근거는 `ops/gates/aigw-runtime-credentials-selftest.sh:17`, `ops/deploy/runconfig-selftest.py:12`이며 이번에는 README·runbook에 비형제 배치 설명만 추가했습니다.
+
+SQL 실험 이미지는 격리 로컬 공개 이미지 `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`입니다. 부모 증거의 실제 버전은 PostgreSQL18.6·vector0.8.7이며 컨테이너는 제거됐습니다. 이는 승인 Harbor 미러·운영 G-PG-IMAGE 통과 증거가 아닙니다. 이번 Ops 변경에 Java/Core/app/Eval249 재실행은 없으며 기존 P05 검증을 새 P06 실행으로 세지 않습니다.
+
+### 사용자 결정1 — 검증 계정의 실효 접근 경계와 서버 인증 예외
+
+정본 근거는 exec `docs/task/ai-rag-gateway-architecture-plan.md:490`입니다. 필수 `pg_read_all_data`·`default_transaction_read_only=on`과 “쓰기·DDL0, 이 DB 밖 권한0”을 함께 요구합니다. 같은 Plan `:489`는 “statement_timeout 등 서버 기본은 건드리지 않음”을 요구합니다. 현재 SQL `ops/postgres/bootstrap.sql:25`~`:27`은 이 처방을 그대로 구현했습니다.
+
+그러나 부모 실제 baseline(`root-sql-probe.json:32`·`:36`)에서 별도 DB의 비공개 테이블 SELECT가 성공했고, 해당 역할이 기본 read-only를 off로 SET한 뒤 외부 DB TEMP DDL/DML도 성공했습니다. ai_gateway 자체 영구 DDL은 거부됐습니다. 원인은 클러스터 범위 predefined READ 역할과 외부 DB의 기본 PUBLIC CONNECT/TEMP 권한이며, read-only 기본값은 변경 불가능한 권한 장벽이 아닙니다. [PG18 predefined roles](https://www.postgresql.org/docs/18/predefined-roles.html)는 모든 데이터의 읽기 권한을 설명하고, [PG18 HBA](https://www.postgresql.org/docs/18/auth-pg-hba-conf.html)는 DB·사용자·접속 유형별 첫 일치 인증 규칙과 include를 설명합니다. HBA는 서버 인증 설정이므로 기존 Plan의 서버 기본 불변 조항 아래 임의 도입할 수 없습니다.
+
+**선택A(권장, 미승인)**: 필수 READ 역할·연결한도2·기본 read-only·고정 OracleQueries를 유지하되 “다른 DB 권한0”을 **이 계정의 ai_gateway 외 DB CONNECT/읽기/쓰기 실효 접근0**으로 명확히 합니다. 서버 기본 불변에 오직 이 역할의 `hba_file` overlay 예외를 승인하는 조항을 제안합니다. TCP와 Unix 모두 ai_gateway에 대한 이 역할의 비밀번호 인증만 허용하고, 그 밖 모든 DB(기본 postgres 포함)의 이 역할 접속은 거부한 뒤 원래 PGDATA HBA를 include하여 다른 역할의 기존 인증을 유지합니다. timeout 등 다른 서버 기본은 유지합니다. HBA는 ACL 비트를 제거하지 않습니다.
+
+부모의 임시 컨테이너 제안 실험(`root-hba-option-probe.json:49`~`:86`, 실험 소스 `root_hba_option_probe.py:56`~`:85`)에서 target 비밀번호 읽기 성공, 다른2DB×TCP/Unix=4접속 HBA 거부, 자체 DB 영구 DML/DDL 거부, app 비밀번호 접속·superuser 유지보수·statement_timeout 보존을 확인했습니다. `approved=false`, `repositoryChanged=false`, `productionChanged=false`입니다. 이 실험 PASS가 저장소 구현이나 운영 적용 PASS를 의미하지 않습니다.
+
+**선택B(대안)**: 사용자가 실효 접근 차단이 아닌 literal SQL ACL 비트0을 요구하면 pg_read_all_data 필수 처방을 제거하고 DB별 객체 SELECT/default privileges와 외부 DB PUBLIC 권한을 재설계해야 합니다. P07/P15 및 다른 역할 영향 범위가 커집니다. A는 기존 전용 DB·고정 READ oracle을 유지하는 최소 변경이므로 권장하며, B를 승인 없이 대신 구현하지 않습니다.
+
+### 사용자 결정2 — F1 로컬 구현과 실제 배포 선행조건의 한정 분리
+
+현재 승인 Plan `:485`는 P06에서 실제 운영 게이트 closure를, `:509`는 P07 선행 P06과 Testcontainers 동일 확정 digest를 요구합니다. `:256`의 G-PG-IMAGE도 “F1 PG 배포·P07 이후”를 막습니다. 따라서 현 Plan으로 P07 로컬 코드부터 진행 가능하다고 해석할 수 없습니다. 승인 AIGW_RUNCONFIG, 실제 승인 Harbor 미러/probe, 소유자 승인 corpus 메타데이터 범위, GiB·노드 근거, 독립 암호화 백업 목적지, PV Retain 실행, 병합 exec SHA/inbound 읽기 승인·runtime/verify 자격은 확보되지 않았습니다(`root-preparation-review.json`, 기존 게이트 문서). 사업 값이나 승인을 임의 생성할 수 없습니다.
+
+정본 Spec `exec:docs/task/ai-rag-gateway-architecture.md:1369`·`:1372`·`:1383`은 F1 PostgreSQL 기술 확인과 배포/수용 게이트를 요구하고, 미완료이면 **해당 배포 NOT_RUN**으로 규정합니다. 검토한 §16에는 이 운영 입력 확보 전 모든 F1 로컬 코드 작성까지 금지하는 명문은 없습니다. 따라서 로컬 구현 선행조건만 더 강하게 둔 Plan의 한정 변경안으로 제시하며 Spec 기준선은 수정하지 않습니다. F2의 명시적 착수 게이트(`Spec:1384`, `Plan:266`~`:272`)는 이 제안의 예외 대상이 아닙니다.
+
+**제안 조항(PROPOSED / USER_DECISION_PENDING)**:
+
+1. Plan의 P06 로컬 준비·계정 경계 검증과 실제 운영 게이트 완료 상태를 분리하여 각각 기록합니다. P06 전체 완료·운영 PASS를 로컬 PASS로 대체하지 않습니다.
+2. 검증 계정 보정의 root 로컬 검증 뒤 F1 P07~P15의 **코드·격리 로컬 시험 준비만** 운영 입력 대기 중 허용합니다. 기존 phase 순서·기능 범위·개별 코드 계약과 실제 Source 연결의 승인 경계를 유지합니다. 외부 입력이 필요한 부분은 명시적 BLOCKED/NOT_RUN으로 남깁니다.
+3. 그 준비의 PostgreSQL 시험에는 위 실측 공개 PG18 이미지 tag/digest·버전·격리 환경을 명시한 test pin을 허용합니다. 이를 승인 Harbor 이미지로 간주하지 않으며 실제 승인 이미지 확보 뒤 관련 bootstrap/마이그레이션/권한·저장소 시험을 승인 digest로 다시 검증하고 차이를 해소합니다. 현 P07 동일 digest 조항과 G-PG-IMAGE의 로컬 구현 차단 범위에만 예외를 둡니다.
+4. 실제 DB/Secret/K8s 배포는 기존 G-EXEC-CHART-REF·G-PG-IMAGE·용량/보호/백업/자격 승인·runconfig 및 Plan §4.1(`:159`·`:163`~`:166`), §5(`:254`~`:263`), §11.9(`:1214`~`:1220`)의 조건을 그대로 요구합니다. P16/F1 exit와 F2·이후 단계의 Spec 게이트·정식 수용을 완화하지 않습니다. Source·corpus·capacity·backup 사업 기본값은 새로 정하지 않습니다.
+
+**하나의 권장 방향**은 “A의 검증 계정 실효 경계 명확화·역할 한정 HBA 예외 + 위 F1 로컬 준비/실제 배포의 한정 분리”를 함께 명시 승인하는 것입니다. 이는 반복적인 일반 phase/커밋 허가 요청이 아니라 승인된 보안 문구·서버 설정 제한·P07 이미지 선행조건을 바꾸는 사용자 결정입니다. 연속 자율 작업 지시만으로 확정 계약을 묵시 변경하지 않습니다. 현재 두 결정과 Plan 개정은 모두 미승인·미적용입니다.
+
+### 승인 후 순서·보존 및 미검증 범위
+
+사용자 결정 후 독립 담당의 **Plan 조항만 수정** → root의 Spec 불변·변경 범위 대조 → 독립 P06 HBA 보정 구현 → root 실제 PG18/Helm/음성·인증 회귀 검증 → 통상 커밋 → 개정된 선행조건에 따른 독립 P07 구현 순서입니다. 각 단계는 기존 연속 작업 승인 범위에서 진행하되 승인 결과를 넘어 확장하지 않습니다. 실제 운영 승인·필수 입력은 소유자에게서 확보할 때까지 미완료로 유지하며 운영 게이트를 위조하지 않습니다. B를 선택하면 먼저 그 권한 설계의 정확한 Plan을 확정해야 합니다.
+
+이번 문서 작업은 이 Dev report의 기존796430바이트 뒤에만 추가하고, README·자격 runbook의 selftest 소스 배치 설명만 추가했습니다. scratch `p06-decision-report/result.json`에 편집 전후 해시·기존 prefix·보호483·Spec/기준선/승인6·Plan·SQL·P05 소스·부모 후보 manifest 및 전체 레포 파일 snapshot 대조를 기록합니다. 기존 증거 JSON과 게이트 상태·Plan 체크박스를 수정하지 않았습니다.
+
+이번 실행에서 테스트·빌드·SQL·Helm 실행, 실제 Harbor/K8s/Secrets/Source/model/SSH/서버 설정·배포·백업·복원·commit/push/MR은 없습니다. 추가 확인은 사용자 두 계약 결정과 실제 운영 입력 확보, 승인 후 새 구현에 대한 실제 root 검증입니다. **phaseComplete=false, userDecisionPending=true**를 유지합니다.
+
+
+## 2026-11-06 P06 승인 A 보완 구현·LOCAL 검증 (부모 독립 검증 대기)
+
+이번 작업은 사용자 “권장으로 진행” 승인 A/B와 부모의 `p06-approved-plan/root-plan-approval.json`(semanticReview PASS, approvedForP06Implementation=true)을 읽고 P06 접속 제한만 구현했습니다. 앞 절의 “미승인/미적용”은 당시 이력이며 승인된 현재 계약은 개정 Plan입니다. SPEC SHA256=`136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3`, 개정 Plan SHA256=`0dbe45183d89ce118d86b09d40ff0a6476d5a8f1440d79b8ae3395102daa2718`를 그대로 유지했습니다. P05 HEAD `b028c81372f6d3f1aa5e7bfee32e94ae1e12df16` 이후 commit/staging/push/MR은 없습니다.
+
+### 근본 원인과 최종 배선
+
+`pg_read_all_data`는 인스턴스 범위 READ 역할이고 다른 DB PUBLIC CONNECT/TEMP가 남으므로 read-only 기본값만으로 타 DB 접근을 막을 수 없었습니다. 승인 A에 따라 literal SQL ACL 0을 주장하지 않고 검증 역할의 타 DB 연결/유효 접근 0을 강제합니다. 기존 bootstrap.sql의 역할·확장·DB 권한 책임과 GRANT/REVOKE는 변경하지 않았습니다(SHA256=`04b42923d3940ed51d0630c0cddb13cc649167fcb8d43027bba07c7f2ca7c11e`). 사용자 스키마·테이블은 시험 관리자 fixture에만 존재합니다.
+
+HBA 정본은 `ops/postgres/acceptance-pg_hba.conf` 한 곳입니다. 앞 네 행은 해당 역할의 ai_gateway local/host SCRAM 허용과 나머지 DB 거부이고, 마지막 필수 include는 `/var/lib/postgresql/18/docker/pg_hba.conf`입니다. 원본 영속 HBA·postgresql.conf·postgresql.auto.conf 수정, ALTER SYSTEM, 새 trust 규칙은 없습니다. 정본 SHA256=`1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22`입니다.
+
+모든 DB lint/render/deploy가 정본을 `--set-file hba.overlay`로 주입합니다. 각 release의 `-hba` ConfigMap을 optional=false/key 명시/0444로 `/etc/aigw/postgres`에 readOnly 디렉터리 mount하고 ENTRYPOINT를 유지한 `postgres -c hba_file=/etc/aigw/postgres/pg_hba.conf`로 기동합니다. checksum은 Pod template annotation에 반영됩니다. PGDATA/PVC mount·이미지·Secret 값·서버 timeout 기본값은 유지했습니다. 주/복원 6종 리소스의 이름·참조·label은 서로 분리되고 restore CronJob은 0입니다.
+
+정본/렌더 계약 변조는 배포 전 고정 오류로 거부하고 실제 파일/key 부재·필수 include 대상 부재·구문 손상은 새 PostgreSQL 기동 실패로 확인했습니다. deploy는 rollout status와 bootstrap 완료 후 Pod 내부 관리자 env로 고정 SQL을 실행해 실제 경로/정본 SHA/앞 네 HBA 규칙/원본 include/오류 0을 확인합니다. 다른 계정의 원본 내부 include도 허용합니다. 원시 SQL 오류는 메모리에서 고정 오류로 바꾸며 배포 실패 증거를 기록합니다. 실제 운영 호출은 실행하지 않았습니다.
+
+`--acceptance-role enabled|disabled`를 추가했습니다. disabled는 Secret 검사·hook 환경변수 참조를 생략하고 false를 전달하면서 HBA를 유지합니다. 활성 세션 정리는 인자 단독의 보장 범위가 아니며 runbook에 두 release 각각 NOLOGIN·대상 세션 종료 → disabled bootstrap → 역할 부재/재접속 거부 → 공유 Secret 삭제 순서를 명시했습니다. HBA 변경의 checksum rollout은 기존 세션까지 끝내는 Pod 교체이며 reload만으로 완료 처리하지 않습니다. 동일 checksum의 승인 리허설은 release별 명시 restart/status 절차입니다. P15 전체 자격 수명·실제 운영 검증은 NOT_RUN입니다.
+
+### 실제 검증과 실행 위치
+
+Windows 실행 cwd는 `C:/workspace_nori/nori-ai-gateway`, Linux 도구 컨테이너 cwd `/ai`는 같은 checkout입니다. exec는 `/exec`에 읽기 전용 mount했고 `AIGW_SELFTEST_EXEC_DIR=/exec`를 전달했습니다. 도구 이미지 ID는 `sha256:aa75a3bbab72c9c0be4e0dada6d7c41cc944fd9b74e8f090683884ee7e22d892`이며 `--network none --pull=never`로만 실행했습니다. 전역 패키지 설치/설정 변경은 없습니다.
+
+| 실행 | 실제 결과 | 로그/증거 |
+|---|---|---|
+| `bash ops/postgres/aigw-hba-local-test.sh --image pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2 --out evidence/F1/gates/p06-hba-local-approved-20261106-r4.json` | exit 0, LOCAL_VALIDATED, 205개 판정 이벤트 | scratch `hba-locked-command.json`, `hba-locked.log`; 새 repo LOCAL JSON r4 |
+| main/restore `aigw-helm.sh --mode lint`와 `--mode render`, missingPVC expected failure, direct Helm release/replicas/PG18/restore backup/HBA 필수 음성, checksum·mount/key/args 음성, shell 문법과 runconfig 실행 | `local_checks.py`의 총 24회 명령이 기대 exit와 일치 | scratch `helm-checks.json`와 항목별 `.stdout/.stderr` |
+| `python3 -B ops/deploy/runconfig-selftest.py` | exit 0, 기존 25개 유지 | scratch `runconfig-selftest.stdout`(위 24회 안에 포함) |
+| `AIGW_SELFTEST_EXEC_DIR=/exec bash ops/gates/aigw-runtime-credentials-selftest.sh` 및 최종 5개 shell `bash -n` | exit 0, 81회 selftest 명령; 기존 59개가 순서·exit·expectedError 그대로 포함 | scratch `locked-checks.json`, `credentials-locked.log`, `selftest-locked-summary.json` |
+| `gradlew.bat -p C:/workspace_nori/nori-ai-gateway :gateway-eval:run "--args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" --no-daemon --console=plain` | exit 0, FILE_HASHED/LOCAL_FILE, 승인 Spec SHA 일치 | scratch `p06-hba-spec-guard.json/.log` |
+
+위 수는 서로 겹치는 반복 명령/시나리오 판정입니다. 205+24+25+81를 고유 시험 수로 합산하지 않습니다. Gradle Test task는 실행하지 않았고 Java 249 회귀와 별도 test-evidence verify도 실행하지 않았습니다(ops 전용 변경, Spec guard는 run task). 소스 UTF-8/LF·한글 literal ?/치환문자 검사와 두 레포 git diff --check는 최종 경계 검증에서 확인합니다.
+
+PG 결과는 `PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit`, vector 0.8.7, pg_trgm 가용·미설치·미사용입니다. 실제 차트에서 렌더한 HBA와 args로 빈 PGDATA 기동·기존 볼륨 재기동·유효 정책 복구를 검증했습니다. bootstrap true 2회/false 2회·삭제 후 재활성, 비특권 속성/READ membership/실제 연결 2개 전제의 세 번째 거부, target 읽기와 wrong-password 거부, postgres/p06_outside/template1의 TCP IPv4·IPv6·Unix HBA_REJECT를 확인했습니다. default_transaction_read_only=off 후 INSERT/UPDATE/DELETE/TRUNCATE/CREATE/CREATE SCHEMA/ALTER/DROP/TEMP는 각각 SQLSTATE 42501로 거부됐고 25006을 통과 근거로 세지 않았습니다. 다른 계정 로그인·admin 유지보수·migrator 스키마 작업과 PUBLIC DDL 권한을 회귀했습니다.
+
+동일한 자기 소유 격리 볼륨의 원본 HBA 대조군과 overlay의 다른 역할 인증 결과가 일치했습니다. 공식 initdb 원본의 loopback/Unix 인증 결과를 일률적 SCRAM 거부로 바꾸지 않았습니다. 모든 서버 설정 비교의 변경 이름은 hba_file 하나였고 statement_timeout도 같았습니다. 원본 HBA 전후 SHA256=`31f65ccbe621d83a6ac98fad2428bc075a05a566a32bc869da7313b9e34a7349`로 동일합니다. 비밀번호는 CSPRNG 가짜 값만 메모리/env로 전달했고 argv/임시 파일/캡처 출력/각 컨테이너 로그에서 값 노출을 검사했습니다. 전체 실행의 컨테이너·볼륨·임시 디렉터리와 Windows python3 shim은 정리됐고 label 조회 잔류는 각각 0입니다. 실행/정리 코드는 자기 소유 label·정확한 container ID·volume 이름을 확인한 자원만 삭제합니다.
+
+초기 r1은 다른 역할의 원본 loopback 인증을 일괄 비밀번호 거부로 가정한 시험 결함으로 FAIL했습니다. 원본 대조군과 실제 결과 일치를 검사하도록 근본 원인을 고쳤습니다. r2는 PostgreSQL이 실제 exit 1로 종료됐으나 기대 로그 문구에 파일 경로가 빠진 시험 결함으로 FAIL했고, 실제 경로와 구체 실패 원인을 함께 검사하도록 고쳤습니다. r3는 205개 판정으로 LOCAL_VALIDATED였습니다. 그 뒤 로그 검사 실패도 자원 정리를 건너뛰지 않는 finally 보완을 반영해 현재 소스를 bash 진입점으로 r4 재검증했습니다. 초기 credentials 실행 1회는 실행 중 소스 편집으로 heredoc 뒤 셸 읽기 위치가 어긋나 PASS 출력 후 exit 1이었으며 통과로 세지 않았습니다. 소스를 고정한 뒤 최종 문법/전체 selftest exit 0으로 확인했습니다. r1/r2/r3 JSON과 앞선 승인 전 부모 proposal 증거는 덮어쓰지 않았습니다.
+
+### 실제 변경 파일과 SHA256
+
+| 파일 | SHA256 |
+|---|---|
+| `AI:docs/gates/f1/postgres-image.md` | `ae3eb6b470e63cdf53eefafed7d8fba8bdc19d9c4aca7b7e2445ec38590a34f6` |
+| `AI:docs/runbooks/aigw-runtime-credentials.md` | `bc3fe0da39841a2a28618b8ba85bda75c49d2c17c9d6d0f855af9874b572e450` |
+| `AI:ops/deploy/aigw-helm.sh` | `b5d2e52f65e119b7136e578b9e9a102f38a989d59722f73d77f7e6208416ecba` |
+| `AI:ops/deploy/hba_policy.py` | `2cf0087ce3d55d3d70b4b57bcb899939b675ad4ff1e7043604045730a803d058` |
+| `AI:ops/gates/aigw-runtime-credentials-selftest.sh` | `21f8998073567fbdf326137fbfadac3dda651e74a691f0ec55009328230d0767` |
+| `AI:ops/postgres/acceptance-pg_hba.conf` | `1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22` |
+| `AI:ops/postgres/aigw-hba-local-test.sh` | `d711b8d55e26f1053760279d34142d6588ba19e40913e3e07d8a30293b9f471c` |
+| `AI:ops/postgres/hba_local_test.py` | `2c4d97d554f7f16be2f111444730817cbb7d0623eb99e02fa2534e9baf67bc01` |
+| `AI:ops/runconfig/README.md` | `1ec50a5704ef03df21b9e86dfb39004204c42fcaef4d74562d000ae868ba7e3c` |
+| `exec:deploy/helm/ai-gateway/db-chart/templates/hba-configmap.yaml` | `31f660a7536ea6a980b65b733496c96c9483898e688977a042547b8bb5a9acb4` |
+| `exec:deploy/helm/ai-gateway/db-chart/templates/statefulset.yaml` | `9fb2ab66c37d9658f52518cf4adb8ef2a47766d2fd429b7e3ac939ccf64c45e1` |
+| `exec:deploy/helm/ai-gateway/db-chart/values.yaml` | `716ff5db725a2eb56687e2a5fb70a5470442032f0c6286bc8eec6f571c597437` |
+
+위 12개 소스/문서 외에는 이 Dev report의 APPEND와 새 LOCAL JSON r1~r4만 추가했습니다. Dev report는 기존 809344바이트(SHA256 `bddb7a664b0265fa8316a24492c22f630e8ddee1afeb962e461cd52865f4a222`)를 그대로 두고 이 절만 UTF-8/LF 바이트로 붙였습니다. 자기 자신 최종 SHA는 순환 참조를 피하기 위해 scratch result.json에 기록합니다. 변경 파일 전체 해시/새 증거 해시는 scratch boundary.json/result.json에 있습니다.
+
+### 범위·Plan 대비 차이·미검증
+
+제품/권한 계약과 phase 순서의 차이는 없습니다. bash 진입점은 Python 구현에 위임하며 Plan의 trap 정리 의무는 Python finally로 구현했습니다. Windows에서는 기존 venv의 python3 shim과 이미 설치된 Linux 도구 이미지로 동일 bash/Helm 경로를 실행했고 별도 정책·사업 기본값·운영 runtime guard 범위를 추가하지 않았습니다. 원본 HBA 내부 include를 배제하지 않도록 검사 범위를 승인된 overlay 네 규칙·필수 include 정본 SHA·전체 구문 오류 0으로 한정했습니다.
+
+부모 보호 스냅샷 483개, Spec/baseline/approval6, 개정 Plan, 기존 F0/PREREG/golden/capture/result/evidence와 기존 P06 JSON은 불변입니다. 전체 source snapshot 비교에서 이번 허용 파일 외 수정은 없습니다. 이미지 Harbor 미러/승인 digest, 승인 runconfig·용량·PV 보호·백업 목적지, 병합 exec SHA/inbound 자격과 실제 운영 배포는 미확보/미검증입니다. 실제 SSH/K8s/Secret/Harbor/모델/서버/Source/배포/운영 백업·복원·CI/push/MR/전역 설정 변경을 실행하지 않았습니다. 승인 Harbor digest 확보 후 관련 bootstrap/HBA·migrate/권한·저장·백업/복원 재시험과 부모 검증이 필요합니다. 실제 rollout 세션 종료·양쪽 운영 자격 수명·운영 수용은 NOT_RUN입니다.
+
+현재 상태는 **P06 CODE/LOCAL_VALIDATED, 부모 독립 검증 대기; P06 전체 미완료; P07 미착수; P16/F1 완료/F2 운영 게이트 BLOCKED/NOT_RUN**입니다. Spec/Plan 체크박스는 변경하지 않았습니다. 다음 P07은 부모 검증 후 별도 세션입니다.
+
+
+## P06 부모 독립 Validate 종료 및 로컬 커밋 경계 (2026-11-06)
+
+부모 승인 근거는 scratch `p06-approved-hba/root-validation-approval.json`과 `root-source-db-review.json`입니다. P06 **CODE/LOCAL_VALIDATED PASS**, **P07 코드 진행 가능**으로 판정됐습니다. P06 운영 전체 완료를 뜻하지 않으며 실제 운영 게이트/P16/F1/F2는 **BLOCKED/NOT_RUN**을 유지합니다. P07 착수와 Spec/Plan 수정은 이번 종료 작업 범위에 포함하지 않습니다.
+
+부모 검증은 AI HEAD `b028c81372f6d3f1aa5e7bfee32e94ae1e12df16`과 당시 dirty ops/exec 차트 소스에서 실행됐습니다. 이후 생성할 로컬 커밋 SHA에서 테스트를 실행했다는 의미가 아닙니다. `root-linux-final/result.json`은 actual Helm, main/restore × acceptance role enabled/disabled의 4개 render variant, 누락·변조 거부를 포함한 outer check 15개 PASS입니다. 내부 credential 81개/runconfig 25개는 이 검사와 겹치므로 합산하지 않습니다. 신규 Java 코드·테스트 변경이 없어 기존 Java 249개 테스트는 반복하지 않았습니다. 부모/worker Spec guard는 각각 exit 0입니다.
+
+실제 격리 PG 검증에 사용한 source HBA SHA256은 `1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22`, bootstrap SQL SHA256은 `04b42923d3940ed51d0630c0cddb13cc649167fcb8d43027bba07c7f2ca7c11e`입니다. `root-pg-review-v2.json`은 75개 PASS와 옛 negative 기대 로그 문구 1개 FAIL이므로 전체 PASS로 처리하지 않습니다. fresh/restart의 TCP·Unix·IPv6 own read, other DB HBA reject, read-only off 후 SQLSTATE 42501, 기존 계정 인증 동일, 설정 변경이 hba_file 하나뿐임과 role off 시 부재 검증은 실제 PASS입니다. 해당 negative는 `root-negative-review-v3.json`에서 missing overlay/invalid syntax/missing include 각각 exit 1과 구체 HBA 원인, valid recovery PASS를 독립 확인하여 닫았습니다.
+
+실패한 검증 도구 실행 이력은 보존합니다. `root-pg-review.json`은 광범위 Docker inspect 메모리 출력에 자체 secret-sentinel 검사가 반응하여 중단됐으며 채팅/파일 비밀 노출은 없었습니다. 소유자를 확인한 자원을 정리한 뒤 inspect 범위를 labels/state로 제한했습니다. `root-negative-review.json`과 v2는 강제 종료/짧은 기동 대기라는 시험 조건의 실패였고, 최종 v3는 소유 컨테이너의 graceful 종료와 180초 기동 대기로 복구까지 PASS했습니다. 실제 코드 변경 없이 검증 도구를 수정한 것이며 과거 실패를 통과로 승격하지 않습니다.
+
+종료 작업의 사전 대조에서 AI 32개/exec 11개, 총 43개 후보 원본 해시가 부모의 `root-reviewed-candidates.json`과 모두 일치했고 두 HEAD와 작업트리 스냅샷도 일치했습니다. 스테이징은 양쪽 모두 비어 있었습니다. 최종 부모 검증의 소스 동결 전후 해시 일치 근거와 보호 483개, Spec/baseline/approval6, ignored Plan, 기존 F0/PREREG/results/evidence 및 기존 report prefix를 확인했습니다. `aigw.root.owner`와 `aigw.p06.owner` 라벨로 컨테이너/볼륨 이름·개수만 조회한 현재 잔류는 각각 0이며 전체 inspect 값은 출력하지 않았습니다.
+
+이번에는 이 Dev report의 원본 바이트를 유지한 추가 절만 작성하고 승인된 정확한 43개 경로를 exec 11개 → AI 32개 순서로 로컬 커밋합니다. README/evidence/코드/Spec/Plan은 편집하지 않습니다. 커밋 전후 diff check, 실제 staged/committed 경로와 blob SHA256, 외부 경로·삭제·누락 0, Dev report 원본 prefix와 보호 파일 불변의 최종 결과 및 두 커밋 SHA는 별도 scratch `p06-approved-close/result.json`과 `final.md`에 기록합니다. 새 구현이 없어 부모 테스트는 반복하지 않습니다. 실제 DB/K8s/SSH/Secret/Harbor/Source/모델 서버 접근, 전역 설정 변경, push/MR/force 및 운영 배포 작업은 실행하지 않습니다.

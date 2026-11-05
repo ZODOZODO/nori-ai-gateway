@@ -1,0 +1,46 @@
+{
+  "purpose": "lint",
+  "profile": "main",
+  "execChartSha": {
+    "value": "0000000000000000000000000000000000000000",
+    "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+  },
+  "pgImage": {
+    "tag": {
+      "value": "lint-pg18",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "digest": {
+      "value": "0000000000000000000000000000000000000000000000000000000000000000",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "pvcSizeGi": {
+    "value": 1,
+    "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+  },
+  "restore": {
+    "pvcSizeGi": {
+      "value": 1,
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "backup": {
+    "type": {
+      "value": "s3",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "destination": {
+      "value": "s3://lint-only.invalid/backup",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "ageRecipient": {
+      "value": "age1lintonly",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "retentionDays": {
+      "value": 7,
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  }
+}

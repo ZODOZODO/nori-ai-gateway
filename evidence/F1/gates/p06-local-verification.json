@@ -1,0 +1,935 @@
+{
+  "status": "LOCAL_ONLY_OPERATIONAL_GATES_NOT_CLOSED",
+  "environment": "Linux Docker, network none, read-only repository bind mounts",
+  "toolImage": "sha256:aa75a3bbab72c9c0be4e0dada6d7c41cc944fd9b74e8f090683884ee7e22d892",
+  "helm": "v4.2.2+gb05881c",
+  "bash": "5.2.15",
+  "python": "3.12.10",
+  "git": "2.39.5",
+  "openssl": "3.0.22",
+  "tests": [
+    {
+      "label": "main-lint",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "restore-lint",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db-restore",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "ai-gateway-db-render",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "render",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "ai-gateway-db-restore-render",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db-restore",
+        "--mode",
+        "render",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "missing-pvc-exact",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "render",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/negative-missing-pvc.json",
+        "--expect-fail",
+        "RENDER_REQUIRED_persistence.size"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": "EXPECTED_FAILURE:RENDER_REQUIRED_persistence.size"
+    },
+    {
+      "label": "expect-success-rejected",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "render",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json",
+        "--expect-fail",
+        "RENDER_REQUIRED_persistence.size"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "expectedError": "EXPECTED_FAILURE_ABSENT"
+    },
+    {
+      "label": "invalid-release",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "other-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RENDER_INVALID_RELEASE"
+    },
+    {
+      "label": "profile-flag-conflict",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json",
+        "--values-profile",
+        "restore"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_PROFILE_MISMATCH"
+    },
+    {
+      "label": "expect-lint-rejected",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "ops/runconfig/fixtures/lint-verify.json",
+        "--expect-fail",
+        "RENDER_REQUIRED_persistence.size"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "EXPECT_FAIL_RENDER_ONLY"
+    },
+    {
+      "label": "replicas-guard",
+      "command": [
+        "helm",
+        "template",
+        "ai-gateway-db",
+        "/nori-tc-exec/deploy/helm/ai-gateway/db-chart",
+        "--set",
+        "pgImage.tag=lint-pg18",
+        "--set-string",
+        "pgImage.digest=0000000000000000000000000000000000000000000000000000000000000000",
+        "--set",
+        "persistence.size=1Gi",
+        "--set-file",
+        "bootstrap.sql=/ai/ops/postgres/bootstrap.sql",
+        "--set",
+        "replicas=2"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "expectedError": "RENDER_INVALID_REPLICAS"
+    },
+    {
+      "label": "pg17-guard",
+      "command": [
+        "helm",
+        "template",
+        "ai-gateway-db",
+        "/nori-tc-exec/deploy/helm/ai-gateway/db-chart",
+        "--set",
+        "pgImage.tag=lint-pg18",
+        "--set-string",
+        "pgImage.digest=0000000000000000000000000000000000000000000000000000000000000000",
+        "--set",
+        "persistence.size=1Gi",
+        "--set-file",
+        "bootstrap.sql=/ai/ops/postgres/bootstrap.sql",
+        "--set",
+        "pgImage.tag=lint-pg17"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "expectedError": "RENDER_INVALID_PG18_TAG"
+    },
+    {
+      "label": "restore-backup-guard",
+      "command": [
+        "helm",
+        "template",
+        "ai-gateway-db-restore",
+        "/nori-tc-exec/deploy/helm/ai-gateway/db-chart",
+        "--set",
+        "pgImage.tag=lint-pg18",
+        "--set-string",
+        "pgImage.digest=0000000000000000000000000000000000000000000000000000000000000000",
+        "--set",
+        "persistence.size=1Gi",
+        "--set-file",
+        "bootstrap.sql=/ai/ops/postgres/bootstrap.sql",
+        "--set",
+        "backup.enabled=true"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "expectedError": "RENDER_RESTORE_BACKUP_FORBIDDEN"
+    },
+    {
+      "label": "syntax-aigw-helm.sh",
+      "command": [
+        "bash",
+        "-n",
+        "/ai/ops/deploy/aigw-helm.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "syntax-aigw-runtime-credentials-selftest.sh",
+      "command": [
+        "bash",
+        "-n",
+        "/ai/ops/gates/aigw-runtime-credentials-selftest.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "syntax-aigw-runtime-credentials.sh",
+      "command": [
+        "bash",
+        "-n",
+        "/ai/ops/gates/aigw-runtime-credentials.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "syntax-corpus-inventory.sh",
+      "command": [
+        "bash",
+        "-n",
+        "/ai/ops/seaweedfs/bin/corpus-inventory.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "credentials-selftest",
+      "command": [
+        "bash",
+        "ops/gates/aigw-runtime-credentials-selftest.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "missing-digest",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:pgImage.digest"
+    },
+    {
+      "label": "missing-ref",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:pvcSizeGi"
+    },
+    {
+      "label": "invalid-schema-size",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_INVALID:pvcSizeGi.value"
+    },
+    {
+      "label": "restore-profile-mismatch",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db-restore",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_PROFILE_MISMATCH"
+    },
+    {
+      "label": "restore-forbidden-keys",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db-restore",
+        "--mode",
+        "lint",
+        "--exec-dir",
+        "/nori-tc-exec",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_KEY_CONFLICT:pvcSizeGi"
+    },
+    {
+      "label": "lint-never-deploy",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "deploy",
+        "--exec-sha",
+        "0000000000000000000000000000000000000000",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:purpose"
+    },
+    {
+      "label": "fixture-ref-never-deploy",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "deploy",
+        "--exec-sha",
+        "0000000000000000000000000000000000000000",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:execChartSha"
+    },
+    {
+      "label": "pending-never-deploy",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "deploy",
+        "--exec-sha",
+        "0000000000000000000000000000000000000000",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:execChartSha"
+    },
+    {
+      "label": "clone-sha-input-mismatch",
+      "command": [
+        "bash",
+        "ops/deploy/aigw-helm.sh",
+        "--release",
+        "ai-gateway-db",
+        "--mode",
+        "deploy",
+        "--exec-sha",
+        "0000000000000000000000000000000000000000",
+        "--runconfig",
+        "input.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "EXEC_SHA_MISMATCH"
+    },
+    {
+      "label": "inventory-no-scope",
+      "command": [
+        "bash",
+        "ops/seaweedfs/bin/corpus-inventory.sh",
+        "--runconfig",
+        "input.json",
+        "--bucket",
+        "nori-tc",
+        "--out",
+        "inventory.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:seaweed.s3Endpoint"
+    }
+  ],
+  "regressionTests": [
+    {
+      "label": "credentials-selftest-final",
+      "command": [
+        "bash",
+        "ops/gates/aigw-runtime-credentials-selftest.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-syntax-aigw-helm.sh",
+      "command": [
+        "bash",
+        "-n",
+        "ops/deploy/aigw-helm.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-syntax-aigw-runtime-credentials.sh",
+      "command": [
+        "bash",
+        "-n",
+        "ops/gates/aigw-runtime-credentials.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-syntax-aigw-runtime-credentials-selftest.sh",
+      "command": [
+        "bash",
+        "-n",
+        "ops/gates/aigw-runtime-credentials-selftest.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-syntax-corpus-inventory.sh",
+      "command": [
+        "bash",
+        "-n",
+        "ops/seaweedfs/bin/corpus-inventory.sh"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-schema-valid",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "lint",
+        "values.json",
+        ""
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "final-schema-missing-digest",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "lint",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:pgImage.digest"
+    },
+    {
+      "label": "final-schema-missing-ref",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "lint",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:pvcSizeGi"
+    },
+    {
+      "label": "final-schema-invalid-type",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "lint",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_INVALID:pvcSizeGi.value"
+    },
+    {
+      "label": "final-pending-rejected",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "deploy",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:execChartSha"
+    },
+    {
+      "label": "final-deploy-missing-pvc",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "deploy",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:execChartSha"
+    },
+    {
+      "label": "final-deploy-missing-pvc-key",
+      "command": [
+        "python3",
+        "-B",
+        "ops/deploy/runconfig.py",
+        "config.json",
+        "ai-gateway-db",
+        "deploy",
+        "values.json",
+        ""
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_MISSING:pvcSizeGi"
+    },
+    {
+      "label": "inventory-aggregate-stub",
+      "command": [
+        "bash",
+        "ops/seaweedfs/bin/corpus-inventory.sh",
+        "--runconfig",
+        "inventory-config.json",
+        "--bucket",
+        "nori-tc",
+        "--out",
+        "inventory.json"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "inventory-yaml-stub",
+      "command": [
+        "bash",
+        "ops/seaweedfs/bin/corpus-inventory.sh",
+        "--runconfig",
+        "inventory-config.json",
+        "--bucket",
+        "nori-tc",
+        "--out",
+        "inventory.json",
+        "--keys-from",
+        "/tmp/tmppcy8l3ud/keys.txt"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "expectedError": null
+    },
+    {
+      "label": "inventory-outside-file-rejected",
+      "command": [
+        "bash",
+        "ops/seaweedfs/bin/corpus-inventory.sh",
+        "--runconfig",
+        "inventory-config.json",
+        "--bucket",
+        "nori-tc",
+        "--out",
+        "inventory.json",
+        "--keys-from",
+        "outside.yaml"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "CORPUS_SCOPE_MISMATCH"
+    },
+    {
+      "label": "inventory-owner-not-approved",
+      "command": [
+        "bash",
+        "ops/seaweedfs/bin/corpus-inventory.sh",
+        "--runconfig",
+        "inventory-config.json",
+        "--bucket",
+        "nori-tc",
+        "--out",
+        "inventory.json"
+      ],
+      "exit": 2,
+      "expected": 2,
+      "expectedError": "RUNCONFIG_NOT_APPROVED:seaweed.s3Endpoint"
+    }
+  ],
+  "credentialsSelftest": {
+    "status": "PASS",
+    "boundary": "stub kubectl/git; 실제 Secret/Source 접근 없음",
+    "checks": [
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "provision-db"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "provision-db"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "F1"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "F2"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "F3"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "F4"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "RESTORE"
+        ],
+        "exit": 0,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "check",
+          "--stage",
+          "F1"
+        ],
+        "exit": 13,
+        "expectedError": null
+      },
+      {
+        "command": [
+          "ops/gates/aigw-runtime-credentials.sh",
+          "provision-db"
+        ],
+        "exit": 1,
+        "expectedError": "SECRET_QUERY_FAILED"
+      },
+      {
+        "command": [
+          "ops/deploy/aigw-helm.sh",
+          "--release",
+          "ai-gateway-db",
+          "--mode",
+          "lint",
+          "--exec-sha",
+          "0000000000000000000000000000000000000000",
+          "--runconfig",
+          "ops/runconfig/fixtures/lint-verify.json"
+        ],
+        "exit": 2,
+        "expectedError": "EXEC_READ_CREDENTIAL_MISSING"
+      },
+      {
+        "command": [
+          "ops/deploy/aigw-helm.sh",
+          "--release",
+          "ai-gateway-db",
+          "--mode",
+          "lint",
+          "--exec-sha",
+          "0000000000000000000000000000000000000000",
+          "--runconfig",
+          "ops/runconfig/fixtures/lint-verify.json"
+        ],
+        "exit": 2,
+        "expectedError": "EXEC_CHART_MISSING"
+      },
+      {
+        "command": [
+          "ops/deploy/aigw-helm.sh",
+          "--release",
+          "ai-gateway-db",
+          "--mode",
+          "lint",
+          "--exec-sha",
+          "0000000000000000000000000000000000000000",
+          "--runconfig",
+          "ops/runconfig/fixtures/lint-verify.json"
+        ],
+        "exit": 2,
+        "expectedError": "EXEC_READ_FORBIDDEN"
+      },
+      {
+        "command": [
+          "ops/deploy/aigw-helm.sh",
+          "--release",
+          "ai-gateway-db",
+          "--mode",
+          "lint",
+          "--exec-sha",
+          "0000000000000000000000000000000000000000",
+          "--runconfig",
+          "ops/runconfig/fixtures/lint-verify.json"
+        ],
+        "exit": 2,
+        "expectedError": "EXEC_SHA_MISMATCH"
+      },
+      {
+        "command": [
+          "ops/deploy/aigw-helm.sh",
+          "--release",
+          "ai-gateway-db",
+          "--mode",
+          "lint",
+          "--exec-sha",
+          "0000000000000000000000000000000000000000",
+          "--runconfig",
+          "ops/runconfig/fixtures/lint-verify.json"
+        ],
+        "exit": 2,
+        "expectedError": "EXEC_CHART_MISSING"
+      }
+    ]
+  },
+  "sqlProbe": {
+    "environment": "isolated local Docker; no Harbor/production probe",
+    "image": "pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2",
+    "tests": [
+      {
+        "test": "bootstrap enabled true",
+        "exit": 0
+      },
+      {
+        "test": "bootstrap enabled true",
+        "exit": 0
+      }
+    ],
+    "roles": [
+      "aigw_acceptance_ro:true:2",
+      "aigw_app:true:-1",
+      "aigw_backup:true:-1",
+      "aigw_migrator:true:-1"
+    ],
+    "effectivePrivileges": [
+      "acceptance_ai_create=false",
+      "acceptance_ai_temp=false",
+      "app_create=false",
+      "migrator_create=true"
+    ],
+    "extension": "vector:0.8.7",
+    "server": "PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "pgdata": "/var/lib/postgresql/18/docker",
+    "pgTrgmAvailableUnused": "pg_trgm:true",
+    "quotedEnvironmentPasswordsTCPLogin": "PASS",
+    "existingPostgresPrivileges": "true:true",
+    "outsideDbRead": {
+      "exit": 0,
+      "readSucceeded": true
+    },
+    "outsideTempWriteDDL": {
+      "exit": 0,
+      "output": [
+        "on",
+        "SET",
+        "CREATE TABLE",
+        "INSERT 0 1",
+        "1"
+      ]
+    },
+    "aiPermanentDDLDenied": {
+      "exit": 3
+    },
+    "disabledCleanupTwice": "PASS",
+    "serverLogsPasswordNonexposure": "PASS (default server logging; captured in memory only)",
+    "status": "LOCAL_BOOTSTRAP_PASS_APPROVED_ROLE_ISOLATION_CONTRACT_CONFLICT_REPRODUCED",
+    "containerRemoved": true
+  },
+  "operationalGatePass": false
+}
