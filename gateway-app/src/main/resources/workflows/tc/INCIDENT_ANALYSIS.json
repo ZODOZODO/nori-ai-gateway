@@ -1,0 +1,83 @@
+{
+  "ownerSystem": "TC",
+  "taskType": "INCIDENT_ANALYSIS",
+  "steps": [
+    {
+      "stepId": "snapshot",
+      "dependsOn": [],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.eqp.getOperationalSnapshot"
+    },
+    {
+      "stepId": "logs",
+      "dependsOn": [
+        "snapshot"
+      ],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.logs.search"
+    },
+    {
+      "stepId": "trace",
+      "dependsOn": [
+        "logs"
+      ],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.trace.search"
+    },
+    {
+      "stepId": "dlq",
+      "dependsOn": [
+        "trace"
+      ],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.dlq.list"
+    },
+    {
+      "stepId": "summary",
+      "dependsOn": [
+        "dlq"
+      ],
+      "optional": false,
+      "includeWhen": [],
+      "processor": "LogSummarizer"
+    },
+    {
+      "stepId": "git",
+      "dependsOn": [
+        "summary"
+      ],
+      "optional": true,
+      "includeWhen": [
+        {
+          "capabilityActive": "tc.git.searchCode"
+        },
+        {
+          "bindingNonEmpty": "summary.terms"
+        }
+      ],
+      "capabilityId": "tc.git.searchCode"
+    },
+    {
+      "stepId": "knowledge",
+      "dependsOn": [
+        "summary"
+      ],
+      "optional": true,
+      "includeWhen": [
+        {
+          "capabilityActive": "tc.knowledge.search"
+        },
+        {
+          "bindingNonEmpty": "summary.terms"
+        }
+      ],
+      "capabilityId": "tc.knowledge.search"
+    }
+  ],
+  "answerSource": "TOOL_RESULTS",
+  "defaultWindowLength": "PT1H"
+}

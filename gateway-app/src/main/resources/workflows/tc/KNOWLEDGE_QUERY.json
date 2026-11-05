@@ -1,0 +1,14 @@
+{
+  "ownerSystem": "TC",
+  "taskType": "KNOWLEDGE_QUERY",
+  "steps": [
+    {
+      "stepId": "knowledge",
+      "dependsOn": [],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.knowledge.search"
+    }
+  ],
+  "answerSource": "TOOL_RESULTS"
+}

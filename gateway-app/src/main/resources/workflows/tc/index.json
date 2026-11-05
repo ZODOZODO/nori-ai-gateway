@@ -1,0 +1,6 @@
+[
+  "workflows/tc/KNOWLEDGE_QUERY.json",
+  "workflows/tc/LIVE_QUERY.json",
+  "workflows/tc/INCIDENT_ANALYSIS.json",
+  "workflows/tc/GENERAL_QUERY.json"
+]

@@ -1,0 +1,121 @@
+{
+  "toolId": "tc.knowledge.getSource",
+  "capabilityId": "tc.knowledge.getSource",
+  "contractVersion": "1.0",
+  "ownerSystem": "TC",
+  "toolKind": "KNOWLEDGE",
+  "sourceAllowlistRef": "sources://TC/knowledge",
+  "availability": "PLANNED",
+  "implementationPhase": "PHASE_1",
+  "description": "문서 원문 조회 (Gateway Mock 단계 계약, 실제 TC 배포 확인 전)",
+  "exampleQuestions": [],
+  "riskLevel": "READ",
+  "operation": "READ",
+  "sideEffects": "NONE",
+  "resourceScope": "AUTHENTICATED_ACTOR",
+  "resourceTypes": [
+    "DOCUMENT"
+  ],
+  "requiredPermission": [
+    "AI_DOC_READ"
+  ],
+  "requiredActorScope": "READ",
+  "requiresApproval": false,
+  "supportsAsync": false,
+  "supportsCancel": false,
+  "idempotent": true,
+  "retryPolicy": {
+    "maxAttempts": 1,
+    "backoffMs": 0
+  },
+  "inputSchemaRef": "schema://TC/tc.knowledge.getSource/input/1.0",
+  "outputSchemaRef": "schema://TC/tc.knowledge.getSource/output/1.0",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "eqp": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 64,
+        "x-resourceType": "EQP"
+      },
+      "from": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 35
+      },
+      "to": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 35
+      },
+      "q": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "additionalProperties": false
+  },
+  "schemaDigest": "e90ef6d97bc1c79572adfbf09dfc86baa427eeffe0012a1d8a397f04fd9f1c39",
+  "timeoutMs": 10000,
+  "maxResourcesPerCall": 1,
+  "inputLimits": {
+    "eqp": {
+      "maxChars": 64,
+      "charUnit": "CODEPOINT",
+      "format": "TC_EQP_ID",
+      "status": "CONFIRMED"
+    },
+    "from": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    },
+    "to": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    },
+    "q": {
+      "maxChars": 256,
+      "charUnit": "CODEPOINT",
+      "format": "TEXT",
+      "status": "CONFIRMED"
+    }
+  },
+  "auditPolicy": "METADATA_ONLY",
+  "adapterVersion": "mock-contract-1.0",
+  "sourceFreshnessPolicy": "LIVE",
+  "outputRefType": "RESULT",
+  "cost": 1
+}

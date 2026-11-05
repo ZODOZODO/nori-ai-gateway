@@ -1,0 +1,15 @@
+{
+  "ownerSystem": "TC",
+  "taskType": "LIVE_QUERY",
+  "steps": [
+    {
+      "stepId": "snapshot",
+      "dependsOn": [],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.eqp.getOperationalSnapshot"
+    }
+  ],
+  "answerSource": "TOOL_RESULTS",
+  "defaultWindowLength": "PT1H"
+}

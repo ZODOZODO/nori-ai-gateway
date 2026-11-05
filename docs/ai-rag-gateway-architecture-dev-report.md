@@ -5469,3 +5469,131 @@ P04 검토 수정의 로컬 검증은 통과했지만, 사용자 승인 전 comm
 부모의 이전 최종 소스·259건(단위255 + 앱IT3 + nativeIT1) 독립 검증은 이미 통과했다. 이번에는 소스·의존 입력 변경 없이 커밋 및 실제 clean checkout 검증만 추가했으므로 안정 코드의 Docker/native 시험을 반복하지 않았다. 승인 소스32개, 보호483개, SPEC·baseline·승인6의 바이트는 불변이다. Plan은 기존 승인 범위 문구 위에 P04 구현/검증 체크박스만 완료로 전환했다. 기존 문서 바이트는 모두 prefix로 보존했다.
 
 **P04 완료. P05는 아직 시작하지 않았다.** 종료 보고를 담는 후속 docs-only 커밋은 위에서 실제 시험한 코드 커밋과 구분한다. 해당 커밋의 코드·빌드 트리는 시험한 커밋과 동일하며 그 docs-only HEAD를 시험했다고 주장하지 않는다. 실제 모델 호출·SSH·K8s·배포·서비스·설정 변경·push는 수행하지 않았다. 부모가 이번 결과를 직접 확인한 후 P05를 새 독립 세션에서 이어간다.
+
+
+### 2026-11-05 P05 Core 계약 구현 — 부모 직접 검증 대기
+
+P04 corrected-layout clean checkout PASS(`../p04-commit-close/result.json`, 실제 코드 `8e51ea9`, 종료 HEAD `d3c96c11651134e74b685b699127e562dd126760`)를 확인한 뒤 P05만 구현했다. 최초 셸 명령은 잘못 추정한 `spec-guard` 파일 읽기로 실패하여 요청된 첫 명령 형식을 지키지 못했다. 구현 파일 변경 전 실제 `:gateway-eval:run --args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md`는 exit 0이었다. 현재 소스는 위 HEAD + P05 미커밋 변경이며, 부모가 직접 검증하기 전 P05 검증 완료·커밋을 선언하지 않는다.
+
+Scope·닫힌 enum·Manifest/Workflow 도메인과 networknt 기동 검증, 정확 버전/등록 digest 정책, owner/활성/ANY-of 권한 Registry view, 순서 ①~⑨ Validator, 실행 직전 Dispatcher 검사와 계약 위반 결과 제거를 구현했다. 리소스 인자도 Schema의 x-resourceType 바인딩으로 검증하므로 Plan에서 resources를 빼서 존재 검사를 우회할 수 없다. q는 디코드 원문 CODEPOINT로 검사하고 qRef 주입은 거부한다. 날짜·시각·offset과 나노초 비교를 검증하며 P13 시간창 우선순위 엔진은 구현하지 않았다. INC의 두 선택 Source는 summary 의존성과 선언된 두 조건만 가진다(실행은 P13). TC Manifest 9종·Workflow 4종이며 index.json은 classpath 목록일 뿐 추가 Capability/Workflow가 아니다. Knowledge 2종은 PLANNED, 이벤트 권한 미확정은 빈 매핑으로 기본 거부한다. AI_* 권한명은 SPEC §9.3의 Mock 단계 매핑 예시이며 실제 TC 권한 등록·배포를 주장하지 않는다.
+
+공통 wiring 예외는 CoreBeansConfiguration의 실제 8개 @Bean 및 AppContextWiringIT의 실제 호출 assertion뿐이다. 기본 seam은 지정된 ConditionalOnProperty(false/missing), enabled=true인데 후속 hooks가 없으면 기동 실패한다. 운영 executor는 등록하지 않아 호출은 fail-closed다. 완료 로직을 fake/no-op으로 대체하지 않았다. Core 시험은 실제 앱 계약 리소스를 test classpath에 포함하여 계약 데이터 변경도 입력 지문에 결속한다. networknt 기본 preload가 참조 오류를 지연할 수 있어 initializeValidators를 명시 호출하며 외부 Schema 참조/식별자는 거부한다.
+
+기술 지원 차이: 기존 승인 RFC 8785 동작을 위해 `gradle/libs.versions.toml`에 `jsonCanonicalization=1.1`과 alias 하나만 추가하고 core에만 `io.github.erdtman:java-json-canonicalization:1.1`을 연결했다(기존 pin 변경 0). 부모가 허용한 최소 allowed_writes 보정 및 날짜·근거를 기존 Plan P05에 직접 반영했다. 사용자 별도 라이브러리 선정으로 표현하지 않는다. 공식 upstream https://github.com/erdtman/java-json-canonicalization 및 Maven Central 1.1 POM/API·Apache-2.0을 재확인했다. 실제 RFC 숫자·음수 0·지수 경계·Unicode UTF-16 키 정렬·escape·surrogate 거부 벡터를 시험했으며 일반 sorted-key JSON으로 대체하지 않았다.
+
+변경 경로 전체(각 행의 디렉터리와 파일명을 결합; 기존 dev report는 이 절만 append):
+
+- `docs/`: `ai-rag-gateway-architecture-dev-report.md`.
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/`: `AppContextWiringIT.java`.
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/`: `CoreBeansConfiguration.java`.
+- `gateway-app/src/main/resources/manifests/tc/`: `index.json`, `tc.dlq.list.json`, `tc.eqp.getOperationalSnapshot.json`, `tc.event.getRecent.json`, `tc.git.searchCode.json`, `tc.knowledge.getSource.json`, `tc.knowledge.search.json`, `tc.logs.search.json`, `tc.model.read.json`, `tc.trace.search.json`.
+- `gateway-app/src/main/resources/workflows/tc/`: `GENERAL_QUERY.json`, `INCIDENT_ANALYSIS.json`, `KNOWLEDGE_QUERY.json`, `LIVE_QUERY.json`, `index.json`.
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/manifest/`: `CoreSeamDefaultsTest.java`, `InputLimitsNotNarrowerTest.java`.
+- `gateway-core/`: `build.gradle.kts`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/dispatch/`: `DispatchTarget.java`, `ExecutionContext.java`, `ToolDispatcher.java`, `ToolExecutor.java`, `ToolResultContractValidator.java`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/plan/`: `InputValidator.java`, `OwnerBoundary.java`, `PlanEnvelope.java`, `PlanStep.java`, `PlanValidator.java`, `RejectReason.java`, `ResourceInputs.java`, `ResourceRef.java`, `ResourceResolver.java`, `ValidationOutcome.java`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/registry/`: `Availability.java`, `CapabilityManifest.java`, `CapabilityRegistry.java`, `ContractVersionPolicy.java`, `ImplementationPhase.java`, `InputLimit.java`, `ManifestLoader.java`, `RegistryView.java`, `RetryPolicy.java`, `RiskLevel.java`, `SchemaContracts.java`, `SideEffects.java`, `TaskType.java`, `ToolKind.java`, `WorkflowDefinition.java`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/result/`: `AdmissionErrorCode.java`, `Claim.java`, `Clarification.java`, `ErrorCode.java`, `Evidence.java`, `JobStatus.java`, `ResultBlock.java`, `ResultStatus.java`, `ToolResultEnvelope.java`, `ToolResultMetadata.java`, `Verdict.java`, `Warning.java`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/scope/`: `ActorRef.java`, `OwnedReference.java`, `OwnerSystem.java`, `VerifiedSystemScope.java`.
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/seam/`: `DispatchInjectionSeam.java`, `PlanInjectionSeam.java`.
+- `gateway-core/src/main/resources/contracts/`: `capability-manifest.schema.json`, `workflow.schema.json`.
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/`: `ContractVersionPolicyTest.java`, `DispatcherOwnerCheckTest.java`, `DomainFixtures.java`, `ManifestDigestTest.java`, `PlanValidatorAvailabilityTest.java`, `PlanValidatorOrderTest.java`, `RegistryViewTest.java`, `ResultStatusClosedEnumTest.java`, `WorkflowOptionalStepContractTest.java`.
+- `gradle/`: `libs.versions.toml`.
+
+정확한 별도 검증 명령·실행 결과(전부 AIGW_SPEC_FILE 명시, glab host token 메모리 조회 → 자식 Authorization Bearer 환경만, --no-daemon; includeTags 없음; 필터 replay는 scratch init에만 적용):
+
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-core:test --no-daemon --console=plain` → exit 0; XML 8개/31건, 실패·오류·skip·aborted 0; runId=`ad7049de-a558-4c82-a64f-0e3788896032`.
+  직후 별도 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --tests *InputLimitsNotNarrowerTest --no-daemon --console=plain` → exit 0; XML 1개/5건, 실패·오류·skip·aborted 0; runId=`06902360-91f0-4f74-ac26-9582beb67e42`.
+  직후 별도 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p05\input-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain` → exit 0; XML 6개/13건, 실패·오류·skip·aborted 0; runId=`1d7d6422-e6c3-4e20-8731-2e2dcb13dcf9`.
+  직후 별도 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *AppContextWiringIT --no-daemon --console=plain` → exit 0; XML 1개/1건, 실패·오류·skip·aborted 0; runId=`cc9b69bb-9531-4cac-a4e0-4a318c3fb893`.
+  직후 별도 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p05\wiring-filter.init.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+
+앱 전체 단위 13건은 P04 모듈 방향·금지 scanner·Scope 생성자·Core 시스템 분기·등록 완전성·runtime 청결 가드와 P05 입력/seam 시험을 포함한다. AppContextWiringIT는 실제 로컬 임시 PostgreSQL 컨테이너로 전체 컨텍스트·실제 ManifestLoader→CapabilityRegistry.view·seam 각 1개를 확인했으며 requireDocker=true, skip 0이다. Core 31 + 앱 전체 13 + 앱 IT 1은 서로 다른 45개 시험이고, 별도 필수 입력 5건은 앱 전체와 중복이다. 태그 단위 계약 시험 성공을 F1 전체 게이트/실제 Source 수용으로 확대하지 않는다.
+
+중간 진단도 scratch 로그에 보존했다. 테스트 코드 컴파일 오류 2건을 수정했다. 첫 IT 시도는 PowerShell이 -Paigw.requireDocker=true를 두 인자로 분리해 Test task 시작 전 실패했고 직후 verifier도 실패했다(0건 PASS로 세지 않음). 인자를 인용한 새 명령으로 실제 Docker 시험·별도 verifier를 실행했다. 최종 결과는 위 새 runId만 기준이며 이전 출력을 새 실행으로 재사용하지 않았다.
+
+SPEC SHA 136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3, baseline·approval6, 보호 483개(기존 F0 관련 482개 전부 포함)가 일치한다. 기존 dev report prefix는 바이트 그대로 보존했다. Python 캐시는 변경/커밋 후보에서 제외했다. 새 raw model/API 응답 저장·실모델/cloud API·SSH·K8s·배포·기존 서비스 재시작·운영 설정·전역 인증 변경·push·커밋은 0이다.
+
+미실행: Eval 전체 249 회귀(변경 0으로 불필요), P05 clean checkout/부모 독립 Validate, 실제 TC/Source/LLM 연동(후속 phase 소유). P07 ScopeAssembler, P11 실제 executor·Source 인가/allowlist·verify hooks, P13 조건 평가/Workflow 실행·Composer·시간창 우선순위, P20 qRef 복원, P23 Knowledge 활성화는 미구현이다. 미해결 업무/보안/승인 계약/운영 결정은 없다. 부모 직접 검증 대기이며 P06은 구현하지 않았다. 상세 명령 JSON·XML·OTR·보호 해시·정확한 전체 경로와 SHA는 이번 scratch `p05/result.json`에 보존한다.
+
+### P05 ROOT-REVIEW 원인 수정 (2026-11-05, 부모 독립 검증 대기)
+
+기존 승인 Spec/Plan과 부모의 실제 경계 probe를 대조해 원인을 수정했다. 기존 생성자·record 필드를 유지하면서 actorRef.value=sub 일치를 명시적으로 강제했다. 이는 Plan §3.3의 actorRef(sub)와 SPEC §9.1의 단일 사용자 신원을 보장하는 최소 변경이며 새 인가 정책·ScopeAssembler를 추가하지 않는다. DomainFixtures와 AppContextWiringIT의 사용자도 일치시켰다.
+
+9개 Manifest의 requiredActorScope와 Registry·현재 인가 fixture를 승인된 READ로 맞췄다. resourceScope=AUTHENTICATED_ACTOR는 서명 scope 클레임이 아니라 인증된 actor의 현재 permCode가 허용하는 리소스 집합을 나타내는 기존 로컬 표지이므로 보존했다(SPEC §9.3). requiredPermission ANY-of는 유지했고, tc.event.getRecent의 []는 상세 F5a 매핑 확정 전 기본 거부로 보존했다. 실제 Registry view 6개와 Knowledge 2개 PLANNED를 유지하며 별도 사용자 결정을 요구하지 않는다.
+
+Dispatcher의 기존 유효 시각 검사와 등록된 Tool owner 검사를 resolver의 resolve/source/authorize/timezone 및 DispatchInjectionSeam보다 먼저 수행한다. 주입 후 실제 Tool/resource owner 검사는 그대로 유지한다. PlanValidator ①~⑨ 순서와 기존 신원·TTL 정책은 변경하지 않았고 비동기 위임·갱신 정책은 구현하지 않는다. 새 회귀 시험은 일치/불일치 신원, READ의 Registry→Validator→Dispatcher 성공, 잘못된/누락 scope 거부, 만료·만료 경계·미래 scope 및 타 owner/미등록 버전에서 외부 호출·seam·executor 0과 결과 참조 비공개를 검증한다.
+
+수정 파일(이번 review-fix 증분):
+- `gateway-app/src/main/resources/manifests/tc/tc.dlq.list.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.eqp.getOperationalSnapshot.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.event.getRecent.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.git.searchCode.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.knowledge.getSource.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.knowledge.search.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.logs.search.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.model.read.json`
+- `gateway-app/src/main/resources/manifests/tc/tc.trace.search.json`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/dispatch/ToolDispatcher.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/registry/CapabilityRegistry.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/scope/VerifiedSystemScope.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/DispatcherPreReadBoundaryTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/DomainFixtures.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/VerifiedIdentityAndReadScopeTest.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java`
+- `docs/ai-rag-gateway-architecture-dev-report.md`(이 절만 append).
+
+CoreBeansConfiguration의 두 한국어 주석, core build의 classpath 결속 주석, ignored Plan의 P05 allowed_writes RFC 8785 주석·부모 기술 보정 문장은 작업 시작 시 실제 UTF-8 바이트에서 이미 정상 한국어였다. 시작 snapshot 및 최종 검사에서 연속 물음표/대체 문자 손상이 없으므로 재작성하지 않았다. 기존 최소 JCS 1.1 버전·alias는 승인된 RFC 8785 지원을 위한 기술 선택이며 별도 사용자 라이브러리 선정이나 SPEC/기존 pin 변경이 아니다. Plan 전체 바이트를 그대로 유지했다.
+
+실행 환경은 기존 Temurin JDK 21.0.10과 venv Python이며, 모든 Gradle 호출에 AIGW_SPEC_FILE을 명시했다. 복사한 secure runner는 glab 자격을 메모리에서만 받아 자식 Bearer 환경으로 전달하고 로그에서 redaction한다. 다음 각 Test 직후 같은 필터/requireDocker 입력으로 별도 공식 verifier를 실행했다.
+
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-core:test --no-daemon --console=plain` → exit 0, XML 10개/36건, 실패·오류·skip·aborted 0, OTR 1개, runId=`9a190d45-512e-4620-bade-d57c2703a580`.
+  직후 별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --tests *InputLimitsNotNarrowerTest --no-daemon --console=plain` → exit 0, XML 1개/5건, 실패·오류·skip·aborted 0, OTR 1개, runId=`cfb7fccf-2c25-401a-b362-11a998ed2400`.
+  직후 별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p05-root-fix\input-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain` → exit 0, XML 6개/13건, 실패·오류·skip·aborted 0, OTR 1개, runId=`ebeed893-927a-4fce-85a7-05a54f8a044f`.
+  직후 별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+
+- 시험: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *AppContextWiringIT --no-daemon --console=plain` → exit 0, XML 1개/1건, 실패·오류·skip·aborted 0, OTR 1개, runId=`ad1a4e90-9066-4255-a5ec-a5d160a1098a`.
+  직후 별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p05-root-fix\wiring-filter.init.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain` → exit 0, TEST_EVIDENCE_VERIFIED.
+
+부모 RootBoundaryProbe를 현재 core main/test 클래스 및 실제 런타임과 SHA가 일치하는 의존성 187개로 다시 컴파일·실행했다. 결과: inconsistentActorAccepted=false, signedReadValidates=true, signedReadVisible=true, expiredScopeResolverReads=0, knownOtherOwnerResolverReads=0. probe의 신원 출력과 별도로 새 생성자 음성 시험이 불일치 예외를 확인했다. 최초 보조 probe 스크립트의 classpath manifest 형식/좌표 해석 오류는 저장소 변경 없이 수정했고, 공식 테스트 실패는 없었다. 기존 p05 실패·진단 증거는 보존했다.
+
+SPEC SHA 136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3, baseline·approval6 및 보호 483개와 기존 Dev report prefix 바이트를 보존했다. source/comment/신규 report UTF-8·LF와 연속 물음표/대체 문자 부재를 검사했다. XML·OTR·실제 runId·명령·해시는 p05-root-fix/result.json 및 같은 scratch의 실행별 원본에 있다.
+
+미실행/한계: 부모의 독립 Validate 및 clean checkout은 대기 중이다. 이 시험은 검증된 scope를 소비하는 P05 계약 시험이며 실제 JWS 서명 검증은 후속 P08 책임이다. 실제 TC/Source/LLM·K8s·네트워크 모델·운영 설정은 실행/변경하지 않았다. Eval 전체 회귀는 Eval 변경이 없어 재실행하지 않았다. 미래 phase 구현·승인 산출물 변경·커밋·push는 없다. 실제 차단 사유는 없고 P05 검증 체크박스는 미완료로 유지했다.
+
+### P05 시험 메타데이터 보정 (2026-11-05, 부모 최종 검증 대기)
+
+Plan §4.2와 실제 OtrLeafExtractor의 단계 누락 시 F0 기본값 처리를 확인했다. 아래 세 클래스에 기존 JUnit @Tag("stage-F1")와 @Tag("label-MOCK_API")를 클래스 수준으로 추가했다. 기존 leaf ID·assertion·guard 및 기능 구현은 그대로 유지했다.
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/PlanValidatorAvailabilityTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/DispatcherOwnerCheckTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/ContractVersionPolicyTest.java`
+
+수정 전 실제 LEAF 6개는 stage=F0, labels=[]였다. 새 실행의 동일한 leaf 집합 6개는 모두 stage=F1, labels=[MOCK_API], PASS이며 contentSha256·OTR·binding 결속을 확인했다. RUN 요약 stage=F0는 기존 task 요약 규약이다. componentId=IT인 로컬 단위 시험 보조 증거이므로 catalog의 ACCEPTANCE/ACC:F1 수용 증거를 대체하거나 F1 게이트 PASS로 처리하지 않는다.
+
+모든 명령에 AIGW_SPEC_FILE 정본 경로를 지정했고, 기존 secure runner를 복사해 자격을 메모리 및 자식 Bearer 환경에서만 사용했다. 수정 전 spec-guard와 수정 후 Test, 직후 별도 verifier를 순서대로 실행했다.
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=spec-guard --spec C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md" --no-daemon --console=plain` → exit 0.
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-core:test --no-daemon --console=plain` → exit 0.
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --no-daemon --console=plain` → exit 0 / TEST_EVIDENCE_VERIFIED.
+
+실제 Test task는 EXECUTED, XML 10개/36건, OTR 1개이며 실패·오류·skip·aborted는 모두 0이다. runId=`4c7b3037-65de-4e28-a04a-8b6c5755e5d4`. filters=[], includeTags=[], requireDocker=false이며 runtimeClasspathSha256=`e78599abbf4846c2eea36eddc537f3e29fa0a4bbf3faff21379939471d42ab42`는 수정 전과 같다.
+
+기존 Dev report 전체 prefix 바이트와 SPEC·Plan·baseline·approval6·보호 483개 및 기존 F0 증거를 보존했다. 기존 소스/기능 구현은 변경하지 않았다. 증거 원본·명령·해시는 scratch p05-tag-fix/result.json과 같은 디렉터리에 보존했다. 변경 범위 밖인 app/Docker/Eval 전체 시험과 부모 독립 probe는 재실행하지 않았다. 부모 최종 Validate·clean checkout은 미실행이며 P05 검증 상태를 변경하지 않았다. 업무 차단 사유는 없으며 커밋·push·P06 진행은 없다.
+
+### P05 부모 직접 Validate 및 로컬 커밋 마감 (2026-11-05)
+
+부모의 최종 `p05-root-fix/root-validation-approval.json`(passed=true)을 확인하여 P05 구현·검증을 완료로 반영했다. 부모는 실제 소스·호출 흐름·bean wiring과 실패 경계를 검토하고 독립 Java probe를 다시 실행했다. actorRef.value=sub 단일 신원 강제(`VerifiedSystemScope`), READ 계약 정합(9개 TC Manifest·`CapabilityRegistry`), 외부 읽기 전 scope·등록 Tool owner 차단(`ToolDispatcher`)을 확인했다. fixture·`AppContextWiringIT`도 해당 계약에 맞췄으며 신규 회귀 시험 `DispatcherPreReadBoundaryTest.java`, `VerifiedIdentityAndReadScopeTest.java`가 이를 검증한다. probe는 불일치 신원 허용=false, READ 노출·검증=true, 만료 scope·타 owner의 resolver 읽기=0이다. 완료 로직을 fake/no-op으로 등록하지 않았으며 주입 없음이 기본인 두 seam만 기본 no-op이다.
+
+최종 승인 시험은 Core 36건(runId `4c7b3037-65de-4e28-a04a-8b6c5755e5d4`), 앱 전체 13건(`ebeed893-927a-4fce-85a7-05a54f8a044f`), 실제 로컬 Docker PostgreSQL AppContext IT 1건(`ad1a4e90-9066-4255-a5ec-a5d160a1098a`)으로 서로 다른 50건이며 실패·오류·skip·aborted=0이다. 별도 필수 입력 5건(`cfb7fccf-2c25-401a-b362-11a998ed2400`)은 앱 전체와 중복이다. 정확한 Test·직후 공식 verifier 명령과 exit=0은 `p05-root-fix/result.json`, 최종 태그 보정 Core 명령은 `p05-tag-fix/result.json`에 있다. 부모의 XML·OTR·binding·content 해시 대조 및 최종 runId는 `p05-root-fix/root-evidence-verification.json`, 독립 probe 결과는 `root-boundary-probe.json`, 공식 verifier 결과는 `root-final-unit-verify.json`, `root-final-it-verify.json`, `root-final-core-tags-verify.json`에 보존했다. 세 기존 테스트 클래스의 태그 보정으로 동일 LEAF 6개는 F1/MOCK_API이며 RUN 요약의 legacy F0 규약과 Eval 구현은 유지했다. 이는 P05 로컬 계약 검증 승인으로 F1 exit·ACCEPTANCE 승인과 다르다.
+
+검증 당시 기준 HEAD는 `d3c96c11651134e74b685b699127e562dd126760`와 당시 dirty source tree다. 승인된 83개 커밋 후보와 SHA-256은 `p05-root-fix/root-approved-source.json`(SHA-256 `096e0e6c8049d717338f1cd30648f2f263d1158446f23adad9e1f663a6acc44b`)에 있다. 마감에서는 구현·시험·build 바이트를 그대로 보존하고 기존 보고서 뒤에 이 절을 추가하며 ignored Plan의 P05 검증 체크박스만 완료로 바꾼다. 기존 JCS 1.1과 catalog 최소 지원 변경은 앞서 기록한 승인 RFC 8785 구현을 위한 기술 지원이다. 이전 P05 보고서의 미래 `ScopeAssembler` 생성 단계 P07 표기는 역사적 오기이며 실제 생성은 Plan P08이다. 과거 문장은 수정하지 않았다.
+
+SPEC·baseline·approval6·보호 483개와 기존 F0·실패·controlled-stop 증거를 보존했다. 기존 보고서 전체 prefix는 바이트 단위로 보존하며 마감 전 길이·해시와 마감 후 증명은 `p05-close/preflight.json`, `p05-close/result.json`에 기록한다. 최초 P05 CLI는 최종 산출물 작성 후 응답 재시도 중 부모가 중단한 exit 1이며 자연 종료 성공으로 해석하지 않는다. 최종 PASS 근거는 실제 review-fix·metadata-fix 결과와 부모의 직접 검증이다. 로컬 커밋의 Git blob을 승인 소스 해시와 대조하며 미래 커밋 SHA에서 시험을 실행했다고 주장하지 않는다.
+
+이 마감은 소스 변경이 없어 시험·fresh gate·전체 Eval 249·clean checkout을 재실행하지 않는다. P04의 실제 fresh clone 검증 이력은 유지한다. 실제 Source·TC·LLM·K8s 및 후속 phase 기능은 미실행이며 미래 검증 책임으로 남는다. P06 구현, push·MR·배포·SSH·서비스/운영 설정·전역 인증 변경은 하지 않는다. 미해결 사용자 결정 차단 사유는 없다. 실제 로컬 커밋 SHA·후속 무결성 확인은 `p05-close/result.json`을 기준으로 한다.

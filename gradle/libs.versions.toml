@@ -1,4 +1,5 @@
 [versions]
+jsonCanonicalization = "1.1"
 springBoot = "4.0.7"
 springAi = "2.0.2"
 testcontainers = "2.0.3"
@@ -13,6 +14,7 @@ otelLogback = "2.33.1-alpha"
 openaiJava = "4.80.0"
 
 [libraries]
+json-canonicalization = { module = "io.github.erdtman:java-json-canonicalization", version.ref = "jsonCanonicalization" }
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "springAi" }
 spring-ai-openai = { module = "org.springframework.ai:spring-ai-openai" }

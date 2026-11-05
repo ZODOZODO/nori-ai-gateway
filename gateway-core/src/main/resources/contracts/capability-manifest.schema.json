@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "toolId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contractVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceAllowlistRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resourceScope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requiredActorScope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputSchemaRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outputSchemaRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "auditPolicy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapterVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceFreshnessPolicy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outputRefType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ownerSystem": {
+      "enum": [
+        "TC",
+        "WM",
+        "HRM"
+      ]
+    },
+    "toolKind": {
+      "enum": [
+        "BUSINESS",
+        "KNOWLEDGE",
+        "GIT",
+        "LOG",
+        "TRACE",
+        "METRICS"
+      ]
+    },
+    "availability": {
+      "enum": [
+        "IMPLEMENTED",
+        "PLANNED",
+        "UNSUPPORTED",
+        "DISABLED"
+      ]
+    },
+    "implementationPhase": {
+      "enum": [
+        "PHASE_1",
+        "PHASE_2",
+        "PHASE_3"
+      ]
+    },
+    "riskLevel": {
+      "enum": [
+        "READ",
+        "DRAFT",
+        "MUTATION",
+        "TEST",
+        "PRIVILEGED"
+      ]
+    },
+    "sideEffects": {
+      "enum": [
+        "NONE",
+        "ISOLATED",
+        "SYSTEM_WRITE",
+        "OPERATIONAL"
+      ]
+    },
+    "exampleQuestions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "requiredPermission": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "resourceTypes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "requiresApproval": {
+      "type": "boolean"
+    },
+    "supportsAsync": {
+      "type": "boolean"
+    },
+    "supportsCancel": {
+      "type": "boolean"
+    },
+    "idempotent": {
+      "type": "boolean"
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxResourcesPerCall": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cost": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retryPolicy": {
+      "type": "object",
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "backoffMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxAttempts",
+        "backoffMs"
+      ],
+      "additionalProperties": false
+    },
+    "schemaDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inputSchema": {
+      "type": [
+        "object",
+        "boolean"
+      ]
+    },
+    "outputSchema": {
+      "type": [
+        "object",
+        "boolean"
+      ]
+    },
+    "inputLimits": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "maxChars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "charUnit": {
+            "const": "CODEPOINT"
+          },
+          "format": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "CONFIRMED"
+          }
+        },
+        "required": [
+          "maxChars",
+          "charUnit",
+          "format",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "toolId",
+    "capabilityId",
+    "contractVersion",
+    "sourceAllowlistRef",
+    "description",
+    "operation",
+    "resourceScope",
+    "requiredActorScope",
+    "inputSchemaRef",
+    "outputSchemaRef",
+    "auditPolicy",
+    "adapterVersion",
+    "sourceFreshnessPolicy",
+    "outputRefType",
+    "ownerSystem",
+    "toolKind",
+    "availability",
+    "implementationPhase",
+    "riskLevel",
+    "sideEffects",
+    "exampleQuestions",
+    "requiredPermission",
+    "resourceTypes",
+    "requiresApproval",
+    "supportsAsync",
+    "supportsCancel",
+    "idempotent",
+    "timeoutMs",
+    "maxResourcesPerCall",
+    "cost",
+    "retryPolicy",
+    "schemaDigest",
+    "inputSchema",
+    "outputSchema",
+    "inputLimits"
+  ],
+  "additionalProperties": false
+}

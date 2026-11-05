@@ -1,0 +1,11 @@
+[
+  "manifests/tc/tc.eqp.getOperationalSnapshot.json",
+  "manifests/tc/tc.event.getRecent.json",
+  "manifests/tc/tc.dlq.list.json",
+  "manifests/tc/tc.logs.search.json",
+  "manifests/tc/tc.trace.search.json",
+  "manifests/tc/tc.git.searchCode.json",
+  "manifests/tc/tc.knowledge.search.json",
+  "manifests/tc/tc.knowledge.getSource.json",
+  "manifests/tc/tc.model.read.json"
+]

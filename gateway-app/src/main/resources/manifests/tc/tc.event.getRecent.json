@@ -1,0 +1,119 @@
+{
+  "toolId": "tc.event.getRecent",
+  "capabilityId": "tc.event.getRecent",
+  "contractVersion": "1.0",
+  "ownerSystem": "TC",
+  "toolKind": "BUSINESS",
+  "sourceAllowlistRef": "sources://TC/event-backend",
+  "availability": "IMPLEMENTED",
+  "implementationPhase": "PHASE_1",
+  "description": "최근 이벤트 조회 (Gateway Mock 단계 계약, 실제 TC 배포 확인 전)",
+  "exampleQuestions": [],
+  "riskLevel": "READ",
+  "operation": "READ",
+  "sideEffects": "NONE",
+  "resourceScope": "AUTHENTICATED_ACTOR",
+  "resourceTypes": [
+    "EQP"
+  ],
+  "requiredPermission": [],
+  "requiredActorScope": "READ",
+  "requiresApproval": false,
+  "supportsAsync": false,
+  "supportsCancel": false,
+  "idempotent": true,
+  "retryPolicy": {
+    "maxAttempts": 1,
+    "backoffMs": 0
+  },
+  "inputSchemaRef": "schema://TC/tc.event.getRecent/input/1.0",
+  "outputSchemaRef": "schema://TC/tc.event.getRecent/output/1.0",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "eqp": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "x-resourceType": "EQP"
+      },
+      "from": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 35
+      },
+      "to": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 35
+      },
+      "q": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "eqp"
+    ]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "additionalProperties": false
+  },
+  "schemaDigest": "fba1dc842564105d80d75a1ebaebab0f8f66cc9c87953d0d4f231b408a912461",
+  "timeoutMs": 10000,
+  "maxResourcesPerCall": 1,
+  "inputLimits": {
+    "eqp": {
+      "maxChars": 64,
+      "charUnit": "CODEPOINT",
+      "format": "TC_EQP_ID",
+      "status": "CONFIRMED"
+    },
+    "from": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    },
+    "to": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    },
+    "q": {
+      "maxChars": 256,
+      "charUnit": "CODEPOINT",
+      "format": "TEXT",
+      "status": "CONFIRMED"
+    }
+  },
+  "auditPolicy": "METADATA_ONLY",
+  "adapterVersion": "mock-contract-1.0",
+  "sourceFreshnessPolicy": "LIVE",
+  "outputRefType": "RESULT",
+  "cost": 1
+}

@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ownerSystem": {
+      "enum": [
+        "TC",
+        "WM",
+        "HRM"
+      ]
+    },
+    "taskType": {
+      "enum": [
+        "KNOWLEDGE_QUERY",
+        "LIVE_QUERY",
+        "INCIDENT_ANALYSIS",
+        "GENERAL_QUERY"
+      ]
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stepId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "processor": {
+            "enum": [
+              "LogSummarizer"
+            ]
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "includeWhen": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "capabilityActive": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "capabilityActive"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "bindingNonEmpty": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "bindingNonEmpty"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "stepId",
+          "dependsOn",
+          "optional",
+          "includeWhen"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "capabilityId"
+            ],
+            "not": {
+              "required": [
+                "processor"
+              ]
+            }
+          },
+          {
+            "required": [
+              "processor"
+            ],
+            "not": {
+              "required": [
+                "capabilityId"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "answerSource": {
+      "enum": [
+        "TOOL_RESULTS",
+        "REGISTRY_VIEW"
+      ]
+    },
+    "defaultWindowLength": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^PT[1-9][0-9]*H$"
+    }
+  },
+  "required": [
+    "ownerSystem",
+    "taskType",
+    "steps",
+    "answerSource"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "taskType": {
+            "const": "INCIDENT_ANALYSIS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "if": {
+                "properties": {
+                  "optional": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "capabilityId": {
+                    "enum": [
+                      "tc.git.searchCode",
+                      "tc.knowledge.search"
+                    ]
+                  },
+                  "includeWhen": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "contains": {
+                      "type": "object",
+                      "properties": {
+                        "bindingNonEmpty": {
+                          "const": "summary.terms"
+                        }
+                      },
+                      "required": [
+                        "bindingNonEmpty"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "steps": {
+            "items": {
+              "properties": {
+                "optional": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "taskType": {
+            "const": "GENERAL_QUERY"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "maxItems": 0
+          },
+          "answerSource": {
+            "const": "REGISTRY_VIEW"
+          }
+        },
+        "not": {
+          "required": [
+            "defaultWindowLength"
+          ]
+        }
+      },
+      "else": {
+        "properties": {
+          "answerSource": {
+            "const": "TOOL_RESULTS"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "taskType": {
+            "enum": [
+              "LIVE_QUERY",
+              "INCIDENT_ANALYSIS"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "defaultWindowLength": {
+            "const": "PT1H"
+          }
+        },
+        "required": [
+          "defaultWindowLength"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "defaultWindowLength"
+          ]
+        }
+      }
+    }
+  ]
+}
