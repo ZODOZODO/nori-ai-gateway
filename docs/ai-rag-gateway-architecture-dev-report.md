@@ -5448,3 +5448,24 @@ P04 검토 수정의 로컬 검증은 통과했지만, 사용자 승인 전 comm
     "--console=plain"
 ]
 ```
+
+
+### 2026-11-05 P04 커밋 및 실제 clean checkout 종료 결론
+
+사용자의 최신 명시 승인에 따라 로컬 커밋을 완료했다. 실제 검증한 코드 커밋은 `8e51ea97049c86ee2a4729d736b8cd934131c792`다. `git clone --no-hardlinks`로 `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p04-commit-close/clean-checkout`에 복제한 뒤 해당 커밋을 detached checkout했다. 빌드 전 tracked/unstaged/untracked 상태는 모두 비어 있었고 build 디렉터리·생산물도 없었다. P03 tokenizer/golden/arg-limits fixture는 tracked checkout에서 공급되었고 기존 untracked 진단 자료·Python 캐시를 복사하지 않았다.
+
+첫 고립 clone build는 P03 arg-limits 근거 시험이 부모 경로의 외부 원본3개 레포를 찾지 못해 NoSuchFileException으로 실패했다. 실패 clone과 원시는 clean-checkout-first-failed 및 first-failed-build*로 그대로 보존했다. 기존 P03 시험은 실제 CODE/SCHEMA의 경로:줄을 대조하므로 scratch sibling에 nori-tc-exec/common/ui-backend 실제 원본을 가리키는 directory junction만 제공했다(읽기 전용 사용, 근거 파일4개 해시 전후 일치). SPEC은 명시한 같은 승인 원본이다. 소스 변경·증거/생산물 복사·시험 제외 없이 새 정상 Git clone을 다시 만들고 build 산출물0 상태에서 아래 명령을 수행했다. 외부 입력 신원은 external-workspace-inputs.json에 기록했다.
+
+모든 호출은 `AIGW_SPEC_FILE=C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md`를 명시하고 기존 gitlab.com 호스트 자격을 메모리 조회·자식 환경으로만 전달했다. 정확한 별도 명령:
+- `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-commit-close\clean-checkout\gradlew.bat -p C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-commit-close\clean-checkout build --no-daemon --console=plain` → exit 0
+- `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-commit-close\clean-checkout\gradlew.bat -p C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p04-commit-close\clean-checkout :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test,:gateway-eval:test" --no-daemon --console=plain` → exit 0
+
+실제 `build` 단독 실행에서 `:gateway-app:writeRuntimeClasspath`가 `:gateway-app:test`보다 먼저 EXECUTED되었고 integrationTest는 실행되지 않았다. 앱 6 + Eval 249 = 255건, 실패·오류·건너뜀·중단 0건이다. 직후 기본 필터(필터·태그 추가 없음)의 별도 verifier는 `TEST_EVIDENCE_VERIFIED`를 출력했다.
+- `:gateway-app:test`: 6건 PASS, runId=`3693a23e-a297-4dfa-bc76-12871e3f4144`, fingerprint=`a2a571f7ba056f42a22317d7d99db0c6a2ff9e3b52cda05e9395410d65f3cff1`, OTR aggregate SHA256=`15dc492c9f598c8e34cc153b351ef2f935ccd8df3cfd453ef1b8b9aa58934e29`, 요약 contentSHA=`2da01866ac5c00d73cf8f86625242082e89bd34db278217157b388622c102243`.
+- `:gateway-eval:test`: 249건 PASS, runId=`e8f87bcb-6e25-45de-9aa6-e8ff151b7435`, fingerprint=`7e3a99c5ade318c341707796af5029cda9bd704da9d3b7b793418dba4baee1a5`, OTR aggregate SHA256=`b265d8d64a5d03478d3a554bb53582b14927e9b765660df6956231b052b5aca3`, 요약 contentSHA=`ef3ffd4dac7783939187f4732112ddf117801202810a24f1f2a58156fee4554d`.
+
+두 finalizer의 실제 gitSha는 코드 커밋 `8e51ea97049c86ee2a4729d736b8cd934131c792`와 같고 runtimeClasspathSha256은 실제 생산 파일의 SHA256 `29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`와 같다. XML 집계, OTR 실제 바이트의 aggregate SHA, binding fingerprint, summary/record contentSHA를 독립 대조했다. 빌드 후 clone Git 상태도 비어 있다. 상세 원시는 이번 scratch의 clean-build*.json/log, clean-validation.json과 XML/OTR 사본에 있다.
+
+부모의 이전 최종 소스·259건(단위255 + 앱IT3 + nativeIT1) 독립 검증은 이미 통과했다. 이번에는 소스·의존 입력 변경 없이 커밋 및 실제 clean checkout 검증만 추가했으므로 안정 코드의 Docker/native 시험을 반복하지 않았다. 승인 소스32개, 보호483개, SPEC·baseline·승인6의 바이트는 불변이다. Plan은 기존 승인 범위 문구 위에 P04 구현/검증 체크박스만 완료로 전환했다. 기존 문서 바이트는 모두 prefix로 보존했다.
+
+**P04 완료. P05는 아직 시작하지 않았다.** 종료 보고를 담는 후속 docs-only 커밋은 위에서 실제 시험한 코드 커밋과 구분한다. 해당 커밋의 코드·빌드 트리는 시험한 커밋과 동일하며 그 docs-only HEAD를 시험했다고 주장하지 않는다. 실제 모델 호출·SSH·K8s·배포·서비스·설정 변경·push는 수행하지 않았다. 부모가 이번 결과를 직접 확인한 후 P05를 새 독립 세션에서 이어간다.

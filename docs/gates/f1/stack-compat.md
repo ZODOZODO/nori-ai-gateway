@@ -200,3 +200,10 @@ P04 검토 수정의 로컬 검증은 통과했지만, 사용자 승인 전 comm
 - 실제 runtime JAR 186행과 native 바이너리 해시, 문서 사본의 바이트 일치를 독립 확인했다(runtime SHA256=`29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`). 부모가 실제 producer의 원시 JAR 바이트·타임스탬프 변경을 재시험하여 두 실행 모두 EXECUTED이고 각각 새 SHA를 정확히 반영함을 확인했다. 현재 단위 출력과 동일한 앱 runtime filter를 적용한 공식 `test-evidence verify`도 부모가 별도 실행하여 exit 0 / `TEST_EVIDENCE_VERIFIED`를 확인했다.
 - 이전 ‘부모 독립 검토 대기’는 당시 이력이며 현재는 통과했다. 보호 파일 483개, Spec·baseline·승인 문서, 기존 보고서 prefix와 정본 구성 경로도 부모가 확인했다. 실제 HEAD는 `a72b1b79dd8995c2da5542ff7064c54773727230`이며 미커밋 소스가 있는 dirty 작업 트리를 배포 신원으로 간주하지 않는다.
 - 원래 인계 조건인 ‘사용자 승인 후에만 커밋’(`commits only after user approval`)을 유지한다. **남은 완료 조건은 사용자 승인 후 커밋 및 해당 커밋의 clean Git checkout 빌드 검증**이다. 그때까지 P04 최종 완료는 보류하며 P05는 미착수다. 이번 작업은 문서 끝 추가만 수행했으며 빌드·시험을 재실행하지 않았다.
+
+
+### 2026-11-05 P04 최신 종료 결론 — 실제 clean Git checkout PASS
+
+P04는 사용자 승인에 따른 로컬 커밋과 실제 clean checkout 검증까지 완료했다. 실제 시험 코드 커밋은 `8e51ea97049c86ee2a4729d736b8cd934131c792`, clone은 `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p04-commit-close/clean-checkout`이다. clone 최초 Git 상태는 비어 있고 build 산출물도 없었다. `gradlew.bat build --no-daemon --console=plain` 단독 exit 0, 직후 별도 `gradlew.bat :gateway-eval:run --args="test-evidence verify --tasks :gateway-app:test,:gateway-eval:test" --no-daemon --console=plain` exit 0 / TEST_EVIDENCE_VERIFIED다(각 호출 AIGW_SPEC_FILE 명시, 기본 필터). 앱6 + Eval249 = 255건, 실패·오류·건너뜀·중단0. producer가 앱 test 전에 실제 실행되었으며 integrationTest는 build에 포함되지 않았다.
+
+실제 finalizer gitSha=`8e51ea97049c86ee2a4729d736b8cd934131c792`, 실제 생산 runtime SHA256=`29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`이며 OTR·binding·요약 신원을 대조했다. 빌드 후 clone도 Git clean이다. 부모가 기존 안정 소스의 259건·runtime/native·원시 증거를 이미 독립 검증했고, 이번 소스 변경은0이라 Docker/native는 반복하지 않았다. SPEC·baseline·승인6·보호483·승인 소스32는 불변이다. 기존 역사와 문서 prefix를 보존하며 이 절이 최신 결론이다. 후속 종료보고 docs-only 커밋의 코드/빌드 트리는 시험한 코드 커밋과 동일하다. P04 완료, P05 미착수, 실제 모델 호출0. 정확한 argv·runId·OTR/summary hash는 dev-report 최신 종료 절과 이번 scratch clean-validation.json에 있다.
