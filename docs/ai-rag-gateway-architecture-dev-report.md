@@ -4649,3 +4649,443 @@
 - C24/C25의 선례(§12.31 로컬 등록 소절)에 따라 C26에는 기존 미커밋 devreport 꼬리를 그대로 포함한다. 기존 §12.32(⑧ 정리) 및 이전 C25 뒤 꼬리의 내용·순서는 바꾸지 않았다. 추가 전 devreport 639,673 B SHA `bf2a3a1d0a07deb06fb3fe79e117b56141b34d571b67ca4317562d731e836d53`, 이 앞부분의 바이트 동일성을 확인했다. 새 등록 준비 소절만 append한다. 실행 결과는 별도 한 소절을 append하고 커밋하지 않는다.
 - C26 대상은 새 prompt 1·새 audit 1·PREREG 초안 4·이 devreport 1, 총 7파일이다. C27은 네 PREREG의 registrationStatus·registeredCommit 기록만 담당한다. 기존 untracked는 포함하지 않는다. push·force·amend 없음.
 - 실행은 C26/C27 뒤 prereg-check 4건 통과 → c-t0 → c-t06 → v2-t0-c → v2-t06-c. preflight 실패 시 복구 없이 중단한다. 측정/사고 원문 출력·저장 금지, JSON 파싱 오류는 `parse failed`만 출력한다. scratch는 사용자 지정 step9/run에만 둔다.
+
+
+### 12.34 P03 v4 ⑩ 연습 재시험 — 상주 변화로 첫 회차 중단 (2026-11-05, Codex, 미커밋)
+
+- 등록은 C26 `c25951e326f9b9c8babaab1b8c62dc1f58164b69` / C27 `891321330b0e7df577da66d8cf4d9ffa2eb243b1`로 완료했다. C26 정확 7파일(prompt·audit·4초안·devreport), C27 정확 4파일(PREREG 메타데이터). 네 등록의 prereg-check는 각각 exit 0·`PREREG_VERIFIED`. `spec-guard` exit 0, SPEC SHA `bb91146a0f0c84f8ec885355dc840c42de06be346c910cd0f846745469bd0de4`, tokenizers 0.23.3.
+- **실행 중단: `20261104T234844Z-diag-c-t0` B 측정 중 `MODEL_NOT_RESIDENT`(Java exit 5, Gradle exit 1). postflight도 `MODEL_NOT_RESIDENT`(Java exit 4, Gradle exit 1), 상주 모델 수 2→1. qwen3:4b의 digest·context는 유지됐으나 bge-m3가 상주 목록에서 사라졌다. SPEC/등록 무효 규칙에 따라 이 회차 전체는 무효이며 유효한 재진단 결과가 아니다.** A·경계와 나머지 c-t06·v2-t0-c·v2-t06-c는 NOT_RUN이다. 상주 복구·연장 요청, load/pull/unload, 서비스 재시작, 설정 변경, sudo는 하지 않았다.
+- preflight는 `F0_PREFLIGHT_OK 2`, template SHA는 `2d54db2b9bb29ce7db54fea63a891f5859603813c555b1f88b5e0994652897f9`로 일치했다. 시작 직후 읽기 전용 ollama ps는 bge-m3의 남은 상주 시간을 약 7분으로 표시했다. 모델 호출은 승인된 첫 B 진단에만 사용했다. 중단 후에는 읽기 전용 postflight·journal 수집과 로컬 report/share-exclude만 수행했다.
+- B 부분 결과: 등록 분모 22 중 16문항/16시도만 기록됐다. t 정답 16, 인자 정답 15는 **실행된 16문항에 한정한 참고값**이며 22문항 완료 점수로 해석하지 않는다. 미실행 문항을 오답으로 채우지 않았다. 원시 결과의 complete=false·abortReason을 보존했다.
+- `.\gradlew.bat :gateway-eval:test --console=plain`: 241건 중 240 PASS·1 FAIL(`PREREG_WORKTREE_DIRTY`), `BUILD FAILED in 6m 3s`, `6 actionable tasks: 2 executed, 4 up-to-date`. 테스트 중 제가 추가한 미추적 prompt를 scratch로 옮겨 작업 트리를 복원하고 실패 테스트 1건만 재실행: 1/1 PASS, `BUILD SUCCESSFUL in 29s`, `6 actionable tasks: 2 executed, 4 up-to-date`. 전체 재실행 PASS로 주장하지 않는다. 상세 원인과 C26 전 검증은 §12.33에 기록했다.
+- 공유 서버: GIN 수집 loopback 47건·외부 0건, 외부 구간 0개. 서버 UTC를 보정하지 않고 callWindows와 닫힌 구간 교차를 적용했다. B 지연 표본 16개 중 제외 0, 유지 16. 수치는 partial/무효 회차의 참고값이다. raw GIN·IP·본문·모델 응답·사고문은 출력·저장하지 않았다.
+
+#### 1) 현재 실행 상태·정답 수(스크립트 계산)
+
+| 등록 | B t·인자(등록 분모 22) | A effectiveT·인자(등록 분모 22) | 경계(등록 9케이스) | 판정 |
+|---|---|---|---|---|
+| c-t0 | 실행 16개 중 16·15, 불완전 | NOT_RUN | NOT_RUN | 상주 변화로 회차 무효 |
+| c-t06 | NOT_RUN | NOT_RUN | NOT_RUN | 앞 회차에서 중단 |
+| v2-t0-c | NOT_RUN | NOT_RUN | NOT_RUN | 앞 회차에서 중단 |
+| v2-t06-c | NOT_RUN | NOT_RUN | NOT_RUN | 앞 회차에서 중단 |
+
+#### 2) 이전 회차와 나란히 비교(이전값은 전부 저장 파일 재집계)
+
+| 대응 등록 | 경로 | 이전 t·인자 /22 또는 경계 /9 | 이번 t·인자 또는 경계 | 이전 → 이번 FINISH_LENGTH | 이전 → 이번 사고 min/median/max | 이전 → 이번 사고 >4928 | 이전 → 이번 답변 >192 | 이전 → 이번 지연 p50/p95 ms(겹침 제외) |
+|---|---|---|---|---|---|---|---|---|
+| i-t0-b → c-t0 | B | 22·22 | 16·15 (실행 16, 무효) | 0 → 0 | 645/1478.5/3578 → 729/1171.5/3049 | 0 → 0 | 0 → 0 | 22847/53928 → 17536/54777 |
+| i-t0-b → c-t0 | A | 22·21 | NOT_RUN | 0 → — | 503/1122.5/3516 → — | 0 → — | 0 → — | 18711/59991 → — |
+| i-t0-b → c-t0 | boundary | 3/9 | NOT_RUN | 8 → — | 1498/5120.0/5120 → — | 8 → — | 0 → — | 161857/221141 → — |
+| i-t06-b → c-t06 | B | 22·19 | NOT_RUN | 1 → — | 497/1012/5120 → — | 1 → — | 0 → — | 15364/60471 → — |
+| i-t06-b → c-t06 | A | 22·21 | NOT_RUN | 0 → — | 469/1080.5/4880 → — | 0 → — | 0 → — | 18967/84782 → — |
+| i-t06-b → c-t06 | boundary | 4/9 | NOT_RUN | 2 → — | 2624/4542/5120 → — | 4 → — | 0 → — | 91344/198934 → — |
+| v2-t0-b → v2-t0-c | B | 19·13 | NOT_RUN | 0 → — | 567/1160.0/4082 → — | 0 → — | 0 → — | 18223/44882 → — |
+| v2-t0-b → v2-t0-c | A | 22·13 | NOT_RUN | 0 → — | 587/1468.5/4461 → — | 0 → — | 0 → — | 24688/81153 → — |
+| v2-t0-b → v2-t0-c | boundary | 1/9 | NOT_RUN | 0 → — | 2282/2617/3333 → — | 0 → — | 0 → — | 49071/68138 → — |
+| v2-t06-b → v2-t06-c | B | 20·11 | NOT_RUN | 0 → — | 631/1640.0/3595 → — | 0 → — | 0 → — | 26232/57100 → — |
+| v2-t06-b → v2-t06-c | A | 21·13 | NOT_RUN | 1 → — | 730/1407/5120 → — | 1 → — | 0 → — | 32514/82802 → — |
+| v2-t06-b → v2-t06-c | boundary | 1/9 | NOT_RUN | 1 → — | 1793/2824.0/5120 → — | 1 → — | 0 → — | 52838/170077 → — |
+
+- 이전 prefix는 `20261104T044320Z-`, 이번 prefix는 `20261104T234844Z-`다. 사고 min/median/max는 재시도 포함 로컬 사고 토큰, median은 통계 중앙값이다. 지연은 기존 share-exclude와 같은 문항 회차 단위(재시도 합산), nearest-rank p50/p95다. 외부 요청과 한 시도라도 겹친 회차만 지연 표본에서 제외하고 정확도는 유지했다. 이전 V2 t0의 share-window는 전체 창을 담은 -2 파일을 썼다. 이번 무효 회차의 값으로 개선·회귀를 판정하지 않는다.
+
+#### 3) 경계 caseId별 passRounds(각 등록 R=1, 전체 9케이스)
+
+| caseId | 이전 I t0 | 이번 C t0 | 이전 I t06 | 이번 C t06 | 이전 V2 t0 | 이번 V2 t0-c | 이전 V2 t06 | 이번 V2 t06-c |
+|---|---|---|---|---|---|---|---|---|
+| NORMAL-01 | 1/1 | NOT_RUN | 1/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| NORMAL-PRECISE | 1/1 | NOT_RUN | 0/1 | NOT_RUN | 1/1 | NOT_RUN | 1/1 | NOT_RUN |
+| MAX-MIXED | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| MAX-HANGUL | 0/1 | NOT_RUN | 1/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| MAX-DIGIT | 0/1 | NOT_RUN | 1/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| MAX-ASCII | 1/1 | NOT_RUN | 1/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| MAX-SUPPLEMENTARY | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| ESCAPE-01 | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+| ESCAPE-CONTROL | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN | 0/1 | NOT_RUN |
+
+#### 4) 이번 실행의 실패 case와 출력 해시
+
+| 경로 | caseId | 틀린 필드 | errorKinds / errorCodes | outputSha256 접두부·기지 유형 |
+|---|---|---|---|---|
+| B | G16 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['127f9390eeb1'] / [None] |
+
+- 알려진 해시는 이번 스크립트가 이전 boundary 결과에서 직접 읽었다: `be5dc92fe2de` = I 내부 EQP0001 선택, `26db1d7e637f` = MAX/ESCAPE 정답, `8d8e08e58b88` = V2 내부 EQP0001 선택. 이번에 경계를 실행하지 않아 새 경계 실패 해시는 없다.
+
+#### 5) F0 5 leaf 참고 매핑
+
+| leaf | 이번 참고 판정 | 근거 |
+|---|---|---|
+| AC-37-CMP | 미검증 | 회차 무효·B 불완전·A 미실행, 같은 분모 비교 불가 |
+| AC-37-OUT-NORMAL | NOT_RUN | 정상 경계 미실행 |
+| AC-37-OUT-MAX | NOT_RUN | 최장 경계 미실행 |
+| AC-37-OUT-ESCAPE | NOT_RUN | escape 경계 미실행 |
+| AC-38-F0 | 미검증 | G08 B 관측은 아래 참고값이며 A 미실행·회차 무효 |
+
+- G08 B 부분 관측: `{'status': 'OK', 'effectiveT': 'INC', 'unknownStepCount': 0, 'toolConsistency': None}`. 회차 전체가 무효이므로 leaf PASS로 처리하지 않는다. 기존 F0 상태는 그대로이며 새 gate 증거·SPEC 체크박스·Plan 변경 0.
+
+#### 6) 보존·추가 확인
+
+- C26에는 C24 선례대로 기존 미커밋 꼬리(§12.32 포함)를 바이트 그대로 포함했다. 본 §12.34 한 소절은 append-only·미커밋이다. 등록 관련 커밋 이외 추가 commit·push·force·amend는 하지 않았다.
+- 하네스 source·기존 등록·prompt·audit·결과·capture·evidence 및 SPEC·Plan은 작업 시작 snapshot과 비교해 변경 0. 이 보고서 추가 직전 C26 devreport 전체 바이트를 접두부로 그대로 보존했다. 기존 untracked 파일도 그대로 뒀다.
+- 재진단을 완료하려면 서버의 두 모델 상주 전제가 유지되는 실행 기회가 필요하다. 이번 세션에서 이를 고치지 않았다. 기존 capture·부분 결과는 재사용/덮어쓰기하지 않으며, 재개 시 새 회차와 capture 충돌에 대한 등록 절차를 먼저 정해야 한다.
+- 집계 스크립트와 검증 로그는 사용자 지정 `step9/run/`에만 있다. `summarize.py`가 이전/현재 원시 결과에서 모든 수를 계산했고, 모든 JSON 파싱은 예외 처리 후 고정 문구 `parse failed`만 출력한다. 이번 생성 파일은 첫 회차의 preflight·B 부분 결과·run-binding·postflight·diagnostic-report, 새 chat-template capture 및 share-window뿐이다.
+
+- 추가 검증: `f0 share-exclude`는 완결 결과만 집계하므로 이번 complete=false B를 제외하고 `RESULTS_MISSING`(Java exit 2, Gradle exit 1)을 출력했다. 이 제약을 우회하거나 하네스를 수정하지 않았다. 위 B 부분 지연은 summarize.py가 같은 닫힌 구간 교차·문항 회차 단위 규칙으로 계산한 참고값이며, 하네스 share-exclude 성공 결과로 주장하지 않는다. 진단 report는 exit 0 `F0_DIAGNOSTIC_REPORT_WRITTEN`이며 불완전 경로의 지표는 결과 없음으로 처리한다. 본인 터널 PID 1464만 명령행 확인 후 종료했다.
+
+
+### 12.35 P03 v4 ⑩ bge-m3 재상주 후 재실행 점검 — 고정 capture binding 충돌로 중단 (2026-11-05, Codex, 미커밋)
+
+- 작업 기준: 사용자 재실행 지시·원본 brief-run.md·이전 final.md·§12.34와 기존 scratch 스크립트를 읽었다. 재등록·하네스 수정·새 commit·push·force·amend 없이 점검했다.
+- **중단 사유: 기존 첫 등록의 필수 chat-template 명령이 `RUN_BINDING_EXISTS`로 거부됐다(Java exit 2, Gradle exit 1, `BUILD FAILED in 12s`). 첫 등록부터 실행 불가하므로 지정 순서의 네 진단을 모두 NOT_RUN으로 남겼다. 이는 모델 상주 실패가 아니라 로컬 capture binding 충돌이다.**
+- SPEC §16 F0(현재 1382행)은 상주/digest/context 변화 시 회차 무효·기존 결과 보존·동일 문항 재측정을 요구한다. F0RunnerCli.results(283~285행)는 새 runId 아래 결과를 허용하며, MeasurementSession.start(49행)는 해당 경로의 binding 존재만 검사한다. 따라서 새 timestamp 결과 디렉터리의 B·A·boundary 자체는 같은 PREREG로 실행할 수 있다. REPORT_EXISTS 검사도 새 결과 디렉터리라면 충돌하지 않는다.
+- 그러나 F0RunnerCli chat-template(94~97행)은 --out을 PREREG.runtimeCaptureDir에 고정한다. c-t0의 경로 `eval/f0/chat-template/v4-diag-c-t0`에는 기존 `run-binding.json`이 있고 그 runId는 `20261104T234844Z-diag-c-t0`이다. 새 AIGW_PARENT_RUN_ID도 이 고정 경로를 바꾸지 못한다. 새 capture 경로를 넘기면 registered 검사(273행)의 ARGUMENT_NOT_REGISTERED 대상이다. MeasurementSession.start는 이 기존 binding을 발견하면 계수기 시작·Preflight.run·showTemplate 전에 거부한다(49~57행). 실제 동일 명령을 실행해 같은 고정 오류를 확인했다. 기존 capture 생략/재사용으로 brief의 필수 단계를 임의 변경하지 않았다.
+- 나머지 세 등록의 capture binding은 현재 없다. 다만 첫 회차에서 충돌이 확인되면 중단하라는 지시 및 지정 순서를 적용해 진행하지 않았다. 기존 capture를 변경·삭제하지 않고 모든 단계를 그대로 다시 수행하려면 등록 경로 또는 하네스 동작 변경이 필요하므로 이번 범위에서 처리하지 않는다.
+- 새 결과 디렉터리·preflight/postflight·share-window를 생성하지 않았다. SSH·ollama ps·모델 생성·embed warmup·load/unload/pull·qwen3 조작은 모두 0회다. 따라서 이번 세션이 공유 로그에 추가한 loopback warmup 요청과 기록할 HTTP code/UTC는 없다. 사용자가 알려 준 00:00 UTC 상주 상태를 이번 검증 결과로 주장하지 않는다.
+
+#### 1) 등록 및 실제 검증 출력
+
+- C26 `c25951e326f9b9c8babaab1b8c62dc1f58164b69`: `docs/ai-rag-gateway-architecture-dev-report.md`, `eval/f0/PREREG-v4-diag-c-t0.md`, `eval/f0/PREREG-v4-diag-c-t06.md`, `eval/f0/PREREG-v4-diag-v2-t0-c.md`, `eval/f0/PREREG-v4-diag-v2-t06-c.md`, `eval/f0/v4/input-audit-v4-c.json`, `eval/f0/v4/prompts/classify-v4-a.txt`.
+- C27 `891321330b0e7df577da66d8cf4d9ffa2eb243b1`: `eval/f0/PREREG-v4-diag-c-t0.md`, `eval/f0/PREREG-v4-diag-c-t06.md`, `eval/f0/PREREG-v4-diag-v2-t0-c.md`, `eval/f0/PREREG-v4-diag-v2-t06-c.md`.
+- 기존 launch/verify 패턴을 재사용한 새 scratch 스크립트로 spec-guard exit 0 및 네 prereg-check exit 0을 확인했다. 이전 검증 로그는 덮어쓰지 않았다.
+
+```text
+CHECK c-t0 PREREG_VERIFIED (exit 0)
+CHECK c-t06 PREREG_VERIFIED (exit 0)
+CHECK v2-t0-c PREREG_VERIFIED (exit 0)
+CHECK v2-t06-c PREREG_VERIFIED (exit 0)
+```
+
+#### 2) 깨끗한 작업 트리 전체 단위 테스트
+
+- 원래 작업 트리에는 이전 미커밋 보고서·미추적 증거가 있어 그대로 보존했다. 같은 저장소의 HEAD=C27을 scratch의 `step9/run/wt`에 detached worktree로 checkout하고 여기서 `.\gradlew.bat :gateway-eval:test --console=plain`을 전체 실행했다. 실행 전후 git status --porcelain 출력 0 B로 clean을 확인했다. 소스·테스트·빌드 설정 수정 0, 신규 commit 0이다.
+- 테스트가 워크스페이스 형제 경로로 참조하는 근거 파일 4개를 컴파일 단계에서 원본 읽기 전용·바이트 동일 복사로 scratch에 배치했다. 다른 저장소 원본은 수정하지 않았다. 실제 근거 검증 테스트를 포함한 전체 판정은 아래 실행 결과에 따른다.
+- XML 실제 집계: tests 241, failures 0, errors 0, skipped 0; Gradle exit 0.
+
+```text
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+BUILD SUCCESSFUL in 7m 46s
+6 actionable tasks: 6 executed
+```
+
+#### 3) 네 재실행의 상태와 이전 점수 비교
+
+| 이전 → 이번 등록 | 이전 B t·인자 /22 | 이전 A effectiveT·인자 /22 | 이전 경계 /9 | 이번 B / A / 경계 | preflight / postflight |
+|---|---|---|---|---|---|
+| i-t0-b → c-t0 | 22·22 | 22·21 | 3 | NOT_RUN / NOT_RUN / NOT_RUN | NOT_RUN / NOT_RUN |
+| i-t06-b → c-t06 | 22·19 | 22·21 | 4 | NOT_RUN / NOT_RUN / NOT_RUN | NOT_RUN / NOT_RUN |
+| v2-t0-b → v2-t0-c | 19·13 | 22·13 | 1 | NOT_RUN / NOT_RUN / NOT_RUN | NOT_RUN / NOT_RUN |
+| v2-t06-b → v2-t06-c | 20·11 | 21·13 | 1 | NOT_RUN / NOT_RUN / NOT_RUN | NOT_RUN / NOT_RUN |
+
+- 이번 네 등록의 FINISH_LENGTH·사고 토큰 min/median/max·사고 >4,928·답변 >192·겹침 제외 수·p50/p95는 모두 NOT_RUN이다. 호출 0회라는 실행 사실과 측정치 0을 구분한다. 이번 실패 caseId·틀린 필드·errorKinds·outputSha256는 결과 자체가 없어 해당 없음이다. 이전 무효 B 16문항을 새 실행 결과로 재사용하지 않았다.
+
+#### 4) 이전 경로별 토큰·지연 통계(기존 summarize.py 함수로 원시 파일 재계산)
+
+| 이전 등록 | 경로 | FINISH_LENGTH | 사고 min/median/max | 사고 >4928 | 답변 >192 | 지연 제외/유지 | p50/p95 ms | 이번 대응 경로 |
+|---|---|---|---|---|---|---|---|---|
+| i-t0-b | B | 0 | 645/1478.5/3578 | 0 | 0 | 0/22 | 22847/53928 | NOT_RUN |
+| i-t0-b | A | 0 | 503/1122.5/3516 | 0 | 0 | 0/22 | 18711/59991 | NOT_RUN |
+| i-t0-b | boundary | 8 | 1498/5120.0/5120 | 8 | 0 | 0/9 | 161857/221141 | NOT_RUN |
+| i-t06-b | B | 1 | 497/1012/5120 | 1 | 0 | 0/22 | 15364/60471 | NOT_RUN |
+| i-t06-b | A | 0 | 469/1080.5/4880 | 0 | 0 | 0/22 | 18967/84782 | NOT_RUN |
+| i-t06-b | boundary | 2 | 2624/4542/5120 | 4 | 0 | 0/9 | 91344/198934 | NOT_RUN |
+| v2-t0-b | B | 0 | 567/1160.0/4082 | 0 | 0 | 0/22 | 18223/44882 | NOT_RUN |
+| v2-t0-b | A | 0 | 587/1468.5/4461 | 0 | 0 | 0/22 | 24688/81153 | NOT_RUN |
+| v2-t0-b | boundary | 0 | 2282/2617/3333 | 0 | 0 | 0/9 | 49071/68138 | NOT_RUN |
+| v2-t06-b | B | 0 | 631/1640.0/3595 | 0 | 0 | 0/22 | 26232/57100 | NOT_RUN |
+| v2-t06-b | A | 1 | 730/1407/5120 | 1 | 0 | 0/22 | 32514/82802 | NOT_RUN |
+| v2-t06-b | boundary | 1 | 1793/2824.0/5120 | 1 | 0 | 0/9 | 52838/170077 | NOT_RUN |
+
+- 이전 prefix는 `20261104T044320Z-`다. 지연은 각 시도 UTC와 외부 요청 구간의 닫힌 구간 교차로 겹친 문항 회차만 제외하고 재시도를 합산한 nearest-rank p50/p95다. 정확도는 유지한다. 이전 V2 t0은 전체 수집창인 share-window의 -2 파일을 사용했다.
+
+#### 5) 경계 case별 passRounds 비교(각 R=1)
+
+| caseId | 이전 I t0 | 이전 I t06 | 이전 V2 t0 | 이전 V2 t06 | 이번 C t0 / C t06 / V2 t0-c / V2 t06-c |
+|---|---|---|---|---|---|
+| NORMAL-01 | 1/1 | 1/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| NORMAL-PRECISE | 1/1 | 0/1 | 1/1 | 1/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| MAX-MIXED | 0/1 | 0/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| MAX-HANGUL | 0/1 | 1/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| MAX-DIGIT | 0/1 | 1/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| MAX-ASCII | 1/1 | 1/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| MAX-SUPPLEMENTARY | 0/1 | 0/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| ESCAPE-01 | 0/1 | 0/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+| ESCAPE-CONTROL | 0/1 | 0/1 | 0/1 | 0/1 | NOT_RUN / NOT_RUN / NOT_RUN / NOT_RUN |
+
+- 알려진 출력 해시를 기존 결과에서 직접 읽어 대조했다: `be5dc92fe2de` = I 내부 EQP0001 선택, `26db1d7e637f` = MAX/ESCAPE 정답, `8d8e08e58b88` = V2 내부 EQP0001 선택. 새 출력이 없어 일치 판정할 대상은 없다.
+
+#### 6) F0 다섯 leaf 참고 매핑 및 추가 확인
+
+| leaf | 이번 네 등록 공통 | 근거 |
+|---|---|---|
+| AC-37-CMP | NOT_RUN | B·A 동일 분모 실측 없음 |
+| AC-37-OUT-NORMAL | NOT_RUN | 정상 경계 미실행 |
+| AC-37-OUT-MAX | NOT_RUN | 최장 경계 미실행 |
+| AC-37-OUT-ESCAPE | NOT_RUN | escape 경계 미실행 |
+| AC-38-F0 | NOT_RUN | G08 두 경로 재실측 없음 |
+
+- DIAGNOSTIC은 정식 게이트 증거가 아니며 이번에는 참고 생성 판정도 할 수 없다. 개선/회귀·F0 통과를 주장하지 않는다. SPEC·Plan·기존 gate 상태를 바꾸지 않았다.
+- 추가로 정해야 하는 사항은 기존 capture를 보존하면서 재측정할 수 있는 절차다. 새 등록 또는 하네스 변경은 이번 작업에서 승인되지 않았고, 충돌 시 중단하라는 사용자 지시에 따라 수행하지 않았다.
+
+#### 7) 보존 확인
+
+- 작업 전 snapshot 534개 파일(SPEC·Plan 포함)의 SHA-256이 모두 동일하다. 중단 회차 `20261104T234844Z-diag-c-t0`의 결과·capture·share-window를 포함해 기존 파일 변경/삭제 0. 원래 git 상태도 작업 시작과 동일하다.
+- 기존 devreport 653970 B SHA-256 `d87910898684545cbba9379f37629651d2b9837081ed240330188b8964d3ae19` 전체를 접두부 그대로 보존하고 본 §12.35만 한 번 append했다. 이번 저장소 변경은 이 문서의 append뿐이며 커밋하지 않았다.
+- scratch 산출물: rerun-check*.log/exit, rerun-capture-conflict.log/exit, rerun-unit-tests.log/exit, rerun-baseline-summary.json, rerun-final.md 및 보존 snapshot. 이전 세션 스크립트·로그·summary·final.md는 덮어쓰지 않았다. 임시 clean worktree와 테스트 결과는 검토용으로 scratch에 유지한다.
+
+
+### 12.36 P03 v4 ⑩ root 승인 capture 생략 후 새 회차 재진단 (2026-11-05, Codex 시작·Claude Code Opus 5.5 인계 완료, 미커밋)
+
+- 세션 인계: Codex 세션이 약 02:17 UTC 사용량 한도로 종료됐다. 인계 시점 프로세스 목록 확인 결과 scratch 오케스트레이터 `continue_runs.py resume-last`(02:08:13 UTC 시작)와 v2-t06-c B 실행(02:08:14 UTC 시작)이 모두 살아 있었다. 따라서 B를 새로 띄우지 않았고 후속 단계도 수동 실행하지 않았다. 같은 오케스트레이터가 B → A → boundary-gen → report → postflight → 공유 창 수집 → share-exclude를 PREREG §2 명령·환경변수·`AIGW_PARENT_RUN_ID=20261105T003119Z-diag-v2-t06-c` 그대로 이어 실행해 02:42:48 UTC `ALL_FOUR_COMPLETE`(exit 0)로 끝났다. 인계 세션은 읽기 전용 상태 조회, 본 절 생성·append만 수행했다.
+
+- 적용 근거: brief-run.md·brief-rerun.md 및 이번 사용자(root) 결정. 지정된 순서 c-t0 → c-t06 → v2-t0-c → v2-t06-c, 새 UTC runId `20261105T003119Z`를 사용했다. 기존 중단 회차 `20261104T234844Z-diag-c-t0`와 기존 결과·등록·capture를 보존했다.
+- c-t0의 단계 3(chat-template)만 사용자 승인에 따라 생략했다. §12의 v3 diag c 단계 c-3(기존 capture 무결성 검증 후 root가 생략을 확정한 선례, 약 1278행)을 적용했다. 스크립트로 template SHA `2d54db2b9bb29ce7db54fea63a891f5859603813c555b1f88b5e0994652897f9`와 등록 audit SHA·capture binding의 runtime manifest 일치, `model-digest.txt`·`qwen3-4b.template.sha256` 두 파일의 `v4-diag-i-t0-b` 대비 바이트 동일성, 등록 모델 digest 일치를 재검증했다. 캡처 binding의 이전 runId도 그대로다.
+- 현재 서버의 읽기 전용 ollama ps로 qwen3:4b ID `359d7dd4bcda`, context 8192와 bge-m3 상주를 확인했다. 과거 00:00 UTC 상태는 사용자 확인 근거이고 이번 확인 시각은 scratch의 between 로그에 별도로 기록했다. 각 측정 명령은 MeasurementSession에서 현재 모델·template SHA·tokenizer pin을 다시 수집하고 audit와 대조한다.
+- c-t0 후속 단계에서 capture/parent binding 오류를 우회하지 않는다. 나머지 세 등록의 단계 3은 기존 capture가 없음을 확인한 뒤 정상 실행 대상으로 두었다. 하네스·등록 변경, 신규 commit·push·amend·force, qwen3 조작은 없다.
+
+#### 1) 등록 및 검증
+
+- C26 `c25951e326f9b9c8babaab1b8c62dc1f58164b69`: `docs/ai-rag-gateway-architecture-dev-report.md`, `eval/f0/PREREG-v4-diag-c-t0.md`, `eval/f0/PREREG-v4-diag-c-t06.md`, `eval/f0/PREREG-v4-diag-v2-t0-c.md`, `eval/f0/PREREG-v4-diag-v2-t06-c.md`, `eval/f0/v4/input-audit-v4-c.json`, `eval/f0/v4/prompts/classify-v4-a.txt`.
+- C27 `891321330b0e7df577da66d8cf4d9ffa2eb243b1`: `eval/f0/PREREG-v4-diag-c-t0.md`, `eval/f0/PREREG-v4-diag-c-t06.md`, `eval/f0/PREREG-v4-diag-v2-t0-c.md`, `eval/f0/PREREG-v4-diag-v2-t06-c.md`.
+
+```text
+CHECK c-t0 PREREG_VERIFIED (exit 0)
+CHECK c-t06 PREREG_VERIFIED (exit 0)
+CHECK v2-t0-c PREREG_VERIFIED (exit 0)
+CHECK v2-t06-c PREREG_VERIFIED (exit 0)
+```
+
+- `spec-guard` exit 0, tokenizers 0.23.3 확인. 전체 단위 테스트는 이번 지시에 따라 재실행하지 않았다. 기존 clean detached worktree 테스트 XML과 로그를 재확인한 결과 {'tests': 241, 'failures': 0, 'errors': 0, 'skipped': 0}, 기존 Gradle exit 0이다.
+
+```text
+BUILD SUCCESSFUL in 7m 46s
+6 actionable tasks: 6 executed
+```
+
+#### 2) 실행 단계·preflight/postflight·중단 여부
+
+- 기존 c-t0 template 파일의 수정 시각(스크립트 조회): `2026-11-05T08:49:29.584755+09:00`; 기존 파일은 수정하지 않았다.
+- 스크래치 자동화 수정: c-t0의 두 preflight 명령은 모두 exit 0·F0_PREFLIGHT_OK 2였으나 제 비교 코드가 models 배열 순서를 그대로 대조해 POSTFLIGHT_CHANGED로 잠시 멈췄다. 실제로는 `[bge-m3, qwen3]` → `[qwen3, bge-m3]` 순서만 달랐고, 모델명으로 정렬해 name·digest·context·residentCount가 모두 같음을 독립 스크립트로 확인했다. 하네스 오류·capture/parent binding 거부·실제 상주 변화가 아니므로 스크래치 비교만 수정하고 완료된 preflight/B/A/boundary/report/postflight 재실행 없이 share 수집부터 재개했다. 첫 자동화 로그·실패 exit 파일도 보존했다.
+- 스크래치 종료코드 읽기 경쟁 수정: v2-t06-c template은 F0_CHAT_TEMPLATE_CAPTURED·실제 Gradle exit 0이었으나 polling이 .exit 파일 생성과 값 기록 사이에 빈 문자열을 읽어 잠시 멈췄다(하네스 오류 코드 없음). preflight/template 실제 exit 0·현재 runId의 새 capture binding·template SHA를 확인하고 빈 값이면 기록 완료까지 기다리도록 스크래치 polling만 고쳤다. 이전 세 회차와 마지막 preflight/template을 다시 실행하지 않고 마지막 B부터 재개했다. 빈 값을 읽은 원래 로그·continue-stopped.txt도 보존했다. 저장소 하네스·등록·capture·결과를 수정한 우회는 없다.
+- 전체 상태: 네 진단 완료.
+
+| 등록 | preflight | postflight | chat-template |
+|---|---|---|---|
+| c-t0 | PASS OK resident=2 | PASS OK resident=2 | 검증 후 root 승인 생략 |
+| c-t06 | PASS OK resident=2 | PASS OK resident=2 | 실행 exit 0 |
+| v2-t0-c | PASS OK resident=2 | PASS OK resident=2 | 실행 exit 0 |
+| v2-t06-c | PASS OK resident=2 | PASS OK resident=2 | 실행 exit 0 |
+
+- 매 회차 preflight 전 ollama ps로 bge-m3 UNTIL을 검사했다(실행된 회차에 한함). 상주·남은 시간 ≥3h라 warmup/keep_alive 연장 요청 0회, 추가 loopback warmup 요청·HTTP code 없음.
+
+| 단계 종료 로그(UTC) | 결과 |
+|---|---|
+| 2026-11-05T00:31:42.755856+00:00 | spec-guard exit=0 signals= |
+| 2026-11-05T00:31:51.092834+00:00 | check-c-t0 exit=0 signals=PREREG_VERIFIED |
+| 2026-11-05T00:31:59.474309+00:00 | check-c-t06 exit=0 signals=PREREG_VERIFIED |
+| 2026-11-05T00:32:07.836686+00:00 | check-v2-t0-c exit=0 signals=PREREG_VERIFIED |
+| 2026-11-05T00:32:16.201818+00:00 | check-v2-t06-c exit=0 signals=PREREG_VERIFIED |
+| 2026-11-05T00:32:25.172776+00:00 | c-t0-preflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T00:42:31.829876+00:00 | c-t0-B exit=0 signals=F0_RUN_COMPLETED B |
+| 2026-11-05T00:53:32.564229+00:00 | c-t0-A exit=0 signals=F0_RUN_COMPLETED A |
+| 2026-11-05T01:00:55.077600+00:00 | c-t0-boundary exit=0 signals=F0_BOUNDARY_COMPLETED 9 |
+| 2026-11-05T01:01:03.433507+00:00 | c-t0-report exit=0 signals=F0_DIAGNOSTIC_REPORT_WRITTEN |
+| 2026-11-05T01:01:11.786629+00:00 | c-t0-postflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T01:02:24.384310+00:00 | c-t0-share-exclude exit=0 signals= |
+| 2026-11-05T01:02:33.179621+00:00 | c-t06-preflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T01:02:41.577512+00:00 | c-t06-template exit=0 signals=F0_CHAT_TEMPLATE_CAPTURED |
+| 2026-11-05T01:15:38.220545+00:00 | c-t06-B exit=0 signals=F0_RUN_COMPLETED B |
+| 2026-11-05T01:25:14.792296+00:00 | c-t06-A exit=0 signals=F0_RUN_COMPLETED A |
+| 2026-11-05T01:34:45.360279+00:00 | c-t06-boundary exit=0 signals=F0_BOUNDARY_COMPLETED 9 |
+| 2026-11-05T01:34:53.707788+00:00 | c-t06-report exit=0 signals=F0_DIAGNOSTIC_REPORT_WRITTEN |
+| 2026-11-05T01:35:02.060390+00:00 | c-t06-postflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T01:35:07.286211+00:00 | c-t06-share-exclude exit=0 signals= |
+| 2026-11-05T01:35:16.088101+00:00 | v2-t0-c-preflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T01:35:24.437943+00:00 | v2-t0-c-template exit=0 signals=F0_CHAT_TEMPLATE_CAPTURED |
+| 2026-11-05T01:35:54.810320+00:00 | v2-t0-c-token-golden exit=0 signals=F0_TOKEN_GOLDEN_COMPLETED 13 |
+| 2026-11-05T01:36:09.196001+00:00 | v2-t0-c-usage exit=0 signals=F0_USAGE_PROBE_COMPLETED |
+| 2026-11-05T01:45:59.784723+00:00 | v2-t0-c-B exit=0 signals=F0_RUN_COMPLETED B |
+| 2026-11-05T01:58:44.558286+00:00 | v2-t0-c-A exit=0 signals=F0_RUN_COMPLETED A |
+| 2026-11-05T02:06:27.150856+00:00 | v2-t0-c-boundary exit=0 signals=F0_BOUNDARY_COMPLETED 9 |
+| 2026-11-05T02:06:35.535754+00:00 | v2-t0-c-report exit=0 signals=F0_DIAGNOSTIC_REPORT_WRITTEN |
+| 2026-11-05T02:06:43.883121+00:00 | v2-t0-c-postflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T02:06:49.113973+00:00 | v2-t0-c-share-exclude exit=0 signals= |
+| 2026-11-05T02:06:57.861129+00:00 | v2-t06-c-preflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T02:07:06.211932+00:00 | v2-t06-c-template exit= signals=F0_CHAT_TEMPLATE_CAPTURED (polling 경쟁으로 빈 값 기록, 실제 .exit 파일 값 0) |
+| 2026-11-05T02:20:30.811664+00:00 | v2-t06-c-B exit=0 signals=F0_RUN_COMPLETED B |
+| 2026-11-05T02:33:55.504708+00:00 | v2-t06-c-A exit=0 signals=F0_RUN_COMPLETED A |
+| 2026-11-05T02:42:26.086592+00:00 | v2-t06-c-boundary exit=0 signals=F0_BOUNDARY_COMPLETED 9 |
+| 2026-11-05T02:42:34.454135+00:00 | v2-t06-c-report exit=0 signals=F0_DIAGNOSTIC_REPORT_WRITTEN |
+| 2026-11-05T02:42:42.791776+00:00 | v2-t06-c-postflight exit=0 signals=F0_PREFLIGHT_OK 2 |
+| 2026-11-05T02:42:48.025297+00:00 | v2-t06-c-share-exclude exit=0 signals= |
+
+#### 3) 이전/현재 정확도·경계 비교(파일에서 스크립트 재계산)
+
+
+| 이전 → 현재 | 이전 B t·인자 /22 | 현재 B | 이전 A effectiveT·인자 /22 | 현재 A | 이전 경계 /9 | 현재 경계 |
+|---|---|---|---|---|---|---|
+| i-t0-b → c-t0 | 22·22/22 | 22·21/22 | 22·21/22 | 22·21/22 | 3/9 | 2/9 |
+| i-t06-b → c-t06 | 22·19/22 | 22·21/22 | 22·21/22 | 22·21/22 | 4/9 | 2/9 |
+| v2-t0-b → v2-t0-c | 19·13/22 | 19·13/22 | 22·13/22 | 22·13/22 | 1/9 | 1/9 |
+| v2-t06-b → v2-t06-c | 20·11/22 | 21·12/22 | 21·13/22 | 18·13/22 | 1/9 | 1/9 |
+
+- 첫 B 종료 시점의 지연 중앙값 17194.0ms로 나머지 190문항 회차를 단순 환산하면 54.4분이다(계수 호출·경계의 긴 출력·재시도·준비 시간 제외 추산). 실제 c-t0 preflight 시작부터 v2-t06-c share-exclude 종료까지는 00:32 ~ 02:42 UTC다.
+- v2-t06-c A의 effectiveT 18/22는 G10 t 오답(LQ→KQ) 1건과, `t`는 기대와 같지만 unknownStepCount=1로 effectiveT가 UNS로 강등된 G20·G21·G22 3건의 합이다. G21은 인자가 모두 일치해 errorKinds가 비어 있으나 effectiveT 기준으로 오답 집계된다. v2-t06-c B G20의 첫 시도는 FINISH_LENGTH로 빈 답변(`e3b0c44298fc` = 빈 문자열 SHA-256)이었고 재시도 출력 `9db7bfc3f597`도 인자 불일치다.
+#### 4) 경로별 토큰·지연 이전 → 현재
+
+- 사고 토큰은 로컬 pin 계수이며 재시도를 포함한 시도별 min/통계 median/max다. FINISH_LENGTH도 시도별 개수다. 지연은 재시도 합산 문항 회차 단위 nearest-rank p50/p95(ms), UTC 닫힌 구간 교차로 외부 요청과 겹친 회차의 지연만 제외하고 정확도는 유지한다. 이전 prefix `20261104T044320Z`, V2 t0의 공유 창은 -2 파일을 사용했다.
+
+| 현재 등록 | 경로 | FINISH_LENGTH | 사고 min/median/max | 사고 >4928 | 답변 >192 | 지연 제외/유지 | p50/p95 ms |
+|---|---|---|---|---|---|---|---|
+| c-t0 | B | 0 → 0 | 645/1478.5/3578 → 620/1025.0/3922 | 0 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 22847/53928 → 16553/68281 |
+| c-t0 | A | 0 → 0 | 503/1122.5/3516 → 503/1122.5/3516 | 0 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 18711/59991 → 18777/60103 |
+| c-t0 | boundary | 8 → 0 | 1498/5120.0/5120 → 1448/2301/4118 | 8 → 0 | 0 → 0 | 0/9 (0.0%) → 0/9 (0.0%) | 161857/221141 → 44539/80471 |
+| c-t06 | B | 1 → 1 | 497/1012/5120 → 638/1268/5120 | 1 → 1 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 15364/60471 → 19688/85478 |
+| c-t06 | A | 0 → 0 | 469/1080.5/4880 → 573/959.5/3760 | 0 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 18967/84782 → 17145/52847 |
+| c-t06 | boundary | 2 → 0 | 2624/4542/5120 → 1414/3636/4308 | 4 → 0 | 0 → 0 | 0/9 (0.0%) → 0/9 (0.0%) | 91344/198934 → 68423/86663 |
+| v2-t0-c | B | 0 → 0 | 567/1160.0/4082 → 567/1160.0/4082 | 0 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 18223/44882 → 18309/44968 |
+| v2-t0-c | A | 0 → 0 | 587/1468.5/4461 → 587/1468.5/4461 | 0 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 24688/81153 → 24940/81400 |
+| v2-t0-c | boundary | 0 → 0 | 2282/2617/3333 → 2282/2617/3333 | 0 → 0 | 0 → 0 | 0/9 (0.0%) → 0/9 (0.0%) | 49071/68138 → 48950/67881 |
+| v2-t06-c | B | 0 → 1 | 631/1640.0/3595 → 491/1280/5120 | 0 → 1 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 26232/57100 → 21051/73849 |
+| v2-t06-c | A | 1 → 0 | 730/1407/5120 → 696/1593/3633 | 1 → 0 | 0 → 0 | 0/22 (0.0%) → 0/22 (0.0%) | 32514/82802 → 28180/65106 |
+| v2-t06-c | boundary | 1 → 0 | 1793/2824.0/5120 → 1555/2864/4087 | 1 → 0 | 0 → 0 | 0/9 (0.0%) → 0/9 (0.0%) | 52838/170077 → 58890/75776 |
+
+#### 5) 경계 case별 passRounds/totalRounds(각 R=1)
+
+
+| caseId | I t0 → C t0 | I t06 → C t06 | V2 t0 → V2 t0-c | V2 t06 → V2 t06-c |
+|---|---|---|---|---|
+| NORMAL-01 | 1/1 → 1/1 | 1/1 → 1/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| NORMAL-PRECISE | 1/1 → 1/1 | 0/1 → 1/1 | 1/1 → 1/1 | 1/1 → 1/1 |
+| MAX-MIXED | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| MAX-HANGUL | 0/1 → 0/1 | 1/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| MAX-DIGIT | 0/1 → 0/1 | 1/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| MAX-ASCII | 1/1 → 0/1 | 1/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| MAX-SUPPLEMENTARY | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| ESCAPE-01 | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+| ESCAPE-CONTROL | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 | 0/1 → 0/1 |
+
+#### 6) 이번 실패 case·틀린 필드·errorKinds·출력 SHA
+
+
+| 등록 | 경로 | caseId | 틀린 필드 | errorKinds / errorCodes | outputSha256 접두부 | 기지 해시 |
+|---|---|---|---|---|---|---|
+| c-t0 | B | G16 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['127f9390eeb1'] | [None] |
+| c-t0 | A | G03 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['445ac9311338'] | [None] |
+| c-t0 | boundary | MAX-MIXED | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | MAX-HANGUL | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | MAX-DIGIT | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | MAX-ASCII | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | MAX-SUPPLEMENTARY | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | ESCAPE-01 | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t0 | boundary | ESCAPE-CONTROL | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | B | G16 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['127f9390eeb1'] | [None] |
+| c-t06 | A | G03 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['445ac9311338'] | [None] |
+| c-t06 | boundary | MAX-MIXED | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | boundary | MAX-HANGUL | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | boundary | MAX-DIGIT | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | boundary | MAX-ASCII | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | boundary | MAX-SUPPLEMENTARY | eqp | ['ARGUMENT_MISMATCH'] / [] | be5dc92fe2de | I 내부 EQP0001 선택 |
+| c-t06 | boundary | ESCAPE-01 | eqp | ['ARGUMENT_MISMATCH'] / [] | ab03b9728859 | None |
+| c-t06 | boundary | ESCAPE-CONTROL | eqp | ['ARGUMENT_MISMATCH'] / [] | d95a10e969c3 | None |
+| v2-t0-c | B | G01 | t/effectiveT, from, to | ['TASK_TYPE_MISMATCH', 'ARGUMENT_MISMATCH'] / [] | ['f6c2926386f3'] | [None] |
+| v2-t0-c | B | G04 | t/effectiveT | ['TASK_TYPE_MISMATCH'] / [] | ['5ac45f612db2'] | [None] |
+| v2-t0-c | B | G08 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['8a356dcf80ac'] | [None] |
+| v2-t0-c | B | G09 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['8132a84619b6'] | [None] |
+| v2-t0-c | B | G11 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['58b4a150fe23'] | [None] |
+| v2-t0-c | B | G12 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['fa3bf734de78'] | [None] |
+| v2-t0-c | B | G16 | t/effectiveT, eqp | ['TASK_TYPE_MISMATCH', 'ARGUMENT_MISMATCH'] / [] | ['5ac45f612db2'] | [None] |
+| v2-t0-c | B | G17 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['c86c720f6f7d'] | [None] |
+| v2-t0-c | B | G20 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['7ca8fd423a65'] | [None] |
+| v2-t0-c | B | G22 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['be30e9b5e125'] | [None] |
+| v2-t0-c | A | G01 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['e82664c62e3f'] | [None] |
+| v2-t0-c | A | G08 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['3dfedc5ae0ce'] | [None] |
+| v2-t0-c | A | G09 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['b1407006e560'] | [None] |
+| v2-t0-c | A | G11 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['f1761c4d9b38'] | [None] |
+| v2-t0-c | A | G12 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['c484734ce737'] | [None] |
+| v2-t0-c | A | G16 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['94c5ec256372'] | [None] |
+| v2-t0-c | A | G17 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['a3611bae245e'] | [None] |
+| v2-t0-c | A | G20 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['62319f821d3d'] | [None] |
+| v2-t0-c | A | G22 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['2fbb1236809c'] | [None] |
+| v2-t0-c | boundary | NORMAL-01 | from, to | ['ARGUMENT_MISMATCH'] / [] | c86c720f6f7d | None |
+| v2-t0-c | boundary | MAX-MIXED | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t0-c | boundary | MAX-HANGUL | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t0-c | boundary | MAX-DIGIT | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t0-c | boundary | MAX-ASCII | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t0-c | boundary | MAX-SUPPLEMENTARY | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t0-c | boundary | ESCAPE-01 | t, eqp | ['TASK_TYPE_MISMATCH', 'ARGUMENT_MISMATCH'] / [] | 794328a9b592 | None |
+| v2-t0-c | boundary | ESCAPE-CONTROL | t, eqp | ['TASK_TYPE_MISMATCH', 'ARGUMENT_MISMATCH'] / [] | 9c560d9472d3 | None |
+| v2-t06-c | B | G01 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['c86c720f6f7d'] | [None] |
+| v2-t06-c | B | G02 | t/effectiveT | ['TASK_TYPE_MISMATCH'] / [] | ['f43e16dda78f'] | [None] |
+| v2-t06-c | B | G03 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['e9c14181a298'] | [None] |
+| v2-t06-c | B | G08 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['8a356dcf80ac'] | [None] |
+| v2-t06-c | B | G09 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['8132a84619b6'] | [None] |
+| v2-t06-c | B | G11 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['58b4a150fe23'] | [None] |
+| v2-t06-c | B | G12 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['fa3bf734de78'] | [None] |
+| v2-t06-c | B | G15 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['e9c14181a298'] | [None] |
+| v2-t06-c | B | G17 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['c86c720f6f7d'] | [None] |
+| v2-t06-c | B | G20 | eqp, from, to | ['ARGUMENT_MISMATCH'] / ['FINISH_LENGTH'] | ['e3b0c44298fc', '9db7bfc3f597'] | [None, None] |
+| v2-t06-c | B | G22 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['beafef32e363'] | [None] |
+| v2-t06-c | A | G01 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['e82664c62e3f'] | [None] |
+| v2-t06-c | A | G08 | eqp, from, to | ['ARGUMENT_MISMATCH'] / [] | ['3dfedc5ae0ce'] | [None] |
+| v2-t06-c | A | G09 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['0ed93fbd45a7'] | [None] |
+| v2-t06-c | A | G10 | t/effectiveT | ['TASK_TYPE_MISMATCH'] / [] | ['b44092d461fb'] | [None] |
+| v2-t06-c | A | G11 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['d071a78ff04b'] | [None] |
+| v2-t06-c | A | G12 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['c484734ce737'] | [None] |
+| v2-t06-c | A | G16 | eqp | ['ARGUMENT_MISMATCH'] / [] | ['94c5ec256372'] | [None] |
+| v2-t06-c | A | G17 | from, to | ['ARGUMENT_MISMATCH'] / [] | ['355710217efc'] | [None] |
+| v2-t06-c | A | G20 | t/effectiveT, eqp | ['ARGUMENT_MISMATCH'] / [] | ['e251998873c4'] | [None] |
+| v2-t06-c | A | G21 | t/effectiveT | [] / [] | ['80e3e797f271'] | [None] |
+| v2-t06-c | A | G22 | t/effectiveT, from, to | ['ARGUMENT_MISMATCH'] / [] | ['c753fe350da1'] | [None] |
+| v2-t06-c | boundary | NORMAL-01 | from, to | ['ARGUMENT_MISMATCH'] / [] | c86c720f6f7d | None |
+| v2-t06-c | boundary | MAX-MIXED | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | MAX-HANGUL | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | MAX-DIGIT | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | MAX-ASCII | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | MAX-SUPPLEMENTARY | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | ESCAPE-01 | eqp | ['ARGUMENT_MISMATCH'] / [] | 8d8e08e58b88 | V2 내부 EQP0001 선택 |
+| v2-t06-c | boundary | ESCAPE-CONTROL | eqp | ['ARGUMENT_MISMATCH'] / [] | 45cc253f5066 | None |
+
+- 기지 해시는 기존 결과에서 직접 읽었다: `be5dc92fe2de` = I 내부 EQP0001 선택, `26db1d7e637f` = MAX/ESCAPE 정답, `8d8e08e58b88` = V2 내부 EQP0001 선택.
+
+#### 7) F0 다섯 leaf 참고 매핑
+
+- DIAGNOSTIC은 정식 게이트 증거가 아니다. CMP의 PASS는 측정 비교가 성립한다는 하네스 규칙이며 후보 A 승격/품질 통과를 뜻하지 않는다. OUT은 생성 조건만 본 참고 판정이다. 정식 계수 입력 official-count/gguf-count가 없으면 정식 OUT 판정은 OUT_INPUT_MISSING·NOT_RUN이며 이번 참고표로 대체하지 않는다.
+
+| leaf | c-t0 | c-t06 | v2-t0-c | v2-t06-c |
+|---|---|---|---|---|
+| AC-37-CMP | PASS 참고·KEEP_B (UNS A/B=22/22, A 기대 t별 p95 예산=False) | PASS 참고·KEEP_B (UNS A/B=22/22, A 기대 t별 p95 예산=False) | PASS 참고·KEEP_B (UNS A/B=22/21, A 기대 t별 p95 예산=False) | PASS 참고·KEEP_B (UNS A/B=19/22, A 기대 t별 p95 예산=False) |
+| AC-37-OUT-NORMAL | PASS 생성 조건 참고 (2/2 케이스) | PASS 생성 조건 참고 (2/2 케이스) | FAIL 생성 조건 참고 (1/2 케이스) | FAIL 생성 조건 참고 (1/2 케이스) |
+| AC-37-OUT-MAX | FAIL 생성 조건 참고 (0/5 케이스) | FAIL 생성 조건 참고 (0/5 케이스) | FAIL 생성 조건 참고 (0/5 케이스) | FAIL 생성 조건 참고 (0/5 케이스) |
+| AC-37-OUT-ESCAPE | FAIL 생성 조건 참고 (0/2 케이스) | FAIL 생성 조건 참고 (0/2 케이스) | FAIL 생성 조건 참고 (0/2 케이스) | FAIL 생성 조건 참고 (0/2 케이스) |
+| AC-38-F0 | PASS 참고 (기대 INC·TC workflow 2/2) | PASS 참고 (기대 INC·TC workflow 2/2) | PASS 참고 (기대 INC·TC workflow 2/2) | PASS 참고 (기대 INC·TC workflow 2/2) |
+
+#### 8) 공유 창·계수 확인·보존·남은 확인
+
+- c-t0: 수집창 2026-11-05T00:31:00Z ~ 2026-11-05T01:03:00Z, 출발지 집계 {'loopback': 121, 'external': 0}, 외부 구간 0개, 미해석 GIN 0. 기존 수집 스크립트대로 공통 prefix부터 누적 수집하되 겹침 제외는 해당 회차 callWindows와만 교차한다. IP·원문·본문은 저장/출력하지 않았다.
+- c-t0: 독립 스크립트의 겹침 제외 수·유지 수·p50/p95가 실제 f0 share-exclude 출력과 모두 일치했다.
+- c-t0/B: completionMinusLocal 값=건수 {2: 21, 3: 1}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- c-t0/A: completionMinusLocal 값=건수 {1: 3, 2: 19}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- c-t0/boundary: completionMinusLocal 값=건수 {2: 9}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- c-t06: 수집창 2026-11-05T00:31:00Z ~ 2026-11-05T01:36:00Z, 출발지 집계 {'loopback': 246, 'external': 0}, 외부 구간 0개, 미해석 GIN 0. 기존 수집 스크립트대로 공통 prefix부터 누적 수집하되 겹침 제외는 해당 회차 callWindows와만 교차한다. IP·원문·본문은 저장/출력하지 않았다.
+- c-t06: 독립 스크립트의 겹침 제외 수·유지 수·p50/p95가 실제 f0 share-exclude 출력과 모두 일치했다.
+- c-t06/B: completionMinusLocal 값=건수 {0: 1, 2: 17, 3: 5}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- c-t06/A: completionMinusLocal 값=건수 {2: 22}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- c-t06/boundary: completionMinusLocal 값=건수 {2: 9}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t0-c: 수집창 2026-11-05T00:31:00Z ~ 2026-11-05T02:07:00Z, 출발지 집계 {'loopback': 439, 'external': 0}, 외부 구간 0개, 미해석 GIN 0. 기존 수집 스크립트대로 공통 prefix부터 누적 수집하되 겹침 제외는 해당 회차 callWindows와만 교차한다. IP·원문·본문은 저장/출력하지 않았다.
+- v2-t0-c: 독립 스크립트의 겹침 제외 수·유지 수·p50/p95가 실제 f0 share-exclude 출력과 모두 일치했다.
+- v2-t0-c: token-golden 입력 계수 일치 13/13. 등록 동등성 게이트는 13/13 일치를 실제 확인한 뒤 usage/B/A/경계로 진행했다.
+- v2-t0-c: usage-probe equalOnCacheHit={'evalCount': True, 'usage': True}. 원시 응답은 출력하지 않았다.
+- v2-t0-c/B: completionMinusLocal 값=건수 {3: 22}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t0-c/A: completionMinusLocal 값=건수 {3: 22}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t0-c/boundary: completionMinusLocal 값=건수 {3: 9}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t06-c: 수집창 2026-11-05T00:31:00Z ~ 2026-11-05T02:43:00Z, 출발지 집계 {'loopback': 565, 'external': 0}, 외부 구간 0개, 미해석 GIN 0. 기존 수집 스크립트대로 공통 prefix부터 누적 수집하되 겹침 제외는 해당 회차 callWindows와만 교차한다. IP·원문·본문은 저장/출력하지 않았다.
+- v2-t06-c: 독립 스크립트의 겹침 제외 수·유지 수·p50/p95가 실제 f0 share-exclude 출력과 모두 일치했다.
+- v2-t06-c/B: completionMinusLocal 값=건수 {0: 1, 3: 22}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t06-c/A: completionMinusLocal 값=건수 {3: 23}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- v2-t06-c/boundary: completionMinusLocal 값=건수 {3: 9}; 실제 promptTokens가 audit보다 작음/큼 0/0. 비제로 차이를 이유로 채점을 바꾸지 않았다. 작음은 잘림 의심 관측이며 입력 계수 동등성은 token-golden에서 별도 검사한다.
+- 기존 보호 파일 534개(SPEC·Plan·중단 회차·기존 capture 포함)의 SHA-256 일치, 변경·삭제 0. 기존 devreport 664439 B 전체를 바이트 접두부 그대로 보존하고 §12.35 뒤에 본 §12.36 한 절만 append했다. 미커밋 상태로 유지한다.
+- 새 결과는 `eval/f0/results/20261105T003119Z-diag-*/`, 새 공유 창은 `docs/gates/f0/share-window-20261105T003119Z-diag-*.json`에 있다. 스크립트·로그·집계·보고서 사본은 지정 scratch `step9/run/continue-*`에만 생성했다. 이전 scratch 결과는 덮어쓰지 않았다.
+- SPEC 체크박스·Plan·운영 설정·기존 gate 증거는 변경하지 않았다. 이번 실측은 정식 F0 게이트 통과나 T 상한 확정을 수행하지 않는다. 사용자 지시 범위의 진단 관측값만 보고한다.
+- bge-m3 재상주 이력: 이번 회차 전 00:00 UTC root가 사용자 승인 하에 keep_alive 24h로 1회 상주시켰다(brief-rerun 기록, HTTP code는 scratch 로그에 없음). 이번 4회차 사이 between 점검(00:32·01:02·01:35·02:06 UTC)은 모두 bge-m3 상주·UNTIL 22~24h였고 warmup 요청은 0회다.
+- SSH 터널: `127.0.0.1:11434` 터널(PID 9928, 00:31:35 UTC 시작)은 Codex 세션이 띄운 것이다. 인계 세션은 터널을 새로 띄우지 않았으므로 지시(본인 터널만 종료)에 따라 종료하지 않고 남겨 두었다.
