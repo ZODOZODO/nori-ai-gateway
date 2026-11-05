@@ -5089,3 +5089,132 @@ BUILD SUCCESSFUL in 7m 46s
 - SPEC 체크박스·Plan·운영 설정·기존 gate 증거는 변경하지 않았다. 이번 실측은 정식 F0 게이트 통과나 T 상한 확정을 수행하지 않는다. 사용자 지시 범위의 진단 관측값만 보고한다.
 - bge-m3 재상주 이력: 이번 회차 전 00:00 UTC root가 사용자 승인 하에 keep_alive 24h로 1회 상주시켰다(brief-rerun 기록, HTTP code는 scratch 로그에 없음). 이번 4회차 사이 between 점검(00:32·01:02·01:35·02:06 UTC)은 모두 bge-m3 상주·UNTIL 22~24h였고 warmup 요청은 0회다.
 - SSH 터널: `127.0.0.1:11434` 터널(PID 9928, 00:31:35 UTC 시작)은 Codex 세션이 띄운 것이다. 인계 세션은 터널을 새로 띄우지 않았으므로 지시(본인 터널만 종료)에 따라 종료하지 않고 남겨 두었다.
+
+
+### 12.37 F0 진단 종료·실모델 정식 측정 F5a 이관 SPEC/Plan 개정 (2026-11-05, Codex, 미커밋)
+
+- 사용자 결정: "이건 ai-gateway 를 다 만들고, 그 이후에 tc backend 에서도 ai-gateway 와 연결하는 부분을 만들고, 모두 연결이 되어서 사용이 가능한 상태에서 테스트를 해야 올바른 테스트가 되겠지. 그때 진행할거야." SPEC §16 F1~F4는 TC 업무 API Mock이고 F5a에서 실제 Backend READ API·위임·프록시·폴링·HTTP 클라이언트를 연결하므로 F5a를 선택했다. F5b는 Front/SSE 단계이므로 API 수준 실모델 품질 시험을 기다릴 이유가 없다.
+- 변경 파일은 SPEC·Plan, `docs/gates/spec-baseline.md`, `docs/gates/spec-approvals/6.md`, 이 Dev report뿐이다. SPEC의 기존 미커밋 변경과 gitignored Plan을 보존한 상태에서 수정했다. P04 구현은 실행하지 않았다.
+- 편집 전 사본: `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/spec-defer/spec-before.md`·`plan-before.md`. SPEC before `bb91146a0f0c84f8ec885355dc840c42de06be346c910cd0f846745469bd0de4`(2612줄) → after `dc5dae6ee5667a5c1209e6399c54bf7d31368f6cfa09d60ce8f6130598ff1b1e`(2613줄). Plan before `69a369cca2444bf9516a55c1981b5a6adcf5993d60c04b118cf25be2c9f8e8e4`(1757줄) → after `334972a33c99af4e507dca99ba5b2a15df0981e8f1123b319e43cacd1e722f93`(1767줄). UTF-8·LF로 기록한다.
+- 핵심 영향: F0 추가 연습·정식 측정을 중단하고 진단 기준선 이력으로 닫는다. F0 PASS·T·정확도·지연 최종 확정은 F1 착수 선행이 아니다. AC-37-CMP·AC-37-OUT-NORMAL/MAX/ESCAPE·AC-38-F0는 ID 유지·F5a TC_LIVE+LLM_LIVE 실제 경로로 이동한다. F2/F4 방어 시험은 유지하고 LLM_STUB가 긴eqp·escape 실모델 시험을 대신하지 않도록 명시한다. A 후보/F4 승격 의존도 F5a 동일3축+실경로p95로 이관한다. 실제 Gateway의 메시지·qRef 조립을 통과하는 증거를 요구하며 하네스 재구현 경로를 수용 근거로 쓰지 않는다.
+- 진단 근거(원문 출력0): `eval/f0/results/20261104T044320Z-diag-*-b/`와 `20261105T003119Z-diag-*/`의 A/B/f0-results.json·boundary/boundary-results.json·preflight/postflight.json, 이 문서 §12.32·§12.34~§12.36, C24/C25 방법(b) 등록과 C26/C27 classify-v4-a 등록을 대조했다. Thinking-2507·192.168.0.160·ctx8192, 224/224 답변 계수·reasoning 분리·content 표지 혼입0, 답변 최대145<192, 대표 A/B p50약17~25s를 확인했다. I t0 B t22/22·args22/22, C t0/t0.6 B t22/22·args21/22다. 최초 I t0.6 args19/22를21~22로 바꾸지 않았다. 새4회차·2프롬프트의 MAX는0/5·ESCAPE는0/2씩이며 EQP0001 후보 JSON을 재구성한 SHA256 접두부be5dc92fe2de/8d8e08e58b88가 저장 해시와 일치했다. classify-v4-a의 경계 사고 소진은8→0·2→0이지만 골든 B t0.6 length1은 남아 있다는 범위를 명시했다.
+- 잠정값: T_cls4928=min(관측 사고 최대5120,8192−3072−192), T_pln4864=min(5120,8192−3072−256), T_cmp5120=같은 모델 관측 최대 차용(직접 Composer 진단0, ctx여유5248 이하). 요청max_tokens5120/5120/5248·ctx assert·실패/1회재시도를 유지한다. 관측5120은 자연 길이 최대가 아니라 상한 도달이다. 정확도 목표t100%(22/22)·args≥21/22(약95.45%)·UNS100%(22/22), 단일 호출p95≤90s(관측 최대85478ms 올림)를 잠정 적용한다. Composer는 대리값임을 명시하고 실제 품질·SLA로 주장하지 않는다. 기존 경로15/30/90s·Job180s는 그대로다. 최종 T/Composer/품질/지연은 F5a 정식 시험 전에 확정한다. 방법(b) LOCAL_TOKENIZER_PIN_V1으로 ⓒ를 닫고 usage 차이는 기록만 하는 기존 진단 정책을 따른다.
+- F0 의존 전수 대조: 헤더/순서/D37·D44·D50, 런타임·캐시 확인, GQ/AC-38 문항, §13.3 기준선 뒤 구현 전 목표 확정, §14.5 T/ⓑ/ⓒ·출력 충분성·재시도·추정, §14.7 슬롯/처리량, §16 선행/F0/F1/F4/F5a, UC-11·O2/O11·원칙23·Envelope/시간 추출·SSH, AC-37/38 부모/leaf·AC-24-PERF·매핑·산출물·완료 상태를 날짜 주석으로 대체했다. F0~F4 백업 범위·WM/HRM 비선행·용량 확장 트리거·이미 존재한 과거 등록/결과/커밋 설명은 유지한다. Plan은 메타/DAG/G-F0-ACCESS·TARGET/G-ARG-LIMITS/G-USAGE/G-INFER-ENV·SHARE/F0 exit/P03/P04/P17/P18/P19/P20/P26·P28/매트릭스/권위producer/handoff/리스크/기존 자체검증 추적을 대조했다. 기존 고정 하네스 catalog의 F0 매핑은 이력이며 F5a 구현 담당자가 실제 producer와 함께 갱신할 인계 항목으로 명시했다(현재 코드 수정0).
+- 고정 행 확인: SPEC1203·1207·1208·1666은 줄 번호와 원문 전체가 편집 전과 같다. 1203의 KQ/LQ/INC/GQ/UNS,1207의 시간35 CODEPOINT·나노초·같은instant·엄격한실제달력,1208의q256·원문코드포인트,1666의Context를 보존했다. ArgLimitsSchemaTest의 간접1203 참조와 F0BoundaryCasesV2Test의 간접1207/1208 참조, v1 q의1666 근거를 확인했다. 새 이력 행은 마지막 고정 행 뒤2287에 추가했다.
+- seq6: approvedAt2026-11-05, approvalRef=`docs/gates/spec-approvals/6.md`(위 사용자 결정 원문 포함), prevSha=bb91146a…d0de4, sha=dc5dae6ee5667a5c1209e6399c54bf7d31368f6cfa09d60ce8f6130598ff1b1e, affectedLeaves=ALL, measurementAffecting=true다. 측정 경로·단계·T·계수/판정 계약이 바뀌므로 seq5와 같은 의미로 true를 사용하며 단순 문구 변경용 false 재판정을 허용하지 않는다. seq1~5 값은 HEAD와 대조해 동일하고 새 항목만 추가했다. changedSections는 실제 변경절 집합과 일치한다.
+- 실제 검증: cwd `C:/workspace_nori/nori-ai-gateway`, `.\gradlew.bat :gateway-eval:test --offline --console=plain`, exit=0, JUnit XML 집계={'tests': 241, 'failures': 0, 'errors': 0, 'skipped': 0}, 실패 테스트=[]. 외부 의존 다운로드를 막는 --offline을 추가했고 테스트의 로컬 HTTP stub만 사용했다. 하네스·테스트 코드는 수정하지 않았다. SPEC·Plan UTF-8/LF·행수·해시·고정행·기준선 사슬·word-diff를 대조했다.
+- 미실행: 모델 실호출·SSH·외부 네트워크·F5a 품질/경계/통합 게이트·서비스/운영 설정 변경·publish·protected 변수 갱신·git add/commit/stash/checkout/reset/push. PREREG·results·evidence·captures·prompts·audits는 변경하지 않았다. 실제 품질 PASS나 eqp 설계 해결을 주장하지 않는다.
+- 열린 항목: 지금 사용자 결정이 필요한 추가 차단 항목은 없다. Gateway eqp 원문 보존 설계와 Composer 직접 분포·잠정 T/목표 최종 확정은 F5a 책임이다. 기존 Composer content 혼입/공유 겹침/readiness errorCode 등 독립 미해결 항목은 종전 책임 시점에 검토한다. 별도 F5a 구현 phase는 기존 Plan에 없어 §13.1 handoff 실행 계약으로 보완했으며 TC 구현 allowed_writes를 임의로 늘리지 않았다.
+- scratch 산출물: spec-before.md·plan-before.md·spec-word-diff.txt·plan-word-diff.txt·before-after-sha256.json·pinned-lines-check.txt·changed-locations.txt·diagnostic-verification.txt·gateway-eval-test-final.log·gateway-eval-test-final.exit·test-tail.txt, 조사/편집/검증 스크립트와 전수검색 inventory는 모두 `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/spec-defer`에 둔다. 전체 파일 경로는 scratch-files.txt에 기록한다.
+
+검증 출력 마지막10줄:
+
+```text
+[Incubating] Problems report is available at: file:///C:/workspace_nori/nori-ai-gateway/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 6m 8s
+6 actionable tasks: 2 executed, 4 up-to-date
+```
+
+#### SPEC 변경 위치(최종 행 번호)
+
+| 절 | 행 | 한 줄 요약 |
+|---|---|---|
+| header | 5, 13, 24, 29 | 최신 F0 종료·F1 비차단·F5a 측정 순서를 명시하고 과거 상태를 이력으로 구분한다. |
+| 0 | 81, 88, 94 | D37/D44/D50의 F0 의존과 A 후보·승격 시점을 F5a로 대체한다. |
+| 4.1 | 306 | 진단 관측과 미확인을 구분하고 추가 런타임 실측을 F5a로 연기한다. |
+| 4.2 | 328 | reasoning 분리 관측을 기록하고 추가 F0 측정 선행을 제거한다. |
+| 5.1 | 368, 373 | 초기값 조정·A 비교/승격 시점을 F5a로 이동한다. |
+| 5.3 | 403, 416 | GQ 품질·AC-38-F0 분류 판정을 F5a로 이관하고 F2/F4 방어 시험을 유지한다. |
+| 5.4 | 421 | 지연 근거를 진단과 F5a 실경로 확인으로 구분한다. |
+| 9.5 | 899 | G-USAGE 일치 관측과 캐시 적중 미확인을 구분한다. |
+| 13.2 | 1099, 1104 | 골든셋 문항을 보존하고 실모델 정식 판정을 F5a로 이관한다. |
+| 13.3 | 1123, 1124 | 목표 최종 확정의 구현 전 차단을 제거하고 잠정값·F5a 사전 확정을 적용한다. |
+| 14.2 | 1136 | F0 상주 관측을 이력으로 두고 F2 설정 게이트를 유지한다. |
+| 14.5 | 1162, 1176, 1178, 1188, 1194, 1195, 1196, 1199, 1200, 1201, 1204, 1211, 1223, 1225 | T·품질·지연 잠정값과 진단 수치·실패 근거를 기록하고 방법(b)/ⓒ 확정·긴eqp 설계 항목·F5a 확인을 명시한다. |
+| 14.7 | 1245, 1249 | 슬롯/처리량의 추가 실측을 F5a로 연기하고 기존 용량 프로필을 유지한다. |
+| 16 | 1349, 1382, 1383, 1386, 1387 | F0를 진단 종료·비게이트로 바꾸고 F1 진입·F4 B 유지·F5a 실모델5 leaf를 명시한다. |
+| 17 | 1431 | AC-38-F0의 실모델 분류·workflow 판정을 F5a로 이관한다. |
+| 19 | 1460, 1469 | 모델 위험·초기값 최종 확인을 F5a로 옮긴다. |
+| 20 | 1515 | F0 선행 실측 순서를 비차단 진단 이력과 F5a 정식 측정으로 대체한다. |
+| 21.3 | 1593 | 계획 Envelope의 F0 후보/F4 승격 의존을 F5a로 옮긴다. |
+| 22.2 | 1674 | 시간 추출 정확도 실모델 판정을 F5a로 이관하고 고정 Context 행을 보존한다. |
+| 26.1 | 1848 | 추가 F0 SSH 실측을 중단하고 F2 보안 게이트를 유지한다. |
+| 27.2 | 1935, 1936, 2020, 2090, 2091, 2092, 2093, 2094, 2126, 2130, 2135, 2142 | AC-37/38·이관5 leaf·F0/F5a 매핑·긴eqp/escape 실모델 필수성을 정합화한다. |
+| 27.4 | 2244, 2249 | F0 진단 산출물과 F5a 실경로 수용 산출물을 구분한다. |
+| 27.5 | 2282, 2284, 2285, 2286, 2287, 2291, 2293 | v1~v4 이력을 보존하고 날짜가 있는 대체 주석·신규 변경 행·현재 검증 상태를 기록한다. |
+
+#### Plan 변경 위치(최종 행 번호)
+
+| 절 | 행 | 한 줄 요약 |
+|---|---|---|
+| 0. 문서 메타 | 9, 11, 14 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 0.1 용어 — 단계와 phase | 19 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 1. 범위 계약 요약 (승인 SPEC 전문 우선) | 32, 41 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 2. 조사한 기존 코드 근거 (정적, 2026-10-27) | 76 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 4.1 명령·OS·cwd | 175, 180 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 5. 게이트 레지스트리 | 250, 251, 252, 253, 274, 275 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 6. DAG·선후관계·단계 exit gate | 292, 298, 305, 310, 312 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P01 레포 부트스트랩·eval 모듈·ac-report (F0) | 354 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P02 F0 하네스 — 골든셋 사전등록·토큰 계수·A/B 러너 (F0) | 361, 366, 372, 374, 384, 385, 392 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P03 F0 진단 기준선 완료·정식 측정 통합 단계로 연기 (이력) | 395, 397, 399, 400, 402, 410, 411, 412, 413, 424, 426, 429 | P03을 진단 기준선 완료·정식 측정 F5a 연기로 닫고⑧~⑩ 및 기존 결과·명령을 이력으로 보존한다. |
+| P04 스택 호환 게이트·모듈 골격·의존 규칙 (F1) | 437 | F0 PASS 선행을 제거하고 자체 기술 게이트를 유지한다. |
+| P17 추론 서버 네트워크 경계·복구 runbook 산출물 (F2 착수 준비, P04~P16 과 병렬) | 778 | F0 PASS 선행을 제거하고 자체 기술 게이트를 유지한다. |
+| P18 토큰 계수·호출 예산 guard·잘림 감지 (F2) | 802, 806 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P19 추론 Client·readiness·503 (F2) | 822, 824 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P20 분류·Composer·재시도·UNSUPPORTED/GQ/리소스 검증 (F2) | 844, 846 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P21 F2 게이트 실행 (F2) | 870 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P26 F4 통합 경로·음성 Fixture·(A) 후보 실행 준비 (F4) | 969 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| P28 성능·부하·장애 주입 (F4) | 1001 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 12. AC·ISO 추적 매트릭스 | 1244 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 12.1 상위 ID(AC-01~AC-46, ISO-01~ISO-15) | 1288, 1289 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 12.2 leaf 216개 | 1456, 1457, 1458, 1459, 1460 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력, leaf·원자 ID 추가·삭제 0) | 1566, 1570, 1571, 1592 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 13. Handoff 계약(P30 산출물 목차)과 후속 NOT_RUN | 1610, 1617 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 13.1 F5a 통합 단계로 이관하는 실모델 품질·경계 시험 (v4.1 대체(2026-11-05)) | 1618, 1619, 1620, 1621, 1622, 1623, 1624, 1625, 1626 | F5a 실제 통합 준비·목표 확정·긴eqp 설계 검토·실모델5 leaf·producer 갱신 책임과 순서를 추가한다. |
+| 14. 미해결 기준 충돌·리스크 (root 검토 필요) | 1637, 1646, 1660 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 15. Author 자체검증 (공식 독립 Review 아님) | 1682, 1684, 1691 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 15.2 root 검토 후 부분 closure (Author 자체검증 — 공식 PASS 아님, 작성 당시 상태 UNREVIEWED/PENDING_REVIEW — 이력, 현재 상태는 §0) | 1730 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+| 15.3 2026-10-29 통합 감사 확정 근본원인 N1~N17 반영 대조 (Author 자체 대조 — 공식 PASS 아님, 작성 당시 상태 UNREVIEWED/PENDING_REVIEW — 이력, 현재 상태는 §0) | 1747 | F0 추가 측정·최종값 선행을 제거하거나 이력으로 대체하고 잠정값·F5a 실행 책임과 정합화한다. |
+
+
+#### 12.37.1 독립 리뷰 5건 보정 (2026-11-05, Codex, 미커밋)
+
+- 범위: 독립 리뷰의 MAJOR 1건·MINOR 4건만 보정했다. 변경 파일은 SPEC·Plan·기존 seq6 기준선/승인 기록·이 append-only 부록이다. 구현·하네스·테스트 코드는 변경하지 않았다.
+- F4 성능 기준: SPEC:1199·Plan P28:1004에 B 경로 15/30/90s를 비교·기록용 잠정 기준으로 명시했다. P28 담당자가 docs/gates/f4/ 기준 JSON을 작성하고 SPEC 소유자가 최신 baselineSeq·SPEC 파일 해시·approved=true·실재 approvalRef로 승인·결속하며 실행 담당자가 AIGW_F4_PERF_CRITERIA를 연결한다. candidateA=false·f0AccuracyQualified=false·경로별 minSamples=20을 명시했다. F5a 최종 모델 목표 승인과 분리하고 기존 PerfReporter 검사를 유지한다.
+- F5b 해석: Plan:1622에서 F5a 배정을 Backend/API 수준 실모델 시험의 해석으로 명시하고 최종 사용자 화면의 사용 가능 상태는 기존 F5b Front/SSE·실제 E2E·운영 수용에서 검증하도록 했다. §12.37 첫 문단의 “F5b는 Front/SSE 단계이므로 API 수준 실모델 품질 시험을 기다릴 이유가 없다”는 설명은 사용자 확정 제외 정책이 아니며 이 부록의 해석으로 대체한다.
+- 공유 겹침: SPEC:1199·1225·Plan:1623을 ⓔ-1 F2/F4 적용 정책(F2 착수 전 SPEC 소유자 확정), ⓔ-2 F5a 실제 측정 창·UTC 로그 수집/해석·겹침 판정(F5a 정식 시험 전 확정)으로 통일했다. 2026-11-04 F0의 겹친 호출만 제외하는 사용자 결정은 이력으로 유지한다.
+- 90s 단위: SPEC:1199·Plan:1623에서 I/C 골든 A/B latencyMs의 문항 회차 지연(최대 1회 재시도 포함, 경계 시험 제외), 최대 관측 p95=85,478ms에서 올린 잠정 목표임을 명시했다. 모든 개별 호출의 관측 상한이 아니다. §12.37의 “단일 호출p95≤90s” 표현은 이 정의로 대체한다. per-callWindow 수치는 이번에 재검증하지 않아 인용하지 않았다.
+- 이력 복원: Plan:310의 “새 환경(v4) 정식 회차만 쓴다”, seq5 affectedLeaves=ALL에 따른 Jetson v1~v3 레코드 부적격·기존 F0 실패 처리 계약을 복원하고 v4.1 대체(2026-11-05)를 붙였다. 원본 대비 전체 diff를 대조해 직접 치환된 SPEC:1194~1196·1382·1935~1936·2130과 Plan:305(DAG)·397·402·429·437·1456~1460·1570~1571의 옛 계약/상태/배정도 이력과 날짜 주석으로 보존했다. §12.37의 모든 과거 문구 보존 보고는 이번 복원까지 반영한 상태로 보완한다.
+- 최종 SHA-256/행수: SPEC `6175e5d1a8221054f8ea72ab73a2aeb79bc278221d73bdbe9dfd13d1c358c2ef` / 2613줄, Plan `f3e6a543bb98c8f4f20032ff215868cc50091e0687cc35398b192ca75535c4ac` / 1767줄. 원본 spec-before.md·plan-before.md는 그대로 보존했다. SPEC 1203·1207·1208·1666행은 원본과 번호·내용 전체가 동일함을 스크립트로 확인했다.
+- seq6: docs/gates/spec-baseline.md:4·docs/gates/spec-approvals/6.md:6의 SPEC 해시를 위 값으로 갱신했다. 이번 수정은 기존 changedSections의 §14.5·§16·§27.2에 포함되므로 23개 목록을 유지했고 전체 diff의 변경 절과 일치함을 확인했다. seq1~5는 HEAD와 동일하며 seq6의 affectedLeaves=ALL·measurementAffecting=true를 유지했다.
+- 실제 검증: 최초 `.\gradlew.bat :gateway-eval:test --offline --console=plain`은 JUnit 241건 모두 통과했으나 후속 testLeafEvidence에서 SPEC_INPUT_MISSING(exit=1)으로 실패했다. 실행 셸에 AIGW_SPEC_FILE이 없어 발생한 실행 설정 오류이며 SpecInputResolver의 파일 입력 요구를 확인했다. `$env:AIGW_SPEC_FILE='C:/workspace_nori/nori-tc-exec/docs/task/ai-rag-gateway-architecture.md'`를 지정하고 같은 명령을 재실행한 최종 결과는 exit=0, JUnit XML 48개·241건, failures/errors/skipped 모두 0이다. 아래는 재실행 출력의 마지막 10줄이다. 모델 호출·SSH·외부 네트워크·실제 F4/F5a 수용 시험은 실행하지 않았다. PREREG·results·evidence는 수정하지 않았고 git commit/add/stash/checkout/reset/push는 실행하지 않았다. F2/F4 겹침 적용 정책과 F5a 최종 목표·실모델 시험은 문서의 후속 확정/검증 책임으로 남는다.
+- 원본 대비 word diff: `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/spec-defer/spec-word-diff-v2.txt`, `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/spec-defer/plan-word-diff-v2.txt`. 검증 기록은 같은 폴더의 review-v2-verification.json·pinned-lines-check-v2.json·test-tail-v2.txt·gateway-eval-test-v2.log(최초 실패)·gateway-eval-test-v2-spec-bound.log(재실행)에 둔다.
+
+```text
+[Incubating] Problems report is available at: file:///C:/workspace_nori/nori-ai-gateway/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 7m 1s
+6 actionable tasks: 2 executed, 4 up-to-date
+```
+
+
+#### 12.37.2 최종 지연 목표 단위 문구 보정 (2026-11-05)
+
+- SPEC §14.5:1223의 잔존 문구만 “잠정 골든 문항 회차 지연 p95≤90s 목표”로 맞췄다. 수치·재시도·경계 정책과 Plan은 변경하지 않았다.
+- 최종 SPEC SHA-256: `136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3`. 기존 미커밋 seq6의 현재 해시만 갱신했고 seq1~5·changedSections·affectedLeaves=ALL·measurementAffecting=true는 보존했다.
+- 현재 scratch의 spec-before.md와 바이트 비교하여 변경은 1223줄 하나뿐이며 총 줄 수·고정 1203/1207/1208/1666줄·UTF-8 LF·Plan 해시 불변을 확인했다. 기존 Dev report 전체 바이트를 보존하고 이 절만 끝에 추가했다.
+- AIGW_SPEC_FILE을 실제 SPEC 절대 경로로 지정하고 `.\gradlew.bat :gateway-eval:test --offline --console=plain`을 이번 보정에서 1회 실행했다: exit=0, JUnit XML 48개, tests=241, failures=0, errors=0, skipped=0. 로그·종료 코드는 현재 scratch의 gateway-eval-final-test.log·gateway-eval-final-test-exit.txt, 검증은 verification.json에 기록한다.
+- §12.37.1의 최초 실패 및 후속 실행 이력은 그대로 보존했다. 실제 통합·모델 시험은 실행하지 않았으며 P04/F1 구현·코드·테스트 변경은 하지 않았다.
