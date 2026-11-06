@@ -28,10 +28,16 @@ class MigrationApplyIT extends PgIntegrationSupport {
             }
             database.migrate(); database.migrate();
             try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
+                try(var columns=statement.executeQuery("SELECT column_name,is_nullable,column_default FROM information_schema.columns WHERE table_schema='gw' AND table_name='job' ORDER BY ordinal_position")){
+                    var names=new java.util.ArrayList<String>();int authority=0;
+                    while(columns.next()){String name=columns.getString(1);names.add(name);if(java.util.Set.of("request_perm","request_pdg").contains(name)){authority++;assertThat(columns.getString(2)).isEqualTo("NO");assertThat(columns.getString(3)).isNull();}}
+                    assertThat(authority).isEqualTo(2);
+                    var backup=new java.util.HashSet<>(java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("aigw.rootDir"),"ops/backup/job-columns-v1.txt")));assertThat(backup).doesNotContain("delegation_id");backup.add("delegation_id");assertThat(names).containsExactlyInAnyOrderElementsOf(backup);
+                }
                 try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
                     var versions = new java.util.ArrayList<String>();
                     while (rows.next()) { String version = rows.getString(1); versions.add(version); if (checksums.containsKey(version)) assertThat(rows.getInt(2)).isEqualTo(checksums.get(version)); }
-                    assertThat(versions).containsExactly("1", "2", "3", "3.1");
+                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4");
                 }
                 try (var rows = statement.executeQuery("SELECT tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
                     int count = 0; while (rows.next()) { count++; assertThat(rows.getString(1)).isEqualTo("aigw_migrator"); } assertThat(count).isEqualTo(16);

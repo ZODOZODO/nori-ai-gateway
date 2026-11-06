@@ -55,13 +55,19 @@ public abstract class StackContextSupport {
     protected void startApplication(Class<?>... additionalSources) {
         prepareSecurityCredentials();
         var properties = new HashMap<String,Object>(securityProperties());
+        properties.putAll(Map.of("ai.gateway.capacity.max-running-jobs",1,"ai.gateway.capacity.generation-concurrency",1,
+            "ai.gateway.capacity.queued-depth",4,"ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s",
+            "ai.gateway.inference.mode","disabled"));
         properties.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app")));
         properties.putAll(extraApplicationProperties());
         if (applicationType() == WebApplicationType.SERVLET) { properties.put("server.address","127.0.0.1"); properties.put("server.port",0); }
-        context = new SpringApplicationBuilder(AiGatewayApplication.class).sources(additionalSources)
+        context = new SpringApplicationBuilder(AiGatewayApplication.class)
+            .sources(com.nori.ai.gateway.app.job.P09TestPorts.class,com.nori.ai.gateway.app.job.P09TestPorts.VerifySeams.class).sources(additionalSources)
             .properties(properties)
             .web(applicationType()).profiles("verify").run(
                 "--spring.flyway.enabled=false",
+                "--ai.gateway.recovery.restore-mode=" + properties.getOrDefault("ai.gateway.recovery.restore-mode",false),
+                "--ai.gateway.recovery.restore-handler.enabled=" + properties.getOrDefault("ai.gateway.recovery.restore-handler.enabled",true),
                 "--spring.kafka.bootstrap-servers=127.0.0.1:1",
                 "--spring.kafka.listener.auto-startup=false",
                 "--nori.storage.s3.enabled=true", "--nori.storage.s3.endpoint=http://127.0.0.1:1",

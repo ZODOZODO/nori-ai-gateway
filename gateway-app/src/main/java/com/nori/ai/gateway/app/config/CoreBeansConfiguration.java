@@ -13,6 +13,9 @@ import java.util.*;
 /** Spring에 의존하지 않는 Core의 빈 등록 책임을 이 설정에 모읍니다. */
 @Configuration(proxyBeanMethods = false)
 public class CoreBeansConfiguration {
+    @Bean com.nori.ai.gateway.core.sanitize.ContentSanitizer contentSanitizer() { return new com.nori.ai.gateway.core.sanitize.ContentSanitizer(); }
+    @Bean com.nori.ai.gateway.core.expiry.ConversationExpiryGuard conversationExpiryGuard() { return new com.nori.ai.gateway.core.expiry.ConversationExpiryGuard(); }
+    @Bean com.nori.ai.gateway.core.job.GenerationSemaphore generationSemaphore(CapacityProfile capacity) { return new com.nori.ai.gateway.core.job.GenerationSemaphore(capacity.generationConcurrency()); }
     @Bean ManifestLoader manifestLoader() { return new ManifestLoader(); }
     @Bean ContractVersionPolicy contractVersionPolicy() { return new ContractVersionPolicy(); }
     @Bean CapabilityRegistry capabilityRegistry(ManifestLoader loader, ContractVersionPolicy versions) {

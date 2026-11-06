@@ -11,6 +11,51 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ArchitectureRulesTest {
+    private static final String PREFIX="com.nori.ai.gateway.";
+    private static Map<String,Set<String>> queueBoundaries(){
+        var rules=new LinkedHashMap<String,Set<String>>();
+        rules.put("queue.AdmissionLookupRepository.find(com.nori.ai.gateway.core.scope.VerifiedSystemScope,java.lang.String)",Set.of("app.job.IdempotentAdmissionLookup"));
+        rules.put("queue.QueueJobRepository.count(java.lang.String)",Set.of("app.job.JobAdmissionService","app.job.JobDispatcher","app.hooks.TestHookController"));
+        rules.put("queue.QueueJobRepository.nonterminal()",Set.of("app.job.JobTimeoutSweeper","app.job.recovery.StartupRecoveryRunner"));
+        rules.put("queue.QueueJobRepository.nextQueued()",Set.of("app.job.JobDispatcher"));
+        rules.put("queue.QueueJobRepository.start(java.lang.String,java.time.Instant)",Set.of("app.job.JobDispatcher"));
+        rules.put("queue.JobDelegationReader.forWorker(java.lang.String)",Set.of("app.job.JobWorker"));
+        rules.put("queue.JobTerminalCommitter.commit(java.lang.String,com.nori.ai.gateway.core.job.TerminalSpec)",Set.of("app.job.JobWorker","app.job.JobTimeoutSweeper","app.job.JobCancellationService","app.job.recovery.StartupRecoveryRunner"));
+        rules.put("queue.JobEventPublisher.publish(long)",Set.of("persistence.queue.JobTerminalCommitter"));
+        rules.put("queue.JobEventPublisher.publishQueued(java.lang.String)",Set.of("app.job.JobDispatcher"));
+        rules.put("queue.JobEventPublisher.terminalCommitted(java.lang.String)",Set.of("persistence.queue.JobTerminalCommitter"));
+        rules.put("queue.JobEventPublisher.republishTerminal()",Set.of("app.job.recovery.StartupRecoveryRunner"));
+        for(String method:List.of("beforeCommit","afterCommit"))rules.put("queue.TerminalCommitObserver."+method+"(java.lang.String)",Set.of("persistence.queue.JobTerminalCommitter"));
+        rules.put("queue.recovery.InstanceEpochRepository.find()",Set.of("app.job.recovery.RecoveryModeRouter"));
+        rules.put("queue.recovery.InstanceEpochRepository.insertIfAbsent(java.lang.String,java.time.Instant)",Set.of("app.job.recovery.RecoveryModeRouter"));
+        rules.put("queue.recovery.InstanceEpochRepository.markRestoreCompleted(java.lang.String,java.time.Instant,java.time.Instant)",Set.of());
+        rules.put("queue.recovery.CacheInvalidationRepository.deleteAllCacheEntries()",Set.of("app.job.recovery.StartupRecoveryRunner"));
+        rules.put("queue.recovery.DbSystemIdentifierReader.read()",Set.of("app.job.recovery.RecoveryModeRouter"));
+        rules.put("queue.recovery.DatabaseEmptinessProbe.isEmpty()",Set.of("app.job.recovery.RecoveryModeRouter"));
+        return rules;
+    }
+    @Test void everyQueueSqlMethodHasClosedSignatureAndActualProductionCaller()throws Exception{
+        var rules=queueBoundaries();var observed=new HashMap<String,Set<String>>();var declared=new HashSet<String>();
+        for(var type:mainClasses()){
+            if(type.getPackageName().startsWith(PREFIX+"persistence.queue")&&!type.reflect().isRecord()&&!type.getName().contains("$")){
+                for(var method:type.getMethods())if(method.getOwner().equals(type)&&method.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))declared.add(method.getFullName().substring((PREFIX+"persistence.").length()).replace(", ",","));
+            }
+            for(var call:type.getMethodCallsFromSelf()){
+                String owner=call.getTargetOwner().getName();if(!owner.startsWith(PREFIX+"persistence.queue.")||owner.equals(type.getName())||call.getTargetOwner().reflect().isRecord())continue;
+                String signature=owner.substring((PREFIX+"persistence.").length())+"."+call.getName()+"("+String.join(",",call.getTarget().getRawParameterTypes().stream().map(c->c.getName()).toList())+")";
+                assertThat(rules).as(signature).containsKey(signature);String caller=type.getName().substring(PREFIX.length());
+                assertThat(rules.get(signature)).as("저장 경계 %s -> %s",caller,signature).contains(caller);observed.computeIfAbsent(signature,k->new HashSet<>()).add(caller);
+            }
+        }
+        assertThat(declared).containsExactlyInAnyOrderElementsOf(rules.keySet());
+        for(var rule:rules.entrySet())assertThat(observed.getOrDefault(rule.getKey(),Set.of())).as(rule.getKey()).containsExactlyInAnyOrderElementsOf(rule.getValue());
+        // 동명 타입·알려지지 않은 메서드·목록 밖 호출자를 허용하는 포괄 예외가 없습니다.
+        assertThat(rules).doesNotContainKey("queue.UnrelatedReader.forWorker(java.lang.String)");
+        assertThat(rules.get("queue.JobDelegationReader.forWorker(java.lang.String)")).doesNotContain("app.job.JobAdmissionService");
+        Path sources=Path.of(System.getProperty("aigw.rootDir"),"gateway-persistence/src/main/java/com/nori/ai/gateway/persistence");
+        var permitted=Set.of("repository/JobRepository.java","queue/JobDelegationReader.java","queue/JobTerminalCommitter.java");
+        try(var paths=Files.walk(sources)){for(var file:paths.filter(p->p.toString().endsWith(".java")).toList())if(Files.readString(file).contains("delegation_id"))assertThat(permitted).contains(sources.relativize(file).toString().replace('\\','/'));}
+    }
     static JavaClasses mainClasses() throws Exception {
         Set<Path> locations = new HashSet<>();
         // 참조된 타입의 자동 해석에 기대지 않고 모든 제품 main 산출물을 직접 수집합니다.

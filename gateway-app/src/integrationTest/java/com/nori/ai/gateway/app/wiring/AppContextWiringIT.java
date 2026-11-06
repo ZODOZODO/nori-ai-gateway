@@ -19,6 +19,16 @@ import static org.assertj.core.api.Assertions.*;
 @org.junit.jupiter.api.Tag("stage-F1")
 @org.junit.jupiter.api.Tag("label-MOCK_API")
 class AppContextWiringIT extends StackContextSupport {
+    @Test void disabledWithoutHooksRejectsAdmissionWithRetryAfterAndKeepsOneClock() {
+        start();
+        assertThat(context.getBeansOfType(java.time.Clock.class)).hasSize(1);
+        assertThat(context.getBean(com.nori.ai.gateway.core.job.InferenceReadiness.class).ready()).isFalse();
+        var now=context.getBean(java.time.Clock.class).instant();
+        var scope=new VerifiedSystemScope(OwnerSystem.TC,"fixture",new ActorRef("actor"),"actor",Set.of(),"a".repeat(64),now,now.plusSeconds(60),"wiring");
+        assertThatThrownBy(()->context.getBean(com.nori.ai.gateway.app.job.JobAdmissionService.class).accept(scope,
+            new com.nori.ai.gateway.app.job.JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of(),"wiring",UUID.randomUUID().toString().replace("-",""))))
+            .isInstanceOfSatisfying(com.nori.ai.gateway.app.job.JobAdmissionService.Rejected.class,e->{assertThat(e.status()).isEqualTo(503);assertThat(e.error()).isEqualTo("INFERENCE_UNAVAILABLE");assertThat(e.retryAfter()).isEqualTo(60);});
+    }
     private String credentialFailure;
     private final String credentialSentinel = "credential-sentinel-" + UUID.randomUUID();
     @Override protected void prepareSecurityCredentials() {
@@ -56,7 +66,7 @@ class AppContextWiringIT extends StackContextSupport {
                 CapabilityRegistry.class, ContractVersionPolicy.class, PlanValidator.class, ToolDispatcher.class,
                 ToolResultContractValidator.class, PlanInjectionSeam.class, DispatchInjectionSeam.class})
             assertThat(context.getBeansOfType(type)).hasSize(1);
-        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(8);
+        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(11);
         assertThat(context.getBean(PlanInjectionSeam.class)).isExactlyInstanceOf(PlanInjectionSeam.NoOp.class);
         assertThat(context.getBean(DispatchInjectionSeam.class)).isExactlyInstanceOf(DispatchInjectionSeam.NoOp.class);
         assertThat(context.getBeansOfType(ToolExecutor.class)).isEmpty();
@@ -120,7 +130,7 @@ class AppContextWiringIT extends StackContextSupport {
         try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
             String latest;
             try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")) {
-                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("3.1");
+                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("4");
             }
             try (var update = connection.prepareStatement("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = ?")) { update.setString(1,latest); assertThat(update.executeUpdate()).isEqualTo(1); }
         }
@@ -169,9 +179,9 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(context.getBeansOfType(com.nori.ai.gateway.app.config.MigrateCommand.class)).isEmpty();
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class)
             .sql("SELECT count(*) FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
-            .query(Integer.class).single()).isEqualTo(4);
+            .query(Integer.class).single()).isEqualTo(5);
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")
-            .query(String.class).list()).containsExactly("1","2","3","3.1");
+            .query(String.class).list()).containsExactly("1","2","3","3.1","4");
     }
 
     private void withMigrationProperties(String role, Runnable action) {

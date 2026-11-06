@@ -21,11 +21,12 @@ public final class JobRepository extends ScopedJdbc {
     public boolean insert(VerifiedSystemScope scope, NewJob job, String delegationId) {
         return transaction(() -> scoped(scope, """
             INSERT INTO gw.job(id, conversation_id, owner_system, actor_ref, status, created_at, idempotency_key,
-                request_digest, expected_path, delegation_id)
-            SELECT :id, :conversation, :bound, :actor, 'QUEUED', :now, :key, :digest, :path, :delegation WHERE EXISTS (
+                request_digest, expected_path, delegation_id, request_perm, request_pdg)
+            SELECT :id, :conversation, :bound, :actor, 'QUEUED', :now, :key, :digest, :path, :delegation, :permissions, :pdg WHERE EXISTS (
             """ + CONVERSATION + ")").param("id", job.id()).param("conversation", job.conversationId())
             .param("key", job.idempotencyKey()).param("digest", job.requestDigest()).param("path", job.expectedPath())
-            .param("delegation", delegationId).update() == 1);
+            .param("delegation", delegationId).param("permissions", new org.springframework.jdbc.support.SqlArrayValue("text", scope.perm().stream().sorted().toArray()))
+            .param("pdg", scope.pdg()).update() == 1);
     }
     public Optional<Job> find(VerifiedSystemScope scope, String jobId) {
         return findMatching(scope, "j.id = :value", jobId);

@@ -1,3 +1,3 @@
 package com.nori.ai.gateway.core.audit;
 
-public enum AuditEventType { AUTH_REJECTED }
+public enum AuditEventType { AUTH_REJECTED, JOB_TERMINAL }

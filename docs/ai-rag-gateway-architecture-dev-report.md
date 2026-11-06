@@ -6205,3 +6205,299 @@ Python 실체는 C:/workspace_nori/.venvs/aigw-eval/Scripts/python.exe, Python 3
 P08 terminal controller와 Source/cache 카운터는 integrationTest 전용 실제 저장 자극입니다. production JobAdmission/queue/worker는 P09, 공식 API는 P10, 일반 AuditWriter/일일 purge scheduler는 P14, 배포 수용은 P16/P29 책임입니다. P09는 부모가 별도 독립 세션으로 시작합니다. V3.1 적용 후 같은 최신 schema의 guard·자격·감사 실패 응답을 확인하기 전 인입을 활성화하지 않습니다. rollback도 승인 A와 동일 schema에 호환되는 앱만 사용하며, 없으면 인입 중단 후 forward-only 보정합니다.
 
 정확 후보/SHA·보호/prefix/HEAD·명령/검증/실패/미실행 원시는 `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p08-implementation/result.json`, `final.md`, 각 `*-proof.json`·`*-xml/`·`*-otr/`에 있습니다. 상태는 NEEDS_PARENT_REVIEW입니다.
+
+
+### P09 요청 큐·실행·취소·재기동 및 부모 검토 보완 — 2026-11-06
+상태는 **CODE/LOCAL_TEST 후보·ROOT_REVIEW_PENDING**입니다. 원 P09 CLI는 부모가 실제 late-cancel RED 종료 뒤 통제 종료했으며 최종 result/report를 작성하지 않았습니다. 아래는 기존 P09 구현과 이번 별도 보완 회차를 함께 보고하며, 원 실행 결과를 성공으로 덮어쓰지 않습니다. Spec/Plan 체크박스·phase COMPLETE·F1/P16/F2 활성화는 변경하지 않았습니다.
+직전 P08 절의 부모 PENDING 표기는 당시 이력입니다. 실제 부모 root-validation-approval.json의 P08 CODE/LOCAL_TEST PASS와 root-commit-verification.json의 PASS·커밋 `8e4e2e7d51f22b5de1b02da75b675ca873715ba3`를 확인했습니다. 기존 Dev report **895382바이트**, SHA256 `00584f8663f40bf95d766e9dbe32509ce53d45d3aa9ff45e31f2b60dede52c71`를 전부 prefix로 보존했습니다.
+착수 정본은 Spec SHA256 `c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`, 기술 보정 승인 Plan SHA256 `7c42f1433fd5df530221f632c7fb212dca92407027c4f5899764cce4a6005045`, baseline seq7 SHA256 `b1040ce78cde516641cdc90da644b03e5d459ddc33668243a935ac4e3d348264`입니다. AI HEAD `8e4e2e7d51f22b5de1b02da75b675ca873715ba3`·exec HEAD `6d744aa57fd4d2970f9fca8c941b43b8a2e18670`·빈 staging·보호 483개와 현재 85개 P09 후보를 snapshot한 뒤 첫 실제 SpecGuard exit0을 확인하고 수정했습니다. Spec/Plan/R6/기준선/SQL/HBA/기존 V는 변경하지 않았습니다.
+#### P09 전체 구현과 영향 범위
+- 필수 CapacityProfile·닫힌 InferenceMode, verify 전용 disabled readiness, mask-v1 ContentSanitizer를 실제 접수 경로에 연결했습니다. 기존 일반 scoped 저장소와 queue_control 잠금을 재사용해 READ_COMMITTED 선조회·잠금 직후 재조회·용량/대화 검사·masked Message·QUEUED Job·event·hook 예약을 한 tx로 저장합니다. 중복은 동일 Job, 충돌은 409, 만료는 404이며 새 위임·행·TTL 연장은 없습니다. V4의 요청 perm/pdg와 백업 열 목록을 연결했습니다.
+- 단일 dispatcher가 FIFO·RUNNING 1 제한을 검사하고 commit 뒤 가상 worker를 시작합니다. worker의 영속 권한 scope와 전용 위임 reader, 대화 만료 우선 검사, 빈 권한 집합의 실행 개시 TC 위임·세션 인가 게이트를 연결했습니다. start gate 실패는 Source 허가로 해석하지 않고 정본 DENIED/SOURCE_UNAVAILABLE 결과로 종결합니다.
+- TerminalSpec의 닫힌 상태 조합과 JobTerminalCommitter의 자기 tx·조건부 terminal 전이·delegation NULL·Result/event/JOB_TERMINAL 감사·commit 뒤 발행을 연결했습니다. QUEUED 취소와 RUNNING 경쟁에서 실제 호출 종료를 확인한 뒤 terminal/슬롯 반납을 한 번만 수행합니다. 큐 >60초와 RUNNING >180초, 만료 우선 정책을 유지합니다.
+- Schema guard 다음 Router/ReadinessPrecondition이 실제 DB identifier·epoch·gw/kn 빈 DB를 판정합니다. 정상 재기동의 interrupted 결과·만료 취소·QUEUED 처리·미발행 terminal 재발행·Ready 전 캐시 무효화를 연결했습니다. restore handler 운영 구현은 P27에 남겼습니다. INITIALIZE_NEW의 캐시는 0→0이므로 부모 신규 standalone probe의 실제 clear1/Ready 전0 독립 검증은 이 보고서에서 대신 주장하지 않습니다. 정상 재기동 2→0 기존 IT와 원 코드 흐름은 최종 회귀에 포함됐습니다.
+- verify hook 인증/arm 예약·rollback·소비·reset·단일 Clock·URL별 filter 경계를 구현하고, 현재 integrationTest classpath/JDK를 쓰는 자식 JVM 재기동 하네스를 연결했습니다. 인가/workflow 미구현 포트는 src/integrationTest 설정만 채우며 운영 성공 기본 빈을 만들지 않았습니다.
+#### 이번 보완의 원인·최소 변경·검증 범위
+1. Spec15.2의 timeWindow:null이 AdmissionRequest Map.copyOf에서 NPE였습니다. LinkedHashMap 얕은 defensive copy·non-null map/key 검사·unmodifiableMap으로 명시 null을 보존했습니다. 기존 IdempotentAdmissionIT에 실제 PG 접수, caller Map 변경 격리, 접근자 불변성, 반대 키 순서 재전송의 같은 Job/행 불변 사례를 추가했습니다. null과 부재의 새로운 동등성/409 정책은 추가하지 않았습니다. nested deep copy·요청 입력 영속화는 이번 범위에 넣지 않았습니다.
+2. worker scope의 배타적 만료 상한이 created+180초여서 실제 PlanValidator가 정확한 180초에 SYSTEM_SCOPE_MISMATCH를 반환했습니다. 승인 Plan N12대로 forWorker만 +180초+1ns로 표현했습니다. 신규 app ScopeAssemblerTest가 실제 ScopeAssembler+GQ PlanValidator의 -1ns/정각/+1ns를 허용/허용/거부로 확인하며 WorkerRestartProcessIT의 동일 영속 scope 기대값을 갱신했습니다. forRequest·JWS60초·일반 validAt·위임 TTL·timeout 수치는 유지했습니다.
+3. 부모 actual PG late-cancel RED는 DB cancel_requested 커밋 뒤 신호를 지연해 실제 IO 종료·markTerminated·TERMINAL_PRECOMMIT 뒤 interrupt가 terminal tx를 중단하는 경우였습니다. SlotLedger.signalIfActive를 markTerminated와 같은 원장 monitor 아래 실행하고 CancellationService/Sweeper 두 외부 신호 호출자를 연결했습니다. 표시 뒤 신호는 생략하지만 Committer의 DB 취소 flag·clock·expiry 최종 판정은 유지합니다. Worker에서는 표시 직전 마지막 interrupt를 표시 직후 소비하고 종료시 복원하도록 보완했습니다. 기존 RED assertion은 약화하거나 제거하지 않았습니다. 표시 전 마지막 신호에 관한 1줄은 호출 흐름과 잠금 순서 근거의 보완이며 그 좁은 interleaving만을 강제한 별도 시험까지 실행했다고 주장하지 않습니다.
+4. 추가 raw Clock 실제 PG RED에서 created+180초+1ns NORMAL commit이 저장용 micro 내림 때문에 SUCCEEDED가 되는 것을 재현했습니다. Committer가 clock을 한 번 읽고 raw policyNow로 timeout/expiry를 판정하며 저장 Timestamp만 micro 정밀도로 내리도록 분리했습니다. 새 JobTerminalDeadlineIT는 실제 Repo INSERT/RUNNING 전이/Committer/DB를 통해 180초 SUCCEEDED·+1ns TIMED_OUT, 결과·감사·event 및 저장 정밀도 보존을 검사합니다. core·기본/제어 Clock·DB schema는 바꾸지 않았습니다. persistence main CP 변경으로 schema/repositoryArch/scope 회귀를 모두 재실행했습니다.
+#### 실패와 선행 GREEN 이력 보존
+원 P09의 compile/r1~r5/설정·Docker·classpath 수집 실패 및 원 late-cancel RED 증거는 p09-implementation에 그대로 남겼습니다. 원 CLI의 완료되지 않은 최종화 스크립트에 적힌 예상 결과를 실제 완료 결과로 사용하지 않았습니다.
+- 부모 p09-late-cancel-red-r1은 test1 FAIL/0error/skip·verifier0이며 runId6848aee3-50ab-466a-b02b-326e1701b5e0입니다. 이번 late-cancel-green-r1은 기존 같은 메서드 1 PASS와 paired verifier0을 확인한 선행 회차입니다. 이후 최종 P09 app IT에서 동결된 모든 보완으로 다시 실행했습니다.
+- terminal-deadline-red-r1은 새 시험의 TransactionTemplate.execute 결과에 대한 AssertJ generic 오버로드 모호성으로 compile 실패했습니다. Test NOT_REPORTED/잔류64 XML을 PASS나 RED로 세지 않았고 paired verifier도 실패했습니다. Boolean 지역변수로 시험 타입만 명확히 한 뒤 새 회차를 사용했습니다.
+- terminal-deadline-red-r2는 실제 test1 FAIL/0error/skip/abort·sourceStable, runId9dba75d7-88be-48e8-b927-57cd31645e7a입니다. 180초 정상 assertion 뒤 +1ns expected TIMED_OUT/actual SUCCEEDED로 실패했으며 paired verifier0은 실행 증거의 유효성일 뿐 PASS가 아닙니다. 최소 수정 후 terminal-deadline-green-r1 1 PASS·paired0과 최종 schema 4필터 회귀를 확인했습니다.
+#### 최종 실제 검증
+각 새 Test 명령 직후 같은 필터/init·requireDocker·PG image/SQL/HBA 입력의 공식 test-evidence verifier를 별도로 실행했습니다. XML testcase·OTR unique JUnit ID·summary passed/executed가 일치하며 failure/error/skip/abort는 0입니다. 마지막 fresh classpath capture로 현재 compiled CP와 원시 binding의 component/fingerprint를 다시 계산했습니다.
+| Plan/회귀 | 회차 | JUnit | runId |
+|---|---|---:|---|
+| 1 | `final-app-it-r1` | 32 | `a34b3b5d-f2cf-4a10-80ee-2a3fd0c8d3fb` |
+| 2 | `p09-02-core-test-r1` | 39 | `cf00f039-2ee5-4f0a-b5a8-a8a28839926f` |
+| 3 | `final-schema-it-r1` | 5 | `e7479c7e-b649-4075-9830-66235ef2fe45` |
+| 4 | `final-persistence-test-r1` | 3 | `6ea0eeb6-f3e8-4f33-a450-0bb561c71db7` |
+| 5 | `final-app-test-r1` | 8 | `debf66a5-72d5-413a-a8d8-6ac9651e80ee` |
+| 6 | `final-scope-it-r1` | 64 | `c81e67db-9fc2-409d-a6d6-35a189010cf1` |
+| 7 | `final-ingress-it-r1` | 30 | `797df662-5bd1-4f63-ae34-6a65bbdc8029` |
+| 8 | `final-auth-audit-it-r1` | 3 | `eab9d1f1-2717-40c5-b03c-602d5a58821c` |
+
+최종 고유 JUnit 184건입니다. 원 Plan7명령 중 core39는 실제 core Test CP/소스·정본 입력이 그대로여서 원 p09-02-core-test-r1 증거/runId를 보존해 재사용했습니다. 과거 global app runtime manifest를 새 값으로 다시 결속하지 않았습니다. schema는 부모 승인대로 기존3필터+JobTerminalDeadlineIT, app unit은 기존4+ScopeAssemblerTest로 확장했습니다. AuthRejectionAuditIT는 V3.1→V4 fixture 영향의 추가 회귀입니다. Worker5 leaf는 JUNIT_OTR/IT/F4 권위로, queue9 tag는 P09 로컬 계약으로 확인했으며 실제 Source/운영 acceptance PASS로 승격하지 않았습니다.
+
+정확 실행 명령과 직후 공식 verifier(실제 credential 값은 자식 env에만 전달):
+
+`final-app-it-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-01.gradle :gateway-app:integrationTest -Paigw.requireDocker=true --tests *JobQueue*IT --tests *WorkerRestart*IT --tests *IdempotentAdmissionIT --tests *AdmissionMaskingIT --tests *HookAndProbeFilterScopeIT --tests *HookArmingIT --tests *AppContextWiringIT --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-01.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain
+```
+
+`p09-02-core-test-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-core:test --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --no-daemon --console=plain
+```
+
+`final-schema-it-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-03.gradle :gateway-persistence:integrationTest -Paigw.requireDocker=true --tests *MigrationApplyIT --tests *DbBootstrapOrderIT --tests *SchemaVersionGuardIT --tests *JobTerminalDeadlineIT --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-03.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:integrationTest --require-docker" --no-daemon --console=plain
+```
+
+`final-persistence-test-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-04.gradle :gateway-persistence:test --tests *RepositorySignatureArchTest --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-04.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:test" --no-daemon --console=plain
+```
+
+`final-app-test-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-05.gradle :gateway-app:test --tests *ArchitectureRulesTest --tests *ModuleConfigurationCompletenessTest --tests *CapacityProfileValidationTest --tests *ReadinessPreconditionTest --tests *ScopeAssemblerTest --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-05.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain
+```
+
+`final-scope-it-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-06.gradle :gateway-persistence:integrationTest -Paigw.requireDocker=true --tests *ScopedRepositoryIT --tests *RetentionBoundaryIT --tests *JobDelegationColumnIT --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-06.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:integrationTest --require-docker" --no-daemon --console=plain
+```
+
+`final-ingress-it-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-07.gradle :gateway-app:integrationTest -Paigw.requireDocker=true --tests *IngressAuthIT --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-07.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain
+```
+
+`final-auth-audit-it-r1`
+
+```text
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-auth-audit.gradle :gateway-persistence:integrationTest -Paigw.requireDocker=true --tests *AuthRejectionAuditIT --no-daemon --console=plain
+C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\filters-auth-audit.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:integrationTest --require-docker" -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\capture-classpaths.gradle -Dp09.classpathOutput=C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix\final-current-test-classpaths.json --no-daemon --console=plain
+```
+
+#### 실제 변경 파일
+
+원 P09 85개 후보를 유지하고 이번 새 시험 2개를 추가했습니다. 아래는 원 P09 시작 snapshot 대비 전체 후보와 최종 SHA입니다. 보고서 자체의 최종 SHA는 result.json에 기록합니다.
+
+- `docs/contracts/test-hooks-v1.md` — `bf2f6723dac03e658ff5831ecc31eaadc8f1ea3f0548875d161f47a0e0a61852`
+
+- `gateway-app/build.gradle.kts` — `ca6392918dc2baae1c6611c1e37544d4ea05eeaa8f1cedaacdc2c825903fd202`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackContextSupport.java` — `df797d24769fb5b8c09288da8cee0b80768c6a41da4bbc2f7147ac407bb0f234`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/harness/AppProcessHarness.java` — `1da4486311c1e644203576cbfd60422a8c0d072d55a25d9774e5791f49e94ca7`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/harness/HarnessFingerprint.java` — `0dabcee40c660010ff719cc043e654b458db85710f7799f8ddd06020d362585d`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/harness/HarnessMain.java` — `3802188a154d195ca48863fef4347c185106f20413d8c2997f97f787a67b2592`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/harness/HarnessP09TestPorts.java` — `0d05aa02a739bc6a055a4fe096b0a840133b82127549e7ccc416e31d5c78d5b6`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/AdmissionMaskingIT.java` — `764dd9975f8cd43b0a7db6b8ebe92d6e4b201c08b3f3a5caa9d44846d236a2ab`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/HookAndProbeFilterScopeIT.java` — `dc775b7bd72768a30e0131850c9408c1409932d4f543e2a08cee0602a6a53b85`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/HookArmingIT.java` — `0b3c583efb21ca0c713b07341040bf64239628ec2413c2a113a87d81ea6652ef`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/IdempotentAdmissionIT.java` — `fd00a24908d67940a3bbaf91c72da0769363bc28dae5c7b02d0477bdff80d573`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/JobQueueIT.java` — `c16ddce2858e07257ea6342e2ea05576e2da89650fafa72b1ca1f3a7530edc30`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09AdmissionEndpoint.java` — `1eb49bb436cfc33dff37714b8bb91e5aa4f359303739d2df9c7bb6ee5f528098`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09AppContextWiringIT.java` — `07fa914cc3d9212b50aad4efd247f9a3c129aceaf99baeb596fcf88685715307`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09QueueSupport.java` — `c9619b63df924f1bdc50f2ebfc35bcfc508872a8ebeac520e0c316aec74894cc`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09TestPorts.java` — `d7b13b6d81e1c045196e5a9c2ccbc48794cf0a20776658772634256211e69a0d`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerRestartEpochIT.java` — `a3a0b24145cf46932f5907bd40de6cd29365f3a9759ddbe18cbd2145728f1792`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerRestartExpiryIT.java` — `67df8c69a12d299c459043584e88dbc8d4b0dedb149d3b30bc2343a0b5649b6d`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerRestartProcessIT.java` — `2067baa2dcb88d3bf1ad82013a38d4de66ecca149db99ba977485b334fe237fc`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerRestartProcessSupport.java` — `4f92bc875a7591f233a0925fb8fe5bbefe42b4bf2f7747d0e4c4d23a88946bfe`
+
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java` — `2a784c52b1069f2583e5f58b356bec0bf92b0dd8e8c63d1ea666eced4d2a5104`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/CapacityProfile.java` — `7c1847a4a08048c9efb6ab3921a69f6b290f3b6cab041424bcbac69aaca0c9e8`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/CoreBeansConfiguration.java` — `eea828f687221e83f47ce07ef0ca836178e257c9f045f453326e715c3a77f873`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/GatewayAppModuleConfiguration.java` — `ebecd55f96a3c0c606ae4cf3fa67988b9362818a0a9ed101f81e59da636a2443`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/InferenceModeProperties.java` — `684ed0fa6422b0ca470a586ef21f8f0d86464903d9342f81c611c16b61a4872c`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/JobConfiguration.java` — `5f63a3ccfe110528aef29c0313683e00c05e9c52bcbee9f2044d947515046c48`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/RecoveryProperties.java` — `1e9ab619be84aa866da433917035b83ded3d7b26708bfd459f16591b0c56fd6e`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/TestHooksConfiguration.java` — `3f5850eee98a5a4c48232f0b7625fb3404b589080a459be7cf17569f9f9091b1`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/ControllableClock.java` — `5c2a14d776e1ca8cb8893101dea03e63b50037956a63948ea3c348a5ac9d4b04`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/FaultInjector.java` — `b3349daa269f81393f627d978c3bb2c215bb23a9fc6cbdb32025fb3afd7cec3c`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/PausePointRegistry.java` — `1f3c74acdb3b7c64ec99f9ff888f344e1fe0917b1d8c7a4eda86bee397f4cd47`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/StructuredClassificationHook.java` — `7d3ed7a944798543317803ed36acd654063df4f9c6ece615a846239dff5e1c25`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookAuthFilter.java` — `e30962c2a27970810bdf6ea9fa08c58d483ec3d59484b34ebb651fa259fb5d3a`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookController.java` — `2d985f59d2df185a0daee2b581d68fefce54655467ea9e204828632b0b3696ca`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookRegistry.java` — `03eab760594170ab5e8121c4256b81b95302f1d6f583a498213d7367983f347e`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/DisabledInferenceReadiness.java` — `edda23ecc5564f09bf41a41dfcacc787f99b7aff669c6614a04af5b267c19fc3`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/IdempotentAdmissionLookup.java` — `2dcce826ead492c48f243c30680c3c6751b522f239041bb1d09beb5e8720212e`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/JobAdmissionService.java` — `39bc9869f91464d628e94bb0ee96beadef970ad01fd560394861bf7a1ad0f958`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/JobCancellationService.java` — `13f5aa112dea72445cbd162687ceeeb682a313c8992fbdb6825d02862019d380`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/JobDispatcher.java` — `1cdff2ffa3dc7c5319a233e3e61015efc1d251ea6f8ede38b2e4ff7ae92a105f`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/JobTimeoutSweeper.java` — `899cf29263b9db22f04f67b3cd4bc101d89707170a1322c5aaabed45cb52d6dd`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/JobWorker.java` — `c0f5baacdc53f63cbb36f3b06df5f8dd1fd65218cf22348d5f5d6a0d61d02d94`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/SlotLedger.java` — `e1021a1d23e0263d7b4e8d449b672f0fd694926f602e53e9a02c44c208536f0f`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/recovery/ReadinessGate.java` — `33d3126280950b020d91fe562078c75b1260af012ba693bf03d9e2ac7d6ca266`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/recovery/ReadinessPrecondition.java` — `b8e77979303ded2dc1862f1ee4c1854900fb36eff5ecb0b633da559a44f7cb8b`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/recovery/RecoveryModeRouter.java` — `6291448aec7cbea847a4345931294acba9fbc63694d45b48b8a685da03e655d6`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/recovery/RestoreRecoveryHandler.java` — `2a5af938e0dd5deee1c4a27dd2e3770cea435828f88a6270b0cef3130bf06876`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/recovery/StartupRecoveryRunner.java` — `85b76123835633d4dc6057571e132f34ab27a63aec1a7bb1708a1534e7cc51fa`
+
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/ScopeAssembler.java` — `71df9e53f3b97c606bd3526058c51f5c323be5965a75456b986e6b376399b42a`
+
+- `gateway-app/src/main/resources/application.yaml` — `a8f4ff7a0ed9063bad26216260263205758b6f9b72e3a4c3dea536d0f49418d4`
+
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/ArchitectureRulesTest.java` — `0b9f7a61418183e5e17e99c3d4a5f77a62bf51860beb67e548b51ea51b26c412`
+
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/CapacityProfileValidationTest.java` — `3daaef025851e042d982f3c758ed578f0fd371abc4cf5d084e4ffbf8cfdf2b65`
+
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/ReadinessPreconditionTest.java` — `8675539cf67852faae67a7b06216015c66a59db75bb61afd597d41920ca33d55`
+
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/security/ScopeAssemblerTest.java` — `71e611085ab47c4f80f87050eb86f9ab2232f4a3f0f8151024e23767a41b8ad0`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/audit/AuditEventType.java` — `78b93659e21edcab9b28bd540085732f57e0171b3ed5278452bceb3d878bf86a`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/expiry/ConversationExpiryGuard.java` — `3e4459c07de683ca68a2315f889421bcbca9964566b3c9a3759ab595b7026dc1`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/CancellationToken.java` — `03079ecc2082de56c45ed2e46ce4ef9e1773c9c5a23151b12f4194867789356d`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/GenerationSemaphore.java` — `43f35da6f421aab19da26d99aefa41bdcad567d2382df92b51db2c28c93a4b4b`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/InferenceMode.java` — `d399d85a236cd2b1c75aff99dc081fc1ae4d98c3177a082dbb1eff6f9cd89856`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/InferenceReadiness.java` — `f3d7ed80a50b543710e77c7a1ae19dbf784ae8e240649339035cc64cc2b6cdaf`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/JobContext.java` — `1a47cc6cee465bff27eaadd1011086a29edf8fd40b12e3b9d6125ac58226adb5`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/TerminalSpec.java` — `e37d7bf8aa29f42b418e3aad14a406987d0e3be2f437c273895ceaa839a56f76`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/job/WorkflowExecutor.java` — `20aea107088aef44c3f87032df11f5a03e743e98e46bbbe1fad31ea23f6c3dc4`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/port/TcSourceAuthorizationPort.java` — `ef52cc195f37a68c51724bd276c438bab21cc91fd8455cedba0218939ef0ddd2`
+
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/sanitize/ContentSanitizer.java` — `30533ef0609f807c4dc0c9c4939fd040704151d8623f39b5925f89ccd3ba4923`
+
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/job/TerminalSpecContractTest.java` — `15b5f1672f8add0e7bf49fcf3a4753ff6e7b7b947b602eb49ce1ff25eecead0a`
+
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/sanitize/ContentSanitizerTest.java` — `02cd1fe9f998ee0e89a34b030f731a7e445797fe18be8cca6d333f89b9760bbc`
+
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/AuthRejectionAuditIT.java` — `43056b744365a6973c4602f95436fc0e815cada7c914c716625c84207ab2a798`
+
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/JobDelegationColumnIT.java` — `ce23387210aded3e1d7b494f000d2761a5065dbbb0d14feb32fe5f527bd8cae6`
+
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/JobTerminalDeadlineIT.java` — `902252ae7c63e0310c59118b8f02c206015b87475aa12bf2ecd5b0fa3648c4c7`
+
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/MigrationApplyIT.java` — `b77b1eee8b18821780b9402744b2e5f0388c0f8a801628a69441e2d6b1c0b929`
+
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/SchemaVersionGuardIT.java` — `0ddabee78e478f1c63450b444cd26b2edb6dc96b3b20fc9aa54efef09b875495`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/AdmissionLookupRepository.java` — `6c614f6663b79a40b5d365d7f4133469c29a95ab7940e037174ef3ea29813956`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/JobDelegationReader.java` — `c52f8a49398a794767079d7ac1490099c469ac1555c027fc16fe7d969f21c22b`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/JobEventPublisher.java` — `c8b278d8faba4d8cd7507a614f089aee302a1e674e9349ae4187c8abc3fccb7d`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/JobScopeRecord.java` — `422ab022f4a3638fcd1e20f17257075554911e99a45300d49dfbef505500626e`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/JobTerminalCommitter.java` — `ae9b2f8a7a47530717cda38536441ca76e9089f4c90903a65df71807347037f3`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/QueueJobRepository.java` — `ecdadd50a83f12ebfbafb6e2105b1c513b470d941dcb8a73764dff5d463656f8`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/TerminalCommitObserver.java` — `8daf30fd2493de564276ff9d7a3e91ec0f3db2fed67178084fdbb9087022e7b2`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/recovery/CacheInvalidationRepository.java` — `c55a898132d8ab84c873aa5cf6fd74ff649585da9aabe60e3acc8e6d9c726b92`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/recovery/DatabaseEmptinessProbe.java` — `34eff00606ef253f7d457b5c9ee6bf6f0a08c0cbecf9979f323598e4c9aa4ee3`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/recovery/DbSystemIdentifierReader.java` — `076d6594d359edf35c912e6eacbf6c6f1da1a0b9e380390f3f9ba002cbd0d851`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/queue/recovery/InstanceEpochRepository.java` — `e035b784cbea25d974545f6bdebff28a03db8406ac93efb606a019962d717c50`
+
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/JobRepository.java` — `3a39e71588f402a8157a9053385efa256a3357699647648c3d22e8e40fc59eee`
+
+- `gateway-persistence/src/main/resources/db/migration/gateway/V4__job_request_authority.sql` — `58479a14c3cc45cff965b96a12a6669def93714d0c8f6ceafa0265017742c5ac`
+
+- `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/RepositorySignatureArchTest.java` — `eabb8e6168cd83b2081820f18565d2b8762b40c8e3619bad8f80ef0081f01808`
+
+- `ops/backup/job-columns-v1.txt` — `5af14bb65c30801087924882e6d888ac1b772792d1629aa8615bafe3203dd227`
+
+- `docs/ai-rag-gateway-architecture-dev-report.md` — 기존895382바이트 전체를 보존한 이번 끝 append입니다.
+
+#### 보존·미실행·남은 검토
+
+Spec/Plan/R6/baseline/두 HEAD/빈 staging/보호483/원 P09 85후보/oldV/bootstrap/HBA/원 probe·patch·실행 결과를 보존했습니다. 제품·시험은 source-freeze 이후 변경하지 않았습니다. Ingress paired verifier 뒤 root 요청 boundary에서 대기했고 root가 Test 실행 없이 현재 CP를 export한 뒤 RESUME했습니다. root 소유 review-inputs.init.gradle의 export 제어 변경 한 개는 별도 before/after SHA로 기록했습니다. 원 probe Java·patch·실행 결과 변경이 아닙니다. 이후 root 자체 PG 1개와 회귀 PG 1개는 각 소유 label/finally로 분리하여 사용하며 다른 fixture를 정리하지 않았고, RootDONE 이후 공유 label 잔류0을 확인했습니다. 커밋/push/MR/SSH/K8s/운영DB/Secrets/Harbor/실제 Source·모델/배포·수용은 실행하지 않았습니다. 제품 fake/no-op로 미래 포트를 채우지 않아 P11/P13/P19 등 후속 빈 책임과 운영 게이트는 그대로 미완료입니다.
+
+부모의 독립 소스·wiring·실패/경쟁·standalone compiled/PG probe·원시 증거 검토와 commit이 남아 있습니다. 이 보고서는 부모 검토를 대체하지 않습니다. 입력 Message/Context의 요청별 영속 연결은 이번 보완으로 구현하지 않았으며 후속 P10 Plan 책임입니다. 기존 ConversationRepository의 scoped saveContext/findContext·saveSummary/findSummary는 동적 SQL로 존재하므로 해당 공통 기능의 재사용 검토가 가능합니다.
+
+원시 결과·현재 CP·명령·보존 manifest는 `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p09-consolidated-fix`의 final-evidence-proof.json/result.json 및 각 회차 XML/OTR/proof를 참조합니다.
+
+### P09 부모 독립 검증 PASS — 2026-11-06
+
+앞 절의 ROOT_REVIEW_PENDING은 당시 상태입니다. 부모 최종 독립 검증 결과는 **P09 CODE/LOCAL_TEST PASS**이며, 제품 소스는 동결 상태를 유지합니다. 이 기록 시점의 local commit은 아직 미실행입니다. 배포·실제 Source/모델·P16/F1 수용은 **NOT_RUN**이며 후속 phase 완료나 운영 활성화를 뜻하지 않습니다.
+
+- `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p09-parent-review/r2-root-validation.json` — PASS, SHA256 `50fed73669fb8c621fecc3106e94e4f7357ba77ee20baa2afda9e2813808d12b`. 후보 88파일·고유 JUnit 184건·8회차의 actual XML/OTR, 현재 CP 재해시와 fingerprint 재계산, 필수 tag, 보호 483파일·895382바이트 원 prefix·Spec/Plan·exec·잔류 0을 부모가 독립 확인했습니다.
+
+- `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p09-parent-review/root-java-probe-validation.json` — PASS, SHA256 `33aa9a32641648edc7f5e08610055f8c44698c912201559a6d8a3d29a0c16ffd`. 실제 compiled AdmissionRequest의 nullable Context와 ScopeAssembler/PlanValidator의 180초 경계를 독립 확인했습니다.
+
+- `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p09-parent-queue-boundary-probe/r1-result.json` — PASS, SHA256 `3ca6788ab82fe96e25e9b352e076f579a849de022f24301a47caddff52a5683d`. 실제 격리 PG에서 만료/find·늦은 claim 취소·stale QUEUED/실행 중 호출의 세 경합과 INITIALIZE_NEW 캐시 삭제 호출 1회·Ready 전 캐시 0을 확인했습니다. 실제 호출 종료 전 terminal/슬롯 반납이 없고 종료 뒤 종결·감사·반납이 각 1회임을 확인했습니다.
+
+- `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p09-parent-terminal-deadline/r1-result.json` — PASS, SHA256 `3627a60df61045b08cca0b762d17259c83bcb625b6c1ed10aa5dd2637b148a98`. 실제 JobTerminalCommitter/PG/raw Instant의 180초 -1ns·정각·+1ns를 SUCCEEDED·SUCCEEDED·TIMED_OUT으로 확인했고 각 감사 1·종결 이벤트 1·delegation NULL을 확인했습니다.
+
+기존 DevReport 원 prefix와 직전 구현 보고 append는 전부 보존하고 이 절만 끝에 추가했습니다. 부모 검증 증거가 기록한 보고서 SHA는 이 절을 추가하기 전의 값이며, 이 추가로 제품 소스·시험·기존 증거 파일은 바뀌지 않았습니다. 커밋은 부모가 별도로 수행합니다.

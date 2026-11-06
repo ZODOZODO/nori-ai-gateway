@@ -9,5 +9,6 @@ import org.springframework.context.annotation.Import;
 
 @Configuration(proxyBeanMethods = false)
 @Import({CoreBeansConfiguration.class, NormalDatabaseConfiguration.class, PersistenceModuleConfiguration.class,
-    IntegrationModuleConfiguration.class, TcMockModuleConfiguration.class, IngressSecurityConfiguration.class})
+    IntegrationModuleConfiguration.class, TcMockModuleConfiguration.class, IngressSecurityConfiguration.class,
+    JobConfiguration.class, TestHooksConfiguration.class})
 public class GatewayAppModuleConfiguration {}

@@ -1,5 +1,6 @@
 import java.security.MessageDigest
 import java.util.zip.ZipFile
+import org.gradle.process.CommandLineArgumentProvider
 
 plugins { application }
 application { mainClass = "com.nori.ai.gateway.app.AiGatewayApplication" }
@@ -34,6 +35,11 @@ dependencies {
 }
 
 tasks.named<Test>("integrationTest") {
+    val harnessArguments = objects.newInstance<HarnessJvmArguments>()
+    harnessArguments.runtimeClasspath.from(sourceSets["integrationTest"].runtimeClasspath)
+    harnessArguments.javaExecutable.set(javaLauncher.map { it.executablePath })
+    harnessArguments.argumentFile.set(layout.buildDirectory.file("aigw/harness-jvm.args"))
+    jvmArgumentProviders.add(harnessArguments)
     val pgImage = providers.environmentVariable("AIGW_PG_TEST_IMAGE").orElse("").get()
     inputs.property("aigw.pgTestImage", pgImage)
     systemProperty("aigw.pgTestImage", pgImage)
@@ -47,6 +53,20 @@ tasks.named<Test>("integrationTest") {
     doFirst {
         if (!pgImage.matches(Regex("[^\\s/@]+(?:/[^\\s/@]+)*:[^\\s/@:]+@sha256:[0-9a-f]{64}")))
             throw GradleException("고정된 PostgreSQL 시험 이미지가 필요합니다")
+    }
+}
+
+abstract class HarnessJvmArguments : CommandLineArgumentProvider {
+    @get:Classpath abstract val runtimeClasspath: ConfigurableFileCollection
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val javaExecutable: RegularFileProperty
+    @get:Internal abstract val argumentFile: RegularFileProperty
+    override fun asArguments(): Iterable<String> {
+        val arguments = listOf("-Daigw.harness.classpath=${runtimeClasspath.asPath}",
+            "-Daigw.harness.javaExe=${javaExecutable.get().asFile.absolutePath}")
+        val file = argumentFile.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(arguments.joinToString("\n", postfix="\n") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }, Charsets.UTF_8)
+        return listOf("@${file.absolutePath}")
     }
 }
 

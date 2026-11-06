@@ -22,7 +22,7 @@ class SchemaVersionGuardIT extends PgIntegrationSupport {
             database.migrate();
             try (var context = application(database, SubsequentRunner.class)) { assertThat(SubsequentRunner.calls).isEqualTo(1); }
             try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
-                statement.executeUpdate("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = '3.1'");
+                statement.executeUpdate("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = '4'");
             }
             SubsequentRunner.calls = 0;
             assertThatThrownBy(() -> application(database, SubsequentRunner.class)).hasMessage("스키마 버전이 애플리케이션과 일치하지 않습니다");

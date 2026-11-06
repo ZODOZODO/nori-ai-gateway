@@ -4,3 +4,19 @@ spring:
     locations: classpath:db/migration/gateway
     default-schema: gw_flyway
     create-schemas: true
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,recovery
+      show-details: never
+      show-components: never
+ai:
+  gateway:
+    recovery:
+      restore-mode: false
+      restore-handler:
+        enabled: true

@@ -10,7 +10,7 @@ class JobDelegationColumnIT extends PgIntegrationSupport {
             database.bootstrap(false); database.migrate();
             try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
                 statement.execute("INSERT INTO gw.conversation VALUES ('c','TC','actor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '1 day','ACTIVE')");
-                try (var insert = connection.prepareStatement("INSERT INTO gw.job(id, conversation_id, owner_system, actor_ref, status, created_at, request_digest, expected_path, delegation_id) VALUES ('j','c','TC','actor','QUEUED',CURRENT_TIMESTAMP,'digest','B',?)")) {
+                try (var insert = connection.prepareStatement("INSERT INTO gw.job(id, conversation_id, owner_system, actor_ref, status, created_at, request_digest, expected_path, delegation_id, request_perm, request_pdg) VALUES ('j','c','TC','actor','QUEUED',CURRENT_TIMESTAMP,'digest','B',?,ARRAY['EQP_READ'],repeat('a',64))")) {
                     byte[] bytes = new byte[32]; new java.security.SecureRandom().nextBytes(bytes);
                     insert.setString(1, java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)); insert.executeUpdate();
                 }

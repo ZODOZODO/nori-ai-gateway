@@ -21,6 +21,8 @@ class RepositorySignatureArchTest {
         for (String name : List.of("Queue", "Retention", "Recovery"))
             expected.add("com.nori.ai.gateway.persistence.maintenance." + name + "MaintenanceRepository");
         expected.add("com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppendRepository");
+        for(String name:List.of("AdmissionLookupRepository","QueueJobRepository"))expected.add("com.nori.ai.gateway.persistence.queue."+name);
+        for(String name:List.of("InstanceEpochRepository","CacheInvalidationRepository"))expected.add("com.nori.ai.gateway.persistence.queue.recovery."+name);
         assertThat(allRepositories.stream().map(type -> type.getName())).containsExactlyInAnyOrderElementsOf(expected);
         var repositories = allRepositories.stream().filter(type -> type.getPackageName().endsWith(".repository")).toList();
         assertThat(repositories).hasSize(9);
@@ -41,7 +43,7 @@ class RepositorySignatureArchTest {
             String caller = type.getName();
             if (caller.equals(target)) continue;
             boolean allowed = target.endsWith("QueueMaintenanceRepository")
-                ? caller.equals("com.nori.ai.gateway.app.job.JobDispatcher")
+                ? Set.of("com.nori.ai.gateway.app.job.JobDispatcher","com.nori.ai.gateway.app.job.JobAdmissionService").contains(caller) && call.getName().equals("lockControl")
                 : target.endsWith("RetentionMaintenanceRepository")
                     ? caller.equals("com.nori.ai.gateway.app.ops.RetentionPurgeJob")
                     : caller.startsWith("com.nori.ai.gateway.app.job.recovery.");
