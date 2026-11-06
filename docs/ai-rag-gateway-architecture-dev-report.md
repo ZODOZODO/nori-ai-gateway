@@ -6092,3 +6092,116 @@ approved Harbor digest·운영 용량·backup/PV/inbound·execMerge·실제 Secr
 - 보호 483개 hash·Spec/Plan·P06 SQL/HBA·V1~V3·승인 문서·기존 root 프로그램/증거 보존을 확인했습니다. commit/push/P08/하위에이전트/SSH/K8s/Secret/Harbor/Source/전역 설정 변경은 수행하지 않았습니다.
 - 생성자/빈/권한/하네스 변경이 없어 관련 없는 전체 67 IT·5 앱 컨텍스트·13 앱 unit·Eval 249는 반복하지 않았습니다. 부모의 실제 독립 프로그램 재실행·최종 검증 및 정확 3파일 로컬 커밋은 후속 부모 책임이며 이번 세션에서는 미실행입니다.
 - scratch 증거: p07-cache-expiry-fix/test-proof.json, result.json, cache-spec-guard.json, cache-retention-it-final*.json, current-fingerprint.json, runtime-classpath.txt 및 raw XML/OTR. 증거 수집기의 첫 XML 표시 이름 중복 판정 실패는 OTR 고유 ID 대조로 바로잡았으며 제품 시험을 재실행하거나 결과를 바꾸지 않았습니다.
+
+
+### P08 인입 인증 및 승인 A안 거절 감사 — 2026-11-06
+상태: 승인 P08 Implement의 구현·LOCAL_TEST 결과 후보이며 **NEEDS_PARENT_REVIEW**입니다. 부모 독립 검토·로컬 커밋은 미실행입니다. DEPLOYMENT/ACCEPTANCE/COMPLETE 및 P16/P29 수용은 NOT_RUN입니다. Spec/Plan의 완료 체크는 변경하지 않았습니다.
+선행 확인: launch-authorization.json의 AI HEAD d6b0b4dee04c7b11afc48de27ef3f814bec72bc8, exec HEAD 6d744aa57fd4d2970f9fca8c941b43b8a2e18670, 승인 A Specify/Plan·R6 seq7(f7abcc35137d8800aeb751245e3376efdf53a9a1) 및 P07 캐시 부모 실제 PG 검증/커밋을 실제 파일과 대조했습니다. 직전 P07 추가 절의 부모 PENDING은 당시 이력이며, 현재는 부모 15 JUnit·공식 verifier·실제 PG 요청 만료 probe PASS와 위 d6b0b4d 커밋 완료입니다. 기존 96 JUnit+17조건은 AEC/P07의 역사적 증거로 보존하며 P08 현재 Spec 수용 증거로 재분류하거나 합산하지 않았습니다.
+첫 Gradle은 정본 spec-guard(exit 0)였고 구현은 그 뒤 시작했습니다. Spec SHA256 c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4, Plan SHA256 16159d39d5242a128d3bb6f1e3f267b6e0be580d7ad9c85ea8f553817343e4b8은 불변입니다.
+#### 구현·변경 이유와 영향
+- 단일 /v1/* REQUEST Filter → 서비스 해시 constant-time 비교 → 신뢰 공개 JWKS/ES256/kid/서명·필수 claim·원본 정밀 NumericDate·경로별 dlg/sys 검증 → ScopeAssembler → Body 4개 시스템 필드 검사 → 검증 scope attribute/재독 wrapper → chain 순서를 연결했습니다. requestId는 서버 UUID입니다. MVC와 같은 RequestPath/PathPattern을 사용하고 probe/test 경계 및 중복 등록 0을 실제 HTTP로 확인했습니다.
+- V3.1만 추가해 AUTH_REJECTED의 미확인 신원 NULL을 허용했습니다. 일반 감사 owner+actor 필수·actor의 owner 필수·기존 owner enum CHECK와 일반 9개 저장소·독립 90일·NULL 포함 purge는 유지합니다. AUTH_REJECTED만 있는 core enum, 닫힌 typed append, 독립 실제 commit, Clock 마이크로초 내림, Auditor/설정만의 실제 호출자·생성자 제약을 연결했습니다. 업무 error enum/P09/P14 이벤트는 추가하지 않았습니다.
+- token 실패 NULL/NULL, 단언 실패(서명 유효한 SYS 불일치 포함) owner/NULL, Body 위반만 완전 검증 owner/actor를 기록합니다. 실제 INSERT/commit/lock timeout/연결 실패는 원래 401/403 대신 503·Retry-After: 1·고정 두 필드 응답이며 후속 처리가 0입니다. 원문/자유 JSON/cause·로그 대체·재시도·가짜 scope가 없습니다.
+- signer는 testFixtures의 두 factory와 provided Instant API에만 있습니다. 합성 private JWK 파일 시험은 자기 TempDir·ACL·finally 삭제를 확인했습니다. 공개 JWKS/해시 파일만 앱 시험에 주입합니다. 실제 production runtime의 signer/test-fixtures/시험 인프라 제외 검사를 유지했습니다.
+- 고정 pdg 벡터 V1~V4/N1~N3를 기존 P02 입력에서 재사용했습니다. Java는 Unicode 코드포인트 정렬·엄격 UTF-8을 사용하며, 기존 Python helper의 추가 제어문자 금지를 정본 CR/LF·공백 조건에 맞추고 비표현 UTF-8 입력을 명시 거부하도록 보정했습니다. 고정 기대값은 변경하지 않았습니다.
+- 기존 앱 시험에 필수 자격을 공급하고 단일 Clock/실제 최신 schema/normal Flyway off/migration-only 격리/Core8/manifest9/capability6/production ToolExecutor0 회귀를 유지했습니다. 기존 두 module 설정 변경은 import/@Import만, app build는 승인 Nimbus implementation 및 tc-mock testFixtures 연결만입니다.
+Spec/Plan의 확정 업무·보안 계약과 차이는 없습니다. wire의 기존 Body contextRef를 유지하며 Body 없는 요청의 동일 단언 전달 위치를 X-Actor-Assertion 헤더로 auth-v1에 구체화했습니다. 두 위치 동시/중복 헤더는 거부하며 신뢰키는 파일에서만 읽습니다. P09/P10/P14 책임을 앞당기지 않았습니다.
+#### 실행 실패·원인·수정
+- p08-app-test: 22건 중 2건 실패. ArchUnit이 jar 경로의 참조 타입 자동 해석에 기대 persistence 설정 생성자 호출을 놓친 수집 결함을 6개 모듈 main 디렉터리 직접 import로 수정했습니다. Nimbus 표준 jku/jwk/x5u를 customParam으로 만든 시험 결함은 표준 builder API로 수정했습니다. 직후 verifier exit 0도 이 실패를 PASS로 만들지 않습니다. r2 22건은 통과했고 이후 원본 인코딩 보강의 최종 r4 24건만 집계합니다.
+- p08-ingress-it: BeforeAll 때 필드 TempDir가 준비되지 않아 초기화 실패. BeforeAll TempDir 인자로 소유 수명을 확보했습니다. 실제 HTTP/leaf 0이며 공식 verifier도 실패했고 이전 XML/요약을 사용하지 않았습니다.
+- p08-ingress-it-r2: HTTP 30건 자체 PASS이나 실행 중 같은 integrationTest 소스셋의 AppContextWiringIT를 보강해 직후 verifier가 STALE_TEST_EVIDENCE로 거부했습니다. 원본을 보존하고 소스를 고정해 r3 30건과 verifier를 통과했습니다. 이후 발견된 아래 제품 파서 결함 때문에 최종 r5만 집계합니다.
+- 독립 Jackson 3.1.8 scratch probe에서 UTF-16LE의 ASCII/NUL 바이트는 UTF-8 decoder를 통과하고 기본 CHARSET_DETECTION은 전체 JSON을 허용함을 재현했습니다. 최초 probe의 첫 token만 확인한 결과는 불충분해 별도 전체 파싱 probe로 보강했으며 두 회차를 보존했습니다. Signed payload/자격/Body 파서의 자동 감지를 명시 비활성화해 승인 UTF-8 계약을 복구했습니다. 실제 서명된 UTF-16/32·손상 UTF-8의 단위/HTTP 거부를 추가하고 영향 앱 단위/HTTP만 재실행했습니다. 새 정책·예외 무시는 없습니다.
+- Nimbus 10.5 독립 probe에서 jku/jwk/x5u의 null 필드가 getter JSON에서 사라짐을 확인했습니다. 원본 헤더의 엄격 UTF-8/중복 키/실제 key 존재 검사를 추가해 null도 UNTRUSTED_KEY_REFERENCE로 거부했습니다. 실제 서명된 단위/HTTP 음성을 보강하고 앱 단위/HTTP만 재실행했습니다. r3/r4 이전 통과 회차는 원시 보존하며 최종 합계에서 제외합니다.
+- Unicode 보조 digest의 첫 Python -c 실행은 PowerShell 인용으로 SyntaxError였고 계산 전 실패였습니다. UTF-8 파일 unicode_vector_probe.py 실행으로 수정했으며 JUnit/고정 벡터 증거에 합산하지 않았습니다. 실패 Test/각 직후 verifier·초기/수정 probe와 raw XML/OTR는 고유 label로 보존했습니다.
+#### 최종 실제 검증
+| 실제 Test task / 필터 | 고유 JUnit | runId | inputFingerprint |
+|---|---:|---|---|
+| `:gateway-core:test` / `전체` | 36 | `fe51d198-a3fe-485c-b7b9-8d072cdfb89d` | `118e8b49546a6027f977684682ad7f79c4704ecca1b6ce593697a5a008e9b6eb` |
+| `:gateway-persistence:test` / `전체` | 12 | `1e75ea08-2bad-4454-8fb0-9d308c1fcd71` | `ce554e936550fdaaf2a3fbdc8d53415843f52889626440718c7e5b1c64047dd9` |
+| `:gateway-persistence:integrationTest` / `*AuthRejectionAuditIT,*DbBootstrapOrderIT,*MigrationApplyIT,*RetentionBoundaryIT,*SchemaVersionGuardIT,*ScopedRepositoryIT` | 70 | `4a31ed94-e05a-4cb2-b2a2-ad56602a57bc` | `2cc3c7e6cc157fea8f17c2cea4bd80a375969c339ed6372e6856fbc39ad6aae3` |
+| `:gateway-tc-mock:test` / `전체` | 4 | `017fb6fe-38ca-4438-83d4-7cac1e809373` | `0df7d60afe4277d07cb605a6ff6daf884c9c15b9144b164c29cf996602a1bb00` |
+| `:gateway-app:test` / `전체` | 24 | `2d188758-ff74-4995-b336-6f2fe0f2a29f` | `8add6ed795584f6930ab2c9e7ed556ce9abfc6066626c952cb927b3bf493ab43` |
+| `:gateway-app:integrationTest` / `*IngressAuthIT` | 30 | `784b9ff5-e6f7-40d3-ad3e-e240398e044a` | `a5ac59cefd50abef31f24d56bb2afd2a836dd1dcb5378d7c9f749da3631d089f` |
+| `:gateway-app:integrationTest` / `*AppContextWiringIT,*StackSmokeIT` | 6 | `e15a400a-27f9-4d0c-b7a0-6ad8cae6467a` | `1fde2c5bd7273eb9f767f85aa3d08ac189bd35d13afb12a74ccf53f6f1b05a5b` |
+
+최종 고유 JUnit은 **182건**입니다. 실패·이전 회차 및 Python 검사는 합산하지 않았습니다. 각 Test는 실제 EXECUTED, XML/OTR 고유 JUnit ID/summary.executed/passed가 일치하며 fail/error/skip/abort=0입니다. ISO-04 기존 20 tag가 각각 정확히 한 case에서 실행됐습니다. raw XML/OTR·leaf/run-binding·현재 공식 fingerprint·실제 classpath/Spec·이미지/SQL/HBA·필터를 대조했습니다. 마지막 앱 실행들은 시작/종료/현재 source hash도 일치합니다. 각 회차의 runtimeClasspath SHA는 해당 proof에 보존하며, 초기 core/persistence의 Nimbus 연결 전 전체 앱 runtime SHA를 후기 runtime과 같은 측정으로 섞지 않습니다.
+
+각 Test 직후 실행한 정확한 명령(전 회차 AIGW_SPEC_FILE 정본 명시, pin/requireDocker/SQL/HBA 유지):
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-core:test --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:test --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:test" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:integrationTest -Paigw.requireDocker=true --tests *MigrationApplyIT --tests *AuthRejectionAuditIT --tests *SchemaVersionGuardIT --tests *DbBootstrapOrderIT --tests *ScopedRepositoryIT --tests *RetentionBoundaryIT --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p08-implementation\persistence-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true "--args=test-evidence verify --tasks :gateway-persistence:integrationTest --require-docker" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-tc-mock:test --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-tc-mock:test" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *IngressAuthIT --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p08-implementation\ingress-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain`
+
+- Test: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *AppContextWiringIT --tests *StackSmokeIT --no-daemon --console=plain`
+- 직후 공식 verifier: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p08-implementation\app-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true "--args=test-evidence verify --tasks :gateway-app:integrationTest --require-docker" --no-daemon --console=plain`
+
+Python 실체는 C:/workspace_nori/.venvs/aigw-eval/Scripts/python.exe, Python 3.12.10/독립 venv입니다. 최종 Plan의 pdg CLI 고정 4양성·3음성 및 기존 Python unit 3건, 독립 Unicode 벡터/입력 경계를 실제 확인했습니다. JUnit 기여는 0입니다. 정확 명령과 출력은 python-proof.json/python-validation-1.log/python-validation-2.log에 있습니다.
+
+실제 PG는 고정 candidate pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2, PostgreSQL 18.6/vector 0.8.7입니다. 호스트 Docker 후보이며 운영 Harbor 승인·배포 수용이 아닙니다. 정본 bootstrap SHA 04b42923d3940ed51d0630c0cddb13cc649167fcb8d43027bba07c7f2ca7c11e, HBA SHA 1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22를 보존했습니다.
+
+#### 실제 변경 파일
+
+- `docs/contracts/auth-v1.md` — SHA256 `d45aac12383832ef2008f374b5c436cd7e3d5d882464cafa2ece14521a070818`
+- `eval/py/pdg_vectors.py` — SHA256 `ef64b2732a388e0329d620fafd1e6a2cc03c558d9d929db68ed273ccd7caa925`
+- `gateway-app/build.gradle.kts` — SHA256 `92eb732bfb3022be7adaacd7c2ff49350b61d40926aafffec5fd43c91e39bedc`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackContextSupport.java` — SHA256 `8e4fa77625ce483ec443bd89b1258d4d2e7b0b3961fb68c7a3ac3a67eeea6dfb`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/security/IngressAuthIT.java` — SHA256 `8b1a9aa79817fd7d84e1f5ff7b9d72e0e7a479969bcdfb4522905aa12e75be54`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/security/IngressTerminalFixture.java` — SHA256 `11541b618673bcf9a3d42a27b579138580e14ae1858587b1d1a4e45b88d6600d`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java` — SHA256 `11e5375ceac47c9040bc314f4f243d2d37fcc7845eccf8fa4339085c873b211b`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/GatewayAppModuleConfiguration.java` — SHA256 `c54f6423ecd641d892c48759ae5e54831f1d121e4d5b44a4fe37dccf6dd50080`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/ActorAssertionVerifier.java` — SHA256 `80c58abc23bc137d890657500b1356fb801f2b32bb09f809683a4b51ba3bc89e`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/AuthRejectionAuditor.java` — SHA256 `9e8f988152440f6a23d129a1acfcd4daf68d71eef2865158e1a558ec7d5624fb`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/BodySystemFieldGuard.java` — SHA256 `4dfe76f4d3fcb2df494d8a02eca7b44d3fd28f81385abf295d9faf5a2a1709f2`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/IngressSecurityConfiguration.java` — SHA256 `de998bd11585e394ca47b5f9792af6b4f2cd805ddb5273fe6883af26c5a1502e`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/RouteClassifier.java` — SHA256 `bbb3af86f21b778e1852360a226bd37460cd472b480ac130d5e07e5a380afbf1`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/ScopeAssembler.java` — SHA256 `951a620ec31af0a1c9363606bd191187a2c0931d57ed20a5d28aa24063865c4a`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/SecurityCredentialFiles.java` — SHA256 `b114744721cf4f0630be527dded67b36ffd300cae77a147cb89c1fa657a944a1`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/ServiceTokenAuthFilter.java` — SHA256 `323d39b05dfacb1aa18a81535400f3774d00ac096751beeedceadb0c4825870c`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/security/VerifiedServiceIdentity.java` — SHA256 `be55c53f89fd30188b0ad18df2060b9e1596e6621850dc3fd89da1a23ea31866`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/ArchitectureRulesTest.java` — SHA256 `d0e780b1a74c74e623c8e75582cf9fb4d8989b8181ec3d7e2093a467a83d9a29`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/security/ActorAssertionVerifierContractTest.java` — SHA256 `5395b1cd48bcaebdeafc5092d5725cb09565fa0d485c73dab8f4185ee907e159`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/security/CredentialFileContractTest.java` — SHA256 `3633a5eb94aeb7bc66cb9aa662234e5316b87f3fb065f7a734a291fc0e439ab1`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/audit/AuditEventType.java` — SHA256 `8647935faef3f53ec7e2146f7792fa60c27005cf762f32a0ad0e085085227998`
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/AuthRejectionAuditIT.java` — SHA256 `fa4ef920eeb0f2d8473233710d4530dc6df5ea919d5335e0f1d3dccc8b75ec2d`
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/MigrationApplyIT.java` — SHA256 `d16c7a4d6bbfe6ffb571ef4e6e68c8dc29264126e536289445f7a305919ff4c4`
+- `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/SchemaVersionGuardIT.java` — SHA256 `46719eea39fface08d50e2c07951feae689ac4b4bc33f016d2891bdbefb59ba8`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/PersistenceModuleConfiguration.java` — SHA256 `b5d0a03d221a16845a1805e92f36701e9a18093a65a89f2a0ee6a58f711b1d17`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionAppend.java` — SHA256 `38817ca1504a757a1481e032a1ff3e87a3da6aff5519029007c5553dd8591251`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionAppendRepository.java` — SHA256 `2304abc395d33091efbfaaf7cc5a5aafe7050ea550fbd4c204f04ba29121b420`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionPersistenceConfiguration.java` — SHA256 `117e9281e051d1a11ca2d9ea477bdc4017f00b8dfb7a921aac428964ebee8f68`
+- `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionReason.java` — SHA256 `a069a07dfed33d553633604cc79b60287a63dc30b49418db7185bd707bac96c6`
+- `gateway-persistence/src/main/resources/db/migration/gateway/V3_1__auth_rejection_identity.sql` — SHA256 `bb4d26b5b1d8d540123e8d1fb01d6c1b16982d82957e289398c71782370f8c76`
+- `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/RepositorySignatureArchTest.java` — SHA256 `977b17444fb0d5693ba18244d107846665b53345c9c56c10dfb2aac10481673d`
+- `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/schema/SchemaVersionGuardTest.java` — SHA256 `dd54bf8d8f39e42cadba4ffe078aa3e1f951ae6b654d480e2c5c0c51db096a79`
+- `gateway-tc-mock/build.gradle.kts` — SHA256 `f14637539b076720d3b051981245a2a0a90f53849eff5ff1bc3f879e34f65992`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/PdgCanonical.java` — SHA256 `94a8b6d2c0d122dd57cf1a9f776277b69e872543ee8d0c814bd3af13d7f01a2d`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/PdgCanonicalTest.java` — SHA256 `131fe440501d2177d232eb934a4813e8f435f4cf70496800e250f98ae1e72f4b`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/StubAssertionSignerClockTest.java` — SHA256 `b9d2e49e40602913b5bdb3121df1953ac52761debadb894b598bd27a6a8fdc82`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/StubAssertionSignerSelectionTest.java` — SHA256 `81ad298aca613bdca955378e3e46b4bb50bb190e8d96eab51242035e7a2f03d3`
+- `gateway-tc-mock/src/test/resources/pdg-vectors-v1.json` — SHA256 `b7a235907bc31b37a2830e0dfac5f48cedc52d8665862c6e742cb07f5caf382b`
+- `gateway-tc-mock/src/testFixtures/java/com/nori/ai/gateway/tcmock/testing/StubAssertionSigner.java` — SHA256 `945f914a15e60b214bd97508cba24e8237978f7d1b4e43319c9225e1cca0a96e`
+- `docs/ai-rag-gateway-architecture-dev-report.md` — 이번 절 끝 append만, 최종 SHA는 result.json의 후보 목록에 기록합니다.
+
+기존 Dev report 873587바이트 SHA256 6ff17295fc19c04d9df2217d0c31fc1976be2acbc028803b9746486babc6cb29를 byte prefix로 보존했습니다. 변경 코드는 UTF-8/LF입니다. 보호 483개·기존 V1~V3·P06 SQL/HBA·Spec/Plan·baseline/approval1~7·기존 캡처/증거·양쪽 HEAD·빈 staging을 대조합니다. fixture의 owner label/finally 정리 뒤 동일 label 컨테이너는 0개입니다. 다른 자원/이미지/checkout 삭제는 없습니다.
+
+#### 미실행·한계·후속 책임
+
+부모의 소스/계약/빈/호출/보안 실패 경로·원시 증거 독립 검토와 로컬 커밋은 미실행입니다. 원격 push/MR/SSH/K8s/운영 DB/Secrets/Harbor/실제 Source·추론 호출/전역 설정 변경/하위 에이전트는 실행하지 않았습니다. root 하네스 변경이 없으므로 Eval 249 전체 회귀는 실행하지 않았습니다. 운영 게이트·P16/P29 수용은 NOT_RUN/BLOCKED를 유지합니다.
+
+P08 terminal controller와 Source/cache 카운터는 integrationTest 전용 실제 저장 자극입니다. production JobAdmission/queue/worker는 P09, 공식 API는 P10, 일반 AuditWriter/일일 purge scheduler는 P14, 배포 수용은 P16/P29 책임입니다. P09는 부모가 별도 독립 세션으로 시작합니다. V3.1 적용 후 같은 최신 schema의 guard·자격·감사 실패 응답을 확인하기 전 인입을 활성화하지 않습니다. rollback도 승인 A와 동일 schema에 호환되는 앱만 사용하며, 없으면 인입 중단 후 forward-only 보정합니다.
+
+정확 후보/SHA·보호/prefix/HEAD·명령/검증/실패/미실행 원시는 `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p08-implementation/result.json`, `final.md`, 각 `*-proof.json`·`*-xml/`·`*-otr/`에 있습니다. 상태는 NEEDS_PARENT_REVIEW입니다.

@@ -15,10 +15,14 @@ class SchemaVersionGuardIT extends PgIntegrationSupport {
             database.bootstrap(false); SubsequentRunner.calls = 0;
             assertThatThrownBy(() -> application(database, SubsequentRunner.class)).isInstanceOf(RuntimeException.class);
             assertThat(SubsequentRunner.calls).isZero();
+            org.flywaydb.core.Flyway.configure().dataSource(database.jdbcUrl(), "aigw_migrator", database.passwordFor("aigw_migrator"))
+                .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").target("3").load().migrate();
+            assertThatThrownBy(() -> application(database, SubsequentRunner.class)).hasMessage("스키마 버전이 애플리케이션과 일치하지 않습니다");
+            assertThat(SubsequentRunner.calls).isZero();
             database.migrate();
             try (var context = application(database, SubsequentRunner.class)) { assertThat(SubsequentRunner.calls).isEqualTo(1); }
             try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
-                statement.executeUpdate("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = '3'");
+                statement.executeUpdate("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = '3.1'");
             }
             SubsequentRunner.calls = 0;
             assertThatThrownBy(() -> application(database, SubsequentRunner.class)).hasMessage("스키마 버전이 애플리케이션과 일치하지 않습니다");

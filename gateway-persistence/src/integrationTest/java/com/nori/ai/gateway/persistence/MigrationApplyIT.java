@@ -6,15 +6,35 @@ import static org.assertj.core.api.Assertions.*;
 class MigrationApplyIT extends PgIntegrationSupport {
     @Test void migratorAppliesExactlyV1ToV3AndOwnsAllObjects() throws Exception {
         try (var database = rawDatabase()) {
-            database.bootstrap(false); database.migrate(); database.migrate();
+            database.bootstrap(false);
+            org.flywaydb.core.Flyway.configure().dataSource(database.jdbcUrl(), "aigw_migrator", database.passwordFor("aigw_migrator"))
+                .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").target("3").load().migrate();
+            var checksums = new java.util.LinkedHashMap<String, Integer>();
             try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
                 try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
                     var versions = new java.util.ArrayList<String>(); while (rows.next()) versions.add(rows.getString(1));
                     assertThat(versions).containsExactly("1", "2", "3");
                 }
+                try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
+                    while (rows.next()) checksums.put(rows.getString(1), rows.getInt(2));
+                }
+                try (var rows = statement.executeQuery("SELECT attnotnull FROM pg_attribute WHERE attrelid = 'gw.audit_event'::regclass AND attname IN ('owner_system','actor_ref')")) {
+                    int count = 0; while (rows.next()) { count++; assertThat(rows.getBoolean(1)).isTrue(); } assertThat(count).isEqualTo(2);
+                }
                 try (var rows = statement.executeQuery("SELECT tablename, tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
                     int count = 0; while (rows.next()) { count++; assertThat(rows.getString(2)).isEqualTo("aigw_migrator"); }
                     assertThat(count).isEqualTo(16);
+                }
+            }
+            database.migrate(); database.migrate();
+            try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
+                try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
+                    var versions = new java.util.ArrayList<String>();
+                    while (rows.next()) { String version = rows.getString(1); versions.add(version); if (checksums.containsKey(version)) assertThat(rows.getInt(2)).isEqualTo(checksums.get(version)); }
+                    assertThat(versions).containsExactly("1", "2", "3", "3.1");
+                }
+                try (var rows = statement.executeQuery("SELECT tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
+                    int count = 0; while (rows.next()) { count++; assertThat(rows.getString(1)).isEqualTo("aigw_migrator"); } assertThat(count).isEqualTo(16);
                 }
             }
         }

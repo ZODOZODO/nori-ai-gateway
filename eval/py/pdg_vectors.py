@@ -1,7 +1,7 @@
 """`pdg` 고정 벡터를 Python hashlib 으로 독립 계산해 기대값과 비교한다(P08 교차검증용).
 
 정본(SPEC §9.1): permCode 중복 제거 → 코드포인트 정렬 → catalogRevision 과 함께 "\\n" 연결 → UTF-8 → SHA-256 소문자 16진.
-입력 위반(빈 revision, revision 의 LF·제어 문자, 빈 permCode·공백 포함 permCode)은 생성 거부한다.
+입력 위반(빈 revision, revision 의 CR·LF, 빈 permCode·공백 포함 permCode)은 생성 거부한다.
 기대값은 벡터 파일의 고정값이며 이 도구는 그 값을 덮어쓰지 않는다. 불일치·음성 미거부 = exit 1, 인자·입력 오류 = exit 2.
 """
 import argparse
@@ -22,15 +22,18 @@ class Parser(argparse.ArgumentParser):
 
 
 def compute(catalog_revision, perms):
-    if not isinstance(catalog_revision, str) or not catalog_revision or re.search(r"[\x00-\x1f\x7f]", catalog_revision):
+    if not isinstance(catalog_revision, str) or not catalog_revision or re.search(r"[\r\n]", catalog_revision):
         raise Rejected("REVISION_INVALID")
     if not isinstance(perms, list):
         raise Rejected("PERMS_INVALID")
     for perm in perms:
-        if not isinstance(perm, str) or not perm or re.search(r"[\s\x00-\x1f\x7f]", perm):
+        if not isinstance(perm, str) or not perm or re.search(r"\s", perm):
             raise Rejected("PERM_INVALID")
     serialized = catalog_revision + "\n" + "\n".join(sorted(set(perms)))
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    try:
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    except UnicodeEncodeError:
+        raise Rejected("UTF8_INVALID") from None
 
 
 def main(argv=None):

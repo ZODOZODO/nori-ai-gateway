@@ -14,7 +14,15 @@ class RepositorySignatureArchTest {
     @Test void nineRepositoriesRequireScopeAndMaintenanceCallersAreRestricted() throws Exception {
         var root = Path.of(System.getProperty("aigw.rootDir"));
         var classes = new ClassFileImporter().importPath(root.resolve("gateway-persistence/build/classes/java/main"));
-        var repositories = classes.stream().filter(type -> type.getPackageName().endsWith(".repository") && type.getSimpleName().endsWith("Repository")).toList();
+        var allRepositories = classes.stream().filter(type -> type.getSimpleName().endsWith("Repository")).toList();
+        var expected = new HashSet<String>();
+        for (String name : List.of("Conversation", "Message", "Job", "JobEvent", "Result", "Evidence", "ToolExecution", "Cache", "Audit"))
+            expected.add("com.nori.ai.gateway.persistence.repository." + name + "Repository");
+        for (String name : List.of("Queue", "Retention", "Recovery"))
+            expected.add("com.nori.ai.gateway.persistence.maintenance." + name + "MaintenanceRepository");
+        expected.add("com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppendRepository");
+        assertThat(allRepositories.stream().map(type -> type.getName())).containsExactlyInAnyOrderElementsOf(expected);
+        var repositories = allRepositories.stream().filter(type -> type.getPackageName().endsWith(".repository")).toList();
         assertThat(repositories).hasSize(9);
         for (var type : repositories) for (var method : type.reflect().getDeclaredMethods()) {
             if (Modifier.isPublic(method.getModifiers()) && !method.isSynthetic()) {
@@ -39,6 +47,20 @@ class RepositorySignatureArchTest {
                     : caller.startsWith("com.nori.ai.gateway.app.job.recovery.");
             assertThat(allowed).as("유지보수 호출자: %s -> %s", caller, target).isTrue();
         }
+    }
+
+    @Test void rejectionAppendHasOnlyTypedAppendAndClosedFields() throws Exception {
+        var type = com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppendRepository.class;
+        assertThat(Modifier.isFinal(type.getModifiers())).isTrue();
+        var methods = Arrays.stream(type.getDeclaredMethods()).filter(m -> Modifier.isPublic(m.getModifiers())).toList();
+        assertThat(methods).hasSize(1);
+        assertThat(methods.getFirst().getName()).isEqualTo("append");
+        assertThat(methods.getFirst().getParameterTypes()).containsExactly(com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppend.class);
+        assertThat(Arrays.stream(com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppend.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+            .containsExactly("requestId", "ownerSystem", "actorRef", "reason");
+        var source = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionAppendRepository.java"));
+        assertThat(source.split("INSERT INTO", -1)).hasSize(2);
+        assertThat(source).doesNotContain("SELECT ", "DELETE ", "UPDATE ", "catch (", "Logger", "new VerifiedSystemScope");
     }
 
     @Test void jobQueriesNeverSelectWildcardOrReadDelegationOutsideDedicatedReader() throws Exception {
