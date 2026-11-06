@@ -36,6 +36,9 @@ class WorkerRestartEpochIT extends P09QueueSupport {
                 for(String status:List.of("RUNNING","QUEUED")) {
                     parent.sql("INSERT INTO gw.message(id,conversation_id,owner_system,role,created_at,content_masked,resource_refs,tool_execution_refs) VALUES (:message,'epoch-c','TC','user',:now,'시대 복원 시험','[]','[]')").param("message","epoch-m-"+status).param("now",java.sql.Timestamp.from(NOW)).update();
                     parent.sql("INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg,request_message_id,request_input) VALUES (:id,'epoch-c','TC','actor',:status,:now,'digest','/v1/query',ARRAY['EQP_READ'],:pdg,:message,'{}')").param("id","epoch-"+status).param("status",status).param("now",java.sql.Timestamp.from(NOW)).param("pdg",P09TestPorts.PDG).param("message","epoch-m-"+status).update();
+                    // 순수 DB fixture의 Job도 접수 감사 원점을 갖습니다. trace는 명시 합성값이며 계측 실측으로 가장하지 않습니다.
+                    parent.sql("INSERT INTO gw.audit_event(recorded_at,owner_system,actor_ref,request_id,conversation_id,job_id,trace_id,event_type,service_ref) VALUES (:now,'TC','actor',:request,'epoch-c',:id,'0af7651916cd43dd8448eb211c80319c','JOB_ACCEPTED','service:TC')")
+                        .param("now",java.sql.Timestamp.from(NOW)).param("request",java.util.UUID.randomUUID().toString()).param("id","epoch-"+status).update();
                 }
                 for(int n=0;n<2;n++)parent.sql("INSERT INTO gw.cache_entry(key_digest,owner_system,actor_ref,pdg,conversation_id,capability_id,value,source_deps,expires_at) VALUES (:key,'TC','actor',:pdg,'epoch-c','fixture','{}','{}',:expiry)").param("key","cache"+n).param("pdg",P09TestPorts.PDG).param("expiry",java.sql.Timestamp.from(NOW.plusSeconds(1000))).update();
             }

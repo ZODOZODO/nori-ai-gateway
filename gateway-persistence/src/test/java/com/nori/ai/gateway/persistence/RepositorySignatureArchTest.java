@@ -23,6 +23,7 @@ class RepositorySignatureArchTest {
         expected.add("com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppendRepository");
         for(String name:List.of("AdmissionLookupRepository","QueueJobRepository"))expected.add("com.nori.ai.gateway.persistence.queue."+name);
         for(String name:List.of("InstanceEpochRepository","CacheInvalidationRepository"))expected.add("com.nori.ai.gateway.persistence.queue.recovery."+name);
+        expected.add("com.nori.ai.gateway.persistence.retention.SourceRetentionProbeRepository");
         assertThat(allRepositories.stream().map(type -> type.getName())).containsExactlyInAnyOrderElementsOf(expected);
         var repositories = allRepositories.stream().filter(type -> type.getPackageName().endsWith(".repository")).toList();
         assertThat(repositories).hasSize(9);
@@ -37,8 +38,12 @@ class RepositorySignatureArchTest {
         for (String module : List.of("gateway-persistence", "gateway-app", "gateway-core", "gateway-integration", "gateway-tc-mock")) {
             var path = root.resolve(module + "/build/classes/java/main"); if (Files.isDirectory(path)) paths.add(path);
         }
+        var probeCallers = new HashMap<String,Set<String>>();
         for (var type : new ClassFileImporter().importPaths(paths)) for (var call : type.getMethodCallsFromSelf()) {
             String target = call.getTargetOwner().getName();
+            // 보존 탐침 유지보수 저장소는 스케줄러의 저장과 읽기 어댑터의 조회만 허용합니다.
+            if (target.equals("com.nori.ai.gateway.persistence.retention.SourceRetentionProbeRepository") && !type.getName().equals(target))
+                probeCallers.computeIfAbsent(call.getName(), name -> new HashSet<>()).add(type.getName());
             if (!target.startsWith("com.nori.ai.gateway.persistence.maintenance.")) continue;
             String caller = type.getName();
             if (caller.equals(target)) continue;
@@ -49,6 +54,8 @@ class RepositorySignatureArchTest {
                     : caller.startsWith("com.nori.ai.gateway.app.job.recovery.");
             assertThat(allowed).as("유지보수 호출자: %s -> %s", caller, target).isTrue();
         }
+        assertThat(probeCallers).isEqualTo(Map.of("upsert", Set.of("com.nori.ai.gateway.app.ops.SourceRetentionProbeScheduler"),
+            "find", Set.of("com.nori.ai.gateway.persistence.retention.SourceRetentionReaderAdapter")));
     }
 
     @Test void rejectionAppendHasOnlyTypedAppendAndClosedFields() throws Exception {

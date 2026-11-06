@@ -7106,3 +7106,105 @@ Plan P13의 allowed_writes와 exact 추가 허용(805~806, 833, 851~852, 860, 87
 - UI 검증은 기존 schema·값·시간·단위·키·행 증폭 불가 조건에 한정합니다. 별도 전역 byte/row 상한이나 범용 단위 schema를 만들지 않았으며, Spec §22.3 운영 수용 PASS로 해석하지 않습니다.
 - P14 책임은 이 작업에서 완료로 주장하지 않습니다. 대상은 캐시 저장의 마스킹 잔여(`WorkflowCacheStore`가 raw를 직렬화함), Audit/OTLP/retention, Source 조건부 Bean 조립입니다.
 - 실제 Loki·Tempo·GitLab Source 연결은 F1~F4부터 필요한 후속 운영 구성·수용 검증 대상이며, 이번 P13 로컬 시험으로 완료하지 않았습니다. F5a 후속 책임은 실제 TC 업무 Backend 연결과 scoped DLQ 4arg의 운영 구현입니다.
+
+
+## P14 관측·감사·보존 CODE/LOCAL_TEST — 2026-11-07 (독립 구현·보정 r2~r5, 부모 독립 판정 대기)
+
+Claude Code `claude-opus-5-5` high 독립 세션(`d6c7bd7f-3c5e-401e-87eb-f58634f29bd9`)이 보정 GO r2·r3·r4·r5를 순서대로 수행했다. 아래 최종 6개 canonical Test는 모두 통과했지만, 이것은 로컬 시험 결과다. P14 COMPLETE·F1·운영 PASS, Spec 체크박스 갱신은 하지 않았으며 부모의 독립 대조를 기다린다.
+
+### 기준과 작업 위치
+
+- 기준 문서: Plan `6daef09368cbd2df777c0050c2e96b2b92ebf4cc5acfa04565b27074993c8851`(r4/r5 정본, 이전 판 `dd9ce765…`·`26bf…`), Spec `90ba8a739c303312065824f9923642812f5e427a5f05a8b13142f792c1ad0550`, baseline seq8 `1bea13bfe7cee9213a60a6369ec3d0ad9c090e8529cd17209f0b9d8c286eb88f`.
+  - 모든 최종 실행에서 runner의 policy 입력(Spec·Plan·baseline)은 불변(`policyInputsStable=true`)이었다.
+- 작업 위치: 단일 writer worktree `C:/workspace_nori/.aigw-worktrees/p14-ai`, branch `aigw/f1-p14`, HEAD `6268403a5ea726f6a66e83cc52638b77fe0bdb06`, WIP 미커밋 상태다.
+  - commit·push·원격·SSH·K8s·Secret·전역 설정·다른 repo 편집은 0이다.
+- 최종 소스 입력: runner 규칙 554파일, digest 앞 16자리 `9663aa5bb4a5b5b1`.
+  - ①②④⑤⑥ Test와 ③ r2(UP-TO-DATE)의 source-inputs가 이 집합과 같다.
+  - ③ r1(실제 실행)은 `gateway-app/.../MetricLabelCardinalityTest.java` 1파일만 다르며, 이 파일은 core Test 입력이 아니다.
+- runtime classpath SHA256 `e07547eaff8e5ce3f8e1c3dc1689b20555c9aea353acdf060657d9afae989e52`(193행). 최종 app Test·verifier가 이 값을 쓰며, 최종 sync 사본과 같다.
+- 초기 source의 이전 PASS(③103·②13·④3·⑤74 등)는 구 source의 이력이다. 최종 집계에 합산하거나 재사용하지 않는다.
+
+### 구현 범위 (Plan P14 allowed_writes·exact 추가 허용 안)
+
+- **감사 생산자:**
+  - core typed `AuditEvent`(API_REQUEST·JOB_ACCEPTED·JOB_CLASSIFIED·TOOL_CALL·TOOL_BLOCKED)와 이벤트별 필드 집합 `AuditFieldAllowlist`(같은 `CapabilityRegistry`의 등록 Tool·sourceRef, 유효 nonzero traceId, UUID requestId).
+  - persistence `AuditWriter`, `AuditRepository.insert`(service_ref)·`insertForJob`(같은 owner·actor·Job의 JOB_ACCEPTED 원점이 정확히 1행일 때만 저장, 0행·중복은 false·무저장).
+  - V7 `audit_request_identity`(service_ref·task_type·result_status 열과 요청 원점 CHECK, trace_id NOT NULL·형식).
+  - `JobTerminalCommitter`의 원점 파생 종결 감사, `commitExpiredQueued`.
+  - app `AuditRecorder`(실패 counter `aigw.audit.write.failures` + 고정 코드 `AUDIT_WRITE_FAILED`).
+  - `ServiceTokenAuthFilter`의 `aigw.request` SERVER span(setNoParent·속성 0)과 API_REQUEST(저장 실패 시 503).
+  - `JobAdmissionService` JOB_ACCEPTED, `WorkflowExecutionRecords` TOOL_CALL/TOOL_BLOCKED, `WorkflowExecutionAdapter` JOB_CLASSIFIED.
+- **관측:**
+  - `ObservabilityConfiguration`: 명시 `OtlpMeterRegistry`, `GatewayOpenTelemetry`, traces off 시 context-only SpanProcessor.
+  - `MetricsCatalog`: 닫힌 라벨, 같은 registry에 등록된 canonical `tool_id`만 허용, 선언과 다른 Meter.Type 거부.
+  - `AllowlistObservationFilter`, `OtlpLogAppenderInstaller`·`AllowlistLogFilter`(5개 고정 코드·닫힌 MDC 값), `logback-spring.xml`(STDOUT), `ops/monitoring/aigw-alerts.yaml`, `docs/gates/f1/alerting.md`.
+- **보존:**
+  - `RetentionMaintenanceRepository`의 bounded batch purge(100, `FOR UPDATE SKIP LOCKED`)와 `findOldestConversationExpiry()`.
+  - `RetentionPurgeJob`: RecoveryCompleted 뒤 Gateway Clock 1h 주기, PURGE_HOLD 준수. 실패 또는 정리 성공 뒤 만료+24h 초과 잔류가 있으면 주기당 1회 counter·`RETENTION_PURGE_FAILED`를 남긴다. 정각은 초과가 아니다.
+  - `SourceRetentionProbeScheduler`·`SourceRetentionProbeRepository`·`SourceRetentionReaderAdapter`, `SourceConnectorConfiguration`(값 부재 시 Bean 0·형식 오류 목록·APPS 명시 probe 창).
+- **기타:** `ExpiryEdgeJobCanceller`, tc-mock testFixtures `ResidueScanner`(JSON·`\uXXXX`·URL·base64 파생 view).
+- **OTel 정렬(r4):** Plan exact 2줄(instrumentation BOM alpha alias·platform)로 stable SDK/exporter를 1.67.0에 맞췄다. 상세 RCA·graph·delta는 `docs/gates/f1/stack-compat.md`의 2026-11-07 P14 절에 있다.
+
+### 실행 실패·원인·수정 (원시 증거 보존, 실패를 PASS로 승격 0)
+
+- **컴파일:** `p14c-compile-r1` exit0(당시 제한 compile), r2·r3·r4 exit1(시험의 구 API·모호 호출 수정), r5 exit0.
+- **③ `p14c-core-test-r1`(보정 초기)** 104/2 FAIL:
+  - `AuditFieldAllowlistTest`의 기대 문구를 typed `sourceRef`로 정정했다.
+  - `WorkflowPlanBuilderTest:38`은 base부터 있던 `Set.copyOf` 순서 의존 단언이라 `containsExactlyInAnyOrder`로 바꿨다.
+- **⑤ `p14c-persist-it-r1`** 84/2 FAIL(`JobTerminalDeadlineIT:90` 실제 2 vs 예상 1, `:118` `[RUNNING,1,0,0]` vs `[RUNNING,0,0,0]`):
+  - `QueueJobRepository.start`가 `job.started` 1행을 쓰는 기존 생산 계약을 기대값에 반영했다(started+종결=2, RUNNING=1).
+  - 총 event 수 검사는 유지했다. r3 중간의 종결 type만 세는 수정은 되돌렸다.
+  - 최소 재현: `p14c-deadline-it-r2` 3/0 → verify VERIFIED.
+- **① `p14c-app-it-r1`** ABORTED(부모가 worker 중단): `io.opentelemetry.api.internal.ConfigUtil` ClassNotFound로 공통 기동이 실패했다. OTel 정렬로 해결했고, `p14c-stacksmoke-r1` 2/0 → verify VERIFIED.
+- **① `p14c-app-it-r2`** ABORTED(본 세션이 worker 중단, XML 19/16 fail/1 skip):
+  - 1.67 SDK는 processor 0개면 noop tracer를 반환해 traceId가 무효가 되고, `감사 허용 목록 밖 값입니다: traceId`로 실패했다.
+  - context-only SpanProcessor로 해결했다. `p14c-span-repro-r1` 5/0 → verify VERIFIED.
+- **① `p14c-app-it-r3`** 완주 exit1 125/5 FAIL(runId `b9cfac45…`, FP `aa38d050…`, source/policy 동결 true). 5건 모두 시험 fixture 결함이며 운영 정책·감사 검사를 약화하지 않고 고쳤다.
+  - `WorkerRestartExpiryIT`: P14 purge가 복구 취소 뒤 만료 대화를 정당하게 삭제한다. 시험 전용 `HarnessP09TestPorts`에 `aigw.harness.purge-hold-at-start` ReadinessPrecondition(-99)을 두어, 이 시험의 재기동만 RecoveryCompleted 전에 기존 `PURGE_HOLD`를 건다. 기존 취소·감사·위임·인가 검사는 유지했다.
+  - `WorkflowExpiryRaceIT`(신규 시험): trigger가 앞선 snapshot TOOL_CALL까지 거부했다. trigger를 `tc.logs.search` TOOL_CALL로 한정하고 snapshot TOOL_CALL 1행을 정확히 단언하도록 고쳤다.
+  - `RetentionProbeWiringIT`: 첫 앱 저장만 기다리던 경쟁을 고쳤다. 성공 3앱(마지막 tc-ui-front 포함)의 이번 주기 probedAt, 요청 창 8회, tc-business 실패 counter를 단일 bounded await로 기다린 뒤 기존 검사를 수행한다.
+  - `IngressAuthIT` 503: Spring logging 초기화의 LoggerContext reset이 class appender를 분리했다. class appender는 활성 컨텍스트 시작 뒤·매 시험 전에 연결을 보장하고, 격리 앱 시험은 open 뒤 전용 캡처를 설치·해제한다. 고정 코드 1건과 인자·예외 0을 단언한다.
+  - `IngressAuthIT` 별칭: filter 인증을 통과한 뒤 handler가 4xx를 내는 별칭은 Plan대로 API_REQUEST 1행(Job 0)이다. filter 실행 여부로 0행 또는 `assertRequestOrigin(0)`(service·UUID requestId·SDK trace)을 단언한다. 401 경로의 DELEGATION_INVALID 단독 검사는 유지했다.
+  - 최소 재현: `p14c-r5-repro-it-r1` 4개 클래스(IngressAuthIT 전체 포함) 40/0 → `p14c-r5-repro-verify-r1` VERIFIED.
+- **② `p14c-final-app-unit-r1`** 19/1 FAIL: `MetricLabelCardinalityTest`의 type 불일치 음성 사례가 같은 registry에 이미 있는 같은 id Timer와 충돌해, Micrometer가 filter 전에 예외를 냈다(`MeterRegistry.java:663`). 이 사례만 새 registry에서 filter 거부(meter 0)를 단언하도록 고쳤다.
+
+### 최종 canonical 결과 (각 Test 직후 같은 filter·Docker 속성의 별도 공식 verifier)
+
+| # | Test label | outcome | tests/fail/err/skip | runId | input FP | verifier |
+|---|---|---|---|---|---|---|
+| ③ | `p14c-final-core-test-r1` | EXECUTED | 104/0/0/0 | `4818420d-8402-4785-83e9-9e8d28b9ad48` | `f63c40e193fba5c7facb23bcf3b34acf221d5993849cfa9ea27e517ba9f33c9a` | `p14c-final-core-verify-r1` VERIFIED |
+| ③ | `p14c-final-core-test-r2`(최종 소스) | UP-TO-DATE | 104/0/0/0 | 같은 runId | 같은 FP | `p14c-final-core-verify-r2` VERIFIED |
+| ② | `p14c-final-app-unit-r2` | EXECUTED | 19/0/0/0 | `97298e01-faf8-427b-baf9-e60a81c2f0e4` | `1ec3af3f63e7418198afbc6010b617420caf0c974f72e68258296d86af88782a` | `p14c-final-app-unit-verify-r2` VERIFIED |
+| ④ | `p14c-final-persist-unit-r1` | EXECUTED | 3/0/0/0 | `c76ea339-b494-4e05-8e86-42712c1cf3e9` | `255242fdf5d7e8295bb7ed3ea854fc80dc26fef0c23a9c45f730a333cd7b6d8b` | `p14c-final-persist-unit-verify-r1` VERIFIED |
+| ⑥ | `p14c-final-tcmock-r1` | EXECUTED | 7/0/0/0 | `8a3ec276-009b-4254-894c-7c8fce701b56` | `022374ef0d942196384852648fe98549c38f3fd3d8b41661d33c92b8d7a82d99` | `p14c-final-tcmock-verify-r1` VERIFIED |
+| ⑤ | `p14c-final-persist-it-r1`(7 패턴) | EXECUTED | 84/0/0/0 | `a3fd09e8-b683-4a6f-b18f-32334782269b` | `a8b810ce92b3ef5b3fbc4a02cbe13369520bfd27fbe06e9dd42fcd356850713b` | `p14c-final-persist-it-verify-r1` VERIFIED |
+| ① | `p14c-final-app-it-r1`(정본 19 + WorkflowKnowledgeIT·WorkerRestartEpochIT, 26 클래스) | EXECUTED | 125/0/0/0 | `234ae18a-6528-412b-bc4e-a280426d3424` | `467bd9482737eab1ef9dce3681adf26bea385f114b4549a81bb66ee467d62336` | `p14c-final-app-it-verify-r1` VERIFIED |
+
+- 고유 최종 시험은 342건(104+19+3+7+84+125)이고 실패·오류·skip은 0이다. verifier VERIFIED는 증거 결속 확인이며, 실패 Test를 PASS로 바꾸지 않는다(`p14c-final-app-unit-r1` 실패는 실패로 보존).
+- 의존: `p14c-final-deps-runtime-r1` exit0(OTel 1.55.0 요청은 모두 `-> 1.67.0`), `p14c-final-depinsight-registry-otlp-r1` exit0(`micrometer-registry-otlp:1.16.6`).
+- `p14c-final-sync-cp-r1` exit0: `docs/gates/f1/runtime-classpath.txt`가 P04 사본 `29edaa95…`에서 생성물 `e07547ea…`로 바뀌었고 바이트 일치를 확인했다.
+- 원시 XML·OTR·run-binding·runtime CP·source-inputs는 scratch `p14-implementation/<label>-*`에 보존했다.
+
+### 미실행·한계·후속 책임
+
+- **NOT_RUN:**
+  - G-ALERT(실제 Prometheus/Alertmanager 규칙 배치)와 G-OBS-READBACK(실제 OTLP 수신·운영 readback).
+  - 실제 Loki·Tempo·GitLab Source IO, 운영 credential, 배포·CI.
+  - `BackupColumnCoverageIT`(P15 이후).
+- **Source 사실:** Source 선언은 disabled를 유지했다. 운영 Source 사실(Tempo 관측 3앱, ui-front 미관측)은 부모의 P16 gate 결정 대상이며 이 phase에서 승격하지 않았다.
+- **자격:** glab gitlab.com 자격은 만료(401) 상태다. CI 최소권한 자격 준비는 P15 책임이다.
+- **base부터 있던 시험 결함 수정:** `WorkflowPlanBuilderTest`의 Set 순서 의존, `JobTerminalDeadlineIT`의 job.started 미반영 기대값, `IngressAuthIT` class appender가 Spring logging reset으로 분리되던 lifecycle.
+- **변경 파일:** append 직전 `git status` 기준 수정 61개 경로(`docs/gates/f1/{runtime-classpath.txt,stack-compat.md}` 포함)와 untracked 18개 경로(신규 파일·디렉터리)다. 그 밖에 이 DevReport append가 있다.
+
+
+### 2026-11-07 P14 부모 최종 독립 검증 — CODE/LOCAL_TEST PASS
+
+독립 구현은 native Claude Code `claude-opus-5-5`, effort `high`로 수행했고 부모가 실제 호출/DI·SQL·실패 경로와 원시 결과를 대조했다. 최종 여섯 Test task의 고유 시험은 core 104 + app unit 19 + persistence unit 3 + tc-mock scanner 7 + persistence IT 84 + app IT 125 = **342건**, 실패·오류·skip 0이다. 각 Test의 별도 공식 verifier와 원시 XML/OTR TEST 식별자·runId·fingerprint·현재 554개 소스/정책 입력·runtime classpath를 함께 대조했다. app IT는 정본 필터 21개/26개 클래스/125건을 빠짐없이 실행했다. persistence IT의 중복 표시 이름은 고유 OTR TEST ID로 구별했다.
+
+native core-r2는 UP-TO-DATE로 최초 core-r1의 결과를 재사용한 실행이다. 부모는 이를 새 실행으로 세지 않고 `p14-parent-core-test-r1`에서 해당 Test에만 `--rerun`을 적용해 실제 104건을 새로 실행했다. 새 runId는 `4c5adef4-21f3-47d0-9211-a06eba1fc633`이고 별도 `p14-parent-core-verify-r1`이 검증했다. 이 강제 실행 전후 787개 컴파일 클래스 바이트는 동일하다. 최종 통합 부모 증거는 scratch `p14-parent-review/final-six-pairs-root-proof-r1.json`, SHA256 `a4c406e9b94619a2bc92de2e221f39e52853960857150c5150ffbd5927dbb01f`다. 명령·필터·신원·각 원시 결과 경로는 이 증거와 각 runner JSON에 보존했다.
+
+기존 실패·부분 중단 진단과 fixture 결함 수정 이력은 그대로 보존했다. 이후의 통과 결과로 이전 실패 기록을 덮어쓰지 않았다. 원래 main 835파일·EXEC 514파일·보호 483파일·Spec SHA `90ba8a739c303312065824f9923642812f5e427a5f05a8b13142f792c1ad0550`·기준선 seq8·기존 DevReport 1,045,423바이트 prefix가 불변이다. 변경 97파일은 정본 allowed_writes 안에 있고 UTF-8/LF/BOM0·git diff --check를 통과했다. stack-compat는 append만 했으며 runtime classpath 문서/생성물은 SHA `e07547eaff8e5ce3f8e1c3dc1689b20555c9aea353acdf060657d9afae989e52`로 바이트 동일하다.
+
+P14의 코드/로컬 검증은 PASS다. 실제 경보 배치(G-ALERT), 실제 운영 OTLP 수신 확인(G-OBS-READBACK), CI/Source/배포 및 P16/F1 종료는 미실행이고 PASS로 세지 않는다. 다음은 별도 Opus 5.5 P15 구현이며 P16 이후는 진행하지 않는다.
+
+자격 확인 보정: 앞 절의 glab gitlab.com 401은 그 자격에 한정한 결과다. 부모가 별도의 기존 Windows Git Credential Manager 자격을 메모리 안에서만 사용해 Bearer API 및 실제 private starter Maven metadata HEAD 200을 확인했다. 값 출력/저장·전역 설정 변경 0이며 로컬 의존 해석이 사용자 신규 계정 제공 때문에 차단된 상태는 아니다. 이 권한을 운영 읽기 전용 또는 CI 전용 자격으로 간주하지 않는다.

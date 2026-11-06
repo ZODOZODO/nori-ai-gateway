@@ -13,7 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Configuration(proxyBeanMethods = false)
 @Import({PersistenceClockConfiguration.class, SchemaVersionGuard.class, AuthRejectionPersistenceConfiguration.class,
     ConversationRepository.class, MessageRepository.class, JobRepository.class, JobEventRepository.class, ResultRepository.class, EvidenceRepository.class, ToolExecutionRepository.class, CacheRepository.class, AuditRepository.class,
-    QueueMaintenanceRepository.class, RetentionMaintenanceRepository.class, RecoveryMaintenanceRepository.class})
+    QueueMaintenanceRepository.class, RetentionMaintenanceRepository.class, RecoveryMaintenanceRepository.class, com.nori.ai.gateway.persistence.audit.AuditWriter.class})
 public class PersistenceModuleConfiguration {
     @Bean TransactionTemplate persistenceTransactions(PlatformTransactionManager manager) { return new TransactionTemplate(manager); }
 }

@@ -17,6 +17,12 @@ import static org.assertj.core.api.Assertions.*;
 import static com.nori.ai.gateway.core.DomainFixtures.*;
 
 class WorkflowExecutorTest {
+    /** 실제 호출 기록만 모으고 사전 차단 기록은 단계 결과 상태로 따로 둔다. */
+    record Recording(List<ToolDispatcher.InvocationRecord> invocations,List<ResultStatus> blocked) implements com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder {
+        Recording(List<ToolDispatcher.InvocationRecord> invocations){this(invocations,new ArrayList<>());}
+        @Override public void record(JobContext job,ToolDispatcher.InvocationRecord invocation){invocations.add(invocation);}
+        @Override public void blocked(JobContext job,String capabilityId,ResultStatus status,Optional<ExecutionContext.DispatchTrace> trace){blocked.add(status);}
+    }
     @Test void processorUsesOnlyLogAncestorsInDeclarationOrderAndCacheUnknownGitMakesNoCacheAuthorization() {
         var loader=new ManifestLoader();var manifests=loader.loadClasspath("manifests/tc/index.json");var versions=new ContractVersionPolicy();var registry=new CapabilityRegistry(manifests,workflows(),Set.of(ImplementationPhase.PHASE_1),versions);
         var validator=new PlanValidator(registry,new PlanInjectionSeam.NoOp(),CLOCK,9,100);var scope=new WorkflowAuthorizationPreparationTest.Fixture().scope;
@@ -34,7 +40,7 @@ class WorkflowExecutorTest {
             }
         });
         var dispatcher=new ToolDispatcher(registry,validator,new ToolResultContractValidator(versions),new DispatchInjectionSeam.NoOp(),tools,CLOCK);var expiry=new ExpiryCheckpoint(new ConversationExpiryGuard(),CLOCK);var store=new ToolResultCacheTest.Store();var cache=new ToolResultCache(store,validator,new ResultAccessEvaluator(),(permissions,documents)->Map.of(),expiry,CLOCK);var records=new ArrayList<ToolDispatcher.InvocationRecord>();
-        var executor=new com.nori.ai.gateway.core.workflow.WorkflowExecutor(registry,validator,dispatcher,authorization,expiry,CLOCK,cache,new BlockBuilder(new UiSchemaValidator()),(job,record)->records.add(record),new com.nori.ai.gateway.core.workflow.LogSummarizer(),new GeneralQueryHelpBuilder());
+        var executor=new com.nori.ai.gateway.core.workflow.WorkflowExecutor(registry,validator,dispatcher,authorization,expiry,CLOCK,cache,new BlockBuilder(new UiSchemaValidator()),new Recording(records),new com.nori.ai.gateway.core.workflow.LogSummarizer(),new GeneralQueryHelpBuilder());
         var fields=Map.<String,Object>of("context",Map.of("timezone","UTC","referenceTime",NOW.toString(),"timeWindow",Map.of("from",NOW.minusSeconds(60).toString(),"to",NOW.toString())),"resourceRefs",List.of(Map.of("type","EQP","ref","EQP_001")));
         var job=new JobContext("request","conversation",scope,"d".repeat(22),NOW.plusSeconds(600),new CancellationToken(),InferenceMode.DISABLED,Map.of("taskType","INCIDENT_ANALYSIS"),new JobRequestInput("message",1,"질문",fields));
         var definition=registry.workflow(scope,TaskType.INCIDENT_ANALYSIS).orElseThrow();var plan=new com.nori.ai.gateway.core.workflow.WorkflowPlanBuilder(registry).build(definition,registry.view(scope),job);
@@ -46,7 +52,7 @@ class WorkflowExecutorTest {
     @Test void aGeneralQueryWithFalseFlagsAndANonexistentSelectedReferenceNeverReadsOrDispatchesAnything() {
         var fixture=new WorkflowAuthorizationPreparationTest.Fixture();var loader=new ManifestLoader();var versions=new ContractVersionPolicy();var registry=new CapabilityRegistry(loader.loadClasspath("manifests/tc/index.json"),workflows(),Set.of(ImplementationPhase.PHASE_1),versions);
         var validator=new PlanValidator(registry,new PlanInjectionSeam.NoOp(),CLOCK,9,100);var dispatcher=new ToolDispatcher(registry,validator,new ToolResultContractValidator(versions),new DispatchInjectionSeam.NoOp(),List.of(),CLOCK);var expiry=new ExpiryCheckpoint(new ConversationExpiryGuard(),CLOCK);var store=new ToolResultCacheTest.Store();var cache=new ToolResultCache(store,validator,new ResultAccessEvaluator(),(permissions,documents)->Map.of(),expiry,CLOCK);var recorded=new ArrayList<ToolDispatcher.InvocationRecord>();
-        var executor=new com.nori.ai.gateway.core.workflow.WorkflowExecutor(registry,validator,dispatcher,fixture.source,expiry,CLOCK,cache,new BlockBuilder(new UiSchemaValidator()),(job,record)->recorded.add(record),new com.nori.ai.gateway.core.workflow.LogSummarizer(),new GeneralQueryHelpBuilder());
+        var executor=new com.nori.ai.gateway.core.workflow.WorkflowExecutor(registry,validator,dispatcher,fixture.source,expiry,CLOCK,cache,new BlockBuilder(new UiSchemaValidator()),new Recording(recorded),new com.nori.ai.gateway.core.workflow.LogSummarizer(),new GeneralQueryHelpBuilder());
         var fields=Map.<String,Object>of("resourceRefs",List.of(Map.of("type","EQP","ref","EQP-not-existing")),"options",Map.of("allowTools",false,"allowKnowledge",false));
         var job=new JobContext("request","conversation",fixture.scope,"d".repeat(22),NOW.plusSeconds(600),new CancellationToken(),InferenceMode.DISABLED,Map.of("taskType","GENERAL_QUERY"),new JobRequestInput("message",1,"도움말",fields));
         var definition=registry.workflow(job.scope(),TaskType.GENERAL_QUERY).orElseThrow();var plan=new com.nori.ai.gateway.core.workflow.WorkflowPlanBuilder(registry).build(definition,registry.view(job.scope()),job);assertThat(plan.toolPlan().targetResources()).isEmpty();assertThat(job.requestInput().requestFields()).isEqualTo(fields);assertThat(job.requestInput().selectedResourceRefs()).containsExactly(new ResourceRef("EQP","EQP-not-existing"));

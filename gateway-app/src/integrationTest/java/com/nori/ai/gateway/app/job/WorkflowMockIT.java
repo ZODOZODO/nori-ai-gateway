@@ -18,7 +18,7 @@ class WorkflowMockIT extends P09QueueSupport {
     @Override protected Map<String,Object> claims(String actor,String delegation){var values=new HashMap<>(super.claims(actor,delegation));values.put("perm",scope(actor).perm().stream().sorted().toList());return values;}
     protected JobAdmissionService.Accepted admit(TaskType task,String key,String conversation,Map<String,Object> fields) {
         hooks().arm("actor",key,new TestHookRegistry.Scenario(task,Set.of(),null,false));var scope=scope("actor");String delegation=registeredDlg("actor");
-        return context.getBean(JobAdmissionService.class).accept(scope,new JobAdmissionService.AdmissionRequest("/v1/query",conversation,"요청 "+key,fields,key,delegation));
+        return inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope,new JobAdmissionService.AdmissionRequest("/v1/query",conversation,"요청 "+key,fields,key,delegation)));
     }
     protected Map<String,Object> fields(String eqp,String from,String to) {
         return Map.of("context",Map.of("timezone","UTC","referenceTime",NOW.toString(),"timeWindow",Map.of("from",from,"to",to)),"resourceRefs",List.of(Map.of("type","EQP","ref",eqp)));
@@ -26,7 +26,7 @@ class WorkflowMockIT extends P09QueueSupport {
     protected tools.jackson.databind.JsonNode payload(String job){return json.readTree(jdbc().sql("SELECT payload::text FROM gw.result WHERE job_id=:id").param("id",job).query(String.class).single());}
     @Test void validPhoneSubjectIsPreservedAcrossTheActualBusinessToolAndAllStoredIdentities() throws Exception {
         String actor="01012345678",key="phone-subject";hooks().arm(actor,key,new TestHookRegistry.Scenario(TaskType.LIVE_QUERY,Set.of(),null,false));
-        var accepted=context.getBean(JobAdmissionService.class).accept(scope(actor),new JobAdmissionService.AdmissionRequest("/v1/query",null,"연락 token=local-private user@example.com SENTINEL:input",workflowFields(),key,registeredDlg(actor)));await(()->state(accepted.jobId()).equals("SUCCEEDED"));
+        var accepted=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope(actor),new JobAdmissionService.AdmissionRequest("/v1/query",null,"연락 token=local-private user@example.com SENTINEL:input",workflowFields(),key,registeredDlg(actor))));await(()->state(accepted.jobId()).equals("SUCCEEDED"));
         var result=payload(accepted.jobId());assertThat(result.path("evidence").get(0).path("actorAccessScope").path("value").asString()).isEqualTo(actor);
         String raw=jdbc().sql("SELECT payload::text FROM gw.tool_execution WHERE job_id=:job").param("job",accepted.jobId()).query(String.class).single();assertThat(json.readTree(raw).path("result").path("evidence").get(0).path("actorAccessScope").path("value").asString()).isEqualTo(actor);
         String stored=jdbc().sql("SELECT payload::text FROM gw.evidence WHERE job_id=:job").param("job",accepted.jobId()).query(String.class).single();assertThat(json.readTree(stored).path("actorAccessScope").path("value").asString()).isEqualTo(actor);assertThat(result.toString()).doesNotContain("local-private","user@example.com","SENTINEL:input");

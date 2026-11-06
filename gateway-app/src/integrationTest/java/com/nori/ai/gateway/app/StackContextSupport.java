@@ -22,6 +22,9 @@ import com.nimbusds.jose.jwk.JWKSet;
 
 @ExtendWith(DockerRequiredExtension.class)
 public abstract class StackContextSupport {
+    // 공용 fixture는 운영 기본 OTLP endpoint로 보내지 않습니다. 전용 인프로세스 수신 시험만 loopback endpoint와 함께 켭니다.
+    private static final Map<String,Object> OTLP_TEST_DEFAULTS = Map.of("ai.gateway.otlp.metrics.enabled", false,
+        "ai.gateway.otlp.traces.enabled", false, "ai.gateway.otlp.logs.enabled", false);
     protected PgTestDatabase database;
     protected ConfigurableApplicationContext context;
     @org.junit.jupiter.api.io.TempDir protected Path securityDirectory;
@@ -61,10 +64,7 @@ public abstract class StackContextSupport {
         properties.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app")));
         properties.putAll(extraApplicationProperties());
         if (applicationType() == WebApplicationType.SERVLET) { properties.put("server.address","127.0.0.1"); properties.put("server.port",0); }
-        context = new SpringApplicationBuilder(AiGatewayApplication.class)
-            .sources(com.nori.ai.gateway.app.job.P09TestPorts.class).sources(additionalSources)
-            .properties(properties)
-            .web(applicationType()).profiles("verify").run(
+        var arguments = new java.util.ArrayList<>(List.of(
                 "--spring.flyway.enabled=false",
                 "--ai.gateway.recovery.restore-mode=" + properties.getOrDefault("ai.gateway.recovery.restore-mode",false),
                 "--ai.gateway.recovery.restore-handler.enabled=" + properties.getOrDefault("ai.gateway.recovery.restore-handler.enabled",true),
@@ -72,7 +72,23 @@ public abstract class StackContextSupport {
                 "--spring.kafka.listener.auto-startup=false",
                 "--nori.storage.s3.enabled=true", "--nori.storage.s3.endpoint=http://127.0.0.1:1",
                 "--nori.storage.s3.bucket=p04-smoke", "--nori.storage.s3.access-key=p04-dummy",
-                "--nori.storage.s3.secret-key=p04-dummy", "--nori.storage.s3.region=us-east-1");
+                "--nori.storage.s3.secret-key=p04-dummy", "--nori.storage.s3.region=us-east-1"));
+        // application.yaml에 있는 OTLP 키는 기본 속성보다 우선하므로 명령행 인자로 넘깁니다.
+        var otlp = new java.util.TreeMap<String,Object>(OTLP_TEST_DEFAULTS);
+        properties.forEach((key, value) -> { if (key.startsWith("ai.gateway.otlp.")) otlp.put(key, value); });
+        otlp.forEach((key, value) -> arguments.add("--" + key + "=" + value));
+        context = new SpringApplicationBuilder(AiGatewayApplication.class)
+            .sources(com.nori.ai.gateway.app.job.P09TestPorts.class).sources(additionalSources)
+            .properties(properties)
+            .web(applicationType()).profiles("verify").run(arguments.toArray(String[]::new));
+    }
+
+    /** 접수 서비스를 직접 부르는 시험이 인입 filter와 같은 앱 OpenTelemetry Bean의 실제 SDK 서버 span 안에서 호출하게 한다. */
+    protected <T> T inRequestSpan(java.util.function.Supplier<T> action) {
+        var span = context.getBean(io.opentelemetry.api.OpenTelemetry.class).getTracer("com.nori.ai.gateway.test").spanBuilder("aigw.request")
+            .setSpanKind(io.opentelemetry.api.trace.SpanKind.SERVER).setNoParent().startSpan();
+        try (var current = span.makeCurrent()) { return action.get(); }
+        finally { span.end(); }
     }
 
     @AfterEach protected void close() {

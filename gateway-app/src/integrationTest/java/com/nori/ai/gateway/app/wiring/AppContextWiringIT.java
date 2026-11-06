@@ -168,7 +168,7 @@ class AppContextWiringIT extends StackContextSupport {
         try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
             String latest;
             try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")) {
-                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("5");
+                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("7");
             }
             try (var update = connection.prepareStatement("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = ?")) { update.setString(1,latest); assertThat(update.executeUpdate()).isEqualTo(1); }
         }
@@ -217,9 +217,9 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(context.getBeansOfType(com.nori.ai.gateway.app.config.MigrateCommand.class)).isEmpty();
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class)
             .sql("SELECT count(*) FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
-            .query(Integer.class).single()).isEqualTo(6);
+            .query(Integer.class).single()).isEqualTo(7);
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")
-            .query(String.class).list()).containsExactly("1","2","3","3.1","4","5");
+            .query(String.class).list()).containsExactly("1","2","3","3.1","4","5","7");
     }
 
     private void withMigrationProperties(String role, Runnable action) {
@@ -230,4 +230,147 @@ class AppContextWiringIT extends StackContextSupport {
         try { action.run(); }
         finally { previous.forEach((key, value) -> { if (value == null) System.clearProperty(key); else System.setProperty(key, value); }); }
     }
+
+    // ---- P14 Source 생산 조립: 같은 Registrar·factory에 명시 snapshot을 공급한다(운영 classpath 파일·전역 cache·env override 없음) ----
+    private static final String APPS = "[\"tc-gateway\",\"tc-business\",\"tc-ui-backend\",\"tc-ui-front\"]";
+    private static String sourceDeclaration(String loki, String tempo, String gitlab) {
+        return "{\"ownerSystem\":\"TC\",\"loki\":{\"sourceAllowlistRef\":\"sources://TC/logs\",\"apps\":" + APPS + ",\"namespace\":\"tc\",\"retentionPolicy\":\"UNBOUNDED_UNVERIFIED\"" + loki + "},"
+            + "\"tempo\":{\"sourceAllowlistRef\":\"sources://TC/trace\",\"services\":" + APPS + ",\"retentionPolicy\":\"UNVERIFIED\"" + tempo + "},"
+            + "\"gitlab\":{\"sourceAllowlistRef\":\"sources://TC/git\",\"repositories\":[{\"projectId\":22,\"sourceRepo\":\"nori-tc-gateway\",\"refs\":[\"main\"],\"pathPrefixes\":[\"src/main\"],\"approvalRef\":\"local-test-approval\"}],"
+            + "\"deployLineage\":[{\"service\":\"tc-gateway\",\"execProjectId\":11,\"packageJobName\":\"package\",\"sourceRepo\":\"nori-tc-gateway\",\"siblingProjectId\":22,\"method\":\"SIBLING_CLONE_LOG\",\"approvalRef\":\"local-test-approval\"}]" + gitlab + "}}";
+    }
+    private static String target(boolean verified, String base) { return ",\"baseUrl\":\"" + base + "\",\"serviceTargetVerified\":" + verified; }
+    private org.springframework.context.annotation.AnnotationConfigApplicationContext sourceChild(String declaration) {
+        var child = new org.springframework.context.annotation.AnnotationConfigApplicationContext();
+        child.setParent(context);
+        child.register(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.FactoryConfiguration.class);
+        new com.nori.ai.gateway.app.config.SourceConnectorConfiguration.Registrar(declaration)
+            .registerBeanDefinitions(org.springframework.core.type.AnnotationMetadata.introspect(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.class), child);
+        child.refresh();
+        return child;
+    }
+    private static final List<Class<?>> SOURCE_BEANS = List.of(com.nori.ai.gateway.integration.loki.LokiLogConnector.class, com.nori.ai.gateway.integration.tempo.TempoTraceConnector.class,
+        com.nori.ai.gateway.integration.gitlab.GitLabCodeConnector.class, com.nori.ai.gateway.integration.gitlab.GitLabPipelineLineageReader.class,
+        com.nori.ai.gateway.integration.loki.SourceHttpClient.class, com.nori.ai.gateway.integration.loki.SourceReadAccess.class, com.nori.ai.gateway.integration.loki.SourceObservability.class,
+        com.nori.ai.gateway.app.config.SourceConnectorConfiguration.LokiProbeFactory.class, com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class,
+        com.nori.ai.gateway.app.job.DirectSourceToolExecutor.GitExecutionScopes.class);
+
+    @Test void productionSourceDeclarationRegistersNoSourceBeanAndOnlyTheActualRetentionReader() throws Exception {
+        var declared = java.nio.file.Path.of(System.getProperty("aigw.rootDir"), "gateway-app/src/main/resources/config/sources/tc-sources-v1.json");
+        byte[] before = java.nio.file.Files.readAllBytes(declared);
+        start();
+        for (Class<?> type : SOURCE_BEANS) assertThat(context.getBeansOfType(type)).as(type.getName()).isEmpty();
+        assertThat(context.getBeansOfType(com.nori.ai.gateway.core.port.SourceRetentionReader.class).values()).singleElement()
+            .isInstanceOf(com.nori.ai.gateway.persistence.retention.SourceRetentionReaderAdapter.class);
+        var snapshot = context.getBean(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.SourceSnapshot.class);
+        assertThat(snapshot.loki().serviceTargetVerified()).isFalse();
+        assertThat(snapshot.tempo().baseUrl()).isEmpty();
+        assertThat(snapshot.gitlab().baseUrl()).isEmpty();
+        assertThat(snapshot.gitlab().tokenPath()).isEmpty();
+        assertThat(snapshot.repositories()).isEmpty();
+        assertThat(snapshot.toString()).doesNotContain("monitoring", "http");
+        var scheduler = context.getBean(com.nori.ai.gateway.app.ops.SourceRetentionProbeScheduler.class);
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(15).toNanos();
+        while (!scheduler.started() && System.nanoTime() < deadline) Thread.sleep(20);
+        assertThat(scheduler.started()).isTrue();
+        Thread.sleep(1500);
+        // factory·확인 범위 입력이 없으므로 탐침 생성·측정·저장은 없습니다(Gate 미확정 NOT_RUN).
+        assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT count(*) FROM gw.source_retention_probe").query(Integer.class).single()).isZero();
+        assertThat(java.nio.file.Files.readAllBytes(declared)).isEqualTo(before);
+    }
+
+    @Test void sameRegistrarBuildsOnlyVerifiedCompleteSourcesAndRejectsActiveMalformedDeclarationsWithoutSourceIo() throws Exception {
+        start();
+        var hits = new java.util.concurrent.atomic.AtomicInteger();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            try (exchange) {
+                hits.incrementAndGet();
+                byte[] body = "{\"status\":\"success\",\"data\":{\"resultType\":\"streams\",\"result\":[]}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body);
+            }
+        });
+        server.start();
+        try {
+            String base = "http://127.0.0.1:" + server.getAddress().getPort();
+            var token = securityDirectory.resolve("gitlab-read-token");
+            java.nio.file.Files.writeString(token, UUID.randomUUID().toString());
+            String tokenJson = ",\"readTokenFile\":\"" + token.toString().replace("\\", "\\\\") + "\"";
+            try (var child = sourceChild(sourceDeclaration(target(true, base), target(true, base), target(true, base) + tokenJson))) {
+                for (Class<?> type : SOURCE_BEANS) if (type != com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class)
+                    assertThat(child.getBeansOfType(type)).as(type.getName()).hasSize(type == com.nori.ai.gateway.integration.loki.SourceHttpClient.class ? 3 : 1);
+                assertThat(child.getBeansOfType(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class)).isEmpty();
+                var loki = child.getBean(com.nori.ai.gateway.integration.loki.LokiLogConnector.class);
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "http")).isSameAs(child.getBean("lokiSourceHttpClient"));
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "access")).isSameAs(child.getBean(com.nori.ai.gateway.integration.loki.SourceReadAccess.class));
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "retention")).isSameAs(context.getBean(com.nori.ai.gateway.core.port.SourceRetentionReader.class));
+                var scopes = child.getBean(com.nori.ai.gateway.app.job.DirectSourceToolExecutor.GitExecutionScopes.class);
+                assertThat(scopes.repositories()).singleElement().satisfies(repo -> assertThat(repo.sourceRepo()).isEqualTo("nori-tc-gateway"));
+                assertThat(scopes.deployLineage()).hasSize(1);
+                assertThat(hits).as("기동 중 Source I/O 0").hasValue(0);
+                var now = context.getBean(java.time.Clock.class).instant();
+                assertThat(child.getBean(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.LokiProbeFactory.class)
+                    .create(new com.nori.ai.gateway.core.retention.TimeWindow(now.minusSeconds(3600), now)).measure("tc-gateway")).isEmpty();
+                assertThat(hits.get()).isPositive();
+            }
+            int afterPositive = hits.get();
+            // 필수 값 부재(verified=true지만 주소·token 경로 없음 포함)·false·불완전(필수 token mount 없음)은 Bean 0·Source I/O 0입니다.
+            for (String declaration : List.of(sourceDeclaration(target(false, base), "", ""), sourceDeclaration("", target(false, base), ""),
+                    sourceDeclaration(",\"serviceTargetVerified\":true", ",\"serviceTargetVerified\":true", ",\"serviceTargetVerified\":true"),
+                    sourceDeclaration("", "", target(true, base)),
+                    sourceDeclaration(target(false, base) + ",\"retentionProbe\":{\"startAt\":\"2026-11-01T00:00:00Z\",\"approvalRef\":\"local-gate-approval\"}", "", ""),
+                    sourceDeclaration("", "", target(true, base) + ",\"readTokenFile\":\"" + securityDirectory.resolve("missing-token").toString().replace("\\", "\\\\") + "\""))) {
+                try (var child = sourceChild(declaration)) {
+                    for (Class<?> type : SOURCE_BEANS) assertThat(child.getBeansOfType(type)).as(type.getName()).isEmpty();
+                }
+            }
+            // retentionProbe가 null이면 부재와 같으므로 ready Loki의 Bean만 있고 확인 범위 입력은 0입니다.
+            try (var child = sourceChild(sourceDeclaration(target(true, base) + ",\"retentionProbe\":null", "", ""))) {
+                assertThat(child.getBeansOfType(com.nori.ai.gateway.integration.loki.LokiLogConnector.class)).hasSize(1);
+                assertThat(child.getBeansOfType(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class)).isEmpty();
+            }
+            // 제공된 값의 타입·URI(SourceHttpClient와 같은 규칙)·경로·retentionProbe 형식 오류만 고정 비민감 기동 오류이며 주소·경로를 추정하지 않습니다.
+            String probe = ",\"retentionProbe\":";
+            for (String declaration : List.of(sourceDeclaration(",\"baseUrl\":\"" + base + "\",\"serviceTargetVerified\":\"true\"", "", ""),
+                    sourceDeclaration("", "", target(true, base) + ",\"readTokenFile\":\"relative/read-token\""), sourceDeclaration(target(true, "http://exa mple"), "", ""),
+                    sourceDeclaration(target(true, "ftp://127.0.0.1:1"), "", ""), sourceDeclaration(target(false, "ftp://127.0.0.1:1"), "", ""),
+                    sourceDeclaration("", target(true, "http://user@127.0.0.1:1"), ""), sourceDeclaration(target(true, base + "/loki"), "", ""),
+                    sourceDeclaration(target(true, base + "/?q=1"), "", ""), sourceDeclaration(target(true, base + "#fragment"), "", ""), sourceDeclaration(",\"baseUrl\":7", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "\"2026-11-01T00:00:00Z\"", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"2026-11-01T00:00:00\",\"approvalRef\":\"local-gate-approval\"}", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"2026-11-01T09:00:00+09:00\",\"approvalRef\":\"local-gate-approval\"}", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"not-a-time\",\"approvalRef\":\"local-gate-approval\"}", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"2026-11-01T00:00:00Z\",\"approvalRef\":\"  \"}", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"2026-11-01T00:00:00Z\"}", "", ""),
+                    sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"2026-11-01T00:00:00Z\",\"approvalRef\":\"local-gate-approval\",\"endAt\":\"2026-11-02T00:00:00Z\"}", "", "")))
+                assertThatThrownBy(() -> sourceChild(declaration).close()).isInstanceOf(IllegalStateException.class).hasMessage("Source 선언 구성이 잘못되었습니다");
+            assertThat(hits).as("음성·오류 경로의 Source I/O 0").hasValue(afterPositive);
+            // 명시 승인 선언의 [startAt, 주기 now) 창만 네 앱 보존 SourceId에 공급하고 같은 snapshot의 Loki 전송기로 실제 측정합니다.
+            var now = context.getBean(java.time.Clock.class).instant();
+            var startAt = now.minus(java.time.Duration.ofDays(2)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            try (var child = sourceChild(sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"" + startAt + "\",\"approvalRef\":\"local-gate-approval\"}", "", ""))) {
+                var input = child.getBean(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class);
+                assertThat(hits).as("기동 중 Source I/O 0").hasValue(afterPositive);
+                for (String app : com.nori.ai.gateway.integration.loki.LokiSourcePolicy.APPS) {
+                    String sourceId = com.nori.ai.gateway.integration.loki.LokiSourcePolicy.retentionSourceId(app);
+                    assertThat(input.window(sourceId, now)).contains(new com.nori.ai.gateway.core.retention.TimeWindow(startAt, now));
+                    assertThat(input.window(sourceId, now.plus(java.time.Duration.ofHours(24)))).contains(new com.nori.ai.gateway.core.retention.TimeWindow(startAt, now.plus(java.time.Duration.ofHours(24))));
+                    assertThat(input.window(sourceId, startAt)).as("startAt이 주기 now보다 앞서지 않으면 창 0").isEmpty();
+                    assertThat(input.window(sourceId, startAt.minusSeconds(1))).isEmpty();
+                }
+                assertThat(input.window("loki:other-app", now)).isEmpty();
+                var window = input.window(com.nori.ai.gateway.integration.loki.LokiSourcePolicy.retentionSourceId("tc-gateway"), now).orElseThrow();
+                assertThat(child.getBean(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.LokiProbeFactory.class).create(window).measure("tc-gateway")).isEmpty();
+                assertThat(hits.get()).isGreaterThan(afterPositive);
+            }
+            int afterProbe = hits.get();
+            var duplicate = new org.springframework.context.annotation.AnnotationConfigApplicationContext();
+            var ready = sourceDeclaration(target(true, base), "", "");
+            new com.nori.ai.gateway.app.config.SourceConnectorConfiguration.Registrar(ready).registerBeanDefinitions(org.springframework.core.type.AnnotationMetadata.introspect(Object.class), duplicate);
+            assertThatThrownBy(() -> new com.nori.ai.gateway.app.config.SourceConnectorConfiguration.Registrar(ready).registerBeanDefinitions(org.springframework.core.type.AnnotationMetadata.introspect(Object.class), duplicate))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("중복");
+            assertThat(hits).as("중복 등록 오류 경로의 Source I/O 0").hasValue(afterProbe);
+        } finally { server.stop(0); }
+    }
+    private static String rootMessage(Throwable failure) { Throwable root = failure; while (root.getCause() != null) root = root.getCause(); return root.getMessage(); }
 }

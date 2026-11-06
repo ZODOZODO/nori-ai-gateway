@@ -100,7 +100,9 @@ class JobQueueIT extends P09QueueSupport {
             }
         }
         await(()->state(late.jobId()).equals("CANCELLED"));await(()->ledger.activeCount()==0);
-        assertThat(ledger.releaseCount()).isEqualTo(2);assertThat(count("result")).isZero();assertThat(count("audit_event")).isEqualTo(3);
+        assertThat(ledger.releaseCount()).isEqualTo(2);assertThat(count("result")).isZero();
+        var jobs=List.of(queued.jobId(),running.jobId(),late.jobId());for(String id:jobs)assertJobAuditLineage(id,true);
+        assertThat(jdbc().sql("SELECT count(*) FROM gw.audit_event WHERE job_id IS NULL OR job_id NOT IN (:ids)").param("ids",jobs).query(Integer.class).single()).isZero();
         assertThat(jdbc().sql("SELECT count(*) FROM gw.job_event WHERE job_id=:id AND type='job.cancelled'").param("id",late.jobId()).query(Integer.class).single()).isOne();
     }
     @Test @Tag("AC-28-ATOMIC") void twoAdmissionsAtLastQueuePlaceProduceExactlyOneAcceptance()throws Exception{
@@ -122,7 +124,7 @@ class JobQueueIT extends P09QueueSupport {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");var job=admit("actor","terminal-race",Set.of());var committer=context.getBean(JobTerminalCommitter.class);
         assertThatThrownBy(()->context.getBean(TransactionTemplate.class).execute(s->committer.commit(job.jobId(),TerminalSpec.forCause(TerminalSpec.Cause.CANCELLED)))).isInstanceOf(IllegalStateException.class);
         try(var pool=Executors.newVirtualThreadPerTaskExecutor()){var one=pool.submit(()->committer.commit(job.jobId(),TerminalSpec.forCause(TerminalSpec.Cause.CANCELLED)));var two=pool.submit(()->committer.commit(job.jobId(),TerminalSpec.forCause(TerminalSpec.Cause.CANCELLED)));assertThat(List.of(one.get(),two.get())).containsExactlyInAnyOrder(true,false);}
-        assertThat(count("audit_event")).isOne();assertThat(count("job_event")).isEqualTo(2);
+        assertThat(assertJobAuditLineage(job.jobId(),true)).containsExactly("JOB_ACCEPTED","JOB_TERMINAL");assertThat(count("audit_event")).isEqualTo(2);assertThat(count("job_event")).isEqualTo(2);
     }
     private void assertResult(String id,String status,String error,String decision){
         var row=jdbc().sql("SELECT r.status,r.error_code,a.decision FROM gw.result r JOIN gw.audit_event a ON a.job_id=r.job_id WHERE r.job_id=:id AND a.event_type='JOB_TERMINAL'").param("id",id).query().singleRow();

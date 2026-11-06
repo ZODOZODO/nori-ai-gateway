@@ -207,3 +207,34 @@ P04 검토 수정의 로컬 검증은 통과했지만, 사용자 승인 전 comm
 P04는 사용자 승인에 따른 로컬 커밋과 실제 clean checkout 검증까지 완료했다. 실제 시험 코드 커밋은 `8e51ea97049c86ee2a4729d736b8cd934131c792`, clone은 `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p04-commit-close/clean-checkout`이다. clone 최초 Git 상태는 비어 있고 build 산출물도 없었다. `gradlew.bat build --no-daemon --console=plain` 단독 exit 0, 직후 별도 `gradlew.bat :gateway-eval:run --args="test-evidence verify --tasks :gateway-app:test,:gateway-eval:test" --no-daemon --console=plain` exit 0 / TEST_EVIDENCE_VERIFIED다(각 호출 AIGW_SPEC_FILE 명시, 기본 필터). 앱6 + Eval249 = 255건, 실패·오류·건너뜀·중단0. producer가 앱 test 전에 실제 실행되었으며 integrationTest는 build에 포함되지 않았다.
 
 실제 finalizer gitSha=`8e51ea97049c86ee2a4729d736b8cd934131c792`, 실제 생산 runtime SHA256=`29edaa9568651ebc588658f45fba789e35c79f02e2a0950f97bcec8f23384a6e`이며 OTR·binding·요약 신원을 대조했다. 빌드 후 clone도 Git clean이다. 부모가 기존 안정 소스의 259건·runtime/native·원시 증거를 이미 독립 검증했고, 이번 소스 변경은0이라 Docker/native는 반복하지 않았다. SPEC·baseline·승인6·보호483·승인 소스32는 불변이다. 기존 역사와 문서 prefix를 보존하며 이 절이 최신 결론이다. 후속 종료보고 docs-only 커밋의 코드/빌드 트리는 시험한 코드 커밋과 동일하다. P04 완료, P05 미착수, 실제 모델 호출0. 정확한 argv·runId·OTR/summary hash는 dev-report 최신 종료 절과 이번 scratch clean-validation.json에 있다.
+
+
+## 2026-11-07 P14 OTel API/SDK 정렬 — 실제 RCA·공식 BOM·current graph·기동 검증 (P04 기록 불변)
+
+P04 이후 resolved runtime에는 `opentelemetry-api`·`context`·`common` 1.67.0과 `api-incubator` 1.67.0-alpha(계측 `opentelemetry-logback-appender-1.0` 2.33.1-alpha·`instrumentation-api` 2.33.1이 요구)가 Boot 4.0.7 BOM의 SDK/exporter 1.55.0과 섞여 있었다(위 P04 runtime SHA `29edaa95…` 사본의 53·60·64행). P04~P13의 main 코드는 SDK provider를 만들지 않아 잠재 결함이었다. P14가 `SdkTracerProvider`/`SdkLoggerProvider`를 처음 생성하면서 드러났다.
+
+- **원인:** `opentelemetry-sdk-common-1.55.0.jar`의 `ExceptionAttributeResolver.getDefault()`(line 36)가 `io.opentelemetry.api.internal.ConfigUtil`을 호출한다. 그런데 `opentelemetry-api-1.67.0.jar`(SHA `538d1dff…`)에는 이 클래스가 없다. 1.67에서는 `opentelemetry-common-1.67.0.jar`의 `io/opentelemetry/common/impl/ConfigUtil.class`로 옮겨졌다. 그 결과 P14 app IT 기동이 `NoClassDefFoundError`로 실패했다(scratch `p14c-app-it-r1`, 부모 중단 ABORTED 진단 근거).
+- **공식 정렬:** 계측 v2.33.1 릴리스의 대상 SDK는 1.67.0이다. `opentelemetry-instrumentation-bom-alpha:2.33.1-alpha`(POM SHA `192bfb99…`)는 `opentelemetry-bom:1.67.0`·`opentelemetry-bom-alpha:1.67.0-alpha`·`opentelemetry-instrumentation-bom:2.33.1`을 import한다(부모 공개 POM 근거 `p14-parent-review/otel-bom-metadata-root-r1/receipt.json`).
+- **Plan 허용 변경:** 정확히 2줄만 바꿨다. `gradle/libs.versions.toml`의 `[libraries]`에 `otel-instrumentation-bom-alpha` alias를, `gateway-app/build.gradle.kts`에 `implementation(platform(libs.otel.instrumentation.bom.alpha))`를 추가했다. `[versions]`·Boot 4.0.7·Spring AI 2.0.2·appender 선택은 그대로다. force/enforcedPlatform/exclude/새 숫자 pin은 0이다.
+- **최초 실제 해석:**
+  - 기존 runner `--secure-auth`(glab gitlab.com 자격)는 `/api/v4/user` 401로 만료 상태였다(`p14c-deps-runtime-bom-r1` exit1, 값 출력 0). 전역 credential은 변경하지 않았다.
+  - scratch init `cached-snapshot-online.init.gradle`(`cacheChangingModulesFor`만 설정)로 이미 캐시된 com.nori SNAPSHOT의 재조회만 생략하고, Maven Central은 `--offline` 없이 해석했다.
+  - `p14c-deps-runtime-bom-r2` exit0, `p14c-depinsight-sdkcommon-r1` exit0(`sdk-common:1.67.0`, By constraint·conflict 1.67.0 vs 1.55.0), `p14c-writecp-bom-r1` exit0(artifact 다운로드).
+- **current graph:**
+  - 최종 `p14c-final-deps-runtime-r1` exit0: OTel 1.55.0 요청 노드는 모두 `-> 1.67.0`이고 미정렬 0이다.
+  - runtime의 stable OTel은 api/context/common/sdk-common/sdk-trace/sdk-logs/sdk-metrics/exporter-common/exporter-otlp/exporter-otlp-common/exporter-sender-okhttp 모두 1.67.0이다. alpha `api-incubator`는 1.67.0-alpha, 계측은 2.33.1(-alpha), `opentelemetry-proto`는 1.8.0-alpha다.
+  - `p14c-final-depinsight-registry-otlp-r1`: `micrometer-registry-otlp:1.16.6`(Boot BOM constraint).
+- **BOM만으로 인한 정확 delta**(BOM 직전 app runtime `f2a986c1…` → 직후 `e07547ea…`):
+  - non-OTel은 OkHttp 5.2.1→5.5.0, Okio 3.16.1→3.18.1 두 개뿐이다.
+  - OTel은 sdk/exporter 계열이 1.55.0→1.67.0으로 올라갔다.
+  - `opentelemetry-sdk`(집계)·`opentelemetry-sdk-extension-autoconfigure-spi` 1.55.0은 제거되었다.
+  - P04 사본과 비교할 때 보이는 jackson·slf4j·nimbus 등의 차이는 이전 phase 의존 변화이며 BOM 변화가 아니다.
+- **1.67 동작 차이와 보정:**
+  - 1.67 `SdkTracerProvider.tracerBuilder`는 `TracerSharedState.hasNoSpanProcessor()`가 true면 `TracerProvider.noop()`을 반환한다. 그러면 export off에서 traceId가 무효가 된다(scratch probe `otel-probe-r4` valid=false, `p14c-app-it-r2` ABORTED 진단).
+  - Plan "span export off여도 SDK context를 생성"에 맞춰 `ObservabilityConfiguration`이 traces off일 때 export하지 않는 context-only `SpanProcessor` 1개를 둔다(probe valid=true).
+- **기동·clean 검증:**
+  - `p14c-stacksmoke-r1` 2/0/0/0 → `p14c-stacksmoke-verify-r1` TEST_EVIDENCE_VERIFIED.
+  - 최종 `p14c-final-app-it-r1` 125/0/0/0(FP `467bd948…`, CP `e07547ea…`) → `p14c-final-app-it-verify-r1` VERIFIED.
+  - `RuntimeClasspathCleanTest`를 포함한 `p14c-final-app-unit-r2` 19/0/0/0 → VERIFIED.
+  - 최종 `syncRuntimeClasspathEvidence`로 `docs/gates/f1/runtime-classpath.txt`가 생성물과 바이트 일치한다(SHA256 `e07547eaff8e5ce3f8e1c3dc1689b20555c9aea353acdf060657d9afae989e52`, 193행).
+- **판정 범위:** 위 결과는 로컬 graph·기동 근거다. 실제 OTLP 수신기·운영 export 판정(G-OBS-READBACK)과 경보 배치(G-ALERT)는 NOT_RUN이다. P14 완료·F1·운영 PASS를 선언하지 않는다.

@@ -14,6 +14,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.opentelemetry:opentelemetry-sdk-logs")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+    implementation("io.micrometer:micrometer-registry-otlp")
+    implementation(platform(libs.otel.instrumentation.bom.alpha))
     implementation(libs.otel.logback)
     implementation(libs.nimbus.jose.jwt)
     add("integrationTestImplementation", libs.nimbus.jose.jwt)

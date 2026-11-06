@@ -40,7 +40,7 @@ class ApiInputIT extends ApiWebSupport {
     void everyApiUsesCurrentActorAndBoundOwnerWithUniformEmpty404() throws Exception {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");var accepted=accept("actor","owner","질문",null,dlg());
         var wm=scope("actor");var owner=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(com.nori.ai.gateway.core.scope.OwnerSystem.WM,wm.authenticatedServiceRef(),wm.actorRef(),wm.sub(),wm.perm(),wm.pdg(),wm.issuedAt(),wm.expiresAt(),wm.requestId());
-        var foreign=context.getBean(JobAdmissionService.class).accept(owner,new JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"foreign",registeredDlg("actor")));
+        var foreign=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(owner,new JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"foreign",registeredDlg("actor"))));
         for(String actor:List.of("other","actor"))for(String path:List.of("/v1/analyses/"+(actor.equals("actor")?foreign.jobId():accepted.jobId()),"/v1/conversations/"+(actor.equals("actor")?foreign.conversationId():accepted.conversationId()))) {
             var response=request("GET",path,actor,null,null,false);assertThat(response.statusCode()).isEqualTo(404);assertThat(response.body()).isEmpty();
         }
@@ -61,5 +61,31 @@ class ApiInputIT extends ApiWebSupport {
         }
         assertThat(request("POST","/v1/query","actor",Map.of("query","질문","options",Map.of("allowTools","yes")),"invalid",true).statusCode()).isEqualTo(400);
         assertThat(count("job")).isZero();assertThat(count("message")).isZero();
+    }
+    private int apiRequests(){return jdbc().sql("SELECT count(*) FROM gw.audit_event WHERE event_type='API_REQUEST' AND job_id IS NULL AND service_ref IS NOT NULL").query(Integer.class).single();}
+    @Test void eachAuthenticatedCallRecordsOneApiRequestAndARejectedAdmissionOriginRollsBackTheWholeAdmission() throws Exception {
+        pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");
+        var posted=request("POST","/v1/query","actor",Map.of("query","질문"),"api-origin",true);assertThat(posted.statusCode()).isEqualTo(202);
+        String jobId=json.readTree(posted.body()).get("jobId").asString();
+        assertThat(apiRequests()).isOne();assertJobAuditLineage(jobId,false);
+        assertThat(jdbc().sql("SELECT count(*) FROM gw.audit_event a JOIN gw.audit_event o ON o.request_id=a.request_id AND o.trace_id=a.trace_id WHERE a.event_type='API_REQUEST' AND o.event_type='JOB_ACCEPTED' AND o.job_id=:job").param("job",jobId).query(Integer.class).single()).isOne();
+        assertThat(request("GET","/v1/analyses/"+jobId,"actor",null,null,false).statusCode()).isBetween(200,299);
+        assertThat(apiRequests()).isEqualTo(2);
+        // SSE는 연결 요청 1회만 감사합니다. 진행 중 Job이므로 연결은 열린 채로 닫습니다.
+        var stream=java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(uri("/v1/analyses/"+jobId+"/events")).timeout(Duration.ofSeconds(10))
+            .header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",signer.sign(claims("actor",null),clock().instant())).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+        assertThat(stream.statusCode()).isEqualTo(200);stream.body().close();
+        assertThat(apiRequests()).isEqualTo(3);
+        try(var connection=database.connection("aigw_migrator");var statement=connection.createStatement()) {
+            statement.execute("CREATE FUNCTION gw.reject_job_accepted_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 접수 감사 거부'; END $$");
+            statement.execute("CREATE TRIGGER reject_job_accepted_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'JOB_ACCEPTED') EXECUTE FUNCTION gw.reject_job_accepted_audit()");
+        }
+        var failures=context.getBean(io.micrometer.core.instrument.MeterRegistry.class).get(com.nori.ai.gateway.app.observability.MetricsCatalog.AUDIT_WRITE_FAILURES).counter();
+        double before=failures.count();var counts=List.of(count("conversation"),count("message"),count("job"),count("job_event"));
+        // 접수 감사가 거부되면 같은 접수 tx의 대화·메시지·Job·이벤트가 모두 되돌아가고 기존 controller DB 오류 응답이 됩니다.
+        assertThat(request("POST","/v1/query","actor",Map.of("query","질문"),"api-origin-rejected",true).statusCode()).isEqualTo(500);
+        assertThat(List.of(count("conversation"),count("message"),count("job"),count("job_event"))).isEqualTo(counts);
+        assertThat(failures.count()).isEqualTo(before+1);
+        assertThat(apiRequests()).isEqualTo(4);
     }
 }

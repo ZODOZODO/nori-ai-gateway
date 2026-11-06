@@ -255,6 +255,100 @@ class RetentionBoundaryIT extends PgIntegrationSupport {
         });
     }
 
+    @Test void boundedConversationBatchesCommitIndependentlyAndOnlyTheFailedBatchRollsBack() throws Exception {
+        var owner = scope(OwnerSystem.TC, "actor", "pdg");
+        var conversations = bean(ConversationRepository.class);
+        var retention = bean(RetentionMaintenanceRepository.class);
+        for (int i = 0; i < 7; i++) assertThat(conversations.insert(owner, "c" + i)).isTrue();
+        assertThat(bean(MessageRepository.class).insert(owner, "c6", message("message", null))).isTrue();
+        assertThat(bean(JobRepository.class).insert(owner, new JobRepository.NewJob("active", "c6", null, "digest", "B", "message", Map.of()), null)).isTrue();
+        clock.now = BASE.plus(CONVERSATION_TTL);
+        assertThatThrownBy(() -> retention.purgeExpiredConversationsBatch(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(retention.purgeExpiredConversationsBatch(2)).isEqualTo(2);
+        assertThat(committedCount("gw.conversation")).isEqualTo(5);
+        try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
+            statement.execute("CREATE FUNCTION public.p14_reject_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'p14 batch failure'; END $$");
+            statement.execute("CREATE TRIGGER p14_reject_delete BEFORE DELETE ON gw.conversation FOR EACH ROW WHEN (OLD.id = 'c4') EXECUTE FUNCTION public.p14_reject_delete()");
+        }
+        try {
+            assertThat(retention.purgeExpiredConversationsBatch(2)).isEqualTo(2);
+            assertThat(committedCount("gw.conversation")).isEqualTo(3);
+            assertThatThrownBy(() -> retention.purgeExpiredConversationsBatch(2)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+            // 실패 batch(c4,c5)만 rollback되고 앞 batch 커밋은 남습니다.
+            assertThat(committedCount("gw.conversation")).isEqualTo(3);
+        } finally {
+            try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
+                statement.execute("DROP TRIGGER p14_reject_delete ON gw.conversation");
+                statement.execute("DROP FUNCTION public.p14_reject_delete()");
+            }
+        }
+        assertThat(retention.purgeExpiredConversations()).isEqualTo(2);
+        assertThat(bean(JdbcClient.class).sql("SELECT id FROM gw.conversation").query(String.class).list()).containsExactly("c6");
+        bean(JdbcClient.class).sql("UPDATE gw.job SET status = 'CANCELLED' WHERE id = 'active'").update();
+        assertThat(retention.purgeExpiredConversations()).isEqualTo(1);
+    }
+
+    @Test void concurrentConversationBatchesSkipLockedRowsAndDeleteEachRowOnce() throws Exception {
+        var owner = scope(OwnerSystem.TC, "actor", "pdg");
+        for (int i = 0; i < 40; i++) assertThat(bean(ConversationRepository.class).insert(owner, "c" + i)).isTrue();
+        clock.now = BASE.plus(CONVERSATION_TTL);
+        var retention = bean(RetentionMaintenanceRepository.class);
+        var total = new java.util.concurrent.atomic.AtomicInteger();
+        var ready = new java.util.concurrent.CountDownLatch(1);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(4)) {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int worker = 0; worker < 4; worker++) futures.add(workers.submit(() -> {
+                ready.await();
+                for (int deleted; (deleted = retention.purgeExpiredConversationsBatch(3)) > 0;) total.addAndGet(deleted);
+                return null;
+            }));
+            ready.countDown();
+            for (var future : futures) future.get(60, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(total.get()).isEqualTo(40);
+        assertThat(committedCount("gw.conversation")).isZero();
+    }
+
+    @Test void boundedAuditBatchesKeepTheirOwnNinetyDayCutoffAndTheNoArgumentApiRepeatsBeyondTheDefaultLimit() throws Exception {
+        var owner = scope(OwnerSystem.TC, "actor", "pdg");
+        var audit = bean(AuditRepository.class);
+        int old = 2 * RetentionMaintenanceRepository.DEFAULT_PURGE_BATCH_SIZE + 5;
+        for (int i = 0; i < old; i++) assertThat(audit.insert(owner, event("old-" + i, null, null))).isTrue();
+        clock.now = BASE.plusNanos(1000);
+        assertThat(audit.insert(owner, event("later", null, null))).isTrue();
+        var retention = bean(RetentionMaintenanceRepository.class);
+        clock.now = BASE.plus(AUDIT_TTL);
+        assertThat(retention.purgeExpiredAuditBatch(2)).isEqualTo(2);
+        assertThat(committedCount("gw.audit_event")).isEqualTo(old - 1);
+        // 기본 한도 100보다 많은 남은 203행을 noarg가 여러 batch로 반복해 모두 지우고 합계를 돌려줍니다.
+        assertThat(retention.purgeExpiredAudit()).isEqualTo(old - 2);
+        assertThat(bean(JdbcClient.class).sql("SELECT request_id FROM gw.audit_event").query(String.class).list()).containsExactly("later");
+        assertThatThrownBy(() -> retention.purgeExpiredAuditBatch(-1)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void noArgumentConversationPurgeRepeatsBeyondTheDefaultLimitAndTheOldestRemainingExpiryIsReadExactly() throws Exception {
+        var owner = scope(OwnerSystem.TC, "actor", "pdg");
+        var conversations = bean(ConversationRepository.class);
+        var retention = bean(RetentionMaintenanceRepository.class);
+        assertThat(retention.findOldestConversationExpiry()).isEmpty();
+        int expired = 2 * RetentionMaintenanceRepository.DEFAULT_PURGE_BATCH_SIZE + 5;
+        for (int i = 0; i < expired; i++) assertThat(conversations.insert(owner, "bulk-" + i)).isTrue();
+        clock.now = BASE.plusNanos(1000);
+        assertThat(conversations.insert(owner, "later")).isTrue();
+        assertThat(retention.findOldestConversationExpiry()).contains(BASE.plus(CONVERSATION_TTL));
+        clock.now = BASE.plus(CONVERSATION_TTL);
+        assertThat(retention.purgeExpiredConversations()).isEqualTo(expired);
+        assertThat(committedCount("gw.conversation")).isOne();
+        // 남은 가장 오래된 만료는 저장된 microsecond 값 그대로입니다.
+        assertThat(retention.findOldestConversationExpiry()).contains(BASE.plusNanos(1000).plus(CONVERSATION_TTL));
+    }
+
+    private long committedCount(String table) throws Exception {
+        // 다른 연결에서 조회하여 각 batch의 커밋 여부를 확인합니다.
+        try (var connection = database.connection("postgres"); var statement = connection.createStatement(); var result = statement.executeQuery("SELECT count(*) FROM " + table)) {
+            result.next(); return result.getLong(1);
+        }
+    }
     private void assertCacheExpiry(VerifiedSystemScope owner, String key, Instant expiry) {
         assertThat(bean(CacheRepository.class).find(owner, "conversation", key)).hasValueSatisfying(value -> assertThat(value.expiresAt()).isEqualTo(expiry));
     }

@@ -30,6 +30,8 @@ public class WorkflowSourceFixture {
         final List<String> codeRefs=new CopyOnWriteArrayList<>(),pipelines=new CopyOnWriteArrayList<>();
         final AtomicInteger lineageTraces=new AtomicInteger(),commits=new AtomicInteger();
         volatile List<String> traceVersions=List.of();
+        volatile String tracePrefix="0".repeat(28);
+        volatile List<String> spanIds=List.of();
         volatile String logText="EQP-001 정상 관측";
         volatile int commitStatus=200;
         final AtomicBoolean blockNextStop=new AtomicBoolean();
@@ -53,7 +55,7 @@ public class WorkflowSourceFixture {
                 } else if(exchange.getRequestURI().getPath().startsWith("/api/traces/")) {
                     String id=exchange.getRequestURI().getPath().substring("/api/traces/".length());int index=Integer.parseInt(id.substring(28),16)-1;
                     var attributes=List.of(Map.of("key","service.name","value",Map.of("stringValue","tc-gateway")),Map.of("key","service.version","value",Map.of("stringValue",traceVersions.get(index))));
-                    var spans=List.of(Map.of("spanId","span-"+index,"name","equipment","startTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
+                    var spans=List.of(Map.of("spanId",spanIds.isEmpty()?"span-"+index:spanIds.get(index),"name","equipment","startTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("batches",List.of(Map.of("resource",Map.of("attributes",attributes),"scopeSpans",List.of(Map.of("spans",spans))))));
                 } else if(exchange.getRequestURI().getPath().contains("/pipelines/")) {
                     String version=exchange.getRequestURI().getPath().split("/")[6];pipelines.add(version);body="[{\"id\":"+(Long.parseLong(version)*10+3)+",\"name\":\"package\",\"status\":\"success\"}]";
@@ -87,7 +89,7 @@ public class WorkflowSourceFixture {
             });
         }
         URI base(){return URI.create("http://127.0.0.1:"+server.getAddress().getPort());}
-        static String traceId(int index){return "0".repeat(28)+String.format("%04x",index+1);}
+        String traceId(int index){return tracePrefix+String.format("%04x",index+1);}
         static String shortSha(String version){return version.equals("123")?"abcdef1":"fedcba1";}
         private Map<String,String> query(URI uri) {
             var values=new LinkedHashMap<String,String>();for(String part:uri.getRawQuery().split("&")){var pair=part.split("=",2);values.put(URLDecoder.decode(pair[0],StandardCharsets.UTF_8),URLDecoder.decode(pair[1],StandardCharsets.UTF_8));}return values;
@@ -96,7 +98,8 @@ public class WorkflowSourceFixture {
         @Override public void close(){release.countDown();server.stop(0);executor.close();meters.close();}
     }
     @Bean Server workflowSourceServer() throws java.io.IOException{return new Server();}
-    @Bean SourceRetentionReader workflowTestRetention(Clock clock){return source->Optional.of(new SourceRetentionReader.VerifiedOldest(P09QueueSupport.NOW.minus(Duration.ofDays(7)),clock.instant()));}
+    // P14 실제 보존 reader Bean과 함께 등록되므로 이 fixture의 고정 관측을 명시 우선합니다(Source 조립 경로 시험은 실제 reader를 씁니다).
+    @Bean @org.springframework.context.annotation.Primary SourceRetentionReader workflowTestRetention(Clock clock){return source->Optional.of(new SourceRetentionReader.VerifiedOldest(P09QueueSupport.NOW.minus(Duration.ofDays(7)),clock.instant()));}
     @Bean LokiLogConnector workflowLoki(Server server,SourceAuthorizationStep authorization,Clock clock,SourceRetentionReader retention,LokiProperties properties){return new LokiLogConnector(new SourceHttpClient(server.base(),"loki",server.observations),new SourceReadAccess(authorization,clock),retention,properties,clock);}
     @Bean TempoTraceConnector workflowTempo(Server server,SourceAuthorizationStep authorization,Clock clock){return new TempoTraceConnector(new SourceHttpClient(server.base(),"tempo",server.observations),new SourceReadAccess(authorization,clock));}
     public static final class GitSetup implements AutoCloseable {

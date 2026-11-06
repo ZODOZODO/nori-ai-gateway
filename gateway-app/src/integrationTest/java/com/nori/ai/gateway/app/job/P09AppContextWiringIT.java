@@ -54,7 +54,9 @@ class P09AppContextWiringIT extends P09QueueSupport {
         props.putAll(Map.of("ai.gateway.capacity.max-running-jobs",1,"ai.gateway.capacity.generation-concurrency",1,"ai.gateway.capacity.queued-depth",4,"ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s","ai.gateway.inference.mode","disabled"));
         props.putAll(Map.of("spring.kafka.bootstrap-servers","127.0.0.1:1","nori.storage.s3.enabled",true,"nori.storage.s3.endpoint","http://127.0.0.1:1","nori.storage.s3.bucket","fixture","nori.storage.s3.access-key","dummy","nori.storage.s3.secret-key","dummy","nori.storage.s3.region","us-east-1"));
         context.close();context=null;
-        try(var production=new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props).run()) {
+        // 공용 로컬 시험은 운영 기본 OTLP endpoint로 내보내지 않습니다(application.yaml 값보다 우선하는 명령행 인자).
+        try(var production=new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props)
+                .run("--ai.gateway.otlp.metrics.enabled=false","--ai.gateway.otlp.traces.enabled=false","--ai.gateway.otlp.logs.enabled=false")) {
             assertThat(production.getBeansOfType(WorkflowExecutor.class)).hasSize(1);assertThat(production.getBean(WorkflowExecutor.class)).isExactlyInstanceOf(WorkflowExecutionAdapter.class);assertThat(production.getBean(InferenceReadiness.class).ready()).isFalse();
         }
         failLate=true;

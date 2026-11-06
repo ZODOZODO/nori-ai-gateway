@@ -28,8 +28,9 @@ public class IngressTerminalFixture {
         private final MessageRepository messages;
         private final Clock clock;
         private final Counters counters;
-        Terminal(ConversationRepository conversations,JobRepository jobs,CacheRepository cache,Clock clock,Counters counters,MessageRepository messages) {
-            this.messages=messages; this.conversations = conversations; this.jobs = jobs; this.cache = cache; this.clock = clock; this.counters = counters;
+        private final com.nori.ai.gateway.app.observability.AuditRecorder audit;
+        Terminal(ConversationRepository conversations,JobRepository jobs,CacheRepository cache,Clock clock,Counters counters,MessageRepository messages,com.nori.ai.gateway.app.observability.AuditRecorder audit) {
+            this.messages=messages; this.conversations = conversations; this.jobs = jobs; this.cache = cache; this.clock = clock; this.counters = counters; this.audit = audit;
         }
         @PostMapping(value={"/v1/query","/v1/conversations/{id}/messages","/v1/analyses"},headers="X-AIGW-Auth-Probe=1")
         ResponseEntity<Map<String,Object>> job(HttpServletRequest request,@RequestBody Map<String,Object> body) { return terminal(request,body,true); }
@@ -46,6 +47,8 @@ public class IngressTerminalFixture {
                 String messageId=UUID.randomUUID().toString();
                 if(!messages.insert(scope,conversation,new MessageRepository.Message(messageId,"user","인증 경계 시험","[]","[]",null,null)))throw new IllegalStateException("시험 메시지 저장 실패");
                 if (!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,null,"fixture","B",messageId,Map.of()),delegation) || jobs.find(scope,jobId).isEmpty()) throw new IllegalStateException("시험 작업 왕복에 실패했습니다");
+                // 직접 만든 시험 Job도 운영 접수와 같은 감사 기록기·인입 요청 span으로 접수 원점을 남깁니다.
+                audit.write(com.nori.ai.gateway.core.audit.AuditEvent.jobAccepted(scope,io.opentelemetry.api.trace.Span.current().getSpanContext().getTraceId(),conversation,jobId));
             }
             counters.source.incrementAndGet();
             if (!cache.put(scope,conversation,"fixture",new CacheRepository.Entry("fixture","{}","[]",clock.instant().plusSeconds(30)))) throw new IllegalStateException("시험 캐시 저장에 실패했습니다");

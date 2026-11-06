@@ -92,8 +92,9 @@ class IngressAuthIT extends StackContextSupport {
         securityDirectory = directory;
         malformed = new MalformedAssertionFixture(); disallowed = new DisallowedAlgorithmFixture();
         otherCurve = new ECKeyGenerator(Curve.P_384).keyID("test-other-curve").algorithm(JWSAlgorithm.ES384).generate().toPublicJWK();
-        appender.start(); ((ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)).addAppender(appender);
         start(IngressTerminalFixture.class,ObservationConfiguration.class);
+        // Spring logging 초기화가 LoggerContext를 reset해 앞서 붙인 appender를 떼므로 활성 컨텍스트 시작 뒤에 붙입니다.
+        attachCapture();
         client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(2)).build();
         clock = context.getBean(MutableClock.class); counters = context.getBean(IngressTerminalFixture.Counters.class);
         observed = (ServiceTokenAuthFilter)context.getBean("serviceTokenAuthFilterRegistration",FilterRegistrationBean.class).getFilter();
@@ -104,7 +105,14 @@ class IngressAuthIT extends StackContextSupport {
         try { super.close(); }
         finally { ((ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)).detachAppender(appender); appender.stop(); }
     }
+    /** 격리 앱의 기동·종료도 logging을 다시 초기화하므로 매 시험 전에 같은 캡처가 root에 붙어 동작 중인지 보장합니다. */
+    void attachCapture() {
+        var root = (ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        if (!appender.isStarted()) appender.start();
+        if (!root.isAttached(appender)) root.addAppender(appender);
+    }
     @BeforeEach void positiveControlAndReset() throws Exception {
+        attachCapture();
         clock.now = NOW; resetRows();
         String assertion = signer.sign(claims(true),NOW);
         var response = send("/v1/query",assertion,serviceToken,Map.of("query","본문 재독 확인"));
@@ -114,7 +122,22 @@ class IngressAuthIT extends StackContextSupport {
         assertThat(counters.downstreamJob.get()).isEqualTo(1); assertThat(counters.source.get()).isEqualTo(1); assertThat(counters.cache.get()).isEqualTo(1); assertThat(counters.roundTrips.get()).isEqualTo(1);
         verify(observed,times(1)).doFilter(any(),any(),any());
         assertNoResidue(response.body(),List.of(assertion,serviceToken,(String)claims(true).get("dlg")));
+        assertRequestOrigin(1);
         resetRows();
+    }
+    /** 정상 인증 요청 1건의 API_REQUEST와 그 요청의 Job 접수 원점이 같은 서버 requestId·service·SDK trace로 결속되는지 확인하고 trace를 돌려준다. */
+    String assertRequestOrigin(int jobs) {
+        var rows = jdbc().sql("SELECT event_type, request_id, trace_id, service_ref, job_id FROM gw.audit_event ORDER BY id").query().listOfRows();
+        assertThat(rows.stream().map(row -> row.get("event_type")).toList()).isEqualTo(jobs == 1 ? List.of("API_REQUEST","JOB_ACCEPTED") : List.of("API_REQUEST"));
+        var request = rows.getFirst();
+        assertThat(UUID.fromString((String)request.get("request_id")).toString()).isEqualTo(request.get("request_id")).isNotEqualTo("client-forged-id");
+        assertThat((String)request.get("trace_id")).matches("[0-9a-f]{32}").isNotEqualTo("0".repeat(32));
+        assertThat(request.get("job_id")).isNull();
+        for (var row : rows) {
+            assertThat(row.get("request_id")).isEqualTo(request.get("request_id")); assertThat(row.get("trace_id")).isEqualTo(request.get("trace_id"));
+            assertThat(row.get("service_ref")).isEqualTo("service:TC");
+        }
+        return (String)request.get("trace_id");
     }
     void resetRows() throws Exception {
         try (var connection = database.connection("postgres"); var statement = connection.createStatement()) { statement.execute("TRUNCATE gw.conversation, gw.audit_event CASCADE"); }
@@ -157,14 +180,14 @@ class IngressAuthIT extends StackContextSupport {
         assertThat(response.statusCode()).isEqualTo(reason.httpStatus());
         assertThat(count("gw.job")).isZero(); assertThat(count("gw.conversation")).isZero(); assertThat(count("gw.message")).isZero();
         assertThat(counters.downstream()).isZero(); verify(observed,times(1)).doFilter(any(),any(),any());
-        var rows = jdbc().sql("SELECT owner_system,actor_ref,request_id,event_type,decision,status,conversation_id,job_id,trace_id,tool_id,source_ref,error_code,timings,token_usage,versions,reduction FROM gw.audit_event").query().listOfRows();
+        var rows = jdbc().sql("SELECT owner_system,actor_ref,request_id,event_type,decision,status,conversation_id,job_id,trace_id,tool_id,source_ref,error_code,timings,token_usage,versions,reduction,service_ref,task_type,result_status FROM gw.audit_event").query().listOfRows();
         assertThat(rows).hasSize(1); var row = rows.getFirst();
         assertThat(row.get("owner_system")).isEqualTo(owner); assertThat(row.get("actor_ref")).isEqualTo(actor);
         assertThat(row.get("event_type")).isEqualTo("AUTH_REJECTED"); assertThat(row.get("decision")).isEqualTo(reason.name()); assertThat(row.get("status")).isEqualTo(Integer.toString(reason.httpStatus()));
         var responseJson = JSONObjectUtils.parse(response.body());
         assertThat(responseJson.keySet()).containsExactlyInAnyOrder("message","requestId");
         assertThat(UUID.fromString((String)responseJson.get("requestId")).toString()).isEqualTo(row.get("request_id"));
-        for (String column : List.of("conversation_id","job_id","trace_id","tool_id","source_ref","error_code","timings","token_usage","versions","reduction")) assertThat(row.get(column)).isNull();
+        for (String column : List.of("conversation_id","job_id","trace_id","tool_id","source_ref","error_code","timings","token_usage","versions","reduction","service_ref","task_type","result_status")) assertThat(row.get(column)).isNull();
         var sentinels = new ArrayList<String>(); sentinels.add(serviceToken); sentinels.add((String)claims(true).get("dlg"));
         if (assertion != null) { sentinels.add(assertion); sentinels.add(JWSObject.parse(assertion).getPayload().toString()); }
         assertNoResidue(response.body(),sentinels);
@@ -204,6 +227,18 @@ class IngressAuthIT extends StackContextSupport {
         assertThat(positive.statusCode()).isEqualTo(202); assertThat(counters.source.get()).isEqualTo(1); assertThat(counters.cache.get()).isEqualTo(1); assertThat(count("gw.job")).isZero();
         resetRows(); rejected("/v1/conversations",signed(claims(true)),serviceToken,Map.of(),DELEGATION_FORBIDDEN,"TC",null);
     }
+    @Test void remoteTraceparentIsNotTrustedAndEachAuthenticatedRequestRecordsOneApiRequest() throws Exception {
+        String remoteTrace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        for (String path : List.of("/v1/query","/v1/conversations")) {
+            var request = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10)).header("X-AIGW-Auth-Probe","1").header("Content-Type","application/json")
+                .header("Authorization","Bearer " + serviceToken).header("X-Actor-Assertion",signed(claims(path.equals("/v1/query"))))
+                .header("traceparent","00-" + remoteTrace + "-00f067aa0ba902b7-01").header("tracestate","aigw=SENTINEL").POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"본문 재독 확인\"}")).build();
+            assertThat(client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(202);
+            // 원격 traceparent를 부모로 쓰지 않고 이 Gateway SDK가 만든 trace만 남깁니다.
+            assertThat(assertRequestOrigin(path.equals("/v1/query") ? 1 : 0)).isNotEqualTo(remoteTrace);
+            resetRows();
+        }
+    }
     @Test void allJobRoutesReplayBodyContextRefAndAllowOnlyMatchingLegacyFields() throws Exception {
         for (String path : List.of("/v1/query","/v1/conversations/id/messages","/v1/analyses")) {
             var body = new LinkedHashMap<String,Object>(Map.of("query","본문 재독 확인","system","TC","originSystem","TC","targetSystem","TC","authorizedSystems",List.of("TC")));
@@ -241,7 +276,13 @@ class IngressAuthIT extends StackContextSupport {
             if (response.statusCode() == 401) {
                 assertThat(jdbc().sql("SELECT decision FROM gw.audit_event").query(String.class).list()).containsExactly("DELEGATION_INVALID");
                 verify(observed,times(1)).doFilter(any(),any(),any());
-            } else assertThat(count("gw.audit_event")).isZero();
+                continue;
+            }
+            long filtered = mockingDetails(observed).getInvocations().stream().filter(invocation -> invocation.getMethod().getName().equals("doFilter")).count();
+            // 컨테이너가 filter 전에 거부한 별칭은 감사 0행입니다. filter 인증을 통과한 뒤 handler가 4xx로 거부한 별칭은
+            // AUTH_REJECTED 없이 인입 API_REQUEST 1행(Job 0)만 남고 그 행은 검증된 service·UUID requestId·유효 SDK trace를 가집니다.
+            if (filtered == 0) assertThat(count("gw.audit_event")).isZero();
+            else { assertThat(filtered).isOne(); assertRequestOrigin(0); }
         }
         for (String path : List.of("/v1/Query","/v1/query/")) {
             resetRows(); var response = send(path,signed(claims(false)),serviceToken,Map.of());
@@ -317,6 +358,12 @@ class IngressAuthIT extends StackContextSupport {
         StubAssertionSigner signing() { return signer; }
         String serviceToken() { return serviceToken; }
         void stopDatabase() { database.close(); database = null; }
+        HttpResponse<String> authenticated() throws Exception {
+            var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + context.getEnvironment().getProperty("local.server.port") + "/v1/query"))
+                .timeout(Duration.ofSeconds(10)).header("X-AIGW-Auth-Probe","1").header("Content-Type","application/json").header("Authorization","Bearer " + serviceToken)
+                .header("X-Actor-Assertion",signer.sign(IngressAuthIT.this.claims(true),NOW));
+            return client.send(request.POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"본문 재독 확인\"}")).build(),HttpResponse.BodyHandlers.ofString());
+        }
         HttpResponse<String> reject(boolean bodyMismatch) throws Exception {
             var values = IngressAuthIT.this.claims(true);
             String assertion = signer.sign(values,NOW);
@@ -342,6 +389,35 @@ class IngressAuthIT extends StackContextSupport {
                 try { Files.deleteIfExists(securityDirectory.resolve("service-tokens.json")); Files.deleteIfExists(securityDirectory.resolve("jwks.json")); Files.deleteIfExists(securityDirectory); }
                 catch (java.io.IOException failure) { throw new IllegalStateException("소유 시험 파일 정리에 실패했습니다",failure); }
             }
+        }
+    }
+    @Test void apiRequestAuditStorageFailureReturnsTheFixed503BeforeTheHandler() throws Exception {
+        try (var isolated = new IsolatedApplication(Map.of())) {
+            isolated.open();
+            assertThat(isolated.authenticated().statusCode()).isEqualTo(202);
+            try (var connection = isolated.ownedDatabase().connection("postgres"); var statement = connection.createStatement()) { statement.execute("TRUNCATE gw.conversation, gw.audit_event CASCADE"); }
+            isolated.application().getBean(IngressTerminalFixture.Counters.class).reset();
+            try (var connection = isolated.ownedDatabase().connection("aigw_migrator"); var statement = connection.createStatement()) {
+                statement.execute("CREATE FUNCTION gw.reject_api_request_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 요청 감사 거부'; END $$");
+                statement.execute("CREATE TRIGGER reject_api_request_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'API_REQUEST') EXECUTE FUNCTION gw.reject_api_request_audit()");
+            }
+            var failures = isolated.application().getBean(io.micrometer.core.instrument.MeterRegistry.class).get(com.nori.ai.gateway.app.observability.MetricsCatalog.AUDIT_WRITE_FAILURES).counter();
+            double before = failures.count();
+            // 격리 앱 기동이 logging을 다시 초기화할 수 있으므로 그 활성 컨텍스트 기동 뒤에 이 시험 전용 캡처를 설치합니다.
+            var captured = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>(); captured.start();
+            var root = (ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME); root.addAppender(captured);
+            try {
+                var response = isolated.authenticated();
+                assertThat(response.statusCode()).isEqualTo(503); assertThat(response.headers().firstValue("Retry-After")).contains("1");
+                var json = JSONObjectUtils.parse(response.body()); assertThat(json.keySet()).containsExactlyInAnyOrder("message","requestId");
+                assertThat(json.get("message")).isEqualTo("요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."); assertThat(UUID.fromString((String)json.get("requestId"))).isNotNull();
+                // handler·Job·Source·Cache 0이며 감사 실패는 counter와 고정 코드로 관측됩니다.
+                assertThat(isolated.application().getBean(IngressTerminalFixture.Counters.class).downstream()).isZero();
+                for (String table : List.of("gw.conversation","gw.message","gw.job","gw.audit_event")) assertThat(isolated.application().getBean(JdbcClient.class).sql("SELECT count(*) FROM " + table).query(Integer.class).single()).as(table).isZero();
+                assertThat(failures.count()).isEqualTo(before + 1);
+                assertThat(captured.list.stream().filter(event -> event.getLoggerName().equals("com.nori.ai.gateway.app.observability.AuditRecorder")).map(event -> event.getMessage()).toList()).containsExactly("AUDIT_WRITE_FAILED");
+                assertThat(captured.list.stream().filter(event -> "AUDIT_WRITE_FAILED".equals(event.getMessage()))).allSatisfy(event -> { assertThat(event.getArgumentArray()).isNullOrEmpty(); assertThat(event.getThrowableProxy()).isNull(); });
+            } finally { root.detachAppender(captured); captured.stop(); }
         }
     }
     @Test void realInsertPermissionFailureConverts401And403To503() throws Exception {

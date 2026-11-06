@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 로그는 Spec §12.3 허용 필드만 내보낸다. stdout은 AllowlistJsonEncoder만 둔다. OTLP logs appender는 ai.gateway.otlp.logs.enabled=true일 때만 OtlpLogAppenderInstaller가 연결한다. -->
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="com.nori.ai.gateway.app.observability.AllowlistJsonEncoder"/>
+    </appender>
+    <!-- P04 stack-compat ⓓ: Spring AI OpenAI 빈 choice WARN이 prompt를 붙이므로 필터만 믿지 않고 logger도 끈다. -->
+    <logger name="org.springframework.ai.openai.OpenAiChatModel" level="OFF"/>
+    <logger name="org.springframework.ai.openai.OpenAiEmbeddingModel" level="OFF"/>
+    <logger name="org.springframework.ai.openai.setup.OpenAiSetup" level="OFF"/>
+    <logger name="com.openai" level="OFF"/>
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

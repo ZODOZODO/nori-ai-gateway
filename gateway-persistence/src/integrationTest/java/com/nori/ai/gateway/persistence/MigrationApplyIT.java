@@ -21,6 +21,34 @@ class MigrationApplyIT extends PgIntegrationSupport {
             }
         }
     }
+    @Test void v7RejectsActiveJobWithoutAuditColumnsOrBackfillAndAppliesOverTerminalJobs() throws Exception {
+        try(var database=rawDatabase()) {
+            database.bootstrap(false);
+            var flyway=org.flywaydb.core.Flyway.configure().dataSource(database.jdbcUrl(),"aigw_migrator",database.passwordFor("aigw_migrator"))
+                .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").target("5").load();flyway.migrate();
+            try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+                sql.execute("INSERT INTO gw.conversation VALUES ('legacy-c','TC','actor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day','ACTIVE')");
+                for(String[] job:new String[][]{{"legacy-done","SUCCEEDED"},{"legacy-active","RUNNING"}}) {
+                    sql.execute("INSERT INTO gw.message(id,conversation_id,owner_system,role,created_at,content_masked,resource_refs,tool_execution_refs) VALUES ('m-"+job[0]+"','legacy-c','TC','user',CURRENT_TIMESTAMP,'질문','[]','[]')");
+                    sql.execute("INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg,request_message_id,request_input) VALUES ('"+job[0]+"','legacy-c','TC','actor','"+job[1]+"',CURRENT_TIMESTAMP,'digest','/v1/query',ARRAY[]::text[],repeat('a',64),'m-"+job[0]+"','{}')");
+                }
+            }
+            assertThatThrownBy(database::migrate).hasStackTraceContaining("V7 requires no active gw.job");
+            try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+                try(var rows=sql.executeQuery("SELECT count(*) FROM gw.audit_event")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isZero();}
+                try(var rows=sql.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_schema='gw' AND table_name='audit_event' AND column_name IN ('service_ref','task_type','result_status')")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isZero();}
+                try(var rows=sql.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")){assertThat(rows.next()).isTrue();assertThat(rows.getString(1)).isEqualTo("5");}
+                sql.execute("UPDATE gw.job SET status='CANCELLED', terminal_at=CURRENT_TIMESTAMP WHERE id='legacy-active'");
+            }
+            // terminal Job만 남으면 원점 없는 active Job이 없으므로 적용되며 가짜 감사 행을 만들지 않습니다.
+            database.migrate();
+            try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+                try(var rows=sql.executeQuery("SELECT count(*) FROM gw.audit_event")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isZero();}
+                try(var rows=sql.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_schema='gw' AND table_name='audit_event' AND column_name IN ('service_ref','task_type','result_status') AND is_nullable='YES'")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isEqualTo(3);}
+                try(var rows=sql.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")){assertThat(rows.next()).isTrue();assertThat(rows.getString(1)).isEqualTo("7");}
+            }
+        }
+    }
     @Test void migratorAppliesExactlyV1ToV3AndOwnsAllObjects() throws Exception {
         try (var database = rawDatabase()) {
             database.bootstrap(false);
@@ -54,7 +82,7 @@ class MigrationApplyIT extends PgIntegrationSupport {
                 try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
                     var versions = new java.util.ArrayList<String>();
                     while (rows.next()) { String version = rows.getString(1); versions.add(version); if (checksums.containsKey(version)) assertThat(rows.getInt(2)).isEqualTo(checksums.get(version)); }
-                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4", "5");
+                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4", "5", "7");
                 }
                 try (var rows = statement.executeQuery("SELECT tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
                     int count = 0; while (rows.next()) { count++; assertThat(rows.getString(1)).isEqualTo("aigw_migrator"); } assertThat(count).isEqualTo(16);

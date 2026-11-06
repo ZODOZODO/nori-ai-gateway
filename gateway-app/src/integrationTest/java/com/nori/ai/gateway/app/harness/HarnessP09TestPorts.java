@@ -2,6 +2,7 @@ package com.nori.ai.gateway.app.harness;
 
 import com.nori.ai.gateway.app.job.P09TestPorts;
 import com.nori.ai.gateway.app.job.HarnessObservationsEndpoint;
+import com.nori.ai.gateway.app.hooks.PausePointRegistry;
 import com.nori.ai.gateway.app.hooks.TestHookRegistry;
 import com.nori.ai.gateway.app.job.recovery.ReadinessPrecondition;
 import com.nori.ai.gateway.core.registry.TaskType;
@@ -23,6 +24,14 @@ public class HarnessP09TestPorts {
                 var rows=jdbc.sql("SELECT id,actor_ref,idempotency_key FROM gw.job WHERE status='QUEUED'").query((rs,n)->new String[]{rs.getString(1),rs.getString(2),rs.getString(3)}).list();
                 for(var row:rows){hooks.arm(row[1],row[2],new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false));tx.executeWithoutResult(s->hooks.bindOnAdmission(row[1],row[2],row[0]));}
             }
+        };
+    }
+    /** 이 속성을 켠 재기동만 RecoveryCompleted 전에 기존 PURGE_HOLD를 걸어, 복구가 끝낸 종결 행을 시험이 관찰하기 전에 정리 주기가 지우지 않게 합니다. */
+    public static final String PURGE_HOLD_AT_START = "aigw.harness.purge-hold-at-start";
+    @Bean ReadinessPrecondition purgeHoldAtStart(org.springframework.core.env.Environment environment,PausePointRegistry pauses){
+        return new ReadinessPrecondition(){
+            @Override public int order(){return -99;}
+            @Override public void run(){if(environment.getProperty(PURGE_HOLD_AT_START,Boolean.class,false))pauses.hold(PausePointRegistry.Point.PURGE_HOLD,"*");}
         };
     }
 }

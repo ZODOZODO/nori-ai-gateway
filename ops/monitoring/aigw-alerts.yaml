@@ -1,0 +1,14 @@
+# AI Gateway 경보 규칙 후보 (Plan §11.6). G-ALERT(경보 전달 경로·rule 형식·수신처) 미확인 상태의 후보이며 배포·수용 PASS가 아니다.
+# 형식 근거: nori-tc-exec docs/observability/03-alert-policy.md(Prometheus rule + Alertmanager 1차안). 확정 형식은 docs/gates/f1/alerting.md 의 G-ALERT 결과를 따른다.
+# 이 파일은 P14가 실제로 내보내는 신호의 규칙만 담는다. 다른 경보의 신호 소유와 상태는 alerting.md 표를 본다.
+groups:
+  - name: aigw-retention
+    rules:
+      - alert: AIGW-RETENTION-PURGE-FAILED
+        # Plan §11.6 "정리 Job 실패 또는 만료 묶음 24h 초과 잔류"의 두 신호는 같은 무라벨 counter다:
+        # RetentionPurgeJob의 batch 실패(rollback 후 다음 주기 재시도), 또는 성공한 주기 뒤 남은 가장 오래된 대화 만료가 그 주기 Gateway Clock보다 24h 넘게 앞선 경우(주기당 1회).
+        expr: increase(aigw_retention_purge_failures_total[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI Gateway 보존 정리 Job 실패"

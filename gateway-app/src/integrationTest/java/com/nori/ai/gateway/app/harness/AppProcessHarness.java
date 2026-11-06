@@ -24,7 +24,9 @@ public final class AppProcessHarness implements AutoCloseable {
         Files.createDirectories(state);Files.deleteIfExists(state.resolve("harness-ready.json"));
         String fingerprint=fingerprintOverride==null?HarnessFingerprint.calculate(classpath):fingerprintOverride;
         Path argfile=Files.createTempFile(state,"harness-",".args");var lines=new ArrayList<String>();
-        properties.forEach((key,value)->lines.add(quote("-D"+key+"="+value)));
+        // 공용 하네스도 운영 기본 OTLP endpoint로 보내지 않습니다. 시험이 명시한 값이 있으면 그 값이 우선합니다.
+        var effective=new TreeMap<String,String>(Map.of("ai.gateway.otlp.metrics.enabled","false","ai.gateway.otlp.traces.enabled","false","ai.gateway.otlp.logs.enabled","false"));effective.putAll(properties);
+        effective.forEach((key,value)->lines.add(quote("-D"+key+"="+value)));
         lines.add("-cp");lines.add(quote(classpath));lines.add(HarnessMain.class.getName());
         for(String value:List.of("--fingerprint",fingerprint,"--config",HarnessP09TestPorts.class.getName(),"--state-dir",state.toString()))lines.add(quote(value));
         Files.writeString(argfile,String.join("\n",lines)+"\n",StandardCharsets.UTF_8);

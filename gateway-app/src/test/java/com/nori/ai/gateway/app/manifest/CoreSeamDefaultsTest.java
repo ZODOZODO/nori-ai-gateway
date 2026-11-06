@@ -10,7 +10,10 @@ class CoreSeamDefaultsTest {
     private ApplicationContextRunner runner(java.time.Clock clock) {return new ApplicationContextRunner().withUserConfiguration(CoreBeansConfiguration.class,com.nori.ai.gateway.tcmock.TcMockModuleConfiguration.class)
         .withBean(java.time.Clock.class,()->clock)
         .withBean(com.nori.ai.gateway.core.cache.ToolResultCache.Store.class,()->org.mockito.Mockito.mock(com.nori.ai.gateway.core.cache.ToolResultCache.Store.class))
-        .withBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder.class,()->(job,invocation)->{throw new AssertionError("빈 등록 시험에서 실제 호출이 발생했습니다");})
+        .withBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder.class,()->new com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder(){
+            public void record(com.nori.ai.gateway.core.job.JobContext job,com.nori.ai.gateway.core.dispatch.ToolDispatcher.InvocationRecord invocation){throw new AssertionError("빈 등록 시험에서 실제 호출이 발생했습니다");}
+            public void blocked(com.nori.ai.gateway.core.job.JobContext job,String capabilityId,com.nori.ai.gateway.core.result.ResultStatus status,java.util.Optional<com.nori.ai.gateway.core.dispatch.ExecutionContext.DispatchTrace> trace){throw new AssertionError("빈 등록 시험에서 실제 차단 기록이 발생했습니다");}
+        })
         .withBean(com.nori.ai.gateway.app.config.CapacityProfile.class,()->new com.nori.ai.gateway.app.config.CapacityProfile(1,1,4,java.time.Duration.ofSeconds(60),java.time.Duration.ofSeconds(180)));}
     private final ApplicationContextRunner runner=runner(java.time.Clock.systemUTC());
     @Test void defaultAndExplicitFalseHaveExactlyOneNoOpOfEachType() {

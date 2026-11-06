@@ -16,6 +16,22 @@ management:
       show-components: never
 ai:
   gateway:
+    sources:
+      loki:
+        split-interval: PT6H
+        per-query-limit: 500
+        max-lines-total: 1000
+        step-deadline: PT30S
+    otlp:
+      endpoint: http://alloy-gateway.monitoring.svc:4318
+      metrics:
+        enabled: true
+        step: PT60S
+      traces:
+        enabled: true
+      # G-OBS-READBACK에서 Alloy OTLP logs 수신 파이프라인이 확인되기 전까지 stdout JSON만 쓴다.
+      logs:
+        enabled: false
     recovery:
       restore-mode: false
       restore-handler:

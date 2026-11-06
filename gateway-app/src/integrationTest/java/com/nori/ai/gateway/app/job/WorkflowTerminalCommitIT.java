@@ -37,7 +37,7 @@ class WorkflowTerminalCommitIT extends P09QueueSupport {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");pauses().hold(PausePointRegistry.Point.SWEEPER_HOLD,"*");
         hooks().arm("actor",key,new TestHookRegistry.Scenario(TaskType.LIVE_QUERY,Set.of(),null,false));
         String delegation=registeredDlg("actor");
-        var accepted=context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"실제 저장 자료",workflowFields(),key,delegation));
+        var accepted=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"실제 저장 자료",workflowFields(),key,delegation)));
         var queue=context.getBean(QueueJobRepository.class);context.getBean(TransactionTemplate.class).executeWithoutResult(tx->assertThat(queue.start(accepted.jobId(),clock().instant())).isTrue());
         var row=queue.nonterminal().stream().filter(value->value.jobId().equals(accepted.jobId())).findFirst().orElseThrow();var workerScope=context.getBean(ScopeAssembler.class).forWorker(row);
         var request=context.getBean(JobRequestInputReader.class).findRequestInput(workerScope,accepted.jobId()).orElseThrow();
@@ -54,7 +54,9 @@ class WorkflowTerminalCommitIT extends P09QueueSupport {
     }
     private void noFinalData(Produced value) {
         String job=value.accepted().jobId(),conversation=value.accepted().conversationId();
-        for(String table:List.of("result","evidence","audit_event"))assertThat(jdbc().sql("SELECT count(*) FROM gw."+table+" WHERE job_id=:job").param("job",job).query(Integer.class).single()).as(table).isZero();
+        for(String table:List.of("result","evidence"))assertThat(jdbc().sql("SELECT count(*) FROM gw."+table+" WHERE job_id=:job").param("job",job).query(Integer.class).single()).as(table).isZero();
+        // 실행 중 감사(접수·분류·Tool)는 남고 종결 감사는 없습니다.
+        assertThat(assertJobAuditLineage(job,false)).doesNotContain("JOB_TERMINAL");
         assertThat(jdbc().sql("SELECT count(*) FROM gw.message WHERE conversation_id=:conversation AND role='assistant'").param("conversation",conversation).query(Integer.class).single()).isZero();
         var scope=value.spec().commitData().orElseThrow().scope();var conversations=context.getBean(ConversationRepository.class);assertThat(conversations.findContext(scope,conversation)).isEmpty();assertThat(conversations.findSummary(scope,conversation)).isEmpty();
         assertThat(jdbc().sql("SELECT count(*) FROM gw.job_event WHERE job_id=:job AND type IN ('job.completed','job.partial','job.failed','job.cancelled')").param("job",job).query(Integer.class).single()).isZero();
@@ -68,7 +70,7 @@ class WorkflowTerminalCommitIT extends P09QueueSupport {
         assertThatThrownBy(()->committer(List.of(fault)).commit(value.accepted().jobId(),value.spec())).isSameAs(original);noFinalData(value);assertThat(events).isEmpty();assertThat(state(value.accepted().jobId())).isEqualTo("RUNNING");
         assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job").param("job",value.accepted().jobId()).query(Integer.class).single()).isOne();
         var actual=context.getBean(JobTerminalCommitter.class);assertThat(actual.commit(value.accepted().jobId(),value.spec())).isTrue();assertThat(actual.commit(value.accepted().jobId(),value.spec())).isFalse();
-        assertThat(events).singleElement().satisfies(event->assertThat(event.type()).isEqualTo("job.completed"));assertThat(count("result")).isOne();assertThat(count("audit_event")).isOne();assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence WHERE job_id=:job").param("job",value.accepted().jobId()).query(Integer.class).single()).isEqualTo(value.spec().commitData().orElseThrow().evidence().size());
+        assertThat(events).singleElement().satisfies(event->assertThat(event.type()).isEqualTo("job.completed"));assertThat(count("result")).isOne();assertThat(assertJobAuditLineage(value.accepted().jobId(),true)).last().isEqualTo("JOB_TERMINAL");assertThat(jdbc().sql("SELECT count(*) FROM gw.audit_event WHERE job_id IS DISTINCT FROM :job").param("job",value.accepted().jobId()).query(Integer.class).single()).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence WHERE job_id=:job").param("job",value.accepted().jobId()).query(Integer.class).single()).isEqualTo(value.spec().commitData().orElseThrow().evidence().size());
     }
     @Test void wrongMessageSequenceDuplicateEvidenceAndAnotherJobsActualToolReferenceAllRollBack() throws Exception {
         var value=produce("bindings");var other=produce("another-job");var data=value.spec().commitData().orElseThrow();var otherData=other.spec().commitData().orElseThrow();var assistant=data.assistantMessage().orElseThrow();
@@ -88,13 +90,13 @@ class WorkflowTerminalCommitIT extends P09QueueSupport {
         assertThat(committer(List.of(advance)).commit(value.accepted().jobId(),value.spec())).isTrue();assertThat(state(value.accepted().jobId())).isEqualTo("CANCELLED");
         assertThat(count("result")).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence").query(Integer.class).single()).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.message WHERE role='assistant'").query(Integer.class).single()).isZero();
         for(String table:List.of("context","conversation_summary"))assertThat(jdbc().sql("SELECT count(*) FROM gw."+table).query(Integer.class).single()).isZero();
-        assertThat(jdbc().sql("SELECT decision FROM gw.audit_event WHERE job_id=:job").param("job",value.accepted().jobId()).query(String.class).single()).isEqualTo("EXPIRY_EDGE");assertThat(jdbc().sql("SELECT external_suppressed FROM gw.job_event WHERE job_id=:job AND type='job.cancelled'").param("job",value.accepted().jobId()).query(Boolean.class).single()).isTrue();
+        assertThat(jdbc().sql("SELECT decision FROM gw.audit_event WHERE job_id=:job AND event_type='JOB_TERMINAL'").param("job",value.accepted().jobId()).query(String.class).single()).isEqualTo("EXPIRY_EDGE");assertJobAuditLineage(value.accepted().jobId(),true);assertThat(jdbc().sql("SELECT external_suppressed FROM gw.job_event WHERE job_id=:job AND type='job.cancelled'").param("job",value.accepted().jobId()).query(Boolean.class).single()).isTrue();
         assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job").param("job",value.accepted().jobId()).query(Integer.class).single()).isOne();
     }
     @Test void expiryBetweenTheLockedPolicyCheckAndValidateDataUsesExpiryEdgeInsteadOfABindingFailure() throws Exception {
         var value=produce("validation-expiry");jdbc().sql("UPDATE gw.conversation SET expires_at=:at WHERE id=:conversation").param("at",java.sql.Timestamp.from(clock().instant().plusSeconds(1))).param("conversation",value.accepted().conversationId()).update();
         var trip=context.getBean(ClockTrip.class);trip.arm();assertThat(context.getBean(JobTerminalCommitter.class).commit(value.accepted().jobId(),value.spec())).isTrue();assertThat(trip.thread).isNull();assertThat(state(value.accepted().jobId())).isEqualTo("CANCELLED");
-        assertThat(count("result")).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence").query(Integer.class).single()).isZero();assertThat(jdbc().sql("SELECT decision FROM gw.audit_event WHERE job_id=:job").param("job",value.accepted().jobId()).query(String.class).single()).isEqualTo("EXPIRY_EDGE");
+        assertThat(count("result")).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence").query(Integer.class).single()).isZero();assertThat(jdbc().sql("SELECT decision FROM gw.audit_event WHERE job_id=:job AND event_type='JOB_TERMINAL'").param("job",value.accepted().jobId()).query(String.class).single()).isEqualTo("EXPIRY_EDGE");assertJobAuditLineage(value.accepted().jobId(),true);
     }
     @Test void actualBusinessReadRuntimeAndErrorAreRecordedMinimallyAndTheSameOriginalObjectIsRethrown() throws Exception {
         int count=0;for(Throwable original:List.of(new IllegalStateException("SENTINEL:runtime-call"),new AssertionError("SENTINEL:error-call"))) {

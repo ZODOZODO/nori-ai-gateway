@@ -72,6 +72,7 @@ public final class ToolDispatcher {
         }
         if (invocation != null) invocation.enter(tool);
         ToolResultEnvelope raw = executor.execute(step, tool, scope, context);
+        if (invocation != null) invocation.returned();
         ToolResultEnvelope result = results.validate(raw, tool);
         boolean validated = result == raw;
         if (result.evidence().stream().anyMatch(e -> !scope.actorRef().equals(e.actorAccessScope())))
@@ -82,8 +83,9 @@ public final class ToolDispatcher {
         return result;
     }
     public sealed interface InvocationOutcome permits Returned, Threw {}
-    public record InvocationRecord(String id,String capabilityId,ResultStatus status,Optional<ErrorCode> errorCode,Optional<ToolResultEnvelope> validatedResult) {
-        public InvocationRecord { Objects.requireNonNull(id);Objects.requireNonNull(capabilityId);Objects.requireNonNull(status);Objects.requireNonNull(errorCode);Objects.requireNonNull(validatedResult); }
+    /** latencyMs는 executor.execute 직전부터 반환·throw까지의 단조 경과 시간이다. */
+    public record InvocationRecord(String id,String capabilityId,ResultStatus status,Optional<ErrorCode> errorCode,Optional<ToolResultEnvelope> validatedResult,long latencyMs) {
+        public InvocationRecord { Objects.requireNonNull(id);Objects.requireNonNull(capabilityId);Objects.requireNonNull(status);Objects.requireNonNull(errorCode);Objects.requireNonNull(validatedResult);if(latencyMs<0)throw new IllegalArgumentException("Tool 호출 경과 시간이 음수입니다"); }
         @Override public String toString() { return "InvocationRecord[보호됨]"; }
     }
     public record Returned(ToolResultEnvelope result,Optional<InvocationRecord> invocation) implements InvocationOutcome {}
@@ -99,11 +101,16 @@ public final class ToolDispatcher {
     private static final class InvocationState {
         private String fallback,capability;
         private InvocationRecord record;
-        void enter(CapabilityManifest tool) { fallback=UUID.randomUUID().toString();capability=tool.capabilityId(); }
+        // 시험 고정 Clock은 실제 구간을 재지 못하므로 단조 시계를 씁니다.
+        private long enteredAt,returnedAt;
+        private boolean returned;
+        void enter(CapabilityManifest tool) { fallback=UUID.randomUUID().toString();capability=tool.capabilityId();enteredAt=System.nanoTime(); }
+        void returned() { returnedAt=System.nanoTime();returned=true; }
+        private long latencyMs() { return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis((returned?returnedAt:System.nanoTime())-enteredAt); }
         void complete(ToolResultEnvelope result,boolean validated) {
-            record=new InvocationRecord(validated?result.toolExecutionId():fallback,capability,result.status(),Optional.ofNullable(result.errorCode()),validated?Optional.of(result):Optional.empty());
+            record=new InvocationRecord(validated?result.toolExecutionId():fallback,capability,result.status(),Optional.ofNullable(result.errorCode()),validated?Optional.of(result):Optional.empty(),latencyMs());
         }
-        InvocationRecord failed() { return new InvocationRecord(fallback,capability,ResultStatus.FAILED,Optional.empty(),Optional.empty()); }
+        InvocationRecord failed() { return new InvocationRecord(fallback,capability,ResultStatus.FAILED,Optional.empty(),Optional.empty(),latencyMs()); }
     }
     public InvocationOutcome dispatchCurrent(PlanValidator.Prepared prepared,com.nori.ai.gateway.core.authz.StepAttempt attempt,
             VerifiedSystemScope scope,com.nori.ai.gateway.core.authz.SourceAuthorizationStep.StepGrant grant,ExecutionContext context) {
@@ -147,7 +154,7 @@ public final class ToolDispatcher {
     }
     private ToolResultEnvelope reject(PlanStep step, VerifiedSystemScope scope, CapabilityManifest registered, ExecutionContext context,
             RejectReason reason, ResultStatus status, ErrorCode error, Clarification clarification) {
-        context.trace().accept(new ExecutionContext.DispatchTrace(step.stepId(), reason));
+        context.trace().accept(new ExecutionContext.DispatchTrace(step.stepId(), reason, error));
         // 실제 실행 대상이 다른 소유자여도 응답은 인증된 원래 범위만 가집니다.
         if (registered.ownerSystem() != scope.boundSystem()) return unsupported(step, scope);
         return results.failure(registered, status, error, clarification);

@@ -3,6 +3,8 @@ package com.nori.ai.gateway.app.job;
 import com.nori.ai.gateway.app.config.CapacityProfile;
 import com.nori.ai.gateway.app.hooks.*;
 import com.nori.ai.gateway.app.job.recovery.ReadinessGate;
+import com.nori.ai.gateway.app.observability.AuditRecorder;
+import com.nori.ai.gateway.core.audit.AuditEvent;
 import com.nori.ai.gateway.core.job.InferenceReadiness;
 import com.nori.ai.gateway.core.sanitize.ContentSanitizer;
 import com.nori.ai.gateway.core.scope.VerifiedSystemScope;
@@ -51,16 +53,17 @@ public final class JobAdmissionService {
     private final Optional<TestHookRegistry> hooks;
     private final Optional<PausePointRegistry> pauses;
     private final org.springframework.context.ApplicationEventPublisher publisher;
+    private final AuditRecorder audit;
     private final JsonMapper json=JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
     private final java.util.concurrent.atomic.AtomicInteger uniqueFallbacks=new java.util.concurrent.atomic.AtomicInteger();
     public int uniqueFallbackCount(){return uniqueFallbacks.get();}
     public JobAdmissionService(PlatformTransactionManager manager,QueueMaintenanceRepository control,IdempotentAdmissionLookup lookup,
             InferenceReadiness readiness,CapacityProfile capacity,QueueJobRepository queue,ConversationRepository conversations,
             MessageRepository messages,JobRepository jobs,JobEventRepository events,ContentSanitizer sanitizer,
-            Optional<TestHookRegistry> hooks,Optional<PausePointRegistry> pauses,org.springframework.context.ApplicationEventPublisher publisher,ReadinessGate recovery){
+            Optional<TestHookRegistry> hooks,Optional<PausePointRegistry> pauses,org.springframework.context.ApplicationEventPublisher publisher,ReadinessGate recovery,AuditRecorder audit){
         transactions=new TransactionTemplate(manager);transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.control=control;this.lookup=lookup;this.readiness=readiness;this.capacity=capacity;this.queue=queue;this.conversations=conversations;
-        this.messages=messages;this.jobs=jobs;this.events=events;this.sanitizer=sanitizer;this.hooks=hooks;this.pauses=pauses;this.publisher=publisher;this.recovery=recovery;
+        this.messages=messages;this.jobs=jobs;this.events=events;this.sanitizer=sanitizer;this.hooks=hooks;this.pauses=pauses;this.publisher=publisher;this.recovery=recovery;this.audit=Objects.requireNonNull(audit);
     }
     public Accepted accept(VerifiedSystemScope scope,AdmissionRequest request){
         if(TransactionSynchronizationManager.isActualTransactionActive())throw new IllegalStateException("접수는 독립 트랜잭션이어야 합니다");
@@ -82,6 +85,8 @@ public final class JobAdmissionService {
             if(!messages.insert(scope,conversation,new MessageRepository.Message(messageId,"user",sanitized.text(),json.writeValueAsString(request.requestFields().getOrDefault("resourceRefs",List.of())),"[]",null,null)))throw new Rejected(404,null,0);
             if(!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,request.idempotencyKey(),digest,request.path(),messageId,request.requestFields()),request.delegation()))throw new Rejected(404,null,0);
             if(!events.insert(scope,jobId,"job.queued","{\"jobId\":\""+jobId+"\"}",false))throw new IllegalStateException("접수 이벤트를 저장할 수 없습니다");
+            // 같은 접수 tx에서 인입 요청 span의 traceId로 원점을 남깁니다. 실패하면 접수 전체가 되돌아갑니다.
+            audit.write(AuditEvent.jobAccepted(scope,io.opentelemetry.api.trace.Span.current().getSpanContext().getTraceId(),conversation,jobId));
             hooks.ifPresent(h->h.bindOnAdmission(scope.sub(),request.idempotencyKey(),jobId));
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
                 @Override public void afterCommit(){hooks.ifPresent(TestHookRegistry::admissionCommitted);pause(PausePointRegistry.Point.ADMISSION_AFTER_COMMIT,jobId);publisher.publishEvent(new AdmissionCommitted(jobId));}

@@ -43,7 +43,7 @@ class WorkerAuthorizationOrderIT extends P09QueueSupport {
         for(TaskType type:List.of(TaskType.GENERAL_QUERY,TaskType.UNSUPPORTED_REQUEST)){
             String key=type.name();hooks().arm("actor",key,new TestHookRegistry.Scenario(type,Set.of(),null,false));var base=scope("actor");
             var withoutSourcePermissions=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(base.boundSystem(),base.authenticatedServiceRef(),base.actorRef(),base.sub(),Set.of(),base.pdg(),base.issuedAt(),base.expiresAt(),base.requestId());
-            var job=context.getBean(JobAdmissionService.class).accept(withoutSourcePermissions,new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of(),key,registeredDlg("actor")));await(()->state(job.jobId()).equals("SUCCEEDED"));
+            var job=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(withoutSourcePermissions,new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of(),key,registeredDlg("actor"))));await(()->state(job.jobId()).equals("SUCCEEDED"));
         }
         assertThat(calls().authorizationRequests()).containsExactly(Set.of(),Set.of());assertThat(calls().count("getEqpSnapshot")).isZero();assertThat(calls().count("direct:logs")).isZero();
     }

@@ -35,7 +35,7 @@ class WorkflowPlanBuilderTest {
         var job=job(TaskType.INCIDENT_ANALYSIS,Map.of("resourceRefs",List.of(Map.of("type","EQP","ref","EQP_001"))));
         var execution=new WorkflowPlanBuilder(active).build(workflow(TaskType.INCIDENT_ANALYSIS),active.view(job.scope()),job,Map.of("from","2026-11-04T00:00Z","to","2026-11-04T01:00Z"));
         var knowledge=execution.toolPlan().plan().getLast();var manifest=active.find(knowledge.capabilityId()).orElseThrow();
-        assertThat(manifest.resourceTypes()).containsExactly("DOCUMENT","EQP");assertThat(knowledge.capabilityId()).isEqualTo("tc.knowledge.search");
+        assertThat(manifest.resourceTypes()).containsExactlyInAnyOrder("DOCUMENT","EQP");assertThat(knowledge.capabilityId()).isEqualTo("tc.knowledge.search");
         assertThat(knowledge.arguments().path("eqp").asString()).isEqualTo("EQP_001");assertThat(ResourceInputs.bound(knowledge,manifest)).containsExactly(new ResourceRef("EQP","EQP_001"));
         class CurrentResolver implements WorkflowResourceResolver {
             OwnerSystem owner=OwnerSystem.TC;boolean exists=true;

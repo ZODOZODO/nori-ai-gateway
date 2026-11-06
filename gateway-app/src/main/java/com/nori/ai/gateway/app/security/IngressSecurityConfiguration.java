@@ -23,8 +23,9 @@ public class IngressSecurityConfiguration {
     @Bean BodySystemFieldGuard bodySystemFieldGuard() { return new BodySystemFieldGuard(); }
     @Bean AuthRejectionAuditor authRejectionAuditor(AuthRejectionAppendRepository repository) { return new AuthRejectionAuditor(repository); }
     @Bean FilterRegistrationBean<ServiceTokenAuthFilter> serviceTokenAuthFilterRegistration(SecurityCredentialFiles credentials, ActorAssertionVerifier verifier,
-            ScopeAssembler scopes, BodySystemFieldGuard bodies, AuthRejectionAuditor auditor) {
-        var registration = new FilterRegistrationBean<>(new ServiceTokenAuthFilter(credentials,verifier,scopes,bodies,auditor));
+            ScopeAssembler scopes, BodySystemFieldGuard bodies, AuthRejectionAuditor auditor, com.nori.ai.gateway.app.observability.AuditRecorder audit,
+            io.opentelemetry.api.OpenTelemetry openTelemetry) {
+        var registration = new FilterRegistrationBean<>(new ServiceTokenAuthFilter(credentials,verifier,scopes,bodies,auditor,audit,openTelemetry));
         registration.setName("serviceTokenAuthFilter"); registration.addUrlPatterns("/v1/*");
         registration.setDispatcherTypes(DispatcherType.REQUEST); registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;

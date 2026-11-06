@@ -56,6 +56,20 @@ class StackSmokeIT extends StackContextSupport {
                 "io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender"}) {
             assertThat(Class.forName(name)).isNotNull();
         }
+        // P14: BOM 관리 registry-otlp의 실제 artifact·명시 registry·OTel 조합과 logging 경계 회귀입니다.
+        assertLoadedArtifact(io.micrometer.registry.otlp.OtlpMeterRegistry.class, "micrometer-registry-otlp-1.16.6.jar");
+        assertLoadedArtifact(Class.forName("io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest"), "opentelemetry-proto-1.8.0-alpha.jar");
+        // 공용 fixture 기본값은 export off이므로 OTLP registry는 없고 SDK provider는 유지됩니다(전용 수신 시험만 loopback으로 켭니다).
+        assertThat(context.getBeansOfType(io.micrometer.core.instrument.MeterRegistry.class).values()).singleElement().isNotInstanceOf(io.micrometer.registry.otlp.OtlpMeterRegistry.class);
+        assertThat(context.getBeansOfType(io.opentelemetry.api.OpenTelemetry.class).values()).singleElement().isInstanceOf(com.nori.ai.gateway.app.observability.GatewayOpenTelemetry.class);
+        assertThat(context.getBeansOfType(com.nori.ai.gateway.app.observability.OtlpLogAppenderInstaller.class)).isEmpty();
+        var root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        assertThat(((ch.qos.logback.core.ConsoleAppender<?>) root.getAppender("STDOUT")).getEncoder()).isInstanceOf(com.nori.ai.gateway.app.observability.AllowlistJsonEncoder.class);
+        // logs=false이면 OTel appender를 만들지 않으므로 root에는 STDOUT만 있습니다.
+        var appenders = new java.util.ArrayList<ch.qos.logback.core.Appender<?>>(); root.iteratorForAppenders().forEachRemaining(appenders::add);
+        assertThat(appenders).noneMatch(io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender.class::isInstance).anyMatch(appender -> appender.getName().equals("STDOUT"));
+        for (String name : new String[]{"org.springframework.ai.openai.OpenAiChatModel", "org.springframework.ai.openai.OpenAiEmbeddingModel", "org.springframework.ai.openai.setup.OpenAiSetup", "com.openai"})
+            assertThat(org.slf4j.LoggerFactory.getLogger(name).isErrorEnabled()).as(name).isFalse();
     }
 
     private void exerciseCompatibilityLibraries() throws Exception {

@@ -15,6 +15,7 @@ public record ExecutionContext(ResourceResolver resolver, Consumer<DispatchTrace
         }
         @Override public String toString(){return "BoundInputs[보호됨]";}
     }
-    public record DispatchTrace(String stepId, RejectReason reason) {}
+    /** error는 reject가 응답에 싣는 ErrorCode이며 없으면 null이다. */
+    public record DispatchTrace(String stepId, RejectReason reason, com.nori.ai.gateway.core.result.ErrorCode error) {}
     public ExecutionContext { Objects.requireNonNull(resolver); Objects.requireNonNull(trace);Objects.requireNonNull(boundInputs); }
 }

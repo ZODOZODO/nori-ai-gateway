@@ -1,5 +1,7 @@
 package com.nori.ai.gateway.app.job;
 
+import com.nori.ai.gateway.app.observability.AuditRecorder;
+import com.nori.ai.gateway.core.audit.AuditEvent;
 import com.nori.ai.gateway.core.evidence.EvidenceAssembler;
 import com.nori.ai.gateway.core.expiry.ExpiryCheckpoint;
 import com.nori.ai.gateway.core.job.*;
@@ -16,15 +18,16 @@ public final class WorkflowExecutionAdapter implements com.nori.ai.gateway.core.
     private final CapabilityRegistry registry;private final WorkflowPlanBuilder builder;private final com.nori.ai.gateway.core.workflow.WorkflowExecutor executor;
     private final WorkflowResourceResolverFactory resolvers;private final TimeWindowResolver windows;private final MessageRepository messages;
     private final ExpiryCheckpoint expiry;private final ContentSanitizer sanitizer;private final TerminalOutcomeAssembler assembler;private final ConversationSummaryBuilder summaries;
-    private final EvidenceAssembler evidenceAssembler;
+    private final EvidenceAssembler evidenceAssembler;private final AuditRecorder audit;
     public WorkflowExecutionAdapter(CapabilityRegistry registry,WorkflowPlanBuilder builder,com.nori.ai.gateway.core.workflow.WorkflowExecutor executor,WorkflowResourceResolverFactory resolvers,
-            TimeWindowResolver windows,MessageRepository messages,ExpiryCheckpoint expiry,ContentSanitizer sanitizer,TerminalOutcomeAssembler assembler,ConversationSummaryBuilder summaries,EvidenceAssembler evidenceAssembler) {
+            TimeWindowResolver windows,MessageRepository messages,ExpiryCheckpoint expiry,ContentSanitizer sanitizer,TerminalOutcomeAssembler assembler,ConversationSummaryBuilder summaries,EvidenceAssembler evidenceAssembler,AuditRecorder audit) {
         this.registry=registry;this.builder=builder;this.executor=executor;this.resolvers=resolvers;this.windows=windows;this.messages=messages;this.expiry=expiry;this.sanitizer=sanitizer;this.assembler=assembler;this.summaries=summaries;
-        this.evidenceAssembler=evidenceAssembler;
+        this.evidenceAssembler=evidenceAssembler;this.audit=Objects.requireNonNull(audit);
     }
     @Override public TerminalSpec execute(JobContext job) {
         expiry.assertLive(job.conversationExpiresAt(),job.cancellation());
         TaskType task=TaskType.valueOf((String)job.classification().get("taskType"));
+        audit.writeForJob(AuditEvent.jobClassified(job.scope(),job.conversationId(),job.jobId(),task));
         var definition=registry.workflow(job.scope(),task).orElse(null);
         if(definition==null)return TerminalSpec.outcome(JobStatus.SUCCEEDED,ResultStatus.UNSUPPORTED,null,Map.of("status",ResultStatus.UNSUPPORTED.name()));
         try{builder.checkOptions(definition,job);}catch(WorkflowPlanBuilder.Blocked blocked){return finishClarification(job,ErrorCode.PLAN_INVALID,List.of("options"));}

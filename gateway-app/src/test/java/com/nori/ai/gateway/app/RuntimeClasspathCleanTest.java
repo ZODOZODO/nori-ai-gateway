@@ -15,7 +15,8 @@ class RuntimeClasspathCleanTest {
         assertThat(file.toString().replace('\\', '/')).endsWith("gateway-app/build/aigw/runtime-classpath.txt");
         String runtime = Files.readString(file);
         assertThat(runtime).isNotBlank().contains("org.springframework.boot:spring-boot:", "ai.djl.huggingface:tokenizers:",
-            "native/lib/linux-x86_64/cpu/libtokenizers.so", "native/lib/win-x86_64/cpu/tokenizers.dll");
+            "native/lib/linux-x86_64/cpu/libtokenizers.so", "native/lib/win-x86_64/cpu/tokenizers.dll",
+            "io.micrometer:micrometer-registry-otlp:1.16.6 ", "io.opentelemetry.proto:opentelemetry-proto:1.8.0-alpha ");
         assertThat(runtime).doesNotContain("junit-platform-reporting", "junit-platform-launcher", ":gateway-eval:", "test-fixtures", "testFixtures", "org.testcontainers:");
         assertThat(runtime).doesNotContain("\r");
         assertThat(runtime.lines()).allMatch(line -> line.matches("\\S+ sha256=[0-9a-f]{64} nativeResources=.*"));

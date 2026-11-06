@@ -42,14 +42,22 @@ public final class JobTerminalCommitter {
     }
     public boolean commit(String jobId, TerminalSpec requested) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("외부 트랜잭션 안에서는 종결할 수 없습니다");
-        try { return commitAttempt(jobId,requested); }
-        catch (FinalWriteExpired expired) { return commitAttempt(jobId,TerminalSpec.forCause(TerminalSpec.Cause.EXPIRY_EDGE)); }
+        try { return commitAttempt(jobId,requested,false); }
+        catch (FinalWriteExpired expired) { return commitAttempt(jobId,TerminalSpec.forCause(TerminalSpec.Cause.EXPIRY_EDGE),false); }
     }
-    private boolean commitAttempt(String jobId,TerminalSpec requested) {
+    /**
+     * 만료 경계 canceller의 QUEUED 스냅샷 전용 종결이다. 잠긴 행이 아직 QUEUED이고 대화가 실제로 만료됐을 때만 EXPIRY_EDGE로 종결하며,
+     * Dispatcher가 먼저 RUNNING으로 바꿨거나 아직 만료 전이면 쓰기 없이 false다(RUNNING은 Worker가 실제 호출 종료 뒤 종결한다).
+     */
+    public boolean commitExpiredQueued(String jobId) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("외부 트랜잭션 안에서는 종결할 수 없습니다");
+        return commitAttempt(jobId,TerminalSpec.forCause(TerminalSpec.Cause.EXPIRY_EDGE),true);
+    }
+    private boolean commitAttempt(String jobId,TerminalSpec requested,boolean expiredQueuedOnly) {
         long[] event = {0};
         boolean won = Boolean.TRUE.equals(new TransactionTemplate(manager).execute(tx -> {
             var rows = jdbc.sql("SELECT j.owner_system,j.actor_ref,j.conversation_id,c.expires_at,j.created_at,j.status,j.cancel_requested_at,j.request_message_id,j.seq FROM gw.job j JOIN gw.conversation c ON c.id=j.conversation_id AND c.owner_system=j.owner_system WHERE j.id=:id AND j.status IN ('QUEUED','RUNNING') AND (:queuedOnly=false OR j.status='QUEUED') FOR UPDATE OF j,c")
-                .param("queuedOnly",requested.terminalCause()==TerminalSpec.Cause.QUEUE_TIMEOUT)
+                .param("queuedOnly",expiredQueuedOnly||requested.terminalCause()==TerminalSpec.Cause.QUEUE_TIMEOUT)
                 .param("id",jobId).query((rs,n) -> new Object[]{rs.getString(1),rs.getString(2),rs.getString(3),rs.getTimestamp(4).toInstant(),rs.getTimestamp(5).toInstant(),rs.getString(6),rs.getTimestamp(7),rs.getString(8),rs.getLong(9)}).list();
             if (rows.isEmpty()) return false;
             var row=rows.getFirst(); Instant policyNow=clock.instant();
@@ -57,6 +65,7 @@ public final class JobTerminalCommitter {
             Instant now=policyNow.truncatedTo(ChronoUnit.MICROS);
             // QUEUED 취소 판단 뒤 디스패치가 먼저 이겼으면 진행 호출을 먼저 종료시킵니다.
             if(requested.terminalCause()==TerminalSpec.Cause.CANCELLED&&"RUNNING".equals(row[5])&&!runningCallTerminated.test(jobId))return false;
+            if(expiredQueuedOnly&&policyNow.isBefore((Instant)row[3]))return false;
             TerminalSpec spec=requested;
             if(Set.of(TerminalSpec.Cause.NORMAL,TerminalSpec.Cause.START_GATE_DENIED,TerminalSpec.Cause.START_GATE_UNAVAILABLE).contains(spec.terminalCause())){
                 if(row[6]!=null)spec=TerminalSpec.forCause(TerminalSpec.Cause.CANCELLED);
@@ -80,9 +89,15 @@ public final class JobTerminalCommitter {
             event[0]=jdbc.sql("INSERT INTO gw.job_event(job_id,owner_system,type,payload,created_at,external_suppressed) VALUES (:id,:owner,:type,CAST(:payload AS jsonb),:now,:suppressed) RETURNING id")
                 .param("id",jobId).param("owner",row[0]).param("type",spec.eventType())
                 .param("payload",encode(eventPayload(jobId,spec))).param("now",Timestamp.from(now)).param("suppressed",spec.externalSuppressed()).query(Long.class).single();
-            jdbc.sql("INSERT INTO gw.audit_event(recorded_at,owner_system,actor_ref,request_id,conversation_id,job_id,event_type,status,error_code,decision) VALUES (:now,:owner,:actor,:id,:conversation,:id,:event,:status,:error,:decision)")
-                .param("now",Timestamp.from(now)).param("owner",row[0]).param("actor",row[1]).param("id",jobId).param("conversation",row[2])
-                .param("event",AuditEventType.JOB_TERMINAL.name()).param("status",spec.jobStatus().name()).param("error",spec.errorCode()==null?null:spec.errorCode().name()).param("decision",spec.terminalCause().name()).update();
+            // 원래 요청의 request_id·trace_id는 같은 owner·actor·Job의 접수 감사에서 파생합니다. 원점이 없으면 종결 전체를 되돌립니다.
+            int audited=jdbc.sql("""
+                INSERT INTO gw.audit_event(recorded_at,owner_system,actor_ref,request_id,conversation_id,job_id,trace_id,event_type,status,error_code,decision,result_status)
+                SELECT :now,:owner,:actor,origin.request_id,:conversation,:id,origin.trace_id,:event,:status,:error,:decision,:resultStatus
+                FROM gw.audit_event origin WHERE origin.event_type='JOB_ACCEPTED' AND origin.job_id=:id AND origin.owner_system=:owner AND origin.actor_ref=:actor
+                """).param("now",Timestamp.from(now)).param("owner",row[0]).param("actor",row[1]).param("id",jobId).param("conversation",row[2])
+                .param("event",AuditEventType.JOB_TERMINAL.name()).param("status",spec.jobStatus().name()).param("error",spec.errorCode()==null?null:spec.errorCode().name()).param("decision",spec.terminalCause().name())
+                .param("resultStatus",spec.resultStatus()==null?null:spec.resultStatus().name()).update();
+            if(audited!=1)throw new IllegalStateException("Job 접수 감사 원점을 확인할 수 없습니다");
             for (var observer:observers) observer.beforeCommit(jobId);
             if(data.isPresent())assertFinalLive((Instant)row[3]);
             return true;

@@ -13,8 +13,8 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         assertThat(jdbc().sql("SELECT delegation_id FROM gw.job WHERE id=:id").param("id",first.jobId()).query(String.class).single().equals(delegation)).isTrue();
         assertThatThrownBy(()->accept("actor","same","다른 질문",null,registeredDlg("actor"))).isInstanceOfSatisfying(JobAdmissionService.Rejected.class,e->{assertThat(e.status()).isEqualTo(409);assertThat(e.error()).isEqualTo("IDEMPOTENCY_KEY_CONFLICT");});assertThat(counts()).isEqualTo(before);
         assertThat(accept("other","same","질문",null,dlg()).jobId()).isNotEqualTo(first.jobId());
-        var wm=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(com.nori.ai.gateway.core.scope.OwnerSystem.WM,"wm",new com.nori.ai.gateway.core.scope.ActorRef("actor"),"actor",Set.of(),P09TestPorts.PDG,NOW,NOW.plusSeconds(60),"wm-request");
-        assertThat(context.getBean(JobAdmissionService.class).accept(wm,new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of(),"same",registeredDlg("actor"))).jobId()).isNotEqualTo(first.jobId());
+        var wm=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(com.nori.ai.gateway.core.scope.OwnerSystem.WM,"wm",new com.nori.ai.gateway.core.scope.ActorRef("actor"),"actor",Set.of(),P09TestPorts.PDG,NOW,NOW.plusSeconds(60),java.util.UUID.randomUUID().toString());
+        assertThat(inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(wm,new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of(),"same",registeredDlg("actor")))).jobId()).isNotEqualTo(first.jobId());
         jdbc().sql("UPDATE gw.conversation SET expires_at=:expiry WHERE id=:id").param("expiry",java.sql.Timestamp.from(NOW.plusSeconds(1))).param("id",first.conversationId()).update();clock().advance(1);var expiredBefore=counts();
         assertThatThrownBy(()->accept("actor","same","질문",null,registeredDlg("actor"))).isInstanceOfSatisfying(JobAdmissionService.Rejected.class,e->assertThat(e.status()).isEqualTo(404));assertThat(counts()).isEqualTo(expiredBefore);
     }
@@ -26,6 +26,8 @@ class IdempotentAdmissionIT extends P09QueueSupport {
             await(()->pauses().reachedCount(PausePointRegistry.Point.ADMISSION_FAST_MISS,point)==2);pauses().release(PausePointRegistry.Point.ADMISSION_FAST_MISS,point);
             var accepted=a.get();assertThat(b.get().jobId()).isEqualTo(accepted.jobId());
             assertThat(count("job")-before.get(0)).isOne();assertThat(count("message")-before.get(1)).isOne();assertThat(count("job_event")-before.get(2)).isOne();
+            // 경합한 두 접수 중 실제 새 Job 하나만 접수 감사 원점을 남깁니다.
+            assertThat(count("audit_event")-before.get(4)).isOne();assertThat(jdbc().sql("SELECT count(*) FROM gw.audit_event WHERE event_type='JOB_ACCEPTED' AND job_id=:id").param("id",accepted.jobId()).query(Integer.class).single()).isOne();
             assertThat(context.getBean(com.nori.ai.gateway.persistence.queue.QueueJobRepository.class).count("QUEUED")).isEqualTo(4);
             assertThat(context.getBean(JobAdmissionService.class).uniqueFallbackCount()).isZero();
             String committed=jdbc().sql("SELECT delegation_id FROM gw.job WHERE id=:id").param("id",accepted.jobId()).query(String.class).single();assertThat(Set.of(firstDlg,secondDlg).contains(committed)).isTrue();
@@ -43,7 +45,7 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         assertThat((Map<String,Object>)request.requestFields().get("context")).containsEntry("timezone","+09:00").containsEntry("timeWindow",null);
         assertThatThrownBy(()->request.requestFields().put("timezone","UTC")).isInstanceOf(UnsupportedOperationException.class);
         var service=context.getBean(JobAdmissionService.class);
-        var first=service.accept(scope("actor"),request);
+        var first=inRequestSpan(()->service.accept(scope("actor"),request));
         assertThat(state(first.jobId())).isEqualTo("QUEUED");
         var before=counts();
         var reorderedContext=new LinkedHashMap<String,Object>();
@@ -51,7 +53,7 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         reorderedContext.put("referenceTime","2026-10-04T10:00:00+09:00");
         reorderedContext.put("timezone","+09:00");
         var replay=new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of("context",reorderedContext),"nullable-context",registeredDlg("actor"));
-        assertThat(service.accept(scope("actor"),replay).jobId()).isEqualTo(first.jobId());
+        assertThat(inRequestSpan(()->service.accept(scope("actor"),replay)).jobId()).isEqualTo(first.jobId());
         assertThat(counts()).isEqualTo(before);
     }
     private List<Integer> counts(){return List.of(count("job"),count("message"),count("job_event"),count("conversation"),count("audit_event"));}

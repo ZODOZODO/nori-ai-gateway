@@ -27,6 +27,7 @@ nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimb
 awssdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awsSdk" }
 nori-storage-starter = { module = "com.nori:nori-object-storage-s3-starter", version = "0.0.1-SNAPSHOT" }
 otel-logback = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otelLogback" }
+otel-instrumentation-bom-alpha = { module = "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha", version.ref = "otelLogback" }
 openai-java-okhttp = { module = "com.openai:openai-java-client-okhttp", version.ref = "openaiJava" }
 junit-bom = { module = "org.junit:junit-bom" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }

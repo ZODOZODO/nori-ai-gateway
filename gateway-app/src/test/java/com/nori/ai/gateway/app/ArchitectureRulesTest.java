@@ -47,11 +47,12 @@ class ArchitectureRulesTest {
         var rules=new LinkedHashMap<String,Set<String>>();
         rules.put("queue.AdmissionLookupRepository.find(com.nori.ai.gateway.core.scope.VerifiedSystemScope,java.lang.String)",Set.of("app.job.IdempotentAdmissionLookup"));
         rules.put("queue.QueueJobRepository.count(java.lang.String)",Set.of("app.job.JobAdmissionService","app.job.JobDispatcher","app.hooks.TestHookController"));
-        rules.put("queue.QueueJobRepository.nonterminal()",Set.of("app.job.JobTimeoutSweeper","app.job.recovery.StartupRecoveryRunner"));
+        rules.put("queue.QueueJobRepository.nonterminal()",Set.of("app.job.JobTimeoutSweeper","app.job.recovery.StartupRecoveryRunner","app.ops.ExpiryEdgeJobCanceller"));
         rules.put("queue.QueueJobRepository.nextQueued()",Set.of("app.job.JobDispatcher"));
         rules.put("queue.QueueJobRepository.start(java.lang.String,java.time.Instant)",Set.of("app.job.JobDispatcher"));
         rules.put("queue.JobDelegationReader.forWorker(java.lang.String)",Set.of("app.job.JobWorker"));
         rules.put("queue.JobTerminalCommitter.commit(java.lang.String,com.nori.ai.gateway.core.job.TerminalSpec)",Set.of("app.job.JobWorker","app.job.JobTimeoutSweeper","app.job.JobCancellationService","app.job.recovery.StartupRecoveryRunner"));
+        rules.put("queue.JobTerminalCommitter.commitExpiredQueued(java.lang.String)",Set.of("app.ops.ExpiryEdgeJobCanceller"));
         rules.put("queue.JobEventPublisher.publish(long)",Set.of("persistence.queue.JobTerminalCommitter"));
         rules.put("queue.JobEventPublisher.publishQueued(java.lang.String)",Set.of("app.job.JobDispatcher"));
         rules.put("queue.JobEventPublisher.publishStarted(java.lang.String)",Set.of("app.job.JobDispatcher"));
@@ -87,6 +88,24 @@ class ArchitectureRulesTest {
         Path sources=Path.of(System.getProperty("aigw.rootDir"),"gateway-persistence/src/main/java/com/nori/ai/gateway/persistence");
         var permitted=Set.of("repository/JobRepository.java","queue/JobDelegationReader.java","queue/JobTerminalCommitter.java");
         try(var paths=Files.walk(sources)){for(var file:paths.filter(p->p.toString().endsWith(".java")).toList())if(Files.readString(file).contains("delegation_id"))assertThat(permitted).contains(sources.relativize(file).toString().replace('\\','/'));}
+    }
+    @Test void generalAuditWritesHaveExactlyThePlannedProductionCallers()throws Exception{
+        var rules=new LinkedHashMap<String,Set<String>>();
+        rules.put("persistence.audit.AuditWriter.write",Set.of("app.observability.AuditRecorder"));
+        rules.put("persistence.audit.AuditWriter.writeForJob",Set.of("app.observability.AuditRecorder"));
+        rules.put("app.observability.AuditRecorder.write",Set.of("app.security.ServiceTokenAuthFilter","app.job.JobAdmissionService"));
+        rules.put("app.observability.AuditRecorder.writeForJob",Set.of("app.job.WorkflowExecutionRecords","app.job.WorkflowExecutionAdapter"));
+        rules.put("persistence.repository.AuditRepository.insert",Set.of("persistence.audit.AuditWriter"));
+        rules.put("persistence.repository.AuditRepository.insertForJob",Set.of("persistence.audit.AuditWriter"));
+        rules.put("core.workflow.WorkflowExecutor$ExecutionRecorder.blocked",Set.of("core.workflow.WorkflowExecutor"));
+        var observed=new HashMap<String,Set<String>>();
+        for(var type:mainClasses())for(var call:type.getMethodCallsFromSelf()){
+            String target=call.getTargetOwner().getName().substring(Math.min(PREFIX.length(),call.getTargetOwner().getName().length()))+"."+call.getName();
+            if(!call.getTargetOwner().getName().startsWith(PREFIX)||!rules.containsKey(target))continue;
+            String caller=type.getName().substring(PREFIX.length());caller=caller.contains("$")?caller.substring(0,caller.indexOf('$')):caller;
+            observed.computeIfAbsent(target,k->new HashSet<>()).add(caller);
+        }
+        for(var rule:rules.entrySet())assertThat(observed.getOrDefault(rule.getKey(),Set.of())).as(rule.getKey()).containsExactlyInAnyOrderElementsOf(rule.getValue());
     }
     static JavaClasses mainClasses() throws Exception {
         Set<Path> locations = new HashSet<>();

@@ -115,20 +115,20 @@ class WorkflowKnowledgeIT extends P09QueueSupport {
         assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job AND capability_id='tc.knowledge.search'").param("job",first.jobId()).query(Integer.class).single()).isOne();
         var actual=context.getBean(Documents.class).calls.getFirst();assertThat(actual.resources()).containsExactly(new com.nori.ai.gateway.core.plan.ResourceRef("EQP","EQP-001"));assertThat(actual.arguments().path("eqp").asString()).isEqualTo("EQP-001");assertThat(actual.arguments().path("q").asString()).contains("EQUIPMENT_ERROR");
         var fields=new LinkedHashMap<String,Object>(workflowFields());fields.put("options",Map.of("allowKnowledge",false));hooks().arm("actor","optional-disabled",new TestHookRegistry.Scenario(TaskType.INCIDENT_ANALYSIS,Set.of(),null,false));
-        var blocked=context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"선택 문서 제외",fields,"optional-disabled",registeredDlg("actor")));await(()->state(blocked.jobId()).equals("SUCCEEDED"));
+        var blocked=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"선택 문서 제외",fields,"optional-disabled",registeredDlg("actor"))));await(()->state(blocked.jobId()).equals("SUCCEEDED"));
         var payload=json.readTree(jdbc().sql("SELECT payload::text FROM gw.result WHERE job_id=:job").param("job",blocked.jobId()).query(String.class).single());assertThat(payload.path("trace").toString()).contains("knowledge","OPTIONAL_STEP_OMITTED");assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job AND capability_id='tc.knowledge.search'").param("job",blocked.jobId()).query(Integer.class).single()).isZero();
         server.logText="EQP-001 정상 관측";var noInput=incidentDocuments("optional-empty",workflowFields());await(()->state(noInput.jobId()).equals("SUCCEEDED"));
         var empty=json.readTree(jdbc().sql("SELECT payload::text FROM gw.result WHERE job_id=:job").param("job",noInput.jobId()).query(String.class).single());assertThat(empty.path("trace").toString()).contains("knowledge","SKIPPED_NO_INPUT");assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job AND capability_id='tc.knowledge.search'").param("job",noInput.jobId()).query(Integer.class).single()).isZero();
         assertThat(jdbc().sql("SELECT count(*) FROM gw.cache_entry WHERE capability_id='tc.knowledge.search'").query(Integer.class).single()).isZero();
     }
     @Test void falseRequiredKnowledgeStopsBeforeAnyResourceToolOrCacheAndReturnsOnlyClarification() throws Exception {
-        hooks().arm("actor","required-disabled",new TestHookRegistry.Scenario(TaskType.KNOWLEDGE_QUERY,Set.of(),null,false));var accepted=context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"문서 차단",Map.of("options",Map.of("allowKnowledge",false)),"required-disabled",registeredDlg("actor")));await(()->state(accepted.jobId()).equals("FAILED"));
+        hooks().arm("actor","required-disabled",new TestHookRegistry.Scenario(TaskType.KNOWLEDGE_QUERY,Set.of(),null,false));var accepted=inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"문서 차단",Map.of("options",Map.of("allowKnowledge",false)),"required-disabled",registeredDlg("actor"))));await(()->state(accepted.jobId()).equals("FAILED"));
         var payload=json.readTree(jdbc().sql("SELECT payload::text FROM gw.result WHERE job_id=:job").param("job",accepted.jobId()).query(String.class).single());assertThat(payload.properties().stream().map(Map.Entry::getKey)).containsExactly("clarification");assertThat(payload.path("clarification").path("reason").asString()).isEqualTo("PLAN_INVALID");assertThat(calls().authorizationRequests()).containsExactly(Set.of());assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution").query(Integer.class).single()).isZero();assertThat(count("cache_entry")).isZero();
     }
 
     private JobAdmissionService.Accepted incidentDocuments(String key,Map<String,Object> fields) {
         hooks().arm("actor",key,new TestHookRegistry.Scenario(TaskType.INCIDENT_ANALYSIS,Set.of(),null,false));
-        return context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"선택 문서 검색",fields,key,registeredDlg("actor")));
+        return inRequestSpan(()->context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"선택 문서 검색",fields,key,registeredDlg("actor"))));
     }
 
 }
