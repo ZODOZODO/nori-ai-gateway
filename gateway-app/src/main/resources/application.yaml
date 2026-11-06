@@ -1,0 +1,6 @@
+spring:
+  flyway:
+    enabled: false
+    locations: classpath:db/migration/gateway
+    default-schema: gw_flyway
+    create-schemas: true

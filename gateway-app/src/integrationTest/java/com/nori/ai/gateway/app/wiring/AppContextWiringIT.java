@@ -16,6 +16,8 @@ import java.time.Instant;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("stage-F1")
+@org.junit.jupiter.api.Tag("label-MOCK_API")
 class AppContextWiringIT extends StackContextSupport {
     @Test void applicationImportsAllModulesAndRealP05CoreBeans() {
         start();
@@ -43,5 +45,93 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(view.find("tc.event.getRecent")).isEmpty();
         assertThat(view.find("tc.knowledge.search")).isEmpty();
         assertThat(registry.workflow(scope,TaskType.INCIDENT_ANALYSIS)).isPresent();
+        for (Class<?> type : List.of(java.time.Clock.class, com.nori.ai.gateway.persistence.schema.SchemaVersionGuard.class,
+                org.springframework.jdbc.core.simple.JdbcClient.class, org.springframework.transaction.support.TransactionTemplate.class,
+                com.nori.ai.gateway.persistence.repository.ConversationRepository.class,
+                com.nori.ai.gateway.persistence.repository.MessageRepository.class,
+                com.nori.ai.gateway.persistence.repository.JobRepository.class,
+                com.nori.ai.gateway.persistence.repository.JobEventRepository.class,
+                com.nori.ai.gateway.persistence.repository.ResultRepository.class,
+                com.nori.ai.gateway.persistence.repository.EvidenceRepository.class,
+                com.nori.ai.gateway.persistence.repository.ToolExecutionRepository.class,
+                com.nori.ai.gateway.persistence.repository.CacheRepository.class,
+                com.nori.ai.gateway.persistence.repository.AuditRepository.class,
+                com.nori.ai.gateway.persistence.maintenance.QueueMaintenanceRepository.class,
+                com.nori.ai.gateway.persistence.maintenance.RetentionMaintenanceRepository.class,
+                com.nori.ai.gateway.persistence.maintenance.RecoveryMaintenanceRepository.class))
+            assertThat(context.getBeansOfType(type)).hasSize(1);
+        var conversations = context.getBean(com.nori.ai.gateway.persistence.repository.ConversationRepository.class);
+        assertThat(conversations.insert(scope, "p07-wiring")).isTrue();
+        assertThat(conversations.find(scope, "p07-wiring")).isPresent();
+    }
+
+    @Test void actualApplicationRejectsMissingHistoryBeforeLaterRunner() throws Exception {
+        database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),
+            java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
+        database.bootstrap(true);
+        LaterRunner.invocations = 0;
+        assertThatThrownBy(() -> startApplication(LaterRunner.class)).isInstanceOf(RuntimeException.class);
+        assertThat(LaterRunner.invocations).isZero();
+        database.migrate();
+        startApplication(LaterRunner.class);
+        assertThat(LaterRunner.invocations).isEqualTo(1);
+        context.close(); context = null;
+        try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = '3'");
+        }
+        LaterRunner.invocations = 0;
+        assertThatThrownBy(() -> startApplication(LaterRunner.class)).hasMessage("스키마 버전이 애플리케이션과 일치하지 않습니다");
+        assertThat(LaterRunner.invocations).isZero();
+    }
+
+    static class LaterRunner implements org.springframework.boot.ApplicationRunner, org.springframework.core.Ordered {
+        static int invocations;
+        @Override public int getOrder() { return 0; }
+        @Override public void run(org.springframework.boot.ApplicationArguments arguments) { invocations++; }
+    }
+
+    @Test void migrationOnlyMainAppliesOnceAndPropagatesWrongRoleProfileAndMigrationFailure() throws Exception {
+        database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),
+            java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
+        database.bootstrap(false);
+        assertThatThrownBy(() -> new org.springframework.boot.builder.SpringApplicationBuilder(com.nori.ai.gateway.app.AiGatewayApplication.class)
+            .web(org.springframework.boot.WebApplicationType.NONE).profiles("migrate")
+            .properties(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_migrator",
+                "spring.datasource.password",database.passwordFor("aigw_migrator"))).run())
+            .hasMessage("일반 애플리케이션에서는 자동 마이그레이션을 사용할 수 없습니다");
+        try (var connection = database.connection("postgres"); var statement = connection.createStatement();
+                var result = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN ('gw','gw_flyway')")) {
+            assertThat(result.next()).isTrue(); assertThat(result.getInt(1)).isZero();
+        }
+        withMigrationProperties("aigw_app", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
+            new String[]{"--spring.profiles.active=migrate"})).hasRootCauseMessage("마이그레이션 전용 역할이 필요합니다"));
+        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
+            new String[0])).hasMessageContaining("마이그레이션 프로필이 필요합니다"));
+        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
+            new String[]{"--spring.profiles.active=migrate", "--spring.flyway.enabled=false"})).isInstanceOf(RuntimeException.class));
+        try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
+            statement.execute("DROP EXTENSION vector");
+        }
+        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
+            new String[]{"--spring.profiles.active=migrate"})).isInstanceOf(RuntimeException.class));
+        database.bootstrap(false);
+        withMigrationProperties("aigw_migrator", () -> {
+            com.nori.ai.gateway.app.config.MigrateApplication.main(new String[]{"--spring.profiles.active=migrate"});
+            com.nori.ai.gateway.app.config.MigrateApplication.main(new String[]{"--spring.profiles.active=migrate"});
+        });
+        startApplication();
+        assertThat(context.getBeansOfType(com.nori.ai.gateway.app.config.MigrateCommand.class)).isEmpty();
+        assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class)
+            .sql("SELECT count(*) FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
+            .query(Integer.class).single()).isEqualTo(3);
+    }
+
+    private void withMigrationProperties(String role, Runnable action) {
+        var properties = Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", role,
+            "spring.datasource.password", database.passwordFor(role));
+        var previous = new HashMap<String, String>();
+        properties.forEach((key, value) -> { previous.put(key, System.getProperty(key)); System.setProperty(key, value); });
+        try { action.run(); }
+        finally { previous.forEach((key, value) -> { if (value == null) System.clearProperty(key); else System.setProperty(key, value); }); }
     }
 }

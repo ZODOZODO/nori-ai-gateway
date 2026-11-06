@@ -12,6 +12,8 @@ import java.net.ServerSocket;
 import java.time.Duration;
 import static org.assertj.core.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("stage-F1")
+@org.junit.jupiter.api.Tag("label-MOCK_API")
 class StackSmokeIT extends StackContextSupport {
     @Test void acceptsStockSdkTransportWithZeroRetriesAndSeparateConnectTimeoutWithoutRequest() {
         var timeout = com.openai.core.Timeout.builder().connect(Duration.ofSeconds(1)).request(Duration.ofSeconds(2)).build();
@@ -37,7 +39,16 @@ class StackSmokeIT extends StackContextSupport {
         assertThat(context.getBean(OpenAiChatModel.class)).isNotNull();
         assertThat(context.getBean(OpenAiEmbeddingModel.class)).isNotNull();
         assertThat(context.getBean(JdbcClient.class).sql("select 1").query(Integer.class).single()).isEqualTo(1);
-        assertThat(context.getBean(Flyway.class).info().all()).isEmpty();
+        assertThat(context.getBeansOfType(Flyway.class)).isEmpty();
+        var jdbc = context.getBean(JdbcClient.class);
+        assertThat(jdbc.sql("SELECT current_user").query(String.class).single()).isEqualTo("aigw_app");
+        var versions = jdbc.sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
+            .query(String.class).list();
+        assertThat(versions.stream().map(org.flywaydb.core.api.MigrationVersion::fromVersion)
+            .max(org.flywaydb.core.api.MigrationVersion::compareTo).orElseThrow())
+            .isEqualTo(com.nori.ai.gateway.persistence.schema.SchemaVersionGuard.latestClasspathVersion());
+        assertThat(jdbc.sql("SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('gw','kn','gw_flyway')")
+            .query(Integer.class).single()).isEqualTo(3);
         assertThat(context.getBean(ConsumerFactory.class)).isNotNull();
         assertThat(context.getBean(ObjectStorageClient.class)).isNotNull();
         for (String name : new String[]{"io.opentelemetry.sdk.logs.SdkLoggerProvider",

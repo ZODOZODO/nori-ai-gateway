@@ -5824,3 +5824,245 @@ PG 결과는 `PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, c
 종료 작업의 사전 대조에서 AI 32개/exec 11개, 총 43개 후보 원본 해시가 부모의 `root-reviewed-candidates.json`과 모두 일치했고 두 HEAD와 작업트리 스냅샷도 일치했습니다. 스테이징은 양쪽 모두 비어 있었습니다. 최종 부모 검증의 소스 동결 전후 해시 일치 근거와 보호 483개, Spec/baseline/approval6, ignored Plan, 기존 F0/PREREG/results/evidence 및 기존 report prefix를 확인했습니다. `aigw.root.owner`와 `aigw.p06.owner` 라벨로 컨테이너/볼륨 이름·개수만 조회한 현재 잔류는 각각 0이며 전체 inspect 값은 출력하지 않았습니다.
 
 이번에는 이 Dev report의 원본 바이트를 유지한 추가 절만 작성하고 승인된 정확한 43개 경로를 exec 11개 → AI 32개 순서로 로컬 커밋합니다. README/evidence/코드/Spec/Plan은 편집하지 않습니다. 커밋 전후 diff check, 실제 staged/committed 경로와 blob SHA256, 외부 경로·삭제·누락 0, Dev report 원본 prefix와 보호 파일 불변의 최종 결과 및 두 커밋 SHA는 별도 scratch `p06-approved-close/result.json`과 `final.md`에 기록합니다. 새 구현이 없어 부모 테스트는 반복하지 않습니다. 실제 DB/K8s/SSH/Secret/Harbor/Source/모델 서버 접근, 전역 설정 변경, push/MR/force 및 운영 배포 작업은 실행하지 않습니다.
+
+
+## P07 CODE/LOCAL_VALIDATED 구현 보고 (2026-11-06, 독립 구현 세션)
+
+P07 범위의 구현과 격리 로컬 시험을 완료했습니다. **CODE/LOCAL_VALIDATED는 구현자 시험 결과이며 부모 독립 Validate는 대기 중입니다. DEPLOYMENT/ACCEPTANCE/COMPLETE는 BLOCKED/NOT_RUN**입니다. P06 부모 승인과 최신 P07 시험 지원 Plan 승인에 따라 진행했으며 Spec/Plan 체크박스는 변경하지 않았습니다. P08·커밋·push·MR·하위 에이전트 작업은 실행하지 않았습니다.
+
+### 정본과 선행 근거
+- Spec: `exec:docs/task/ai-rag-gateway-architecture.md`, SHA256 `136261bdd91a87f01c69072fd90c76e1d453ae9e96d6ea478f6a83f1ec3465f3`. 최초 Gradle SpecGuard exit 0 뒤에만 파일을 편집했습니다.
+- 직접 읽고 계산한 최신 승인 Plan: `exec:docs/task/ai-rag-gateway-architecture-plan.md`, SHA256 `12e29e5215ce117ba869a1d2734594ed61aa3690346c05103cc2fd565dfd4f63`. §3.4·§4·§7 P07·§8 및 Spec §8/9/12/16/21의 해당 계약을 대조했습니다.
+- 선행 proof: 부모 scratch의 `p06-approved-close/root-commit-verification.json`, `p06-approved-hba/root-validation-approval.json`, `p07-test-support-plan/root-plan-approval.json`. P06 CODE/LOCAL_VALIDATED와 P07 CODE 착수 승인만 근거로 사용했습니다.
+- 실제 시험 HEAD: AI `b307e53bf120297687cb4fa5236bc41fb63c973d`, exec `6d744aa57fd4d2970f9fca8c941b43b8a2e18670` + 아래 dirty P07 소스입니다. 미래 커밋에서 실행한 결과가 아닙니다.
+
+### 구현 내용·호출·배선
+
+- V1은 bootstrap이 설치한 vector 0.8.7을 검증하고 gw/kn과 DML 기본 권한을 만듭니다. 이력은 migrator 소유 gw_flyway에만 생성합니다. V2는 대화·메시지·문맥·요약·Job·큐 제어·이벤트·결과·Evidence·Tool 실행·캐시를 생성합니다. V3는 허용 메타데이터 감사·retention probe·backup_run·instance_epoch를 생성하고 backup_run INSERT/sequence USAGE만 backup에 추가합니다. V4 이후와 bootstrap 객체는 추가하지 않았습니다.
+- 일반 앱 → GatewayAppModuleConfiguration → PersistenceModuleConfiguration의 실제 @Import → JdbcClient/명시적 TransactionTemplate/Clock → SchemaVersionGuard·9개 scope 저장소·3개 유지보수 저장소입니다. guard는 Ordered.HIGHEST_PRECEDENCE의 실제 ApplicationRunner이며 클래스패스 최신 V와 DB 최신 성공 V를 Flyway 숫자 버전으로 비교합니다. 빈 DB·비어 있는 성공 이력·V10 불일치에서 후속 runner 실행 0을 확인했습니다.
+- 일반 앱은 Flyway 비활성입니다. NormalDatabaseConfiguration의 BeanFactoryPostProcessor가 일반 진입점의 migrate 프로필/자동 Flyway 활성화를 DDL 초기화 전에 거부합니다. 전용 config.MigrateApplication은 DataSource/Flyway 자동 설정과 migrate 프로필 MigrateCommand만 구성합니다. 전략에서 DB current_user를 먼저 검사한 후 Spring Flyway 초기화가 한 번 migrate하고, runner 완료 뒤 main이 컨텍스트를 닫고 반환합니다. 잘못된 역할/프로필·Flyway 비활성·마이그레이션 실패를 성공으로 삼지 않습니다. System.exit는 없습니다. **P15 hook은 일반 앱 main을 migrate 프로필로 실행하는 대신 이 전용 MigrateApplication 클래스를 명시적으로 실행해야 합니다. 이번 packaging task 변경은 없습니다.**
+- 9개 저장소의 public 실행 메서드는 VerifiedSystemScope를 첫 인자로 받습니다. scope에서 system/actor를 바인딩하고 부모 Conversation의 현재 소유권·expires_at > Clock.now를 JOIN/EXISTS로 확인합니다. Message/Job/이벤트/Result/Evidence/Tool/Cache와 Context/Summary도 같은 경계를 통과합니다. payload의 owner 값은 인가 정본이 아닙니다. audit는 actor/system과 90일 경계를 함께 검사합니다. 인증 JWT의 새 수명 정책은 추가하지 않았습니다.
+- Job SELECT는 명시 열만 사용하고 일반 DTO에 일시 위임을 포함하지 않습니다. P07 제품 코드에서 delegation_id는 접수 INSERT에만 등장합니다. terminal 잔류는 DB job_dlg_terminal_null 제약으로 막으며, 실제 DB에서 terminal 상태 5종의 23514/정확한 제약 이름과 같은 UPDATE의 NULL 삭제·조건부 1회 성공을 확인했습니다. worker 전용 reader와 terminal 업무 서비스는 P09 책임으로 남겼고 앞당기지 않았습니다.
+- Queue/Retention/RecoveryMaintenanceRepository는 별도 타입으로 등록하고 ArchUnit이 dispatcher/purge/recovery 서비스 외 실행 호출을 제한합니다. 큐 잠금은 실제 기존 tx를 요구하며, purge는 만료됐어도 비 terminal Job이 있으면 삭제하지 않습니다. 미래 서비스나 no-op 구현은 만들지 않았습니다.
+- 공유 PgTestDatabase testFixtures가 정본 bootstrap/HBA → migrator migrate → app 연결을 소유합니다. CSPRNG 자격은 메모리/자기 컨테이너 env와 테스트 JVM 메모리 속성으로만 전달하고 자격 값을 argv/정본 파일/증거에 쓰지 않았습니다. 자기 label을 확인한 컨테이너를 finally/close에서 정리합니다. 컨텍스트를 먼저 닫습니다. 생산 코드의 테스트 분기나 가짜 guard는 없습니다.
+- persistence/app integrationTest는 동일한 AIGW_PG_TEST_IMAGE 전체 pin을 선언 입력과 aigw.pgTestImage에 결속합니다. bootstrap/HBA 실제 바이트 SHA도 파일 입력 및 aigw.pgBootstrapSha256/aigw.pgHbaSha256에 결속하며 fixture가 실제 바이트를 다시 비교합니다. 누락·비고정·형식 오류 pin은 factory 단위 시험과 실행 전 Gradle 검증에서 거부하고 fallback은 없습니다. 기존 루트 N17 메커니즘을 사용했으며 루트 build/catalog/pins는 변경하지 않았습니다.
+- StackContextSupport는 PG17 빈 DB 대신 공유 PG18 준비 후 app 역할로 일반 verify 앱을 실행합니다. StackSmoke는 Flyway 빈 부재·app current_user·성공 이력/클래스패스 최신 V·필수 스키마를 검사합니다. 기존 모델 미호출·라이브러리 호환 assertion과 AppContextWiring의 P05 8개 Core 빈/9 manifest/6 capability/production executor 부재 assertion은 유지했습니다.
+
+### 실행 명령과 실제 결과
+
+모든 Gradle은 scratch run_gradle.py로 AIGW_SPEC_FILE을 명시하고 --secure-auth의 메모리 캡처 Bearer 자격과 --no-daemon을 사용했습니다. 아래 명령은 각각 별도 프로세스입니다. 각 최종 Test 직후 같은 task/필터/includeTags/requireDocker/image/SQL·HBA SHA 입력의 공식 test-evidence verify를 별도 실행했습니다. 앱 필터는 scratch app-filter.init.gradle에서 동일하게 재현했습니다. XML/OTR/summary/run-binding/runtimeClasspath/inputFingerprint를 대조했습니다.
+
+| 최종 Test | exit | 실제 case | 실패/오류/skip | 공식 검증 exit | scratch 실행 proof |
+|---|---:|---:|---|---:|---|
+| `:gateway-persistence:test` | 0 | 11 | 0/0/0 | 0 | `persistence-unit-final.json` / `persistence-unit-final-verify.json` |
+| `:gateway-persistence:integrationTest` | 0 | 53 | 0/0/0 | 0 | `persistence-it-r4.json` / `persistence-it-r4-verify.json` |
+| `:gateway-app:integrationTest` | 0 | 5 | 0/0/0 | 0 | `app-it-r1.json` / `app-it-r1-verify.json` |
+| `:gateway-app:test` | 0 | 13 | 0/0/0 | 0 | `app-unit-final.json` / `app-unit-final-verify.json` |
+
+최종 서로 다른 task의 case 합계는 82건입니다. 앞선 실행/실패/재실행은 합산하지 않았습니다. UP-TO-DATE/NO-SOURCE를 새 Test 실행으로 세지 않았고 최종 네 Test의 taskOutcome은 모두 EXECUTED입니다.
+
+- 실행: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:test --no-daemon --console=plain`
+  별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run --args=test-evidence verify --tasks :gateway-persistence:test --no-daemon --console=plain`
+  runId `d820b272-52b7-4ff4-8655-d1afb347e4fb`, inputFingerprint `30a7218c1d1916ed580b86076d03784421dc0e92b491b8394dc401312cf0dae5`.
+- 실행: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:integrationTest -Paigw.requireDocker=true --no-daemon --console=plain`
+  별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run -Paigw.requireDocker=true --args=test-evidence verify --tasks :gateway-persistence:integrationTest --no-daemon --console=plain`
+  runId `28df6823-5be1-42e7-9f8f-9b63b99c8c1d`, inputFingerprint `0ac274a9d7d405e97d969863718a6a5c65561fcf19fbf233b237c7b542a1166f`.
+- 실행: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *AppContextWiringIT --tests *StackSmokeIT --no-daemon --console=plain`
+  별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p07-implementation\app-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true --args=test-evidence verify --tasks :gateway-app:integrationTest --no-daemon --console=plain`
+  runId `9c88a4b7-5417-4ae9-8d9c-819faf65ca49`, inputFingerprint `2fd68c1562d047a5a282515269e7cf7de098d61fdf4e08d5a29a6da00b76afa1`.
+- 실행: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain`
+  별도 검증: `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run --args=test-evidence verify --tasks :gateway-app:test --no-daemon --console=plain`
+  runId `79379e7b-4202-435b-b5c4-ed02d163efba`, inputFingerprint `1f0375d0fda6110cf838f190a0972ba8b854f8b0880331b35ce36f43f28449bc`.
+
+공통 실제 runtimeClasspath SHA256은 `c97a88754eb9c0f32577f809454e37c91082650a01e54bd6cc65a64a429f6d81`입니다. 상세 classpath와 각 binding/leaf 해시·실제 실행 클래스·필터·정본 입력은 scratch `test-proof.json`과 `runtime-classpath.txt`에 있습니다.
+
+기존 OtrLeafExtractor는 모든 RUN 요약의 stage 메타데이터를 F0로 고정합니다(기존 구현 불변). 실제 P07 OTR의 stage-F1/label-MOCK_API 태그를 별도로 확인했고 기반 persistence 시험의 leaf records는 비어 있습니다. RUN 요약으로 F0 판정이나 전체 ISO 수용 PASS를 주장하지 않습니다.
+
+53개 persistence IT에는 migration 2건, bootstrap/권한/HBA 1건, terminal 제약 1건, 실제 guard 1건, scoped 저장소 48건이 있습니다. scoped 45건은 9개 저장소 × 정상 TC/동일 actor WM/다른 actor/만료/now==expiresAt이며 각 case에 대표 read/write를 함께 검증합니다. 나머지는 null/빈 키/중복/부모 불일치/pdg/독립 90일·캐시 경계/명시 tx·비 terminal purge 보호입니다. 하나의 case 안 여러 assertion이나 권한별 SQL 검사를 독립 case로 더하지 않았습니다. 실제 bootstrap true 2회 → migrate → app CRUD/DDL 거부 → backup 전 테이블 SELECT와 유일한 예외 INSERT → acceptance readonly off 후 정확한 42501 → 다른 DB TCP/Unix 구체 HBA reject → false 2회/역할 부재를 확인했습니다. stage-F1/label-MOCK_API 기반 로컬 시험이며 전체 ISO 수용 PASS나 운영 gate 레코드로 등록하지 않았습니다.
+
+실패 이력도 scratch에 남겼습니다. persistence-it-r1은 PowerShell의 인자 분리로 시험 실행 전 실패했습니다. r2는 실제 guard의 직접 예외에 root-cause를 잘못 기대한 assertion 및 Clock 중복 등록으로 실패했습니다(XML 6개 중 initializationError 1개 포함, OTR 실제 test 5개). Clock 기본 설정의 조건 평가를 사용자 빈 등록 뒤로 지연시켜 등록 순서 의존을 없앴습니다. r3는 같은 actor/system의 준비 행에 같은 멱등 키를 재사용한 시험 fixture 오류로 scoped 47건이 준비 단계에서 실패했습니다. DB unique 제약을 유지하고 준비 키를 분리했습니다. r3 도중 너무 일찍 시작한 verifier는 STALE_TEST_EVIDENCE로 거부됐으며 완료 뒤 별도 r3-verify-after는 exit 0이었습니다. 실패한 Test를 통과로 바꾸지 않았습니다. 최종 r4의 53건은 모두 실제 PASS입니다. app-compile-r1의 공개 JDBC/Flyway 타입 가시성 실패는 persistence의 기존 두 starter를 api로 노출하여 수정했고 app-compile-r2 exit 0 및 최종 앱 시험으로 재확인했습니다. 런타임 artifact/버전 추가는 없습니다.
+
+### PostgreSQL 입력과 운영 한계
+- 개발 candidate: `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`. fixture가 실제 server_version 18.6과 vector 0.8.7을 질의해 확인했습니다. 실제 버전 문자열은 test-proof.json의 actualDatabaseProof와 XML에 있습니다.
+- 정본 bootstrap SHA256 `04b42923d3940ed51d0630c0cddb13cc649167fcb8d43027bba07c7f2ca7c11e`, HBA SHA256 `1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22`. 두 정본 파일은 편집하지 않았습니다.
+- 승인 Harbor 운영 digest로 이미지 전환한 재시험은 NOT_RUN입니다. 전환 시 두 모듈 선언 입력/시스템 속성과 N17 fingerprint가 달라지며 bootstrap/HBA/migration/권한/저장 회귀를 실제 재실행하고 부모가 확인하기 전 배포/수용/전체 완료로 승격하지 않습니다.
+- 실제 K8s/SSH/Secret/Harbor/Source/모델 서버·운영 백업/복원/CI/전역 설정 변경은 실행하지 않았습니다. P15 hook·packaging·실제 운영 수용은 이 결과가 검증한 범위가 아닙니다. 운영 입력 대기와 F1 코드 로컬 준비를 분리한 승인 B를 유지합니다.
+
+### 실제 변경 파일·Plan 차이·보호
+
+다음은 P07 실제 변경 경로와 SHA256입니다(이 Dev report 자신의 최종 해시는 scratch result.json에 기록). persistence API 가시성, Clock 지연 기본 설정과 일반 앱 DDL 사전 거부는 확정된 배선/실패 정책을 만족하기 위한 기술적 구현입니다. 업무·보안·운영 계약의 변경이나 승인 Spec/Plan 충돌은 발견하지 않았습니다. P05 Core/Registry/Manifest/Validator/Dispatcher는 수정하지 않았습니다.
+
+| 파일 | SHA256 |
+|---|---|
+| `gateway-app/build.gradle.kts` | `4aa6583f6de70bf4a68e922de48c81d64bf996ce301aa70b960e5c88164cd004` |
+| `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackContextSupport.java` | `833f7fb273dc013c1fa97e3afaffc10ea7d3e0c9c5ec5d166f67b53e2333141e` |
+| `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackSmokeIT.java` | `eb0cf69aff483420de6768c9cc3992792b345a2c2217bb983305f71f7adaaa7b` |
+| `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java` | `727083bae489aa5691c99b00e769c12bae61806239d618cfb4b07708b378831a` |
+| `gateway-app/src/main/java/com/nori/ai/gateway/app/config/GatewayAppModuleConfiguration.java` | `350a9a4bc4cabd9d07b043f5e1a349ca0b4b227b7b5cd330ec124758d6a8f558` |
+| `gateway-app/src/main/java/com/nori/ai/gateway/app/config/MigrateApplication.java` | `73966ad9b7f34c2dd526172e145b3d39e3a5dda90615e320b05c1ed9ca77694e` |
+| `gateway-app/src/main/java/com/nori/ai/gateway/app/config/MigrateCommand.java` | `08042a9fcc4a6df3aeef1faa991b0efaeab149dc4d04ed25bad17a572b1f0ec2` |
+| `gateway-app/src/main/java/com/nori/ai/gateway/app/config/NormalDatabaseConfiguration.java` | `1516541b14dbf16ecf0e64daa99fa814c2e74aad515f57e656345d69ba8cb4cf` |
+| `gateway-app/src/main/resources/application-migrate.yaml` | `00f0ad99350bf5b18b7f3af5f1082a83626bd197fcbe8497f76fcb635e472258` |
+| `gateway-app/src/main/resources/application.yaml` | `b5b933bce0c5944a64e14a77d8dd3f14da7b083c62f966bc27f786ca20873354` |
+| `gateway-persistence/build.gradle.kts` | `e887cb67bafcf9b5983cfc7c6499e9a37c6cf8ccfb98036135102c1532ba3f3d` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/DbBootstrapOrderIT.java` | `1e28ef46faad881b951d2fa24d3e9adea537dbda14a4c9705a49bcdf01f4d232` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/JobDelegationColumnIT.java` | `7de206f308e65c9699bce507e064b106c4b14c4b3c373bad01b8fbe75945d73d` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/MigrationApplyIT.java` | `7ae401bfee7f9f0d0f7c43050861ec6fdb92bf5620294ee7bc7f4917d637b5c3` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/PgIntegrationSupport.java` | `04db4027c7475373b837442b78d4847b1a0a22cda4aa466cdc51a2bda4da6bb5` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/SchemaVersionGuardIT.java` | `a2c9235d7a11b03f6b1ba2ee3f109201905ae8aeafbe8be863257604fba97e9a` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/ScopedRepositoryIT.java` | `c830f3217b831202eaf989331e2c300fed812c61ef6df19500c38f0e03002769` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/PersistenceClockConfiguration.java` | `d49ecb8b182585093a8737701e259b68494b9631cf8439efe359817b869eaf1c` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/PersistenceModuleConfiguration.java` | `bc414a5bf3f913dda7acee7a83272d5df0443c94b1ccd77a37730c674eff794c` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/maintenance/QueueMaintenanceRepository.java` | `9aa0c7dc70deb5ea21b47b4e88d51bc36d02d94c74804838ba0c81a8fe54e030` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/maintenance/RecoveryMaintenanceRepository.java` | `0db2770f60e3f773350b605a08b3cf6887afd0a7fdb4b5653951544a2f2c4c34` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/maintenance/RetentionMaintenanceRepository.java` | `d394c54331678d18bb807c619af25dfefb5a23508a5f7c61b8d0699c126ce0c3` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/AuditRepository.java` | `6d8b8f012467429d4e85d0f7f9bceff3a15481703fe36c2af3b371ee0e03632f` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/CacheRepository.java` | `10c35587ffa4bb1982eaf4ab06d08cb45d6d6e7573738737a109894e00d1bda5` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/ConversationRepository.java` | `aead9520d18142f01cea42affe44cbcb927f9170d9017f34b7fd426f746c90ac` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/EvidenceRepository.java` | `caa2d1c16212e3d84a02d0d485dc3e2cc90fd188d5884ffb0b8092afc8341274` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/JobEventRepository.java` | `2ae6ed2d18eb3661e03e949a2d51a50aeb90f709ea7aef96ea4f5204a7bb0d24` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/JobRepository.java` | `4ed377608dff38e5ee058de5a5e77bf5b7dca3332ffaeadc2e075f6f375e57be` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/MessageRepository.java` | `a79088f983237755bf88a54c27d9cff874135a530cee9bb04725ad109388814e` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/ResultRepository.java` | `bd850b51200829d004d7804d16f6e0a27dcb995677221f88ef717a3d871b641d` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/ScopedJdbc.java` | `5f0d22e1962f1bfd49d52cf6365863a5769fbd82196070e96e412660dd002aff` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/ToolExecutionRepository.java` | `62e07e3750e7a68f10ac7f27eee8f658fc249de2aa83966f54050d0d63daa114` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/schema/SchemaVersionGuard.java` | `df45b9ae981ec9f0e9cd05466e299e46ff4ffcb65bef3a7748d6fcd980c0edea` |
+| `gateway-persistence/src/main/resources/db/migration/gateway/V1__schemas_and_extension_assert.sql` | `c79f6d25a2202c21aa280dcc68446f23cdc57bf7e63158d83092d1f9a4624d61` |
+| `gateway-persistence/src/main/resources/db/migration/gateway/V2__conversation_job_core.sql` | `ef879b7dd36359e659129fee5aca2c1634fe50a321f3d5a54cfa10d3bd8d5914` |
+| `gateway-persistence/src/main/resources/db/migration/gateway/V3__audit_ops.sql` | `209a5c8665e384cfbf46a23ba875af39c74dd5569cabcc81b45a9a3f764818eb` |
+| `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/PgTestInputTest.java` | `6325c5ad24aad10af537954d6487fa7da5386d9e6e022fc88c37201e6e4623f3` |
+| `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/RepositorySignatureArchTest.java` | `1c2e5a0706bc1df7aede91ca0fc8a5323f462dbc02d202c71adfb9c66c236932` |
+| `gateway-persistence/src/test/java/com/nori/ai/gateway/persistence/schema/SchemaVersionGuardTest.java` | `348a0a1b57caa8bdb829ec7f69dd0aecbd85b942a93751ca3fe8174f9a358fe4` |
+| `gateway-persistence/src/testFixtures/java/com/nori/ai/gateway/persistence/testing/PgTestDatabase.java` | `6d523960e2478983d75314eee8a2255c23a9cf09659f7f09eb15e5f7ef467872` |
+
+기존 report 825975바이트(SHA256 `c952d02902bca6771f4c4e9b24d5bd32b8d1b70eb138611fdac7478dd37383bd`)는 그대로 보존하고 이 절만 UTF-8 LF로 추가했습니다. 보호 483개와 기존 파일 전체 스냅샷을 대조했고 허용 경로 밖 변경은 없습니다. Spec/baseline/approval6/최신 Plan/기존 P06 JSON/옛 F0·PREREG·golden·capture·results·evidence는 불변입니다. 최종 경로/해시·부모 승인 proof·보호/원본 prefix·자원 정리·noOps/noP08/noCommit 확인은 scratch `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p07-implementation/result.json` 및 `final.md`에 기록합니다. 부모의 독립 Validate 및 운영 선행조건은 별도이며 이번 세션에서 전체 완료로 표시하지 않습니다.
+
+### P07 부모 실제 PostgreSQL 재현 결함 근본수정 — 2026-11-06
+
+상태: CODE/LOCAL_VALIDATED만 PASS이며 부모 독립 Validate는 PENDING입니다. 기존 구현의 82건 PASS는 부모 승인이 아니며, 아래 부모 초기 결함은 exit 0이어도 제품 결함입니다. 부모 프로그램·실행기·초기 결과를 수정/실행/덮어쓰지 않았고, 이번 수정은 영구 회귀시험으로 검증했습니다. DEPLOYMENT/ACCEPTANCE/COMPLETE는 BLOCKED/NOT_RUN입니다.
+
+#### 근본원인·수정·영향
+
+- CacheRepository.put: 요청 expiresAt를 그대로 저장하여 부모 만료를 넘겼습니다. 소유권·actor·미만료 조건을 만족하는 부모 행을 같은 INSERT SELECT에서 읽고 LEAST(요청 만료, 부모 만료)로 제한합니다. ON CONFLICT UPDATE는 이미 제한된 EXCLUDED.expires_at를 사용합니다. 더 짧은 TTL, pdg별 분리, 타 owner/actor 및 없는/만료 부모 쓰기 거부를 보존합니다.
+- AuditRepository: 조회에 살아 있는 부모의 30일 만료/존재를 요구한 것이 원인입니다. 조회는 감사 자신의 owner_system+actor_ref+recorded_at+90일만으로 판정합니다. INSERT는 부모 존재·실제 owner/actor·job/conversation 상호 일치를 검사하되 부모 만료로 종결 메타데이터 저장을 막지 않습니다. nullable parent의 명시 CAST와 의도된 부모 FK 부재는 그대로입니다. 기존 9×5 시험은 대화묶음 8×5 엄격 만료와 감사 5조건 독립 기대로 분리했습니다. 이는 Spec §12.2·§12.3의 확정 계약 복구입니다.
+- ScopedJdbc :now, Audit cutoff, RetentionMaintenanceRepository의 대화 now/감사 cutoff: Timestamp 바인딩의 미래 반올림이 만료 1ns 직전 조회 차단·조기 삭제를 일으켰습니다. 실제 사용 JDBC 42.7.11 TimestampUtils.toString의 nanosExceed499 올림 경로를 javap로 확인했습니다(jdbc-rounding-proof.json). 해당 기준시각만 ChronoUnit.MICROS로 내림해 저장 정밀도와 비교합니다. 비교 연산자, 만료 시각, 30/90일 기간, Clock 정책은 바꾸지 않았습니다. JSONB Context와 resolvedTimeWindow 원본 Instant/나노초는 변환하지 않습니다.
+- 호출/wiring: AiGatewayApplication → GatewayAppModuleConfiguration → PersistenceModuleConfiguration @Import의 기존 9개 저장소와 유지보수 빈/생성자 연결을 확인했습니다. scoped 공통 시각은 대화묶음 저장소의 조회/쓰기 경계에 영향을 주며, 이외 app/Core/Registry/Manifest/P05 assertion·루트 build·권한/스키마는 변경하지 않았습니다.
+
+#### 부모 초기 결과 보존
+
+아래는 수정 전 부모 결과 그대로이며 이번 세션의 수정 후 부모 프로그램 결과가 아닙니다. 원본 경로: ../p07-implementation/root-probe-initial-defects.json. metadata 파일명 충돌의 Python KeyError java는 이전 부모 하네스 정리 이력이고, 후속 runtime.json 분리 뒤 완료된 실제 PostgreSQL 재현과 구분해 보존합니다.
+
+```json
+{
+  "conversationTtlExactly30Days": true,
+  "conversationTtlSeconds": 2592000,
+  "cacheExpiryWithinConversation": false,
+  "auditInsert": true,
+  "conversationVisible1nsBeforeExpiry": false,
+  "purgeDoesNotDelete1nsBeforeExpiry": false,
+  "conversationHiddenAtExpiry": true,
+  "auditVisibleAfterConversationExpiry": false,
+  "auditVisibleAfterConversationPurge": false,
+  "auditWithoutParentInsert": true,
+  "auditHiddenAt90Days": true,
+  "unlinkedAuditVisible1nsBefore90Days": false,
+  "auditPurgeCount1nsBeforeUnlinkedExpiry": 2,
+  "unlinkedAuditSurvivesPurgeBefore90Days": false
+}
+```
+
+#### 영구 회귀시험과 실제 실행 증거
+
+RetentionBoundaryIT 14건을 추가했습니다. 캐시 INSERT/충돌 UPDATE 제한·짧은 TTL·pdg 분리·소유권 거부, 대화/독립 감사의 -1us/-1ns/정확 만료/+1ns/+1us 조회 및 실제 purge 행 수, 대화 31일 감사 조회·만료 소유 부모 감사 쓰기·부모 정리 뒤 90일 직전 조회·정확 90일 차단/정리·이후 독립행 보존, 알 수 없는/타 owner/타 actor/서로 다른 부모 거부를 확인했습니다. StepClock 생성 TTL=2592000초 및 touch/context/message 뒤 만료 불변, Context referenceTime/timeWindow와 Message resolvedTimeWindow의 9자리 나노초 문자열 왕복도 확인했습니다. ScopedRepositoryIT의 기존 40건 대화묶음 격리/엄격 만료와 독립 감사 5조건, 나머지 기존 시험은 유지했습니다.
+
+첫 Gradle은 실제 SpecGuard(fix-spec-guard) exit 0이며 그 뒤에만 편집했습니다. 모든 Gradle에 AIGW_SPEC_FILE을 지정했습니다. 시험/검증의 이미지·requireDocker·aigw.* 입력은 동일하고 앱 IT 필터는 재사용한 app-filter.init.gradle로 verifier에 재현했습니다. glab token은 메모리 캡처 후 Authorization Bearer child env로만 전달했습니다.
+
+| Test task | 실제 고유 case | Test exit | 직후 별도 공식 verifier exit | 실행 상태 |
+|---|---:|---:|---:|---|
+| `:gateway-persistence:test` | 11 | 0 | 0 | EXECUTED |
+| `:gateway-persistence:integrationTest` | 67 | 0 | 0 | EXECUTED |
+| `:gateway-app:integrationTest` | 5 | 0 | 0 | EXECUTED |
+| `:gateway-app:test` | 13 | 0 | 0 | EXECUTED |
+
+실제 명령(각 Test 바로 뒤 별도 verifier 실행):
+
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:test --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-persistence:test" --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:integrationTest -Paigw.requireDocker=true --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run -Paigw.requireDocker=true "--args=test-evidence verify --tasks :gateway-persistence:integrationTest" --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:integrationTest -Paigw.requireDocker=true --tests *AppContextWiringIT --tests *StackSmokeIT --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p07-root-fix\app-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true "--args=test-evidence verify --tasks :gateway-app:integrationTest" --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-app:test --no-daemon --console=plain`
+- `C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --no-daemon --console=plain`
+
+최종 고유 case 합계 96건(이전 회차/부모 probe 미합산). XML failure/error/skip=0, OTR failed/skipped/aborted=0, leaf summary failed/skipped/aborted=0, 모든 대상 Test task=EXECUTED입니다. runId·build binding·inputFingerprint·현재 fingerprint·runtimeClasspath를 대조했고 공식 verifier의 TEST_EVIDENCE_VERIFIED를 확인했습니다. verifier exit 0과 실제 Test PASS를 별도로 판정했습니다. 증거: `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p07-root-fix\test-proof.json` SHA256 `88ecce40410042089a5634a167366fa27fba040906c61e88a48efe70bbe18ae6`. 이번 수정 시험의 실패 회차가 있으면 원본 label 증거를 보존하며 최종 집계에 포함하지 않습니다.
+
+최종 증거 수집기 첫 시도는 서로 다른 parameterized method의 동일 XML 표시 이름을 classname+name만으로 중복 판정해 exit 1(DUPLICATE_XML_CASE)이었습니다. 제품 Test 실패가 아니며 기록은 proof-collection-initial-failure.json에 보존했습니다. OTR의 JUnit uniqueId(클래스·메서드·invocation)로 고유성을 확인하고 XML/OTR/summary 수를 대조해 수집 exit 0을 얻었습니다. 기존 캡처를 덮어쓰지 않고 동일 바이트를 확인했습니다.
+
+PostgreSQL image `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`, 실제 PostgreSQL 18.6/vector 0.8.7. Docker 필수 두 IT가 해당 pin으로 실행됐습니다. 승인 Harbor 운영 digest 재시험·실운영 배포·수용은 미실행입니다. Eval 249 전체는 반복하지 않았습니다(제품 루트/하네스 변경 없음).
+
+#### 실제 변경 파일·SHA256
+
+| 경로 | 수정 후 SHA256 |
+|---|---|
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/RetentionBoundaryIT.java` | `cce7052f1505b956919eaf72b80330932378210009ee894d1d2c23484949aa44` |
+| `gateway-persistence/src/integrationTest/java/com/nori/ai/gateway/persistence/ScopedRepositoryIT.java` | `e10d6b8543f0b935945e092ba46d5997a568ba07269aaf5e50d8edf5cf1c0085` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/maintenance/RetentionMaintenanceRepository.java` | `e4d4d60f78f1b06de90d40cc5beac4ab02665049665b66b3b25653b3a8173451` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/AuditRepository.java` | `c8c26db0107f609f2191fa6d70033659aa94b299801048da8ea18340d28024e3` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/CacheRepository.java` | `2455a5c76228df1c106bbecd6e6cae71c92e8528b557597a2d2953d91d36017f` |
+| `gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/repository/ScopedJdbc.java` | `126cfc7dc6f9ab415514d4d2321666481fe4ddcc816df5e3b5dd01b41e972bc9` |
+
+위 6개 persistence 파일과 이 Dev report append만 이번 세션의 변경입니다. Spec/Plan 차이·충돌·신규 정책 결정은 없습니다. SQL V1~V3, P06 bootstrap/HBA, Spec/Plan, 보호 483개, 기존 P06/F0/PREREG/golden 및 앞 구현 전체 미커밋 상태를 보존합니다.
+기존 보고서 847947바이트 SHA256 `4ac31aefdd85cc0d188b4e70770dbbb205a78584eaf8678bf6f9bfd38269bad4`를 prefix 그대로 보존하고 이 절만 UTF-8 LF로 append했습니다. 소유 label을 확인한 fixture finally 정리 뒤 잔류를 읽기 전용 확인합니다. 다른 소유 자원을 무조건 삭제하지 않습니다.
+변경/보호 hash·append prefix·공식 검증 proof·자원 정리·noCommit/noPush/noOps/noP08/noSubAgents 최종 결과: `C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p07-root-fix\result.json`. 부모가 독립 재검증한 뒤 커밋/P08을 별도 세션으로 진행합니다.
+
+### P07 부모 직접 검증 PASS 및 로컬 종료 — 2026-11-06
+
+부모 정본 `scratchpad/p07-root-fix/root-validation-approval.json`의 status=PASS에 따라 CODE 및 허용된 LOCAL_VALIDATED의 부모 검증 PASS를 기록합니다. 앞 절의 부모 PENDING 이후에 수행된 검증입니다. 실제 배포·수용·전체 COMPLETE는 완료하지 않았습니다. 이 종료 세션은 코드·Spec·Plan·기존 evidence를 변경하거나 Test task를 반복하지 않고 증거와 현재 파일을 읽어 대조했습니다.
+
+초기 `p07-implementation/result.json`의 자체 82건 PASS는 부모에게 반려되었습니다. `root-probe-initial-defects.json`의 exit=0은 프로그램 종료값이며 캐시 부모 TTL 초과, 부모 만료/삭제 후 감사 조회 실패, 만료 1ns 직전 조기 차단/삭제라는 제품 결함을 PASS로 만들지 않습니다. 부모 하네스 최초 metadata 실행은 출력 파일명 충돌로 KeyError java가 발생했습니다. 이름을 분리한 metadata 2회차 성공과 실제 PostgreSQL 결함 재현 결과를 별도로 보존했습니다. 증거 수집기 DUPLICATE_XML_CASE 이력 또한 앞 절과 원본 증거 그대로 보존합니다.
+
+근본수정은 CacheRepository.put의 INSERT/충돌 UPDATE에 LEAST(요청 만료, 소유 부모 만료)를 적용한 것, AuditRepository의 90일 조회를 감사 자체 owner/actor/recorded_at 기준으로 독립시킨 것, ScopedJdbc의 now 및 감사/정리 cutoff를 마이크로초로 내림하여 JDBC/PG 시각 반올림의 조기 만료를 막은 것입니다. 감사 쓰기는 부모 owner/actor와 job/conversation 일치를 유지하면서 소유한 만료 부모의 종결 메타데이터를 허용합니다. 실제 근거는 해당 저장소·RetentionMaintenanceRepository와 RetentionBoundaryIT 14건 및 ScopedRepositoryIT입니다. Spec/Plan 확정 계약 복구이며 새 business/security 정책 결정이나 계약 변경은 없습니다.
+
+최종 실제 고유 JUnit case는 **96건**입니다. 초기 82건·실패 회차·별도 부모 프로그램을 합산하지 않습니다. XML failure/error/skipped=0, OTR 및 leaf summary failed/skipped/aborted=0이며 OTR JUnit uniqueId로 고유성을 확인했습니다.
+
+| Test task | 최종 case | runId | inputFingerprint | binding SHA256 |
+|---|---:|---|---|---|
+| `:gateway-persistence:test` | 11 | `49bda1bf-4f5a-4620-b504-a4ab678ee779` | `dc038668f7382acdf1e73f408a55587d32e18c35d5bdb583bcc60c44adda4f3e` | `c9dd21583edae4ed0a63756550718e322b1b34922bb028ff56309ce4a8e2133b` |
+| `:gateway-persistence:integrationTest` | 67 | `411f53bf-17e9-499d-a423-008f987c325b` | `016424ee76583f5b383b63b648df71cbb4daa63c3d6c801805971ba3eb2c52fb` | `242898014b57615009cb4ab97093a67fbee641d658951bcc667d7c9fa935d8ab` |
+| `:gateway-app:test` | 13 | `56bf821d-f507-40fa-aad5-9fd312669057` | `1e27ed1019b937db091c7dd9049f5de971e6464c054dae8c361f289960dc18f4` | `8f4358595dd36048e56dc21fde5bf2454a6ea634535c0d331c44e9d0f3329a77` |
+| `:gateway-app:integrationTest` | 5 | `1a6dd4fc-f69f-453d-9e9b-4c18a12fa84a` | `0d41366bfa21e039e4353f454f262a05db40ebebf88d97e196699a595463ed9a` | `2d8d2561fbf059359cb9b9b3d0656b07929ce72452db73faddd0eac5f98d3d79` |
+
+XML/OTR/leaf summary의 case·상태·실행 클래스, runId·Spec SHA·runtimeClasspath SHA·현재 inputFingerprint와 run-binding을 실제 대조했습니다. 앱 IT 필터는 `*AppContextWiringIT`, `*StackSmokeIT` 두 개이고 다른 task의 testFilters 및 모든 includeTags는 빈 목록입니다. 두 IT의 aigw.requireDocker=true·시험 이미지 pin·정본 SQL/HBA 입력이 일치합니다. 부모 `root-official-verify.json` exit=0과 `root-official-verify.log`의 TEST_EVIDENCE_VERIFIED를 확인했습니다. 공식 명령은 `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --require-docker --tasks :gateway-persistence:test,:gateway-persistence:integrationTest,:gateway-app:test,:gateway-app:integrationTest"`이며 기존 app-filter.init.gradle로 동일 필터를 재현했습니다. 종료 세션에서 이 명령을 재실행하지 않았습니다.
+
+정본 bootstrap SHA256 `04b42923d3940ed51d0630c0cddb13cc649167fcb8d43027bba07c7f2ca7c11e`, HBA SHA256 `1146cf885b2b35e6c0880fdc41fe21602d5169fae2bdc19c23bb4c121539dc22`를 보존했습니다. 명시 candidate `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`의 실제 PostgreSQL 18.6/vector 0.8.7 로컬 시험이며 운영 Harbor 이미지 승인에 해당하지 않습니다.
+
+fixture `PgTestDatabase`는 정본 SHA 확인·HBA read-only mount·고정 이미지·일회성 난수 자격·소유 label 확인 후 close를 구현합니다. `DbBootstrapOrderIT.canonicalBootstrapMigrationAppAndRestrictedBackupAcceptanceRoles`는 bootstrap 재실행, 앱 DML/DDL 거부, 16개 테이블 backup/acceptance 권한, acceptance read-only 해제 후 쓰기 거부, Unix ai_gateway 허용 및 postgres/template1/p07_outside의 TCP/Unix HBA 거부, acceptance 역할 제거를 검증합니다. `MigrationApplyIT`는 V1~V3 재실행/소유권과 vector 부재 실패를 검증합니다. `AppContextWiringIT`는 실제 AiGatewayApplication 기동·저장소 bean·실제 쓰기/읽기, history 부재/버전 불일치 시 후속 runner 미실행, migrate-only main의 역할·프로필·실패 전파와 일반 앱 자동 DDL 사전 거부를 검증합니다. 같은 클래스의 기존 P05 Core 8개 bean·registry/manifest/validator/dispatcher·NoOp seam assertion 및 최종 앱 단위시험 13건도 유지했습니다. 실제 코드와 최종 실행 클래스 목록이 일치하며 운영 실행을 의미하지 않습니다.
+
+부모 별도 실제 PG 프로그램 `p07-implementation/root-probe-r2-result.json`은 status=PASS, exit=0입니다. 초기 프로그램에 wrong owner/actor 거부와 소유 만료 부모 감사 쓰기 조건을 추가한 후 재실행했습니다. 최종 standalone program PASS이며 sourceFrozen=true, 실행 전후 소스 hash 일치입니다. 종료 시점에도 sourceHashes의 모든 파일을 실제 대조해 일치를 확인했습니다. 아래 17조건은 JUnit과 별도입니다(15개 bool=true, TTL=2592000, 감사 정리 count=1).
+
+| 부모 프로그램 조건 | 실제 결과 |
+|---|---|
+| `conversationTtlExactly30Days` | `true` |
+| `conversationTtlSeconds` | `2592000` |
+| `cacheExpiryWithinConversation` | `true` |
+| `auditInsert` | `true` |
+| `conversationVisible1nsBeforeExpiry` | `true` |
+| `purgeDoesNotDelete1nsBeforeExpiry` | `true` |
+| `conversationHiddenAtExpiry` | `true` |
+| `auditVisibleAfterConversationExpiry` | `true` |
+| `auditOtherSystemDenied` | `true` |
+| `auditOtherActorDenied` | `true` |
+| `auditOwnExpiredParentInsert` | `true` |
+| `auditVisibleAfterConversationPurge` | `true` |
+| `auditWithoutParentInsert` | `true` |
+| `auditHiddenAt90Days` | `true` |
+| `unlinkedAuditVisible1nsBefore90Days` | `true` |
+| `auditPurgeCount1nsBeforeUnlinkedExpiry` | `1` |
+| `unlinkedAuditSurvivesPurgeBefore90Days` | `true` |
+
+최종 probe SHA256 `7b65cee54e68db415a688cb398ce663448320d3be534b73f0daf588d549653fb`, 프로그램 SHA256 `a6845795f8e769455353a05066111fad60873f983d57def97cbd340b3bedf41e`입니다. 부모 승인 JSON SHA256 `69d97ca6d7af779660e9ca034624945b753e51b9976b64f1720dca247fa4016c`를 기준으로 후보 42개 경로와 파일 해시 전체를 대조했습니다. AI HEAD `b307e53bf120297687cb4fa5236bc41fb63c973d`, exec HEAD `6d744aa57fd4d2970f9fca8c941b43b8a2e18670` 및 전체 작업트리 baseline 일치·스테이징 비어 있음을 확인한 뒤 이 절만 추가했습니다. 이 절 직전 보고서 전체 858764바이트 SHA256 `20d00229652cfa0db6f80a3bc8d364ac6068c0ebdcac625b27b3af741f7d694e`를 byte prefix로 보존합니다.
+
+보호 483개, Spec/baseline/approval6, Plan SHA256 `12e29e5215ce117ba869a1d2734594ed61aa3690346c05103cc2fd565dfd4f63`, P06 SQL/HBA·기존 JSON·F0/PREREG/golden/results/evidence 및 기존 Dev report 본문은 불변입니다. 부모 changes만 정확한 로컬 커밋 후보이며 보고서만 이 append로 해시가 바뀝니다. staged/committed 경로·각 blob SHA256·최종 commit SHA와 prefix/보호 대조 결과는 scratch `p07-close/result.json`, `final.md`에 기록합니다. exec에는 커밋을 만들지 않습니다.
+
+approved Harbor digest·운영 용량·backup/PV/inbound·execMerge·실제 Secret 부재 등 기존 P06 외부 게이트는 BLOCKED/NOT_RUN입니다. 실제 배포·수용·전체 COMPLETE로 승격하지 않습니다. 승인 B의 기존 순서로 P08은 다음 독립 세션에서 Plan의 기술 wiring 누락 보완부터 이어갈 수 있으며 이 세션은 P08을 실행하지 않습니다. push/MR/SSH/K8s/Secret/Harbor/Source/전역 설정 변경·하위 에이전트는 없습니다. P04 임시 clone은 사용자 요청에 따라 작업 폴더 밖 `scratch/p04-retired-clean-checkout`으로 가역 이동된 기존 상태이며 원본은 없습니다. 영구삭제는 자동승인 검토에 막혀 실행 0인 상태를 유지하고 이 세션은 추가 삭제/이동하지 않았습니다.
