@@ -8,6 +8,14 @@ import static org.assertj.core.api.Assertions.*;
 import static com.nori.ai.gateway.core.DomainFixtures.*;
 
 class WorkflowOptionalStepContractTest {
+    @Test void cacheableIsExplicitTypedRoundTripsAndTheLegacyConstructorDefaultsFalse() {
+        var loader=new ManifestLoader();var original=(ObjectNode)SchemaContracts.parse(readIncident());
+        for(var step:original.get("steps"))assertThat(step.get("cacheable").isBoolean()).isTrue();
+        for(Object value:Arrays.asList(null,"true",1)) {var copy=original.deepCopy();var first=(ObjectNode)copy.get("steps").get(0);if(value==null)first.remove("cacheable");else first.set("cacheable",SchemaContracts.JSON.valueToTree(value));assertThatThrownBy(()->loader.decodeWorkflow(copy)).isInstanceOf(IllegalArgumentException.class);}
+        var processor=original.deepCopy();((ObjectNode)processor.get("steps").get(4)).put("cacheable",true);assertThatThrownBy(()->loader.decodeWorkflow(processor)).isInstanceOf(IllegalArgumentException.class);
+        var workflow=loader.decodeWorkflow(original);assertThat(loader.decodeWorkflow(SchemaContracts.parse(SchemaContracts.JSON.writeValueAsString(original)))).isEqualTo(workflow);
+        assertThat(new WorkflowDefinition.Step("legacy",ID,null,List.of(),false,List.of()).cacheable()).isFalse();
+    }
     @Test void actualWorkflowOrderOptionalConditionsAndDefaultWindowsMatchContract() {
         var workflows=workflows();assertThat(workflows).hasSize(4).extracting(WorkflowDefinition::taskType).doesNotContain(TaskType.UNSUPPORTED_REQUEST);
         var incident=workflows.stream().filter(w -> w.taskType()==TaskType.INCIDENT_ANALYSIS).findFirst().orElseThrow();

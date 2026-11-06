@@ -78,13 +78,17 @@
                 }
               ]
             }
+          },
+          "cacheable": {
+            "type": "boolean"
           }
         },
         "required": [
           "stepId",
           "dependsOn",
           "optional",
-          "includeWhen"
+          "includeWhen",
+          "cacheable"
         ],
         "additionalProperties": false,
         "oneOf": [

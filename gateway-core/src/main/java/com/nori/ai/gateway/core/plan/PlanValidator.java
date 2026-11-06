@@ -20,6 +20,9 @@ public final class PlanValidator {
         this.maxSteps = maxSteps; this.maxCost = maxCost;
     }
     public ValidationOutcome validate(PlanEnvelope plan, VerifiedSystemScope scope, ResourceResolver resolver) {
+        return validateInternal(plan, scope, resolver, false);
+    }
+    private ValidationOutcome validateInternal(PlanEnvelope plan, VerifiedSystemScope scope, ResourceResolver resolver, boolean pending) {
         List<ValidationOutcome.Trace> trace = new ArrayList<>();
         if (scope == null || !scope.validAt(clock.instant()) || plan != null && !scope.requestId().equals(plan.requestId()))
             return reject(trace, 1, RejectReason.SYSTEM_SCOPE_MISMATCH, List.of());
@@ -45,12 +48,14 @@ public final class PlanValidator {
                 || !tool.sourceAllowlistRef().equals(binding.sourceAllowlistRef())) return reject(trace, 4, RejectReason.SOURCE_NOT_ALLOWED, List.of());
         }
         pass(trace, 4);
+        if (!pending) {
         for (var entry : tools.entrySet()) {
             if (entry.getValue() == null) continue;
             var authorization = resolver == null ? null : resolver.authorize(entry.getValue(), entry.getKey(), scope);
             if (!authorized(entry.getValue(), authorization, scope)) return reject(trace, 5, RejectReason.DENIED, List.of());
         }
         pass(trace, 5);
+        }
         for (CapabilityManifest tool : tools.values()) {
             if (tool == null) continue;
             RejectReason failure = executable(tool);
@@ -108,6 +113,89 @@ public final class PlanValidator {
             && tool.sourceAllowlistRef().equals(current.sourceAllowlistRef()) && scope.actorRef().equals(current.actorRef())
             && scope.pdg().equals(current.permissionDigest()) && current.actorScopes().contains(tool.requiredActorScope())
             && tool.requiredPermission().stream().anyMatch(p -> scope.perm().contains(p) && current.permissions().contains(p));
+    }
+    public sealed interface Preparation permits Prepared, Rejected, ReadRejected {}
+    public record Rejected(ValidationOutcome outcome) implements Preparation {}
+    public record ReadRejected(ResultStatus status) implements Preparation {
+        public ReadRejected { if (status != ResultStatus.DENIED && status != ResultStatus.SOURCE_UNAVAILABLE) throw new IllegalArgumentException("조회 상태가 잘못되었습니다"); }
+    }
+    public enum AuthorizationState { PENDING }
+    public Preparation prepare(PlanEnvelope plan, VerifiedSystemScope scope, WorkflowResourceResolver resolver) {
+        try {
+            ValidationOutcome outcome = validateInternal(plan,scope,resolver,true);
+            if (!outcome.accepted()) return new Rejected(outcome);
+            Map<String,CapabilityManifest> manifests = new LinkedHashMap<>();
+            for (PlanStep step : plan.plan()) manifests.put(step.stepId(),registry.find(step.capabilityId()).orElseThrow());
+            return new Prepared(plan,scope,resolver,manifests,clock);
+        } catch (WorkflowResourceResolver.ReadFailure failure) { return new ReadRejected(failure.status()); }
+    }
+    public static final class Prepared implements Preparation {
+        private final Object identity = new Object();
+        private final PlanEnvelope plan;
+        private final VerifiedSystemScope scope;
+        private final WorkflowResourceResolver resolver;
+        private final Map<String,CapabilityManifest> manifests;
+        private final Clock clock;
+        private final IdentityHashMap<com.nori.ai.gateway.core.authz.StepAttempt,PlanStep> boundSteps=new IdentityHashMap<>();
+        private Prepared(PlanEnvelope plan, VerifiedSystemScope scope, WorkflowResourceResolver resolver, Map<String,CapabilityManifest> manifests,Clock clock) {
+            this.plan=plan; this.scope=scope; this.resolver=resolver; this.manifests=Map.copyOf(manifests);this.clock=clock;
+        }
+        public AuthorizationState authorizationState() { return AuthorizationState.PENDING; }
+        public PlanEnvelope plan() { return plan; }
+        public WorkflowResourceResolver resolver() { return resolver; }
+        public CapabilityManifest manifest(String stepId) { return Objects.requireNonNull(manifests.get(stepId)); }
+        public com.nori.ai.gateway.core.authz.StepAttempt newAttempt(PlanStep step, VerifiedSystemScope supplied,
+                com.nori.ai.gateway.core.authz.StepAttempt.Purpose purpose) {
+            PlanStep original=plan.plan().stream().filter(s->Objects.equals(s.stepId(),step.stepId())).findFirst().orElseThrow();
+            CapabilityManifest manifest=manifest(step.stepId());
+            if (supplied != scope || !scope.validAt(clock.instant()) || !scope.requestId().equals(plan.requestId()) || !Objects.equals(original.capabilityId(),step.capabilityId())
+                    || !original.resources().equals(step.resources()) || !original.dependsOn().equals(step.dependsOn())) throw new IllegalArgumentException("실행 계획 결속이 다릅니다");
+            var before=original.arguments(); var after=step.arguments();
+            if (before == null || after == null) { if (!Objects.equals(before,after)) throw new IllegalArgumentException("실행 인자가 다릅니다"); }
+            else {
+                var a=before.deepCopy(); var b=after.deepCopy();
+                if (a instanceof tools.jackson.databind.node.ObjectNode ao && b instanceof tools.jackson.databind.node.ObjectNode bo) { ao.remove("q"); bo.remove("q"); }
+                if (!a.equals(b)) throw new IllegalArgumentException("실행 인자가 다릅니다");
+            }
+            if (new InputValidator().validate(manifest,step.arguments(),resolver.timezone(scope)) != null) throw new IllegalArgumentException("실행 인자를 확인해 주세요");
+            var mode=manifest.toolKind()==ToolKind.BUSINESS ? com.nori.ai.gateway.core.authz.StepAttempt.Mode.BACKEND_READ_REQUIRED : com.nori.ai.gateway.core.authz.StepAttempt.Mode.DIRECT_SOURCE;
+            if (purpose != com.nori.ai.gateway.core.authz.StepAttempt.Purpose.DISPATCH && (mode == com.nori.ai.gateway.core.authz.StepAttempt.Mode.BACKEND_READ_REQUIRED || manifest.toolKind()==ToolKind.KNOWLEDGE)) throw new IllegalArgumentException("캐시 대상이 아닙니다");
+            var binding=new com.nori.ai.gateway.core.authz.StepAttempt.Binding(scope.boundSystem(),scope.actorRef(),scope.sub(),scope.requestId(),plan.requestId(),step.stepId(),step.capabilityId(),manifest.sourceAllowlistRef(),Set.copyOf(manifest.requiredPermission()),manifest.contractVersion(),manifest.schemaDigest(),digest(step.arguments()),digest(ResourceInputs.bound(step,manifest)));
+            var attempt=com.nori.ai.gateway.core.authz.StepAttempt.create(identity,binding,purpose,mode);
+            boundSteps.put(attempt,new PlanStep(step.stepId(),step.capabilityId(),step.dependsOn(),step.resources(),step.arguments()));
+            return attempt;
+        }
+        public PlanStep boundStep(com.nori.ai.gateway.core.authz.StepAttempt attempt) {
+            PlanStep step=boundSteps.get(attempt);
+            if(!owns(attempt,scope)||step==null||!matches(attempt,step))throw new IllegalArgumentException("실행 인자 결속이 다릅니다");
+            return new PlanStep(step.stepId(),step.capabilityId(),step.dependsOn(),step.resources(),step.arguments());
+        }
+        public boolean owns(com.nori.ai.gateway.core.authz.StepAttempt attempt, VerifiedSystemScope supplied) {
+            if (attempt == null || !attempt.belongsTo(identity) || supplied != scope) return false;
+            var b=attempt.binding(); var m=manifests.get(b.stepId());
+            return m != null && b.ownerSystem()==scope.boundSystem() && b.actorRef().equals(scope.actorRef()) && b.sub().equals(scope.sub())
+                && b.requestId().equals(scope.requestId()) && b.jobId().equals(plan.requestId()) && b.capabilityId().equals(m.capabilityId())
+                && b.sourceRef().equals(m.sourceAllowlistRef()) && b.manifestRequiredPermissions().equals(Set.copyOf(m.requiredPermission()))
+                && b.contractVersion().equals(m.contractVersion()) && b.schemaDigest().equals(m.schemaDigest());
+        }
+        public boolean matches(com.nori.ai.gateway.core.authz.StepAttempt attempt, PlanStep step) {
+            var m=manifests.get(step.stepId());
+            return m != null && attempt.binding().stepId().equals(step.stepId()) && attempt.binding().capabilityId().equals(step.capabilityId())
+                && attempt.binding().argumentsDigest().equals(digest(step.arguments())) && attempt.binding().resourcesDigest().equals(digest(ResourceInputs.bound(step,m)));
+        }
+        private static String digest(Object value) {
+            try { byte[] json=SchemaContracts.canonicalize(SchemaContracts.JSON.writeValueAsString(value)).getBytes(java.nio.charset.StandardCharsets.UTF_8); return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(json)); }
+            catch (java.security.NoSuchAlgorithmException failure) { throw new IllegalStateException("실행 결속을 만들 수 없습니다",failure); }
+        }
+        @Override public String toString() { return "Prepared[보호됨]"; }
+    }
+    public boolean authorizedStep(Prepared prepared, com.nori.ai.gateway.core.authz.StepAttempt attempt,
+            com.nori.ai.gateway.core.authz.SourceAuthorizationStep.StepGrant grant, VerifiedSystemScope scope) {
+        return prepared != null && prepared.owns(attempt,scope) && scope.validAt(clock.instant()) && grant != null && grant.matches(attempt)
+            && "READ".equals(prepared.manifest(attempt.binding().stepId()).requiredActorScope())
+            && grant.currentPdg()!=null && grant.currentPdg().matches("[0-9a-f]{64}")
+            && !attempt.binding().manifestRequiredPermissions().isEmpty() && grant.requested().containsAll(grant.allowed())
+            && !Collections.disjoint(grant.allowed(),attempt.binding().manifestRequiredPermissions());
     }
     private boolean cycleOrMissing(PlanStep step, Map<String, PlanStep> all, Set<String> visiting, Set<String> done) {
         if (done.contains(step.stepId())) return false;

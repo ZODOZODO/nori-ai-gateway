@@ -48,7 +48,8 @@
         {
           "entryRef": "entry-001",
           "occurredAt": "2026-11-06T00:00:00Z",
-          "messageType": "EVENT"
+          "messageType": "EVENT",
+          "eqpId": "EQP-001"
         }
       ],
       "completeness": {
@@ -63,7 +64,8 @@
         {
           "entryRef": "entry-001",
           "occurredAt": "2026-11-06T00:00:00Z",
-          "messageType": "EVENT"
+          "messageType": "EVENT",
+          "eqpId": "EQP-001"
         }
       ],
       "completeness": {

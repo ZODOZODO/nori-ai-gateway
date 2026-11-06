@@ -12,6 +12,19 @@ import static com.nori.ai.gateway.integration.gitlab.GitLabFixture.*;
 
 class GitLabPipelineLineageTest {
     @TempDir Path directory;
+    @Test void commitNotFoundAndUnavailableAreDistinctAndAnAllowedPhysicalRetryCanVerify() throws Exception {
+        try(var fixture=new GitLabFixture(directory)) {
+            fixture.commitStatus=503;
+            assertThat(fixture.reader().siblingCommits(request(GitLabSourcePolicy.SOURCE_REF),ENTRY,123).reason()).isEqualTo(GitLabPipelineLineageReader.Reason.SOURCE_UNAVAILABLE);
+            assertThat(fixture.stub.requests.stream().filter(req->req.path().contains("/repository/commits/"))).hasSize(2);
+            fixture.stub.requests.clear();fixture.commitStatus=404;
+            assertThat(fixture.reader().siblingCommits(request(GitLabSourcePolicy.SOURCE_REF),ENTRY,123).reason()).isEqualTo(GitLabPipelineLineageReader.Reason.SHORT_SHA_UNRESOLVED);
+            assertThat(fixture.stub.requests.stream().filter(req->req.path().contains("/repository/commits/"))).hasSize(1);
+            fixture.stub.requests.clear();var attempts=new java.util.concurrent.atomic.AtomicInteger();
+            fixture.stub.responder=req->req.path().endsWith("/trace")?new Response(200,fixture.trace):req.path().contains("/repository/commits/")?new Response(attempts.incrementAndGet()==1?500:200,fixture.commit):new Response(200,fixture.jobs);
+            assertThat(fixture.reader().siblingCommits(request(GitLabSourcePolicy.SOURCE_REF),ENTRY,123).commitSha()).isEqualTo(FULL_SHA);assertThat(attempts).hasValue(2);
+        }
+    }
     @Test void commitsApiIsTheOnlySourceOfVerifiedFortyCharacterSiblingSha() throws Exception {
         try (var fixture = new GitLabFixture(directory)) {
             var lineage = fixture.reader().siblingCommits(request(GitLabSourcePolicy.SOURCE_REF), ENTRY, 123);

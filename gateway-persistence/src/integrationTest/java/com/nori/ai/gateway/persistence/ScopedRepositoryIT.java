@@ -16,6 +16,54 @@ import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScopedRepositoryIT extends PgIntegrationSupport {
+    @Test void exactPreviousAdmissionChoosesImmediateSeqBeforeTestingWindowAndNeverSkipsNull() {
+        var repository=bean(MessageRepository.class);
+        assertThat(repository.findPreviousResolvedTimeWindow(requestScope("j-tc"),"j-tc","m-tc")).isEmpty();
+        request("window-a","z-message-a");request("window-b","a-message-b");request("window-c","m-message-c");
+        Map<String,Object> a=Map.of("from","2026-11-05T00:00:00.123456789Z","to","2026-11-05T01:00:00.987654321Z");
+        Map<String,Object> b=Map.of("from","2026-11-05T02:00:00.000000001Z","to","2026-11-05T03:00:00.999999999Z");
+        assertThat(repository.updateResolvedTimeWindow(requestScope("window-a"),"window-a","z-message-a",a)).isTrue();
+        assertThat(repository.findPreviousResolvedTimeWindow(requestScope("window-c"),"window-c","m-message-c")).isEmpty();
+        assertThat(repository.updateResolvedTimeWindow(requestScope("window-b"),"window-b","a-message-b",b)).isTrue();
+        assertThat(repository.findPreviousResolvedTimeWindow(requestScope("window-c"),"window-c","m-message-c")).contains(b);
+        assertThat(bean(MessageRepository.class).findByConversation(scope(OwnerSystem.TC,"a"),"tc").stream().filter(m->m.id().equals("m-message-c")).findFirst().orElseThrow().resolvedTimeWindow()).isNull();
+        assertThat(repository.updateResolvedTimeWindow(requestScope("window-c"),"window-c","z-message-a",b)).isFalse();
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(requestScope("window-c"),"window-c","z-message-a")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(scope(OwnerSystem.TC,"a"),"window-c","m-message-c")).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void previousReaderDistinguishesParentScopeExpiryRoleAndStoredJsonCorruption() throws Exception {
+        request("window-a","window-ma");request("window-b","window-mb");var repository=bean(MessageRepository.class);
+        for(String corrupted:List.of("null","{}","[]","{\"from\":1,\"to\":2}","{\"from\":\"2026-02-30T00:00Z\",\"to\":\"2026-03-01T00:00Z\"}")) {
+            context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("UPDATE gw.message SET resolved_time_window=CAST(:value AS jsonb) WHERE id='window-ma'").param("value",corrupted).update();
+            assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(requestScope("window-b"),"window-b","window-mb")).isInstanceOf(RuntimeException.class);
+        }
+        // 손상 JSON을 SQL NULL로 되돌리고 정상 scope 양성 제어를 먼저 확인해야 아래 음성이 scope/role/만료 guard 자체를 검증한다.
+        context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("UPDATE gw.message SET resolved_time_window=NULL WHERE id='window-ma'").update();
+        var base=requestScope("window-b");
+        assertThat(repository.findPreviousResolvedTimeWindow(base,"window-b","window-mb")).isEmpty();
+        var other=new VerifiedSystemScope(base.boundSystem(),base.authenticatedServiceRef(),new ActorRef("b"),"b",base.perm(),base.pdg(),base.issuedAt(),base.expiresAt(),base.requestId());
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(other,"window-b","window-mb")).isInstanceOf(IllegalStateException.class);
+        var owner=new VerifiedSystemScope(OwnerSystem.WM,base.authenticatedServiceRef(),base.actorRef(),base.sub(),base.perm(),base.pdg(),base.issuedAt(),base.expiresAt(),base.requestId());
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(owner,"window-b","window-mb")).isInstanceOf(IllegalStateException.class);
+        context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("UPDATE gw.message SET role='assistant',resolved_time_window=NULL WHERE id='window-ma'").update();
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(base,"window-b","window-mb")).isInstanceOf(IllegalStateException.class);
+        context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("UPDATE gw.message SET role='user' WHERE id='window-ma'").update();
+        assertThat(repository.findPreviousResolvedTimeWindow(base,"window-b","window-mb")).isEmpty();
+        context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("UPDATE gw.conversation SET created_at=:created,expires_at=:now WHERE id='tc'").param("created",Timestamp.from(NOW.minus(Duration.ofDays(30)))).param("now",Timestamp.from(NOW)).update();
+        assertThatThrownBy(()->repository.findPreviousResolvedTimeWindow(base,"window-b","window-mb")).isInstanceOf(IllegalStateException.class);
+        assertThat(repository.updateResolvedTimeWindow(base,"window-b","window-mb",Map.of("from","2026-11-05T00:00Z","to","2026-11-05T01:00Z"))).isFalse();
+    }
+    @Test void currentCacheOverloadsBindActualStagePdgAndKeepLegacyIsolationUnchanged() {
+        var cache=bean(CacheRepository.class);var scope=scope(OwnerSystem.TC,"a");String current="b".repeat(64);
+        assertThat(cache.put(scope,"tc","current-cache",current,cache(NOW.plusSeconds(60)))).isTrue();
+        assertThat(cache.find(scope,"tc","current-cache",current)).isPresent();assertThat(cache.find(scope,"tc","current-cache")).isEmpty();assertThat(cache.find(scope,"tc","current-cache","c".repeat(64))).isEmpty();
+        assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT pdg FROM gw.cache_entry WHERE key_digest='current-cache'").query(String.class).single()).isEqualTo(current);
+        for(String parent:List.of("wm","other","expired","edge")){assertThat(cache.find(scope,parent,"current-cache",current)).isEmpty();assertThat(cache.put(scope,parent,"current-cache",current,cache(NOW.plusSeconds(60)))).isFalse();}
+        assertThat(cache.find(withPdg(scope,"changed"),"tc","cache-tc")).isEmpty();assertThat(cache.find(scope,"tc","cache-tc")).isPresent();
+        assertThatThrownBy(()->cache.find(scope,"tc","current-cache","bad")).isInstanceOf(IllegalArgumentException.class);
+    }
+    private VerifiedSystemScope requestScope(String job){var original=scope(OwnerSystem.TC,"a");return new VerifiedSystemScope(original.boundSystem(),original.authenticatedServiceRef(),original.actorRef(),original.sub(),original.perm(),original.pdg(),original.issuedAt(),original.expiresAt(),job);}
+    private void request(String job,String message){var scope=requestScope(job);assertThat(bean(MessageRepository.class).insert(scope,"tc",message(message))).isTrue();assertThat(bean(JobRepository.class).insert(scope,new JobRepository.NewJob(job,"tc",null,"digest","B",message,Map.of()),null)).isTrue();}
     @Test void requestInputForeignKeyAndObjectConstraintRejectCrossConversationAndNonObjectSnapshots() throws Exception {
         try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
             String prefix="INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg,request_message_id,request_input) VALUES ";

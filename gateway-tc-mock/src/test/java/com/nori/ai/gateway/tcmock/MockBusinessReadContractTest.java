@@ -24,6 +24,20 @@ class MockBusinessReadContractTest {
     private final MockTcBusinessReadAdapter adapter = new MockTcBusinessReadAdapter(scenarios, authorization, clock, calls, manifests);
     private final TimeWindow window = new TimeWindow(now.minusSeconds(3000), now.plusSeconds(1));
     @BeforeEach void register() { registry.register(call.sub(), call.dlg()); }
+    @Test void scopedDlqFiltersAuthoritativeEquipmentAndNanoHalfOpenBeforeLegacyProjection() {
+        var exact=new TimeWindow(Instant.parse("2026-11-05T23:00:00.123456789Z"),Instant.parse("2026-11-05T23:30:00.987654321Z"));
+        for(String id:List.of("dlq-scoped","dlq-scoped-other-snapshot")) {
+            scenarios.select(id);
+            for(String source:List.of("gateway","business")) {
+                var result=adapter.listDlq(call,"EQP-001",source,exact);assertThat(result.status()).isEqualTo(ResultStatus.SUCCESS);assertThat(result.data().items()).extracting(DlqEntry::entryRef).containsExactly("shared-start","last-nano");
+                assertThat(result.data().completeness().loadedEntries()).isEqualTo(5);assertThat(result.data().completeness().scannedKeys()).isEqualTo(5);
+                assertThat(adapter.listDlq(call,"EQP-002",source,exact).data().items()).extracting(DlqEntry::entryRef).containsExactly("other-eqp");
+                assertThat(adapter.listDlq(call,source,exact).data().items()).hasSize(3);
+            }
+        }
+        assertThat(adapter.listDlq(call,"EQP-001","missing",exact).status()).isEqualTo(ResultStatus.SOURCE_UNAVAILABLE);
+        assertThatThrownBy(()->adapter.listDlq(call,(String)null,"gateway",exact)).isInstanceOf(IllegalArgumentException.class);assertThatThrownBy(()->adapter.listDlq(call,"EQP-001","gateway",null)).isInstanceOf(IllegalArgumentException.class);
+    }
     @Test void canonicalManifestDigestsAndMockPermissionsMatchActualResources() throws Exception {
         for (var manifest : manifests) assertThat(adapter.schemaDigest(manifest.toolId())).isEqualTo(manifest.schemaDigest());
         try (var input = getClass().getResourceAsStream("/config/source-permissions/tc-v1.json")) {

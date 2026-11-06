@@ -26,7 +26,9 @@ class SourceOwnershipAndCurrentAuthorizationTest {
     @Test void currentPermissionsAreRecheckedAndNeverReusedFromTheAdmissionScope() throws Exception {
         try (var stub = new ConnectorTestSupport()) {
             AtomicInteger authorizationReads = new AtomicInteger();
-            var access = access((call, required) -> authorizationReads.incrementAndGet() < 3 ? new Allowed(required, "b".repeat(64)) : new DelegationInvalid());
+            var revoked=new java.util.concurrent.atomic.AtomicBoolean();
+            var access = access((call, required) -> {authorizationReads.incrementAndGet();return revoked.get()?new DelegationInvalid():new Allowed(required,"b".repeat(64));});
+            stub.responder=request->{revoked.set(true);return new ConnectorTestSupport.Response(200,emptyLoki());};
             var connector = new LokiLogConnector(stub.http("loki"), access, ignored -> Optional.empty(), new LokiProperties(), CLOCK);
             var result = connector.search(request(LokiSourcePolicy.SOURCE_REF), new LokiLogConnector.LogQuery(new TimeWindow(NOW.minusSeconds(1), NOW), List.of(), 1000));
             assertThat(result.status()).isEqualTo(ResultStatus.DENIED); assertThat(stub.requests).hasSize(1); assertThat(result.items()).isEmpty();

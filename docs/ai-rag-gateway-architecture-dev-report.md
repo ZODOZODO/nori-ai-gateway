@@ -7004,3 +7004,105 @@ Spec/Plan 확정 계약 변경·추가 업무정책·P12 owner 재설계·P13/P1
 패키지 저장소의 최초 Gradle metadata HEAD401은 검증 CLI 시작 전 실패로 보존했습니다. 동일 cached 입력을 사용한 새 label의 offline verifier는 통과했고, 부모가 같은 URL의 현재 Bearer HEAD200을 별도 확인했습니다. 최초 Gradle401의 세부 원인은 미확정이며 credentials/전역 설정을 고쳤다고 주장하지 않습니다. 새 환경의 전체 의존 해석·CI 검증을 완료로 표시하지 않습니다.
 
 이 판정은 CODE/LOCAL_TEST 범위입니다. P13의 실제 workflow는 아직 미구현이며 시험용 workflow 대체물은 그 phase에서 교체합니다. 실제 TC·Source·모델 연결, 배포·운영 수용·P16·F1 종료·F2는 미실행입니다. P13의 직전 턴 시간창 및 allowTools/allowKnowledge 의미 두 항목은 사용자 답변을 기다리고 있으며, 확정 후 Spec과 Plan에 반영한 뒤 별도 P13 에이전트가 구현합니다.
+
+## P13 고정 workflow·Evidence·캐시·종결 저장 CODE/LOCAL_TEST — 2026-11-07 (독립 구현·부모 로컬 검증 PASS)
+
+부모가 실제 코드·계약·원시 XML/OTR·별도 verifier의 FP/CP를 대조해 CODE/LOCAL_TEST를 확인했습니다. 필수 7개 Test task의 419건이 통과했으며 실패·오류·skip은 0건입니다. 근거는 `scratch/p13-r6-root/root-all-seven-final-pairs-r1.json`(SHA256 `a0fddc7358d3140560caf8110774ce6ae16352fdd7405c2731e30229111c78f2`)과 최종 소스의 `p13-core-verify-r8`·`p13-app-it-verify-r4`입니다. 이 판정은 실제 배포·운영 수용·P16/F1 종료를 대신하지 않으며 Spec·Plan의 전체 완료 체크박스는 변경하지 않았습니다.
+
+기존 P13 구현·시험 이력은 보존했고, 사용자 모델 변경 뒤 남은 검증과 시험 보완은 Claude Code `claude-opus-5-5` high 독립 세션에서 수행했습니다. 아래 기준은 로컬 커밋 전 시험 시점의 기록이며, 후속 커밋 식별자는 Git 이력과 Plan의 진행 상태로 확인합니다.
+
+### 기준과 작업 위치
+
+- 확정 Spec `90ba8a739c303312065824f9923642812f5e427a5f05a8b13142f792c1ad0550`, Plan `a89b979d79b93d50f4b38ec861af8bcc65a84a4b5f0f94183e7ab09a77d6ddf1`(사용자 확정 직전 요청 창·allowTools/allowKnowledge 결정과 부모의 Knowledge search EQP 보완 반영본), 기준선 seq8 `1bea13bfe7cee9213a60a6369ec3d0ad9c090e8529cd17209f0b9d8c286eb88f`. 모든 최종 실행에서 runner의 policyInputsStable=true입니다.
+- 시험·구현 시점의 단일 writer worktree는 `C:/workspace_nori/.aigw-worktrees/p13-ai`, branch는 `aigw/f1-p13`, 시험 base/HEAD는 `4f936d6902a10c7e28204e24051a8424fd96c8f4`이며 WIP를 대상으로 검증했습니다. 독립 구현 세션은 원본 main·nori-tc-exec·운영 환경을 변경하지 않았고 commit·push·배포·Secret/K8s/SSH 조작을 하지 않았습니다.
+- 최종 소스 입력(runner 규칙 521파일)은 ③ `p13-persist-it-r3`·`p13-persist-it-verify-r3`·①② verifier `p13-core-verify-r8`·`p13-app-it-verify-r4`의 source-inputs와 같습니다.
+- ①② 원 Test(`p13-core-test-r6`·`p13-app-it-r2`)와 ④~⑦ Test snapshot은 최종 소스와 정확히 1파일이 다릅니다. 그 파일은 `gateway-persistence/src/integrationTest/.../ScopedRepositoryIT.java`이며 아래 ③ 시험 보정 때문입니다. 이 파일은 그 Test들의 입력에 들어가지 않습니다. ①②는 아래처럼 최종 소스에서 verifier로 같은 FP를 공식 확인했습니다.
+- runtime classpath 파일 SHA256 `3e78fa8feb84207c386e78140f7b9c89460df2b9c93fe97bc564559ef3933a50`은 모든 최종 Test와 r8/r4 verifier에서 같습니다.
+
+### 구현 범위와 이유
+
+Plan P13의 allowed_writes와 exact 추가 허용(805~806, 833, 851~852, 860, 879~883줄) 안에서 다음을 연결했습니다.
+
+- core workflow 실행: `WorkflowPlanBuilder`·`WorkflowExecutionPlan`·`StepBinding`·`WorkflowExecutor`·`WorkflowOutcome`·`TerminalOutcomeAssembler`·`ComposerOutcome(NOT_INVOKED만 사용)`·`ResultSourceDepsRecorder`(Job-local)·`LogSummarizer`·`ConversationSummaryBuilder`, 시간창 `TimeWindowResolver`, 블록 `BlockBuilder`·`UiSchemaValidator`·`GeneralQueryHelpBuilder`, `EvidenceAssembler`, `ToolResultCache`(core는 JDBC 비의존, nested Store).
+- 단계 현재 인가: 기존 legacy `PlanValidator.validate`/`ToolDispatcher.dispatch` API·9순서를 보존하고, actual workflow 전용 typed 준비(`PlanValidator` nested Preparation)·`WorkflowResourceResolver`·`StepAttempt`·`SourceAuthorizationStep.authorizeStep`·`ToolDispatcher.dispatchCurrent/dispatchBusiness`를 추가했습니다. 구조 준비의 PENDING을 인가 PASS로 쓰지 않습니다.
+- 실행 carrier: `ExecutionContext`의 additive `Optional<BoundInputs>`(2arg 호환), `WorkflowDefinition` Step의 cacheable와 `workflow.schema.json`의 해당 boolean 계약, 세 TC workflow JSON.
+- 종결 저장: `TerminalSpec`의 9번째 `Optional<CommitData>`(8arg 호환), `JobTerminalCommitter`의 같은 tx 결속 검사와 최종 자료 저장, `JobConfiguration`의 저장소 DI.
+- 직전 요청 창: `MessageRepository`의 정확 Message 창 update와 LATERAL 직전 seq 한 요청 reader(Plan 810~832줄 SQL), `CacheRepository`의 current-pdg overload.
+- app 연결: `app/job`의 `WorkflowExecutionAdapter`·`WorkflowExecutionConfiguration`·`WorkflowExecutionRecords`·`WorkflowContent`·`WorkflowCacheStore`·`WorkflowResourceResolverFactory`·`DirectSourceToolExecutor`·`BusinessToolExecutor`·`ToolResults`·`DeploymentEvidenceResolver`·`SourceRetentionAttributesProvider`, `CoreBeansConfiguration`·`GatewayAppModuleConfiguration` Bean 조립.
+- DLQ: `TcBusinessReadPort.listDlq` 4arg overload, Mock `MockScenarioStore`·`MockTcBusinessReadAdapter`·package-private `MockDlqRow`, 시나리오 JSON 귀속 fixture, `docs/contracts/tc-ai-read-api-v1.md` 설명. 기존 3arg·DTO·wire1.0·digest는 변경하지 않았습니다.
+- Source: P12 Connector의 하위 READ lifecycle/attempt 전달과 short SHA 해석 불가·실제 장애 구별(`SourceHttpClient`·`SourceReadAccess`·`LokiLogConnector`·`TempoTraceConnector`·`GitLabCodeConnector`·`GitLabPipelineLineageReader`).
+- Manifest: `tc.knowledge.search.json`의 `resourceTypes`에 `EQP` 한 값만 추가했습니다(Plan 860줄). 나머지 필드와 `tc.knowledge.getSource.json`은 변경하지 않았습니다.
+- 공유 하네스: P09 시험 fake workflow를 실제 adapter·DB 관찰로 교체했습니다(`P09TestPorts`·`P09QueueSupport`·`WorkerRestartProcessSupport` 및 기존 app IT caller).
+
+위 파일별 Plan 조항 대응은 구현 세션의 기록과 현재 diff에 근거합니다. 부모의 exact allowed_writes 대조는 별도로 필요합니다.
+
+### 실행 실패·원인·수정 (원본 보존)
+
+모든 실패 회차의 원 log·XML·OTR·run-binding·source-inputs는 scratch `p13-implementation/`에 label별로 보존했습니다. 실패한 실행의 paired verifier exit0은 증거 결속만 확인한 것이며 Test PASS가 아닙니다.
+
+- `p13-app-it-r1`: 107건 중 104 PASS·3 FAIL, exit1. 원인과 수정:
+  - `JobQueueIT` late cancel: GQ hold fixture가 DB 신호 순서를 바꿨습니다. 실제 INC Source barrier와 TERMINAL_PRECOMMIT으로 시험만 정합했습니다.
+  - `WorkerRestartInputIT`: Tool 0개 GQ가 prepare 중 불필요한 자원 READ를 했습니다. Builder 결함으로, tools가 비면 targetResources를 빈 목록으로 하고 원 JobInput/Context selectedRefs는 보존하도록 수정했습니다.
+  - `WorkflowKnowledgeIT`: DENIED 기대값을 HTTP404로 잘못 썼습니다. 기존 HTTP200 exact 5필드 계약으로 시험만 수정했습니다.
+  - paired `p13-app-it-verify-r1` exit0.
+- `p13-app-risk-it-r1`: 25건 중 23 PASS·2 FAIL. 원인과 수정:
+  - optional Knowledge의 기존 EQP 입력이 DOCUMENT-only resourceTypes와 충돌했습니다. 부모의 Plan 보완 뒤 위 Manifest 한 값을 추가했습니다.
+  - Threw 최소 기록의 Optional errorCode를 시험이 필수로 기대했습니다. 시험만 정확 3키로 정합했습니다.
+  - 진단 재실행 `p13-app-failure-it-r1` 2/2와 paired는 진단용이며 전체 ②를 대체하지 않습니다.
+- `p13-persist-it-r1`: 72건 중 71 PASS·1 FAIL, exit1, paired `p13-persist-it-verify-r1` exit0(FP `6e706c29…`). 원인과 수정:
+  - P13 신규 `ScopedRepositoryIT.previousReaderDistinguishesParentScopeExpiryRoleAndStoredJsonCorruption`이 `tc` 대화의 `expires_at`만 고정 Clock `NOW`로 바꿨습니다. `@BeforeEach`가 같은 `NOW`로 만든 `created_at`과 같아져 V2 `CHECK (expires_at > created_at)`를 위반했습니다(SQLState 23514).
+  - 제품 스키마나 reader 결함이 아닌 시험 fixture 결함입니다. 같은 파일의 기존 `edge` fixture처럼 `created_at=NOW-30일`을 함께 갱신하도록 시험 1줄만 수정했습니다. 이 값은 실제 제약 `expires_at > created_at`(V2:4)와 Spec 30일 정책을 모두 만족합니다. 계약·제품 변경은 0입니다.
+  - 중간 회차 `p13-persist-it-r2` 72/72와 paired `p13-persist-it-verify-r2`(FP `ee57ea2a…`)는 원본 그대로 보존하지만 최종 결과가 아닙니다.
+- 부모 검토 보완(같은 시험 메서드만, 사용자 결정 불필요): r2 시점의 음성 assertion 두 개가 실제 guard를 독립적으로 검증하지 못했습니다.
+  - 다른 actor/owner 음성: 손상 JSON loop의 마지막 invalid 값이 남은 상태라 scope 필터가 회귀해도 JSON 예외로 통과할 수 있었습니다.
+  - reader 만료 음성: `role='assistant'`가 복원되지 않아 만료 guard가 회귀해도 role 예외로 통과할 수 있었습니다.
+  - 보정: loop 직후 이전 Message의 `resolved_time_window`를 SQL NULL로 되돌리고 올바른 base scope의 `Optional.empty` 양성 제어를 넣었습니다. role 음성 뒤에는 `role='user'`로 복원하고 같은 양성 제어를 다시 넣었습니다. 손상 loop·role 음성·만료 IllegalState·update=false는 그대로 유지했습니다. 신규 시험·추상화·제품/스키마 변경은 0입니다.
+
+### 최종 실제 검증
+
+각 Test 뒤 별도 공식 verifier를 같은 소스·정책 입력으로 실행했습니다. 건수는 복사된 원시 JUnit XML에서 독립 집계했고 leaf 결과와 같습니다.
+
+| # | Test label / 명령 | XML 클래스 | tests / fail / error / skip | runId | inputFingerprint | paired label (결과) |
+|---|---|---|---|---|---|---|
+| ① | `p13-core-test-r6` `:gateway-core:test` | 33 | 100 / 0 / 0 / 0 | `b984d325-c04f-4b5f-9a34-91f53b33360f` | `2f6518abf68e3e92ae19ccf10e7d2ece25955bf590064dc94cb45be99f2121dd` | `p13-core-verify-r6` exit0, 최종 소스 verifier `p13-core-verify-r8` exit0 `TEST_EVIDENCE_VERIFIED`(중간 r7 보존) |
+| ② | `p13-app-it-r2` `:gateway-app:integrationTest -Paigw.requireDocker=true` 무필터 | 31 | 120 / 0 / 0 / 0 | `c828ef6b-56c9-42bc-be07-8f1003cd4941` | `d471c093fba073cb400d651bb6b158f45f846a8c90ffb33a8ae636cec8851b28` | `p13-app-it-verify-r2` 무필터 exit0, 최종 소스 무필터 verifier `p13-app-it-verify-r4` exit0 `TEST_EVIDENCE_VERIFIED`(중간 r3 보존) |
+| ③ | `p13-persist-it-r3` `:gateway-persistence:integrationTest -Paigw.requireDocker=true` + 5 `--tests` | 5 | 72 / 0 / 0 / 0 | `17604254-b817-4de1-a4fc-e0cd6e99fdc0` | `05477bb7036b1b379070a89e8b66c1427221c945612571311cddbbdd02661dee` | `p13-persist-it-verify-r3` (`-I persistence-it-filter.init.gradle`) exit0 |
+| ④ | `p13-persist-unit-r1` `:gateway-persistence:test --tests "*RepositorySignatureArchTest"` | 1 | 3 / 0 / 0 / 0 | `3dac5a9a-1456-46f1-86f4-a1f711ca3b95` | `97619d728fc87f3bfcffe7d8f58e360e834e6300ce2e8ecf0a3e3a1e089466fc` | `p13-persist-unit-verify-r1` (`-I persistence-unit-filter.init.gradle`) exit0 |
+| ⑤ | `p13-app-unit-final-r1` `:gateway-app:test` 4 기존 패턴 + `com.nori.ai.gateway.app.job.WorkflowContentTest` | 5 | 13 / 0 / 0 / 0 | `f9d49eb2-6215-48ff-b0e3-e37185527a87` | `3fe51ee5b2d956d71ab772caa6f171066fcc1312ca3ee7630c64814023e88f51` | `p13-app-unit-final-verify-r1` (`-I app-unit-filter.init.gradle`) exit0 |
+| ⑥ | `p13-tcmock-test-r1` `:gateway-tc-mock:test` 전체 | 6 | 40 / 0 / 0 / 0 | `502c9b23-f23d-45f0-b326-2077ef7b63c1` | `f76334f571e801e1b27cb3c0c0b169d21b0c2ecf757c99fab618a30a2c83880e` | `p13-tcmock-verify-r1` exit0 |
+| ⑦ | `p13-integration-final-r1` `:gateway-integration:test` 전체 | 13 | 71 / 0 / 0 / 0 | `553e33ce-9c47-42a9-8fbf-ee8c0ddfbb57` | `4b32db5b0589db7cac5b00dc6904d50033bfd289b92ee1efc6e9e4c42c0bd581` | `p13-integration-final-verify-r1` exit0 |
+
+- 모든 Test는 `--offline --no-daemon`, JDK 21.0.10, PG 이미지 `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`로 실행했습니다. PG는 한 번에 최대 1개였고, 실행은 runner `p13-implementation/run_gradle.py`로 순차 진행했습니다.
+- ② XML 31개는 시험 소스 30파일과 `WorkflowSourceCompositionIT.java` 안의 두 번째 최상위 클래스 `WorkflowDuplicateSourceIT`를 합한 수와 정확히 같습니다(나머지 5파일은 `@TestConfiguration` 지원 클래스).
+- ③의 시험 보정 뒤 ①②는 다시 실행하지 않았습니다(58분 App 전체와 무관 core 재실행 0). 다만 verifier가 실행 시점의 task 입력으로 fingerprint를 재계산합니다(`build.gradle.kts:210-215`). 그래서 최종 소스에서도 ① `2f6518ab…`·② `d471c093…`·CP `3e78fa8f…`가 그대로임을 r8/r4로 공식 확인했습니다. 원 Test와 다른 파일은 persistence integrationTest 소스 1개뿐이며 두 task의 입력이 아닙니다.
+- ④~⑦은 보정 전 source snapshot으로 완료된 결과를 그대로 보존했습니다. 위 1파일 외 차이는 없습니다. 이번 보완 범위에 따라 ④~⑦의 추가 verifier는 실행하지 않았습니다.
+- 원시 경로: scratch `p13-implementation/<label>.log|.json|.exit.txt|-source-inputs.json`과 `<label>-<module>-<task>-{xml,otr,leaf-results.json,run-binding.json,runtime-classpath.txt}`입니다.
+
+### 정본 Plan 명령 대비 차이
+
+- ⑤: Plan의 4패턴에 실제 존재하는 신규 `WorkflowContentTest` FQCN 하나를 Test와 paired init에 함께 추가했습니다. "③~⑤의 새/수정 시험 클래스가 선택 목록 밖이면 정확 FQCN만 추가" 조항(893줄)에 근거합니다. ③④의 변경 시험은 기존 선택 목록 안에 있습니다.
+- ⑦ `:gateway-integration:test` 전체와 paired는 Plan 명령 목록 밖입니다. P13이 P12 Connector 6파일을 변경했으므로 부모 지시에 따라 추가 실행했습니다.
+- Eval 249 전체 재실행과 관련 없는 회귀는 Plan대로 실행하지 않았습니다.
+
+### 실제 변경 파일 (`git status --porcelain -uall` 118항목, 이 보고서 포함 전)
+
+- 문서: `docs/contracts/gateway-api-v1.md`, `docs/contracts/tc-ai-read-api-v1.md`
+- gateway-core main 수정: `core/authz/SourceAuthorizationStep.java`, `core/dispatch/{ExecutionContext,ToolDispatcher}.java`, `core/job/TerminalSpec.java`, `core/plan/PlanValidator.java`, `core/port/TcBusinessReadPort.java`, `core/registry/WorkflowDefinition.java`, `resources/contracts/workflow.schema.json`
+- gateway-core main 신규: `core/authz/StepAttempt.java`, `core/blocks/{BlockBuilder,GeneralQueryHelpBuilder,UiSchemaValidator}.java`, `core/cache/ToolResultCache.java`, `core/evidence/EvidenceAssembler.java`, `core/plan/WorkflowResourceResolver.java`, `core/time/TimeWindowResolver.java`, `core/workflow/{ComposerOutcome,ConversationSummaryBuilder,LogSummarizer,ResultSourceDepsRecorder,StepBinding,TerminalOutcomeAssembler,WorkflowExecutionPlan,WorkflowExecutor,WorkflowOutcome,WorkflowPlanBuilder}.java`
+- gateway-core test: 수정 `{DispatcherPreReadBoundaryTest,WorkflowOptionalStepContractTest}.java`, 신규 `{BlockBuilderTest,EvidenceVerdictTest,ExecutionContextBindingTest,GeneralQueryHelpBuilderTest,KnowledgeEvidenceProjectionTest,LogSummarizerTest,StepAttemptGrantTest,TerminalOutcomeAssemblerTest,TimeWindowResolverTest,ToolResultCacheTest,UiSchemaValidatorTest,WorkflowAuthorizationPreparationTest,WorkflowExecutorTest,WorkflowPlanBuilderTest}.java`
+- gateway-app main: 수정 `app/config/{CoreBeansConfiguration,GatewayAppModuleConfiguration,JobConfiguration}.java`, `resources/manifests/tc/tc.knowledge.search.json`, `resources/workflows/tc/{INCIDENT_ANALYSIS,KNOWLEDGE_QUERY,LIVE_QUERY}.json`; 신규 `app/job/{BusinessToolExecutor,DeploymentEvidenceResolver,DirectSourceToolExecutor,SourceRetentionAttributesProvider,ToolResults,WorkflowCacheStore,WorkflowContent,WorkflowExecutionAdapter,WorkflowExecutionConfiguration,WorkflowExecutionRecords,WorkflowResourceResolverFactory}.java`
+- gateway-app test: 수정 `ArchitectureRulesTest.java`, `manifest/CoreSeamDefaultsTest.java`; 신규 `job/WorkflowContentTest.java`
+- gateway-app integrationTest: 수정 `job/{HookArmingIT,IdempotentAdmissionIT,JobQueueIT,P09AppContextWiringIT,P09QueueSupport,P09TestPorts,WorkerAuthorizationOrderIT,WorkerRestartInputIT,WorkerRestartProcessIT,WorkerRestartProcessSupport}.java`, `web/SseApiIT.java`, `wiring/AppContextWiringIT.java`; 신규 `job/{DeploymentLineageIT,WorkflowExpiryRaceIT,WorkflowKnowledgeIT,WorkflowMockIT,WorkflowSourceCompositionIT,WorkflowSourceFixture,WorkflowTerminalCommitIT}.java`
+- gateway-integration: main 수정 `gitlab/{GitLabCodeConnector,GitLabPipelineLineageReader}.java`, `loki/{LokiLogConnector,SourceHttpClient,SourceReadAccess}.java`, `tempo/TempoTraceConnector.java`; test 수정 `gitlab/GitLabPipelineLineageTest.java`, `loki/SourceOwnershipAndCurrentAuthorizationTest.java`, 신규 `SourceAttemptGuardTest.java`
+- gateway-persistence: main 수정 `queue/JobTerminalCommitter.java`, `repository/{CacheRepository,MessageRepository}.java`; integrationTest 수정 `ScopedRepositoryIT.java`
+- gateway-tc-mock: main 수정 `{MockScenarioStore,MockTcBusinessReadAdapter}.java`, 신규 `MockDlqRow.java`; scenarios 수정 `{authz-down,catalog-down,catalog-rev2,comm-down,comm-trim,contract-v2,default,dlq-down,dlq-partial,index,logout,lot-ended,lot-multi,lot-unknown,permission-revoked}.json`, 신규 `{dlq-scoped,dlq-scoped-other-snapshot}.json`; test 수정 `MockBusinessReadContractTest.java`
+- `docs/ai-rag-gateway-architecture-dev-report.md` (이 append)
+
+### 미실행·한계·후속 책임
+
+- 실제 TC·Loki·Tempo·GitLab·모델 연결, CI, 배포, 운영 수용, P16·F1 종료는 미실행입니다. 승인되지 않은 URI/repo/ref/token은 만들지 않았습니다.
+- production Knowledge는 기존 PLANNED·fail-closed 상태입니다. IMPLEMENTED 양성은 시험 stub 구성에 한정되며 P23 실제 검색·원문 구현이 아닙니다. `tc.knowledge.getSource`의 DOCUMENT-only resourceTypes와 optional EQP 입력이 같은 방식으로 충돌할 가능성은 P13 범위에서 변경하지 않았습니다. 활성화 전 검토가 필요합니다.
+- Git 경로는 요청 전에 적용 sourceRevision을 확인하는 생산자가 없어 해당 캐시 lookup/put을 하지 않습니다. LOG/TRACE 캐시와 구별됩니다.
+- UI 검증은 기존 schema·값·시간·단위·키·행 증폭 불가 조건에 한정합니다. 별도 전역 byte/row 상한이나 범용 단위 schema를 만들지 않았으며, Spec §22.3 운영 수용 PASS로 해석하지 않습니다.
+- P14 책임은 이 작업에서 완료로 주장하지 않습니다. 대상은 캐시 저장의 마스킹 잔여(`WorkflowCacheStore`가 raw를 직렬화함), Audit/OTLP/retention, Source 조건부 Bean 조립입니다.
+- 실제 Loki·Tempo·GitLab Source 연결은 F1~F4부터 필요한 후속 운영 구성·수용 검증 대상이며, 이번 P13 로컬 시험으로 완료하지 않았습니다. F5a 후속 책임은 실제 TC 업무 Backend 연결과 scoped DLQ 4arg의 운영 구현입니다.

@@ -36,6 +36,9 @@ class DispatcherPreReadBoundaryTest {
         var otherStep = new PlanStep("s1", other.capabilityId(), List.of(), step().resources(), step().arguments());
         assertLocalRejection(other, otherStep, scope(), RejectReason.OWNER_MISMATCH);
         assertLocalRejection(modify(manifest(), "contractVersion", "2.0"), step(), scope(), null);
+        var knowledge=new ManifestLoader().loadClasspath("manifests/tc/index.json").stream().filter(value->value.capabilityId().equals("tc.knowledge.search")).findFirst().orElseThrow();
+        var foreign=(tools.jackson.databind.node.ObjectNode)SchemaContracts.JSON.valueToTree(knowledge);foreign.put("ownerSystem","WM").put("capabilityId","wm.knowledge.search").put("toolId","wm.knowledge.search").put("sourceAllowlistRef","sources://WM/knowledge");var foreignKnowledge=new ManifestLoader().decode(foreign);
+        assertLocalRejection(foreignKnowledge,new PlanStep("knowledge",foreignKnowledge.capabilityId(),List.of(),List.of(new ResourceRef("EQP","EQP_001")),SchemaContracts.JSON.createObjectNode().put("eqp","EQP_001")),scope(),RejectReason.OWNER_MISMATCH);
     }
 
     private void assertLocalRejection(CapabilityManifest manifest, PlanStep step, VerifiedSystemScope scope, RejectReason reason) {

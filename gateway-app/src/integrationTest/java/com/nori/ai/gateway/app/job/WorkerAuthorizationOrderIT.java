@@ -15,31 +15,29 @@ import static org.assertj.core.api.Assertions.*;
 
 class WorkerAuthorizationOrderIT extends P09QueueSupport {
     @TestConfiguration(proxyBeanMethods=false) static class StageConfiguration {
-        @Bean P09TestPorts.StageProbe realAuthorizationStageFixture(MockTcBusinessReadAdapter business,SourceAuthorizationStep authorization,MockCallCounter calls,PausePointRegistry pauses) {
-            return job->{
-                var call=new DelegatedCall(job.scope().sub(),job.delegation());
-                var eqp=business.getEqpSnapshot(call,"EQP-001");
-                pauses.hit(PausePointRegistry.Point.TOOL_IN_FLIGHT,job.jobId());
-                var source=authorization.authorizeBefore("sources://TC/logs",job.scope(),call);
-                String status;
-                if(source instanceof SourceAuthorizationStep.Granted){calls.increment("direct:logs");status="SUCCESS";}
-                else status=source instanceof SourceAuthorizationStep.Denied?"DENIED":"SOURCE_UNAVAILABLE";
-                boolean complete=eqp.status()==ResultStatus.SUCCESS&&status.equals("SUCCESS");
-                return TerminalSpec.outcome(complete?JobStatus.SUCCEEDED:JobStatus.PARTIAL,complete?ResultStatus.SUCCESS:ResultStatus.PARTIAL,null,
-                    Map.of("eqpStatus",eqp.status().name(),"logsStatus",status));
+        @Bean static org.springframework.beans.factory.config.BeanPostProcessor observeActualSnapshot(org.springframework.beans.factory.ObjectProvider<PausePointRegistry> pauses,org.springframework.beans.factory.ObjectProvider<P09TestPorts.Observations> observations) {
+            return new org.springframework.beans.factory.config.BeanPostProcessor(){
+                @Override public Object postProcessAfterInitialization(Object bean,String name) {
+                    if(!(bean instanceof MockTcBusinessReadAdapter business))return bean;
+                    var actual=org.mockito.Mockito.spy(business);
+                    org.mockito.Mockito.doAnswer(invocation->{var result=invocation.callRealMethod();var job=observations.getObject().workflows.getLast();pauses.getObject().hit(PausePointRegistry.Point.TOOL_IN_FLIGHT,job.jobId());return result;})
+                        .when(actual).getEqpSnapshot(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString());
+                    return actual;
+                }
             };
         }
     }
-    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,StageConfiguration.class};}
-    private JobAdmissionService.Accepted live(String key,Set<PausePointRegistry.Point> pause){hooks().arm("actor",key,new TestHookRegistry.Scenario(TaskType.LIVE_QUERY,pause,null,false));return accept("actor",key,"업무 조회",null,dlg());}
+    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,StageConfiguration.class,WorkflowSourceFixture.class};}
+    private JobAdmissionService.Accepted live(String key,Set<PausePointRegistry.Point> pause){return incident(key,pause);}
     private String payload(String job){return jdbc().sql("SELECT payload::text FROM gw.result WHERE job_id=:id").param("id",job).query(String.class).single();}
     @Test void validEmptyPreflightPrecedesClassificationAndEachSourceAuthorizationWithoutUnion() throws Exception {
         var point=PausePointRegistry.Point.BEFORE_CLASSIFICATION;var job=live("ordered",Set.of(point));
         await(()->pauses().reachedCount(point,job.jobId())==1);
         assertThat(calls().authorizationRequests()).containsExactly(Set.of());assertThat(calls().count("getEqpSnapshot")).isZero();assertThat(calls().count("direct:logs")).isZero();assertThat(observations().workflows).isEmpty();
         pauses().release(point,job.jobId());await(()->state(job.jobId()).equals("SUCCEEDED"));
-        assertThat(calls().authorizationRequests()).containsExactly(Set.of(),Set.of("EQP_READ"),Set.of("AI_LOG_READ"));
-        assertThat(calls().count("getEqpSnapshot")).isOne();assertThat(calls().count("direct:logs")).isOne();
+        assertThat(calls().authorizationRequests().getFirst()).isEmpty();assertThat(calls().authorizationRequests().stream().skip(1)).allSatisfy(required->assertThat(required).hasSize(1));
+        assertThat(calls().authorizationRequests()).contains(Set.of("EQP_READ"),Set.of("AI_LOG_READ"),Set.of("AI_TRACE_READ"));
+        assertThat(calls().count("getEqpSnapshot")).isOne();assertThat(context.getBean(WorkflowSourceFixture.Server.class).logs).hasValue(4);
     }
     @Test void validGeneralAndUnsupportedFixturesDoNotRequireSourcePermissions() throws Exception {
         for(TaskType type:List.of(TaskType.GENERAL_QUERY,TaskType.UNSUPPORTED_REQUEST)){
@@ -70,9 +68,10 @@ class WorkerAuthorizationOrderIT extends P09QueueSupport {
                 context.getBean(MockDelegationRegistry.class).revoke(MockDelegationRegistry.hash(delegation));
             }else context.getBean(MockScenarioStore.class).select(scenario);
             pauses().release(point,job.jobId());await(()->state(job.jobId()).equals("PARTIAL"));
-            assertThat(json.readTree(payload(job.jobId())).path("logsStatus").asString()).isEqualTo(scenario.equals("logout")?"DENIED":"SOURCE_UNAVAILABLE");
+            var stages=json.readTree(payload(job.jobId())).path("toolSummary");
+            assertThat(java.util.stream.StreamSupport.stream(stages.spliterator(),false).filter(stage->stage.path("stepId").asString().equals("logs"))).singleElement().satisfies(stage->assertThat(stage.path("status").asString()).isEqualTo(scenario.equals("logout")?"DENIED":"SOURCE_UNAVAILABLE"));
         }
-        assertThat(calls().count("getEqpSnapshot")).isEqualTo(2);assertThat(calls().count("direct:logs")).isZero();
+        assertThat(calls().count("getEqpSnapshot")).isEqualTo(2);assertThat(context.getBean(WorkflowSourceFixture.Server.class).logs).hasValue(0);
     }
     @Test void conversationExpiryBeforePreflightKeepsAuthorizationAndResultAtZero() throws Exception {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");var job=live("expiry",Set.of());jdbc().sql("UPDATE gw.conversation SET expires_at=:at WHERE id=:id").param("at",java.sql.Timestamp.from(NOW.plusSeconds(1))).param("id",job.conversationId()).update();clock().advance(1);pauses().release(PausePointRegistry.Point.DISPATCH_HOLD,"*");await(()->state(job.jobId()).equals("CANCELLED"));

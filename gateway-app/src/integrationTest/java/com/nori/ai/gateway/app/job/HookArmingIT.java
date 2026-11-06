@@ -23,7 +23,7 @@ class HookArmingIT extends P09QueueSupport {
         hooks().arm("actor","one",new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false));hooks().arm("actor","two",new TestHookRegistry.Scenario(TaskType.LIVE_QUERY,Set.of(),null,false));
         assertThatThrownBy(()->hooks().arm("actor","one",new TestHookRegistry.Scenario(TaskType.LIVE_QUERY,Set.of(),null,false))).isInstanceOf(TestHookRegistry.Conflict.class);
         try(var pool=Executors.newVirtualThreadPerTaskExecutor()){
-            var a=pool.submit(()->accept("actor","one","질문",null,dlg()));var b=pool.submit(()->accept("actor","two","질문",null,dlg()));var one=a.get();var two=b.get();
+            var a=pool.submit(()->accept("actor","one","질문",null,dlg()));var b=pool.submit(()->context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",workflowFields(),"two",registeredDlg("actor"))));var one=a.get();var two=b.get();
             assertThat(hooks().binding(one.jobId()).orElseThrow().taskType()).isEqualTo(TaskType.GENERAL_QUERY);assertThat(hooks().binding(two.jobId()).orElseThrow().taskType()).isEqualTo(TaskType.LIVE_QUERY);
             int count=hooks().reservationCount();assertThat(accept("actor","one","질문",null,dlg()).jobId()).isEqualTo(one.jobId());assertThat(hooks().reservationCount()).isEqualTo(count);
             assertThatThrownBy(()->hooks().arm("actor","one",new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false))).isInstanceOf(TestHookRegistry.Conflict.class);

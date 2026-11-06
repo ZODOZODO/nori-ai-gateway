@@ -13,5 +13,7 @@
   "dlq-down",
   "comm-trim",
   "comm-down",
-  "empty"
+  "empty",
+  "dlq-scoped",
+  "dlq-scoped-other-snapshot"
 ]

@@ -74,6 +74,20 @@ public final class MockTcBusinessReadAdapter implements TcBusinessReadPort {
                 evaluated.missingFields(), evaluated.warnings(), RetentionMeta.none());
         });
     }
+    @Override public TcReadResult<DlqData> listDlq(DelegatedCall call,String eqpId,String sourceId,TimeWindow window) {
+        if (eqpId==null || eqpId.isBlank() || eqpId.codePointCount(0,eqpId.length())>64 || window==null) throw new IllegalArgumentException("설비와 시간 구간을 확인해 주세요");
+        return read(call,"DLQ_READ","listDlq",DlqData.class,()-> {
+            var snapshot=scenarios.attributedSnapshot();
+            var original=snapshot.legacy().dlqs().get(sourceId);
+            if (original==null) return unavailable();
+            var rows=snapshot.attributed().get(sourceId);
+            if (rows==null) throw new IllegalStateException("DLQ 설비 귀속을 확인할 수 없습니다");
+            var evaluated=new DlqCompletenessEvaluator().evaluate(original.completeness());
+            var selected=rows.stream().filter(row->eqpId.equals(row.eqpId()) && contains(window,row.projection().occurredAt())).map(MockDlqRow::projection).toList();
+            var status=evaluated.status()==ResultStatus.SUCCESS && selected.isEmpty()?ResultStatus.EMPTY:evaluated.status();
+            return result(status,status==ResultStatus.SOURCE_UNAVAILABLE?null:new DlqData(selected,original.completeness()),evaluated.missingFields(),evaluated.warnings(),RetentionMeta.none());
+        });
+    }
     @Override public TcReadResult<CommLogData> getCommLogs(DelegatedCall call, String eqpId, String sourceId, TimeWindow window) {
         return read(call, "COMM_LOG_READ", "getCommLogs", CommLogData.class, () -> {
             var data = scenarios.current().commLogs().get(sourceId);

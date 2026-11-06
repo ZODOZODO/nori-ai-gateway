@@ -55,3 +55,11 @@ Mock 응답은 contractVersion=1.0 wrapper와 typed result를 JSON으로 왕복�
 stateDirectory를 지정하면 `delegations.json`과 시나리오 ID만 담은 `scenario.json`을 force 후 원자 교체하고 생성자에서 읽습니다. 저장 실패·손상 위임 상태는 사용 불가로 처리합니다. 단위시험은 재생성 시 expiresAt/폐기 보존과 원문 부재를 검사합니다. 실제 프로세스 halt/restart·RecoveryModeRouter 선행 loading·verify 전용 state-dir guard·hook 등록은 P10 합류 후 P11 전체 검증 대상입니다.
 
 시나리오는 `tcmock/scenarios/index.json`에 등록된 ID만 선택할 수 있습니다. Mock 호출 계수는 operation 이름별 건수만 보존합니다. 원문 dlg·토큰·payload는 계수와 상태 파일에 포함하지 않습니다.
+
+## P13 설비 범위 DLQ 소비와 F5a 인계
+
+기존 `listDlq(call, sourceId, window)`와 반환 `TcReadResult<DlqData>`·Manifest output shape·contractVersion 1.0은 유지합니다. P13 실제 업무 Tool은 additive `listDlq(call, eqpId, sourceId, window)`를 사용합니다. 기본 구현은 `UnsupportedOperationException`으로 닫으며 기존 source-wide 메서드에 위임해 설비 범위를 약화하지 않습니다. 실제 어댑터는 원천 항목의 검증된 설비 귀속과 `[startAt,endAt)`를 모두 검사한 뒤 기존 DLQ 항목 DTO로 투영해야 합니다.
+
+Mock은 동일 snapshot의 설비 귀속 자료를 먼저 필터링하고 기존 DTO·wire/schema 검증으로 반환합니다. 빈·null·64자를 넘는 eqpId 또는 null 창은 잘못된 입력이고, 설비 귀속 자료 손상은 계약 실패이며, 미등록 Source는 `SOURCE_UNAVAILABLE`입니다. 다른 설비 항목이나 endAt 경계 항목을 합치지 않고, 성공한 필터의 0건은 `EMPTY`로 보존합니다. F5a 실제 TC 어댑터도 원천 설비 귀속을 확인하는 4arg 구현이 필요하며 외부 endpoint·인자 wire의 확정은 F5a 책임입니다. 이 내부 additive 호출을 외부 API 버전 변경이나 실제 TC 연결 증거로 해석하지 않습니다.
+
+실제 workflow의 Source 인가는 각 READ의 현재 허용 집합과 응답 pdg를 소비합니다. 접수 단언의 전체 권한 pdg와 현재 Source 응답 pdg가 같다고 가정하지 않으며, Gateway가 응답 pdg를 계산·보정하지 않습니다. 기존 legacy `PlanValidator.validate`의 검사 계약은 보존하고 actual workflow의 typed prepare·단계 시도·현재 grant 경로로 연결합니다. 인가 응답을 단계 사이에 캐시하지 않습니다.

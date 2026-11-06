@@ -24,6 +24,12 @@ public final class ToolDispatcher {
         this.executors = Map.copyOf(registered);
     }
     public ToolResultEnvelope dispatch(PlanStep step, VerifiedSystemScope scope, ExecutionContext context) {
+        if(context.boundInputs().isPresent())throw new IllegalArgumentException("기존 실행 경로에 단계 자료를 전달할 수 없습니다");
+        return dispatchInternal(step,scope,context,null,null,null,null);
+    }
+    private ToolResultEnvelope dispatchInternal(PlanStep step, VerifiedSystemScope scope, ExecutionContext context,
+            PlanValidator.Prepared prepared, com.nori.ai.gateway.core.authz.StepAttempt attempt,
+            com.nori.ai.gateway.core.authz.SourceAuthorizationStep.StepGrant grant, InvocationState invocation) {
         Objects.requireNonNull(step); Objects.requireNonNull(scope); Objects.requireNonNull(context);
         CapabilityManifest registered = registry.find(step.capabilityId()).orElse(null);
         // 로컬에서 거부할 수 있는 인증·소유권 오류는 Backend 조회와 시험 주입보다 먼저 차단합니다.
@@ -44,7 +50,8 @@ public final class ToolDispatcher {
         var source = target.source();
         if (source == null || !source.allowed() || source.ownerSystem() != scope.boundSystem() || !tool.sourceAllowlistRef().equals(source.sourceAllowlistRef()))
             return reject(step, scope, registered, context, RejectReason.SOURCE_NOT_ALLOWED, ResultStatus.DENIED, null, null);
-        if (!PlanValidator.authorized(tool, context.resolver().authorize(tool, step, scope), scope))
+        if (prepared == null ? !PlanValidator.authorized(tool, context.resolver().authorize(tool, step, scope), scope)
+            : attempt.mode()==com.nori.ai.gateway.core.authz.StepAttempt.Mode.DIRECT_SOURCE && !validator.authorizedStep(prepared,attempt,grant,scope))
             return reject(step, scope, registered, context, RejectReason.DENIED, ResultStatus.DENIED, null, null);
         RejectReason executable = validator.executable(tool);
         if (executable != null) return reject(step, scope, registered, context, executable, ResultStatus.UNSUPPORTED, null, null);
@@ -59,10 +66,84 @@ public final class ToolDispatcher {
                 new Clarification(ErrorCode.RESOURCE_NOT_FOUND, List.of("targetResources")));
         ToolExecutor executor = executors.get(tool.toolKind());
         if (executor == null) return reject(step, scope, registered, context, RejectReason.UNSUPPORTED, ResultStatus.UNSUPPORTED, null, null);
-        ToolResultEnvelope result = results.validate(executor.execute(step, tool, scope, context), tool);
+        if (attempt != null) {
+            if (grant != null) grant.consume(attempt,com.nori.ai.gateway.core.authz.StepAttempt.Purpose.DISPATCH);
+            else attempt.consume(com.nori.ai.gateway.core.authz.StepAttempt.Purpose.DISPATCH);
+        }
+        if (invocation != null) invocation.enter(tool);
+        ToolResultEnvelope raw = executor.execute(step, tool, scope, context);
+        ToolResultEnvelope result = results.validate(raw, tool);
+        boolean validated = result == raw;
         if (result.evidence().stream().anyMatch(e -> !scope.actorRef().equals(e.actorAccessScope())))
-            return results.failure(tool, ResultStatus.FAILED, ErrorCode.CONTRACT_INVALID, null);
+            { result = results.failure(tool, ResultStatus.FAILED, ErrorCode.CONTRACT_INVALID, null); validated=false; }
+        if(validated)try{com.nori.ai.gateway.core.evidence.EvidenceAssembler.projectKnowledge(tool,result,scope);}
+        catch(IllegalArgumentException invalidMetadata){result=results.failure(tool,ResultStatus.FAILED,ErrorCode.CONTRACT_INVALID,null);validated=false;}
+        if (invocation != null) invocation.complete(result,validated);
         return result;
+    }
+    public sealed interface InvocationOutcome permits Returned, Threw {}
+    public record InvocationRecord(String id,String capabilityId,ResultStatus status,Optional<ErrorCode> errorCode,Optional<ToolResultEnvelope> validatedResult) {
+        public InvocationRecord { Objects.requireNonNull(id);Objects.requireNonNull(capabilityId);Objects.requireNonNull(status);Objects.requireNonNull(errorCode);Objects.requireNonNull(validatedResult); }
+        @Override public String toString() { return "InvocationRecord[보호됨]"; }
+    }
+    public record Returned(ToolResultEnvelope result,Optional<InvocationRecord> invocation) implements InvocationOutcome {}
+    public static final class Threw implements InvocationOutcome {
+        private final Throwable failure;
+        private final InvocationRecord invocation;
+        private Threw(Throwable failure,InvocationRecord invocation) { this.failure=failure;this.invocation=invocation; }
+        public InvocationRecord invocation() { return invocation; }
+        public void suppress(Throwable secondary) { if (failure!=secondary) failure.addSuppressed(secondary); }
+        public void rethrow() { if (failure instanceof RuntimeException runtime) throw runtime; throw (Error)failure; }
+        @Override public String toString() { return "Threw[보호됨]"; }
+    }
+    private static final class InvocationState {
+        private String fallback,capability;
+        private InvocationRecord record;
+        void enter(CapabilityManifest tool) { fallback=UUID.randomUUID().toString();capability=tool.capabilityId(); }
+        void complete(ToolResultEnvelope result,boolean validated) {
+            record=new InvocationRecord(validated?result.toolExecutionId():fallback,capability,result.status(),Optional.ofNullable(result.errorCode()),validated?Optional.of(result):Optional.empty());
+        }
+        InvocationRecord failed() { return new InvocationRecord(fallback,capability,ResultStatus.FAILED,Optional.empty(),Optional.empty()); }
+    }
+    public InvocationOutcome dispatchCurrent(PlanValidator.Prepared prepared,com.nori.ai.gateway.core.authz.StepAttempt attempt,
+            VerifiedSystemScope scope,com.nori.ai.gateway.core.authz.SourceAuthorizationStep.StepGrant grant,ExecutionContext context) {
+        if (!validator.authorizedStep(prepared,attempt,grant,scope) || attempt.mode()!=com.nori.ai.gateway.core.authz.StepAttempt.Mode.DIRECT_SOURCE)
+            throw new IllegalArgumentException("현재 단계 인가 결속이 다릅니다");
+        return dispatchAttempt(prepared,attempt,scope,grant,context);
+    }
+    public InvocationOutcome dispatchBusiness(PlanValidator.Prepared prepared,com.nori.ai.gateway.core.authz.StepAttempt attempt,
+            VerifiedSystemScope scope,ExecutionContext context) {
+        if (!prepared.owns(attempt,scope) || !attempt.fresh() || attempt.mode()!=com.nori.ai.gateway.core.authz.StepAttempt.Mode.BACKEND_READ_REQUIRED)
+            throw new IllegalArgumentException("업무 조회 결속이 다릅니다");
+        return dispatchAttempt(prepared,attempt,scope,null,context);
+    }
+    private InvocationOutcome dispatchAttempt(PlanValidator.Prepared prepared,com.nori.ai.gateway.core.authz.StepAttempt attempt,
+            VerifiedSystemScope scope,com.nori.ai.gateway.core.authz.SourceAuthorizationStep.StepGrant grant,ExecutionContext context) {
+        if (!prepared.owns(attempt,scope)||attempt.purpose()!=com.nori.ai.gateway.core.authz.StepAttempt.Purpose.DISPATCH || context.resolver()!=prepared.resolver()) throw new IllegalArgumentException("실행 목적이 다릅니다");
+        PlanStep original=prepared.plan().plan().stream().filter(s->s.stepId().equals(attempt.binding().stepId())).findFirst().orElseThrow();
+        // 실행 인자는 시도에 결속된 동일 객체를 Prepared에서 복원합니다.
+        PlanStep step=prepared.boundStep(attempt);
+        if (!prepared.matches(attempt,step) || !original.capabilityId().equals(step.capabilityId())) throw new IllegalArgumentException("실행 단계가 다릅니다");
+        validateBoundInputs(prepared,attempt,scope,context,step);
+        InvocationState state=new InvocationState();
+        try { return new Returned(dispatchInternal(step,scope,context,prepared,attempt,grant,state),Optional.ofNullable(state.record)); }
+        catch (RuntimeException | Error failure) { if (state.fallback==null) throw failure; return new Threw(failure,state.failed()); }
+        finally { attempt.close(); }
+    }
+    private void validateBoundInputs(PlanValidator.Prepared prepared,com.nori.ai.gateway.core.authz.StepAttempt attempt,VerifiedSystemScope scope,ExecutionContext context,PlanStep step) {
+        boolean git=prepared.manifest(step.stepId()).toolKind()==ToolKind.GIT;
+        if(context.boundInputs().isEmpty()){if(git)throw new IllegalArgumentException("단계 자료 결속이 필요합니다");return;}
+        var inputs=context.boundInputs().orElseThrow();if(!git||inputs.attempt()!=attempt)throw new IllegalArgumentException("단계 자료 결속이 다릅니다");
+        Set<String> ancestors=new HashSet<>();collectAncestors(step,prepared.plan(),ancestors);
+        var actual=new ArrayList<>(inputs.bindings().keySet());
+        var ordered=prepared.plan().plan().stream().map(PlanStep::stepId).filter(actual::contains).toList();
+        if(!actual.equals(ordered))throw new IllegalArgumentException("단계 자료 순서가 다릅니다");
+        inputs.bindings().forEach((key,binding)->{
+            if(!ancestors.contains(key)||prepared.manifest(key).toolKind()!=ToolKind.TRACE||binding.ownerSystem()!=scope.boundSystem()||!binding.dataRef().belongsTo(scope.boundSystem()))throw new IllegalArgumentException("단계 자료 소유 범위가 다릅니다");
+        });
+    }
+    private void collectAncestors(PlanStep step,PlanEnvelope plan,Set<String> ancestors) {
+        for(String id:step.dependsOn())if(ancestors.add(id))collectAncestors(plan.plan().stream().filter(value->value.stepId().equals(id)).findFirst().orElseThrow(),plan,ancestors);
     }
     private ToolResultEnvelope reject(PlanStep step, VerifiedSystemScope scope, CapabilityManifest registered, ExecutionContext context,
             RejectReason reason, ResultStatus status, ErrorCode error, Clarification clarification) {

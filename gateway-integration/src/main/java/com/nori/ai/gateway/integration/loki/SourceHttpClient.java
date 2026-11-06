@@ -29,11 +29,16 @@ public final class SourceHttpClient {
     public static final class Failure extends RuntimeException {
         private final boolean retryable;
         private final boolean deadline;
+        private final boolean httpNotFound;
         public Failure(boolean retryable, boolean deadline) {
+            this(retryable,deadline,false);
+        }
+        private Failure(boolean retryable,boolean deadline,boolean httpNotFound) {
             super(deadline ? "Source 조회 마감에 도달했습니다" : "Source 조회를 완료하지 못했습니다", null, false, false);
-            this.retryable = retryable; this.deadline = deadline;
+            this.retryable = retryable; this.deadline = deadline;this.httpNotFound=httpNotFound;
         }
         public boolean deadline() { return deadline; }
+        public boolean httpNotFound(){return httpNotFound;}
     }
     public record Page(JsonNode body, String nextPage) {}
     @FunctionalInterface public interface StreamReader<T> { T read(InputStream stream) throws IOException; }
@@ -60,19 +65,26 @@ public final class SourceHttpClient {
         return builder.encode().buildAndExpand(values).toUri();
     }
     public Page json(URI uri, String token, long deadline) {
+        return json(uri,token,deadline,()->{});
+    }
+    public Page json(URI uri,String token,long deadline,Runnable beforeAttempt) {
         return read(uri, token, deadline, (stream, headers) -> {
             byte[] bytes = stream.readNBytes(MAX_JSON_BYTES + 1);
             if (bytes.length > MAX_JSON_BYTES) throw new Failure(false, false);
             JsonNode body = mapper.readTree(bytes);
             if (body == null) throw new Failure(false, false);
             return new Page(body, headers.getFirst("X-Next-Page"));
-        });
+        },beforeAttempt);
     }
     public <T> T stream(URI uri, String token, long deadline, StreamReader<T> reader) {
-        return read(uri, token, deadline, (body, headers) -> reader.read(body));
+        return stream(uri,token,deadline,reader,()->{});
+    }
+    public <T> T stream(URI uri,String token,long deadline,StreamReader<T> reader,Runnable beforeAttempt) {
+        return read(uri, token, deadline, (body, headers) -> reader.read(body),beforeAttempt);
     }
     @FunctionalInterface private interface ResponseReader<T> { T read(InputStream stream, HttpHeaders headers) throws IOException; }
-    private <T> T read(URI uri, String token, long deadline, ResponseReader<T> reader) {
+    private <T> T read(URI uri, String token, long deadline, ResponseReader<T> reader,Runnable beforeAttempt) {
+        Objects.requireNonNull(beforeAttempt);
         if (!Objects.equals(base.getAuthority(), uri.getAuthority()) || !base.getScheme().equals(uri.getScheme())) throw new Failure(false, false);
         // JVM의 wire 로깅이 활성화된 환경은 요청 전에 거부하여 검색어 노출을 막습니다.
         if (Logger.getLogger("sun.net.www.protocol.http.HttpURLConnection").isLoggable(Level.FINE)
@@ -85,6 +97,10 @@ public final class SourceHttpClient {
         for (int attempt = 0; attempt < 2; attempt++) {
             if (Thread.currentThread().isInterrupted()) throw new Failure(false, false);
             if (expired(deadline)) throw new Failure(false, true);
+            // guard의 취소·만료·현재 인가 오류는 전송 오류나 재시도로 바꾸지 않습니다.
+            beforeAttempt.run();
+            if (Thread.currentThread().isInterrupted()) throw new Failure(false,false);
+            if (expired(deadline)) throw new Failure(false,true);
             long remainingMs = Math.max(1, (deadline - nowNanos()) / 1_000_000 + 1);
             boolean deadlineLimited = remainingMs <= READ_TIMEOUT.toMillis();
             // 응답 stream·관측 handler와 JDK client의 종료까지 마쳐야 상위 실행 슬롯을 반환할 수 있습니다.
@@ -116,7 +132,7 @@ public final class SourceHttpClient {
                 return request.exchange((req, response) -> {
                     try {
                         int status = response.getStatusCode().value();
-                        if (status < 200 || status >= 300) throw new Failure(status >= 500 && status <= 599, false);
+                        if (status < 200 || status >= 300) throw new Failure(status >= 500 && status <= 599, false,status==404);
                         InputStream bounded = new FilterInputStream(response.getBody()) {
                             private void check() { if (expired(deadline)) throw new Failure(false, true); }
                             @Override public int read() throws IOException { check(); int value = super.read(); check(); return value; }

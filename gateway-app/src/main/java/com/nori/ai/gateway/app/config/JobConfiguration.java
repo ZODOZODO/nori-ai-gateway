@@ -35,7 +35,7 @@ public class JobConfiguration {
     @Bean DbSystemIdentifierReader dbSystemIdentifierReader(JdbcClient jdbc){return new DbSystemIdentifierReader(jdbc);}
     @Bean DatabaseEmptinessProbe databaseEmptinessProbe(JdbcClient jdbc){return new DatabaseEmptinessProbe(jdbc);}
     @Bean JobEventPublisher jobEventPublisher(JdbcClient jdbc,Clock clock,ApplicationEventPublisher publisher){return new JobEventPublisher(jdbc,clock,publisher);}
-    @Bean JobTerminalCommitter jobTerminalCommitter(JdbcClient jdbc,PlatformTransactionManager manager,Clock clock,ConversationExpiryGuard expiry,JobEventPublisher publisher,List<TerminalCommitObserver> observers,CapacityProfile capacity,SlotLedger slots){return new JobTerminalCommitter(jdbc,manager,clock,expiry,publisher,observers,capacity.jobLifetimeLimit(),slots::terminated);}
+    @Bean JobTerminalCommitter jobTerminalCommitter(JdbcClient jdbc,PlatformTransactionManager manager,Clock clock,ConversationExpiryGuard expiry,JobEventPublisher publisher,List<TerminalCommitObserver> observers,CapacityProfile capacity,SlotLedger slots,ConversationRepository conversations,MessageRepository messages,EvidenceRepository evidence,ToolExecutionRepository executions){return new JobTerminalCommitter(jdbc,manager,clock,expiry,publisher,observers,capacity.jobLifetimeLimit(),slots::terminated,conversations,messages,evidence,executions);}
     @Bean SlotLedger slotLedger(){return new SlotLedger();}
     @Bean IdempotentAdmissionLookup idempotentAdmissionLookup(AdmissionLookupRepository repository,Clock clock){return new IdempotentAdmissionLookup(repository,clock);}
     @Bean @ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="disabled")

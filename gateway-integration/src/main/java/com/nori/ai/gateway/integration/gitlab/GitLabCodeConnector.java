@@ -25,7 +25,12 @@ public final class GitLabCodeConnector {
     public CodeResult searchCode(SourceReadAccess.Request request, String term, CodeScope scope, String ref) {
         return searchCode(request, term, scope, ref, Optional.empty());
     }
-    public CodeResult searchCode(SourceReadAccess.Request request, String term, CodeScope scope, String ref, Optional<GitLabPipelineLineageReader.Lineage> lineage) {
+    public CodeResult searchCode(SourceReadAccess.Request request,String term,CodeScope scope,String ref,Optional<GitLabPipelineLineageReader.Lineage> lineage) {
+        try{return searchGuarded(request,term,scope,ref,lineage);}
+        catch(SourceReadAccess.GuardStopped stopped){throw stopped.rethrow();}
+        catch(SourceReadAccess.Rejected rejected){return result(rejected.status());}
+    }
+    private CodeResult searchGuarded(SourceReadAccess.Request request,String term,CodeScope scope,String ref,Optional<GitLabPipelineLineageReader.Lineage> lineage) {
         Objects.requireNonNull(scope); Objects.requireNonNull(lineage);
         var repo = policy.repository(scope.sourceRepo()).orElse(null);
         if (repo == null || !GitLabSourcePolicy.pathAllowed(repo, scope.pathPrefix()) || ref == null
@@ -41,7 +46,7 @@ public final class GitLabCodeConnector {
                 authorized = access.check(request, GitLabSourcePolicy.SOURCE_REF);
                 if (authorized != ResultStatus.SUCCESS) return result(authorized);
                 var response = http.json(http.uri(List.of("api", "v4", "projects", Long.toString(repo.projectId()), "search"),
-                    Map.of("scope", "blobs", "search", term, "ref", ref, "per_page", 100, "page", page)), token, deadline);
+                    Map.of("scope", "blobs", "search", term, "ref", ref, "per_page", 100, "page", page)), token, deadline,()->access.require(request,GitLabSourcePolicy.SOURCE_REF));
                 if (!response.body().isArray()) throw new SourceHttpClient.Failure(false, false);
                 for (JsonNode hit : response.body()) {
                     String path = hit.path("path").asText();
@@ -59,7 +64,8 @@ public final class GitLabCodeConnector {
                 page++;
             } while (true);
             return new CodeResult(snippets.isEmpty() ? ResultStatus.EMPTY : ResultStatus.SUCCESS, snippets);
-        } catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
+        } catch(SourceReadAccess.GuardStopped | SourceReadAccess.Rejected guarded){throw guarded;}
+        catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
     }
     private static CodeResult result(ResultStatus status) { return new CodeResult(status, List.of()); }
 }

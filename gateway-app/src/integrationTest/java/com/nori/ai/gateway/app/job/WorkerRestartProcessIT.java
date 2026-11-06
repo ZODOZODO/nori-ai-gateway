@@ -17,10 +17,11 @@ class WorkerRestartProcessIT extends WorkerRestartProcessSupport {
         haltWithRunningAndQueued();String queued=job("queued");launch(NOW.plusSeconds(1));await(()->state(queued).equals("SUCCEEDED"));
         assertThat(started(queued)).isOne();
         var payload=json.readTree(jdbc.sql("SELECT payload::text FROM gw.result WHERE job_id=:id").param("id",queued).query(String.class).single());
-        assertThat(payload.get("requestPerm").toString()).isEqualTo("[\"EQP_READ\",\"MODEL_READ\"]");assertThat(payload.get("requestPdg").asString()).isEqualTo(P09TestPorts.PDG);assertThat(payload.get("requestId").asString()).isEqualTo(queued);
-        assertThat(payload.get("issuedAt").asString()).isEqualTo(NOW.toString());assertThat(payload.get("expiresAt").asString()).isEqualTo(NOW.plusSeconds(180).plusNanos(1).toString());
-        assertThat(payload.get("inputMessageId").asString()).isEqualTo(jdbc.sql("SELECT request_message_id FROM gw.job WHERE id=:id").param("id",queued).query(String.class).single());
-        assertThat(payload.get("inputQuestion").asString()).isEqualTo("시험 질의");assertThat(payload.get("requestFields").get("context").get("referenceTime").asString()).isEqualTo("2026-11-06T09:00:00+09:00");
+        var scope=restoredScope(queued);assertThat(scope.perm()).containsExactlyInAnyOrder("EQP_READ","MODEL_READ");assertThat(scope.pdg()).isEqualTo(P09TestPorts.PDG);assertThat(scope.requestId()).isEqualTo(queued);
+        assertThat(scope.issuedAt()).isEqualTo(NOW);assertThat(scope.expiresAt()).isEqualTo(NOW.plusSeconds(180).plusNanos(1));
+        var input=requestInput(queued);assertThat(input.messageId()).isEqualTo(jdbc.sql("SELECT request_message_id FROM gw.job WHERE id=:id").param("id",queued).query(String.class).single());
+        assertThat(input.maskedQuestion()).isEqualTo("시험 질의");assertThat(((Map<?,?>)input.requestFields().get("context")).get("referenceTime")).isEqualTo("2026-11-06T09:00:00+09:00");
+        assertThat(payload.has("requestFields")).isFalse();assertThat(payload.path("blocks").isArray()).isTrue();
         assertThat(count("result",queued)).isOne();var observations=send("/__test/harness-observations","GET",null,null,null,false);assertThat(json.readTree(observations.body()).get("authorization").asInt()).isOne();
     }
     @Test @Tag("AC-18-WORKER-QUEUED-EXPIRED") void queuedAfterOneEightyOneRemainsQueueTimeoutAndRunningIsInterrupted()throws Exception{

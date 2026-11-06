@@ -14,7 +14,8 @@
   "sideEffects": "NONE",
   "resourceScope": "AUTHENTICATED_ACTOR",
   "resourceTypes": [
-    "DOCUMENT"
+    "DOCUMENT",
+    "EQP"
   ],
   "requiredPermission": [
     "AI_DOC_READ"

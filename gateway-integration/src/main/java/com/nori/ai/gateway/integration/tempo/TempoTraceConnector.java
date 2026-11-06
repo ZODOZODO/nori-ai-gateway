@@ -20,14 +20,19 @@ public final class TempoTraceConnector {
     private final SourceHttpClient http;
     private final SourceReadAccess access;
     public TempoTraceConnector(SourceHttpClient http, SourceReadAccess access) { this.http = Objects.requireNonNull(http); this.access = Objects.requireNonNull(access); }
-    public TraceResult search(SourceReadAccess.Request request, String service, TimeWindow window) {
+    public TraceResult search(SourceReadAccess.Request request,String service,TimeWindow window) {
+        try{return searchGuarded(request,service,window);}
+        catch(SourceReadAccess.GuardStopped stopped){throw stopped.rethrow();}
+        catch(SourceReadAccess.Rejected rejected){return result(rejected.status(),List.of());}
+    }
+    private TraceResult searchGuarded(SourceReadAccess.Request request, String service, TimeWindow window) {
         if (!LokiSourcePolicy.APPS.contains(service)) return result(ResultStatus.DENIED, List.of());
         ResultStatus authorized = access.check(request, SOURCE_REF);
         if (authorized != ResultStatus.SUCCESS) return result(authorized, List.of());
         long deadline = http.deadline(Duration.ofSeconds(30));
         try {
             JsonNode body = http.json(http.uri(List.of("api", "search"), Map.of("q", "{resource.service.name=\"" + service + "\"}",
-                "start", window.startAt().getEpochSecond(), "end", ceilSecond(window.endAt()))), null, deadline).body();
+                "start", window.startAt().getEpochSecond(), "end", ceilSecond(window.endAt()))), null, deadline,()->access.require(request,SOURCE_REF)).body();
             if (!body.path("traces").isArray()) throw new SourceHttpClient.Failure(false, false);
             List<Trace> traces = new ArrayList<>(); Set<String> seen = new HashSet<>();
             for (JsonNode hit : body.path("traces")) {
@@ -36,23 +41,30 @@ public final class TempoTraceConnector {
                 if (!seen.add(id)) continue;
                 authorized = access.check(request, SOURCE_REF);
                 if (authorized != ResultStatus.SUCCESS) return result(authorized, List.of());
-                Trace trace = load(id, deadline, Optional.of(window));
+                Trace trace = load(request,id, deadline, Optional.of(window));
                 if (!trace.spans().isEmpty()) traces.add(trace);
             }
             return result(traces.isEmpty() ? ResultStatus.EMPTY : ResultStatus.SUCCESS, traces);
-        } catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE, List.of()); }
+        } catch(SourceReadAccess.GuardStopped | SourceReadAccess.Rejected guarded){throw guarded;}
+        catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE, List.of()); }
     }
-    public TraceResult getTrace(SourceReadAccess.Request request, String traceId) {
+    public TraceResult getTrace(SourceReadAccess.Request request,String traceId) {
+        try{return getTraceGuarded(request,traceId);}
+        catch(SourceReadAccess.GuardStopped stopped){throw stopped.rethrow();}
+        catch(SourceReadAccess.Rejected rejected){return result(rejected.status(),List.of());}
+    }
+    private TraceResult getTraceGuarded(SourceReadAccess.Request request, String traceId) {
         if (!validTraceId(traceId)) return result(ResultStatus.DENIED, List.of());
         ResultStatus authorized = access.check(request, SOURCE_REF);
         if (authorized != ResultStatus.SUCCESS) return result(authorized, List.of());
         try {
-            Trace trace = load(traceId, http.deadline(Duration.ofSeconds(30)), Optional.empty());
+            Trace trace = load(request,traceId, http.deadline(Duration.ofSeconds(30)), Optional.empty());
             return result(trace.spans().isEmpty() ? ResultStatus.EMPTY : ResultStatus.SUCCESS, trace.spans().isEmpty() ? List.of() : List.of(trace));
-        } catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE, List.of()); }
+        } catch(SourceReadAccess.GuardStopped | SourceReadAccess.Rejected guarded){throw guarded;}
+        catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE, List.of()); }
     }
-    private Trace load(String id, long deadline, Optional<TimeWindow> window) {
-        JsonNode body = http.json(http.uri(List.of("api", "traces", id), Map.of()), null, deadline).body();
+    private Trace load(SourceReadAccess.Request request,String id, long deadline, Optional<TimeWindow> window) {
+        JsonNode body = http.json(http.uri(List.of("api", "traces", id), Map.of()), null, deadline,()->access.require(request,SOURCE_REF)).body();
         JsonNode batches = body.has("batches") ? body.path("batches") : body.path("resourceSpans");
         if (!batches.isArray()) throw new SourceHttpClient.Failure(false, false);
         List<Span> spans = new ArrayList<>();

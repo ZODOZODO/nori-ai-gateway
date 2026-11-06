@@ -19,7 +19,7 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         assertThatThrownBy(()->accept("actor","same","질문",null,registeredDlg("actor"))).isInstanceOfSatisfying(JobAdmissionService.Rejected.class,e->assertThat(e.status()).isEqualTo(404));assertThat(counts()).isEqualTo(expiredBefore);
     }
     @Test void admitRaceAtQueueBoundary()throws Exception{
-        var running=admit("actor","running",Set.of(PausePointRegistry.Point.TOOL_IN_FLIGHT));await(()->state(running.jobId()).equals("RUNNING"));for(int i=0;i<3;i++)admit("actor","fill"+i,Set.of());
+        var running=admit("actor","running",Set.of(PausePointRegistry.Point.BEFORE_CLASSIFICATION));await(()->state(running.jobId()).equals("RUNNING"));for(int i=0;i<3;i++)admit("actor","fill"+i,Set.of());
         String point="actor:race";pauses().hold(PausePointRegistry.Point.ADMISSION_FAST_MISS,point);var before=counts();String firstDlg=dlg(),secondDlg=dlg();
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()){
             var a=executor.submit(()->accept("actor","race","질문",null,firstDlg));var b=executor.submit(()->accept("actor","race","질문",null,secondDlg));
@@ -30,7 +30,7 @@ class IdempotentAdmissionIT extends P09QueueSupport {
             assertThat(context.getBean(JobAdmissionService.class).uniqueFallbackCount()).isZero();
             String committed=jdbc().sql("SELECT delegation_id FROM gw.job WHERE id=:id").param("id",accepted.jobId()).query(String.class).single();assertThat(Set.of(firstDlg,secondDlg).contains(committed)).isTrue();
             assertThat(accept("actor","race","질문",null,dlg()).jobId()).isEqualTo(accepted.jobId());
-        }pauses().release(PausePointRegistry.Point.TOOL_IN_FLIGHT,running.jobId());
+        }pauses().release(PausePointRegistry.Point.BEFORE_CLASSIFICATION,running.jobId());
     }
     @Test void nullableContextRemainsImmutableAcrossIdempotentAdmission(){
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");

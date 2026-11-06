@@ -37,3 +37,11 @@ SSE 연결·재연결은 매 요청 새 actor 단언을 사용합니다. `Last-E
 `job.started`는 실제 dispatcher의 `QUEUED → RUNNING` 전이와 같은 트랜잭션에서 저장합니다. commit 뒤 같은 Job의 queued, started를 발행한 다음 worker를 실행합니다. 시작 전 종결이 먼저 이기면 started 행·발행·worker 실행이 없으며 rollback도 RUNNING과 started를 함께 취소합니다.
 
 최종 결과 wrapper의 `payload.blocks[]`에는 서버가 확정한 배열 순서에 따른 additive `id`(`b0`, `b1`, …)가 있습니다. 전체 참조는 `(jobId,id)`이며 같은 dataRef를 가진 블록도 구분합니다. content 안의 업무 id는 유지하며 upstream `ResultBlock`·Tool envelope·Manifest에는 이 필드를 요구하지 않습니다. 최종 저장 직전에 `ResultBlockIds`를 사용하는 실제 workflow producer는 P13의 책임입니다. GET·대화 이력은 저장 id를 재발급하지 않고, Export는 해당 Job의 저장 id가 정확히 한 건일 때만 같은 블록을 반환합니다. 미존재·중복 id는 빈 404입니다. P10의 helper 기반 저장 fixture 시험은 P13 실제 workflow 생산/저장 검증을 대신하지 않습니다.
+
+## P13 실행 결과 연결
+
+terminal 상태·이벤트 집계의 정본은 승인 Spec §5.4의 표입니다. 실행기는 선택 단계의 `OPTIONAL_STEP_OMITTED`·`SKIPPED_NO_INPUT`을 실패 집계에서 제외하고, 실제 단계 결과를 `toolSummary`에 보존합니다. F1의 `disabled` 실행은 Composer를 호출하지 않으며 서술 부재만으로 실패나 `LLM_UNAVAILABLE`을 만들지 않습니다. 입력·계획 확인이 필요한 결과의 저장 payload는 `clarification{reason,fields}`만 포함합니다.
+
+`options.allowTools/allowKnowledge`는 정확히 `false`인 경우에만 차단합니다. 필수 조회를 차단하면 자원·Tool·캐시 조회 전에 `PLAN_INVALID` 확인 요청으로 종결하며, 선택 Knowledge만 차단하면 해당 단계를 제외합니다. GQ 도움말은 두 값이 false여도 업무 조회 없이 생성합니다. 시간창을 이전 요청에서 이어받는 경우 같은 대화에서 바로 앞에 접수된 요청 한 건의 확정 창만 사용하고, 그 요청에 창이 없으면 더 오래된 창을 건너뛰어 고르지 않고 구간을 확인합니다.
+
+실제 workflow의 최종 블록 배열을 확정한 후 `ResultBlockIds.assign`을 한 번 적용합니다. Evidence의 최종 저장 식별자와 모든 최종 참조는 현재 Job에 결속하고, 캐시 envelope의 원 ToolExecution 식별자·이전 Job 저장 결과는 바꾸지 않습니다. 결과·Evidence·assistant 메시지·Context·요약·Source 의존성과 terminal 상태·이벤트·감사는 같은 마지막 트랜잭션에서 저장합니다. 실행 중 이미 확정한 Tool 호출 이력은 마지막 저장의 실패로 지우지 않습니다.

@@ -5,10 +5,38 @@ import java.util.*;
 
 public record TerminalSpec(JobStatus jobStatus, ResultStatus resultStatus, ErrorCode errorCode,
         String eventType, boolean externalSuppressed, Map<String,Object> resultPayload,
-        Map<String,Object> resultSourceDeps, Cause terminalCause) {
+        Map<String,Object> resultSourceDeps, Cause terminalCause, Optional<CommitData> commitData) {
+    public TerminalSpec(JobStatus jobStatus,ResultStatus resultStatus,ErrorCode errorCode,String eventType,boolean externalSuppressed,
+            Map<String,Object> resultPayload,Map<String,Object> resultSourceDeps,Cause terminalCause) {
+        this(jobStatus,resultStatus,errorCode,eventType,externalSuppressed,resultPayload,resultSourceDeps,terminalCause,Optional.empty());
+    }
+    public record StoredEvidence(Evidence value,Optional<EvidenceSourceRef> source) {
+        public StoredEvidence { Objects.requireNonNull(value);Objects.requireNonNull(source); }
+        @Override public String toString(){return "StoredEvidence[보호됨]";}
+    }
+    public record AssistantMessage(String messageId,String contentMasked,List<com.nori.ai.gateway.core.plan.ResourceRef> resourceRefs,List<String> toolExecutionRefs,String responseRef) {
+        public AssistantMessage { Objects.requireNonNull(messageId);Objects.requireNonNull(contentMasked);Objects.requireNonNull(responseRef);resourceRefs=List.copyOf(resourceRefs);toolExecutionRefs=List.copyOf(toolExecutionRefs); }
+        @Override public String toString(){return "AssistantMessage[보호됨]";}
+    }
+    public record CommitData(com.nori.ai.gateway.core.scope.VerifiedSystemScope scope,String jobId,String conversationId,String requestMessageId,long jobSeq,
+            List<StoredEvidence> evidence,Optional<AssistantMessage> assistantMessage,Optional<Map<String,Object>> context,
+            Optional<Map<String,Object>> summary,ResultSourceDeps sourceDeps) {
+        public CommitData {
+            Objects.requireNonNull(scope);Objects.requireNonNull(jobId);Objects.requireNonNull(conversationId);Objects.requireNonNull(requestMessageId);Objects.requireNonNull(sourceDeps);
+            if(jobSeq<=0)throw new IllegalArgumentException("요청 순번이 잘못되었습니다");
+            evidence=List.copyOf(evidence);Objects.requireNonNull(assistantMessage);
+            context=Objects.requireNonNull(context).map(JobRequestInput::immutableFields);summary=Objects.requireNonNull(summary).map(JobRequestInput::immutableFields);
+        }
+        @Override public String toString(){return "CommitData[보호됨]";}
+    }
+    public TerminalSpec withCommitData(CommitData data) {
+        return new TerminalSpec(jobStatus,resultStatus,errorCode,eventType,externalSuppressed,resultPayload,resultSourceDeps,terminalCause,Optional.of(data));
+    }
     public enum Cause { NORMAL, EXPIRY_EDGE, QUEUE_TIMEOUT, JOB_TIMEOUT, WORKER_INTERRUPTED,
         RESTORE_EXPIRED, RESTORE_LIMIT, RESTORE_INTERRUPTED, START_GATE_DENIED, START_GATE_UNAVAILABLE, CANCELLED }
     public TerminalSpec {
+        Objects.requireNonNull(commitData);
+        if(commitData.isPresent()&&(terminalCause!=Cause.NORMAL||!commitData.get().sourceDeps().equals(dependencies(resultSourceDeps))))throw new IllegalArgumentException("최종 자료 결속이 다릅니다");
         Objects.requireNonNull(jobStatus); Objects.requireNonNull(terminalCause);
         if(terminalCause==Cause.NORMAL&&resultStatus==null)throw new IllegalArgumentException("종결 결과가 필요합니다");
         resultSourceDeps = Map.copyOf(Objects.requireNonNull(resultSourceDeps));
@@ -38,6 +66,10 @@ public record TerminalSpec(JobStatus jobStatus, ResultStatus resultStatus, Error
         if (terminalCause != Cause.EXPIRY_EDGE && terminalCause != Cause.RESTORE_EXPIRED) valid &= !externalSuppressed;
         if (resultStatus == null) valid &= resultSourceDeps.isEmpty();
         if (!valid) throw new IllegalArgumentException("승인된 종결 상태 조합이 아닙니다");
+    }
+    private static ResultSourceDeps dependencies(Map<String,Object> values) {
+        if(values.isEmpty())return new ResultSourceDeps(List.of(),List.of());
+        return com.nori.ai.gateway.core.registry.SchemaContracts.JSON.convertValue(values,ResultSourceDeps.class);
     }
     public static TerminalSpec outcome(JobStatus job, ResultStatus result, ErrorCode error, Map<String,Object> payload) {
         String event = job == JobStatus.SUCCEEDED ? "job.completed" : job == JobStatus.PARTIAL ? "job.partial" : "job.failed";

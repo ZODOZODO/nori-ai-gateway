@@ -38,7 +38,7 @@ class P09AppContextWiringIT extends P09QueueSupport {
         for(Class<?> type:List.of(JobWorker.class,JobTerminalCommitter.class,RecoveryModeRouter.class,StartupRecoveryRunner.class,com.nori.ai.gateway.app.security.ActorAssertionVerifier.class))assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(type),"clock")).isSameAs(clock);
         assertThat(context.getBean(InferenceReadiness.class).ready()).isTrue();var accepted=admit("actor","wiring",Set.of());await(()->state(accepted.jobId()).equals("SUCCEEDED"));
         assertThat(observations().workflows).singleElement().satisfies(j->{assertThat(j.scope().perm()).containsExactlyInAnyOrder("EQP_READ","MODEL_READ");assertThat(j.inferenceMode()).isEqualTo(InferenceMode.DISABLED);});
-        assertThat(context.getBeansOfType(com.nori.ai.gateway.core.dispatch.ToolExecutor.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.nori.ai.gateway.core.dispatch.ToolExecutor.class).values()).extracting(com.nori.ai.gateway.core.dispatch.ToolExecutor::toolKind).containsExactlyInAnyOrder(com.nori.ai.gateway.core.registry.ToolKind.BUSINESS,com.nori.ai.gateway.core.registry.ToolKind.LOG,com.nori.ai.gateway.core.registry.ToolKind.TRACE,com.nori.ai.gateway.core.registry.ToolKind.GIT);
         context.getBean(ReadinessGate.class).down();int before=count("job");
         assertThat(postQuery("actor","before-ready","질문").statusCode()).isEqualTo(503);assertThat(count("job")).isEqualTo(before);
     }
@@ -48,13 +48,16 @@ class P09AppContextWiringIT extends P09QueueSupport {
         for(String failure:List.of("missing","invalid")){hookFileFailure=failure;assertThatThrownBy(()->startApplication(extraSources())).hasStackTraceContaining("시험 훅 인증 파일이 잘못되었습니다");}
         assertThat(output.getAll().contains(hashSentinel)).isFalse();hookFileFailure=null;
     }
-    @Test void missingProductPortsFailAndLaterPreconditionFailurePublishesNoStart()throws Exception{
+    @Test void actualWorkflowPortExistsWithoutHooksAndLaterPreconditionFailurePublishesNoStart()throws Exception{
         var props=new HashMap<String,Object>();securityProperties().forEach(props::put);
         props.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app"),"spring.flyway.enabled",false));
         props.putAll(Map.of("ai.gateway.capacity.max-running-jobs",1,"ai.gateway.capacity.generation-concurrency",1,"ai.gateway.capacity.queued-depth",4,"ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s","ai.gateway.inference.mode","disabled"));
         props.putAll(Map.of("spring.kafka.bootstrap-servers","127.0.0.1:1","nori.storage.s3.enabled",true,"nori.storage.s3.endpoint","http://127.0.0.1:1","nori.storage.s3.bucket","fixture","nori.storage.s3.access-key","dummy","nori.storage.s3.secret-key","dummy","nori.storage.s3.region","us-east-1"));
-        assertThatThrownBy(()->new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props).run()).hasStackTraceContaining(WorkflowExecutor.class.getName());
-        context.close();context=null;failLate=true;
+        context.close();context=null;
+        try(var production=new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props).run()) {
+            assertThat(production.getBeansOfType(WorkflowExecutor.class)).hasSize(1);assertThat(production.getBean(WorkflowExecutor.class)).isExactlyInstanceOf(WorkflowExecutionAdapter.class);assertThat(production.getBean(InferenceReadiness.class).ready()).isFalse();
+        }
+        failLate=true;
         try{assertThatThrownBy(()->startApplication(extraSources())).hasMessage("후순위 확인 실패");assertThat(createdDispatcher.started()).isFalse();assertThat(createdSweeper.started()).isFalse();}
         finally{failLate=false;}
     }

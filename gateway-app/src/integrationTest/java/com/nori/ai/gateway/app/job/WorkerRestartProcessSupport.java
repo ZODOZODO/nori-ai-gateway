@@ -62,10 +62,20 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
     protected int started(String id){return jdbc.sql("SELECT count(*) FROM gw.job_event WHERE job_id=:id AND type='job.started'").param("id",id).query(Integer.class).single();}
     protected void await(java.util.function.BooleanSupplier test)throws Exception{long deadline=System.nanoTime()+Duration.ofSeconds(15).toNanos();while(!test.getAsBoolean()&&System.nanoTime()<deadline)Thread.sleep(20);assertThat(test.getAsBoolean()).isTrue();}
     protected void haltWithRunningAndQueued()throws Exception{
-        arm("running","TERMINAL_PRECOMMIT",List.of("TOOL_IN_FLIGHT"));String running=admit("running");await(()->state(running).equals("RUNNING"));
-        arm("queued",null,List.of());admit("queued");assertThat(hook("/__test/pause",Map.of("point","TOOL_IN_FLIGHT","jobId",running,"op","RELEASE")).statusCode()).isEqualTo(204);
+        arm("running","TERMINAL_PRECOMMIT",List.of("BEFORE_CLASSIFICATION"));String running=admit("running");await(()->state(running).equals("RUNNING"));
+        arm("queued",null,List.of());admit("queued");assertThat(hook("/__test/pause",Map.of("point","BEFORE_CLASSIFICATION","jobId",running,"op","RELEASE")).statusCode()).isEqualTo(204);
         assertThat(harness.awaitExit(Duration.ofSeconds(15))).isEqualTo(137);
         assertThat(started(running)).isOne();assertThat(started(job("queued"))).isZero();
+    }
+    protected com.nori.ai.gateway.core.job.JobRequestInput requestInput(String job) {
+        var scope=restoredScope(job);
+        var source=new DriverManagerDataSource(database.jdbcUrl(),"aigw_app",database.passwordFor("aigw_app"));var tx=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.support.JdbcTransactionManager(source));
+        return new com.nori.ai.gateway.persistence.repository.JobRepository(JdbcClient.create(source),tx,Clock.fixed(NOW.plusSeconds(1),ZoneOffset.UTC)).findRequestInput(scope,job).orElseThrow();
+    }
+    protected com.nori.ai.gateway.core.scope.VerifiedSystemScope restoredScope(String job) {
+        var persisted=jdbc.sql("SELECT j.owner_system,j.actor_ref,j.request_perm,j.request_pdg,j.id,j.created_at,j.conversation_id,c.expires_at,j.status FROM gw.job j JOIN gw.conversation c ON c.id=j.conversation_id AND c.owner_system=j.owner_system WHERE j.id=:id")
+            .param("id",job).query((rs,n)->new com.nori.ai.gateway.persistence.queue.JobScopeRecord(com.nori.ai.gateway.core.scope.OwnerSystem.valueOf(rs.getString(1)),rs.getString(2),Set.copyOf(Arrays.asList((String[])rs.getArray(3).getArray())),rs.getString(4),rs.getString(5),rs.getTimestamp(6).toInstant(),rs.getString(7),rs.getTimestamp(8).toInstant(),rs.getString(9))).single();
+        return new com.nori.ai.gateway.app.security.ScopeAssembler().forWorker(persisted);
     }
     @Override @AfterEach protected void close(){try{if(harness!=null){harness.close();assertThat(harness.sentinelCount()).isZero();}}finally{super.close();}}
 }

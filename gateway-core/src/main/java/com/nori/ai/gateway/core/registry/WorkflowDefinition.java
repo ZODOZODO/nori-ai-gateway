@@ -15,7 +15,10 @@ public record WorkflowDefinition(OwnerSystem ownerSystem, TaskType taskType, Lis
         }
     }
     public record Step(String stepId, String capabilityId, String processor, List<String> dependsOn,
-            boolean optional, List<IncludeWhen> includeWhen) {
+            boolean optional, List<IncludeWhen> includeWhen, boolean cacheable) {
+        public Step(String stepId,String capabilityId,String processor,List<String> dependsOn,boolean optional,List<IncludeWhen> includeWhen) {
+            this(stepId,capabilityId,processor,dependsOn,optional,includeWhen,false);
+        }
         public Step {
             dependsOn = List.copyOf(dependsOn); includeWhen = List.copyOf(includeWhen);
             if (stepId == null || stepId.isBlank() || (capabilityId == null) == (processor == null)
@@ -24,6 +27,7 @@ public record WorkflowDefinition(OwnerSystem ownerSystem, TaskType taskType, Lis
             if (optional && (includeWhen.size() != 2 || includeWhen.stream().filter(c -> capabilityId != null && capabilityId.equals(c.capabilityActive())).count() != 1
                 || includeWhen.stream().filter(c -> c.bindingNonEmpty() != null).count() != 1))
                 throw new IllegalArgumentException("선택 단계 조건이 잘못되었습니다");
+            if (processor != null && cacheable) throw new IllegalArgumentException("처리 단계는 캐시할 수 없습니다");
         }
     }
     public WorkflowDefinition {

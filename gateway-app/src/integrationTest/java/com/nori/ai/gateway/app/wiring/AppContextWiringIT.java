@@ -99,10 +99,15 @@ class AppContextWiringIT extends StackContextSupport {
                 com.nori.ai.gateway.core.result.ResultAccessEvaluator.class,com.nori.ai.gateway.core.result.KnowledgeDocumentStateReader.class,
                 com.nori.ai.gateway.core.result.EvidenceSourceReader.class,com.nori.ai.gateway.core.expiry.ExpiryCheckpoint.class})
             assertThat(context.getBeansOfType(type)).hasSize(1);
-        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(20);
+        for(Class<?> type:List.of(com.nori.ai.gateway.core.workflow.LogSummarizer.class,com.nori.ai.gateway.core.blocks.GeneralQueryHelpBuilder.class,com.nori.ai.gateway.core.evidence.EvidenceAssembler.class,com.nori.ai.gateway.core.workflow.WorkflowExecutor.class,com.nori.ai.gateway.app.job.WorkflowExecutionAdapter.class))assertThat(context.getBeansOfType(type)).hasSize(1);
+        assertThat(context.getBeansOfType(com.nori.ai.gateway.core.workflow.ResultSourceDepsRecorder.class)).isEmpty();
+        var actual=context.getBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.class);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(actual,"summarizer")).isSameAs(context.getBean(com.nori.ai.gateway.core.workflow.LogSummarizer.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(actual,"help")).isSameAs(context.getBean(com.nori.ai.gateway.core.blocks.GeneralQueryHelpBuilder.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(com.nori.ai.gateway.app.job.WorkflowExecutionAdapter.class),"evidenceAssembler")).isSameAs(context.getBean(com.nori.ai.gateway.core.evidence.EvidenceAssembler.class));
         assertThat(context.getBean(PlanInjectionSeam.class)).isExactlyInstanceOf(PlanInjectionSeam.NoOp.class);
         assertThat(context.getBean(DispatchInjectionSeam.class)).isExactlyInstanceOf(DispatchInjectionSeam.NoOp.class);
-        assertThat(context.getBeansOfType(ToolExecutor.class)).isEmpty();
+        assertThat(context.getBeansOfType(ToolExecutor.class).values()).extracting(ToolExecutor::toolKind).containsExactlyInAnyOrder(ToolKind.BUSINESS,ToolKind.LOG,ToolKind.TRACE,ToolKind.GIT);
         var loader=context.getBean(ManifestLoader.class);var manifests=loader.loadClasspath("manifests/tc/index.json");
         assertThat(manifests).hasSize(9);
         var now=Instant.now();var scope=new VerifiedSystemScope(OwnerSystem.TC,"service",new ActorRef("actor"),"actor",Set.of("EQP_READ","DLQ_READ","MODEL_READ","AI_LOG_READ","AI_TRACE_READ","AI_CODE_READ","AI_DOC_READ"),"digest",now.minusSeconds(1),now.plusSeconds(60),"request");

@@ -11,6 +11,9 @@ public interface TcBusinessReadPort {
     TcReadResult<ActiveWorkLots> getActiveWorkLots(DelegatedCall call, String eqpId);
     TcReadResult<List<RecentEvent>> getRecentEvents(DelegatedCall call, String eqpId, TimeWindow window);
     TcReadResult<DlqData> listDlq(DelegatedCall call, String sourceId, TimeWindow window);
+    default TcReadResult<DlqData> listDlq(DelegatedCall call,String eqpId,String sourceId,TimeWindow window) {
+        throw new UnsupportedOperationException("설비 범위 DLQ 조회가 구현되지 않았습니다");
+    }
     TcReadResult<CommLogData> getCommLogs(DelegatedCall call, String eqpId, String sourceId, TimeWindow window);
     TcReadResult<List<ModelNode>> readModel(DelegatedCall call, Optional<String> modelId);
     TcReadResult<List<Resource>> resolveResource(DelegatedCall call, String type, String ref);

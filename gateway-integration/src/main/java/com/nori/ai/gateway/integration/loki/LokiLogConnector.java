@@ -32,6 +32,11 @@ public final class LokiLogConnector {
         this.properties = Objects.requireNonNull(properties); this.clock = Objects.requireNonNull(clock);
     }
     public LogResult search(SourceReadAccess.Request request, LogQuery query) {
+        try{return searchGuarded(request,query);}
+        catch(SourceReadAccess.GuardStopped stopped){throw stopped.rethrow();}
+        catch(SourceReadAccess.Rejected rejected){return result(rejected.status());}
+    }
+    private LogResult searchGuarded(SourceReadAccess.Request request,LogQuery query) {
         Objects.requireNonNull(query);
         if (query.limit() > properties.maxLinesTotal()) throw new IllegalArgumentException("조회 건수가 전체 상한을 초과했습니다");
         ResultStatus granted = access.check(request, LokiSourcePolicy.SOURCE_REF);
@@ -55,7 +60,8 @@ public final class LokiLogConnector {
             if (appWindows.isEmpty()) return new LogResult(ResultStatus.OUT_OF_RETENTION, List.of(), List.of(window), Set.of(), 0);
             Instant earliest = appWindows.values().stream().map(TimeWindow::startAt).min(Comparator.naturalOrder()).orElseThrow();
             window = new TimeWindow(earliest, window.endAt());
-        } catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
+        } catch (SourceReadAccess.GuardStopped | SourceReadAccess.Rejected guarded) { throw guarded; }
+        catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
         int rejected = 0;
         Instant end = window.endAt();
         while (end.isAfter(window.startAt())) {
@@ -74,7 +80,7 @@ public final class LokiLogConnector {
                 ResultStatus authorized = access.check(request, LokiSourcePolicy.SOURCE_REF);
                 if (authorized != ResultStatus.SUCCESS) return result(authorized);
                 try {
-                    Batch batch = query(http, app, query.terms(), subwindow, properties.limitPerQuery(), "backward", deadline);
+                    Batch batch = query(http, app, query.terms(), subwindow, properties.limitPerQuery(), "backward", deadline,()->access.require(request,LokiSourcePolicy.SOURCE_REF));
                     rejected += batch.rejectedLabels();
                     if (batch.rawCount() >= properties.limitPerQuery() && batch.oldestAt() != null && appStart.isBefore(batch.oldestAt()))
                         missing.add(new TimeWindow(appStart, batch.oldestAt()));
@@ -89,7 +95,8 @@ public final class LokiLogConnector {
                     if (!failure.deadline()) return result(ResultStatus.SOURCE_UNAVAILABLE);
                     missing.add(new TimeWindow(window.startAt(), end));
                     return finish(items, missing, warnings, rejected);
-                } catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
+                } catch (SourceReadAccess.GuardStopped | SourceReadAccess.Rejected guarded) { throw guarded; }
+        catch (RuntimeException failure) { return result(ResultStatus.SOURCE_UNAVAILABLE); }
             }
             end = start;
         }
@@ -106,9 +113,12 @@ public final class LokiLogConnector {
         return new LogResult(merged.isEmpty() ? (items.isEmpty() ? ResultStatus.EMPTY : ResultStatus.SUCCESS) : ResultStatus.PARTIAL, sorted, merged, warnings, rejected);
     }
     static Batch query(SourceHttpClient http, String app, List<String> terms, TimeWindow window, int limit, String direction, long deadline) {
+        return query(http,app,terms,window,limit,direction,deadline,()->{});
+    }
+    private static Batch query(SourceHttpClient http,String app,List<String> terms,TimeWindow window,int limit,String direction,long deadline,Runnable beforeAttempt) {
         var uri = http.uri(List.of("loki", "api", "v1", "query_range"), Map.of("query", LokiSourcePolicy.selector(app, terms),
             "start", nanos(window.startAt()), "end", nanos(window.endAt()), "limit", limit, "direction", direction));
-        JsonNode root = http.json(uri, null, deadline).body();
+        JsonNode root = http.json(uri, null, deadline,beforeAttempt).body();
         if (!"success".equals(root.path("status").asText()) || !"streams".equals(root.path("data").path("resultType").asText())
                 || !root.path("data").path("result").isArray()) throw new SourceHttpClient.Failure(false, false);
         List<LogLine> items = new ArrayList<>(); int count = 0, rejected = 0; Instant oldest = null;

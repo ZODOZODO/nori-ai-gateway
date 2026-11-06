@@ -10,9 +10,9 @@ import static org.assertj.core.api.Assertions.*;
 
 class SseApiIT extends ApiWebSupport {
     @Test @Tag("AC-24-JOB") void actualAdmissionDispatcherAndWorkflowPublishQueuedStartedTerminalInOrderAndReplay() throws Exception {
-        var job=admit("actor","lifecycle",Set.of(PausePointRegistry.Point.TOOL_IN_FLIGHT));await(()->observations().workflows.size()==1);
+        var job=admit("actor","lifecycle",Set.of(PausePointRegistry.Point.BEFORE_CLASSIFICATION));await(()->pauses().reachedCount(PausePointRegistry.Point.BEFORE_CLASSIFICATION,job.jobId())==1);
         var response=stream(job.jobId(),"actor",null);assertThat(response.statusCode()).isEqualTo(200);
-        pauses().release(PausePointRegistry.Point.TOOL_IN_FLIGHT,job.jobId());
+        pauses().release(PausePointRegistry.Point.BEFORE_CLASSIFICATION,job.jobId());
         var lines=new ArrayList<String>();
         try(var input=new BufferedReader(new InputStreamReader(response.body(),java.nio.charset.StandardCharsets.UTF_8))) {
             for(String line;(line=input.readLine())!=null;){lines.add(line);if(line.isEmpty()&&lines.stream().anyMatch(value->value.equals("event:job.completed")))break;}

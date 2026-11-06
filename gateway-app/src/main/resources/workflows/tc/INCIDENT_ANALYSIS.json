@@ -7,7 +7,8 @@
       "dependsOn": [],
       "optional": false,
       "includeWhen": [],
-      "capabilityId": "tc.eqp.getOperationalSnapshot"
+      "capabilityId": "tc.eqp.getOperationalSnapshot",
+      "cacheable": false
     },
     {
       "stepId": "logs",
@@ -16,7 +17,8 @@
       ],
       "optional": false,
       "includeWhen": [],
-      "capabilityId": "tc.logs.search"
+      "capabilityId": "tc.logs.search",
+      "cacheable": true
     },
     {
       "stepId": "trace",
@@ -25,7 +27,8 @@
       ],
       "optional": false,
       "includeWhen": [],
-      "capabilityId": "tc.trace.search"
+      "capabilityId": "tc.trace.search",
+      "cacheable": true
     },
     {
       "stepId": "dlq",
@@ -34,7 +37,8 @@
       ],
       "optional": false,
       "includeWhen": [],
-      "capabilityId": "tc.dlq.list"
+      "capabilityId": "tc.dlq.list",
+      "cacheable": false
     },
     {
       "stepId": "summary",
@@ -43,7 +47,8 @@
       ],
       "optional": false,
       "includeWhen": [],
-      "processor": "LogSummarizer"
+      "processor": "LogSummarizer",
+      "cacheable": false
     },
     {
       "stepId": "git",
@@ -59,7 +64,8 @@
           "bindingNonEmpty": "summary.terms"
         }
       ],
-      "capabilityId": "tc.git.searchCode"
+      "capabilityId": "tc.git.searchCode",
+      "cacheable": true
     },
     {
       "stepId": "knowledge",
@@ -75,7 +81,8 @@
           "bindingNonEmpty": "summary.terms"
         }
       ],
-      "capabilityId": "tc.knowledge.search"
+      "capabilityId": "tc.knowledge.search",
+      "cacheable": false
     }
   ],
   "answerSource": "TOOL_RESULTS",

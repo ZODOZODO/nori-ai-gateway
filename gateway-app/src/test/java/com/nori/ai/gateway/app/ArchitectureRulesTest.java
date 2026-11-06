@@ -11,6 +11,37 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ArchitectureRulesTest {
+    @Test void workflowAttemptReceiptCacheAndExactMessageCallsHaveClosedProductionOwners() throws Exception {
+        Map<String,Set<String>> rules=new LinkedHashMap<>();
+        rules.put("core.authz.StepAttempt.create",Set.of("core.plan.PlanValidator$Prepared"));
+        rules.put("core.authz.StepAttempt.belongsTo",Set.of("core.plan.PlanValidator$Prepared"));
+        rules.put("core.authz.StepAttempt.claimEvaluation",Set.of("core.authz.SourceAuthorizationStep"));
+        rules.put("core.authz.StepAttempt.consume",Set.of("core.authz.SourceAuthorizationStep$StepGrant","core.dispatch.ToolDispatcher"));
+        rules.put("core.authz.StepAttempt.close",Set.of("core.authz.SourceAuthorizationStep","core.dispatch.ToolDispatcher"));
+        rules.put("core.plan.PlanValidator$Prepared.boundStep",Set.of("core.dispatch.ToolDispatcher"));
+        rules.put("core.plan.PlanValidator$Prepared.newAttempt",Set.of("core.workflow.WorkflowExecutor"));
+        rules.put("core.authz.SourceAuthorizationStep$StepGrant.consume",Set.of("core.dispatch.ToolDispatcher","core.cache.ToolResultCache"));
+        rules.put("core.authz.SourceAuthorizationStep.authorizeStep",Set.of("core.workflow.WorkflowExecutor"));
+        rules.put("core.dispatch.ExecutionContext.boundInputs",Set.of("core.dispatch.ToolDispatcher","app.job.DirectSourceToolExecutor"));
+        rules.put("core.cache.ToolResultCache$Store.find",Set.of("core.cache.ToolResultCache"));
+        rules.put("core.cache.ToolResultCache$Store.put",Set.of("core.cache.ToolResultCache"));
+        rules.put("persistence.repository.MessageRepository.findPreviousResolvedTimeWindow",Set.of("app.job.WorkflowExecutionAdapter"));
+        rules.put("persistence.repository.MessageRepository.updateResolvedTimeWindow",Set.of("app.job.WorkflowExecutionAdapter"));
+        rules.put("persistence.repository.ToolExecutionRepository.insert",Set.of("app.job.WorkflowExecutionRecords"));
+        var actual=new HashMap<String,Set<String>>();
+        for(var type:mainClasses()) {
+            for(var dependency:type.getDirectDependenciesFromSelf())if(type.getPackageName().startsWith(PREFIX+"core.plan"))assertThat(dependency.getTargetClass().getName()).doesNotStartWith(PREFIX+"core.workflow.");
+            for(var call:type.getMethodCallsFromSelf()) {
+                String owner=call.getTargetOwner().getName();if(!owner.startsWith(PREFIX))continue;
+                String target=owner.substring(PREFIX.length())+"."+call.getName(),caller=type.getName().substring(PREFIX.length());
+                if(rules.containsKey(target)) {assertThat(rules.get(target)).as("실제 호출자 %s -> %s",caller,target).contains(caller);actual.computeIfAbsent(target,ignored->new HashSet<>()).add(caller);}
+                if(owner.equals(PREFIX+"persistence.repository.CacheRepository")&&((call.getName().equals("find")&&call.getTarget().getRawParameterTypes().size()==4)||(call.getName().equals("put")&&call.getTarget().getRawParameterTypes().size()==5)))assertThat(caller).isEqualTo("app.job.WorkflowCacheStore");
+                if(owner.equals(PREFIX+"core.port.TcBusinessReadPort")&&call.getName().equals("listDlq")&&caller.equals("app.job.BusinessToolExecutor"))assertThat(call.getTarget().getRawParameterTypes()).hasSize(4);
+            }
+            for(var call:type.getConstructorCallsFromSelf())if(call.getTargetOwner().getName().equals(PREFIX+"core.dispatch.ExecutionContext$BoundInputs"))assertThat(type.getName()).isEqualTo(PREFIX+"core.workflow.WorkflowExecutor");
+        }
+        for(var rule:rules.entrySet())assertThat(actual.getOrDefault(rule.getKey(),Set.of())).as(rule.getKey()).containsExactlyInAnyOrderElementsOf(rule.getValue());
+    }
     private static final String PREFIX="com.nori.ai.gateway.";
     private static Map<String,Set<String>> queueBoundaries(){
         var rules=new LinkedHashMap<String,Set<String>>();

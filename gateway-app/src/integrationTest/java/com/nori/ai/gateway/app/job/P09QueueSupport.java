@@ -28,7 +28,7 @@ public abstract class P09QueueSupport extends StackContextSupport {
     protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class};}
     @BeforeEach protected void setupQueue(){start(extraSources());}
     @Override @AfterEach protected void close(){
-        try{if(context!=null){pauses().reset();var call=observations().blockingCall;if(call!=null)call.allowExit.countDown();long deadline=System.nanoTime()+Duration.ofSeconds(5).toNanos();while(context.getBean(SlotLedger.class).activeCount()>0&&System.nanoTime()<deadline)Thread.sleep(10);}}
+        try{if(context!=null){pauses().reset();context.getBeansOfType(WorkflowSourceFixture.Server.class).values().forEach(server->server.release.countDown());long deadline=System.nanoTime()+Duration.ofSeconds(5).toNanos();while(context.getBean(SlotLedger.class).activeCount()>0&&System.nanoTime()<deadline)Thread.sleep(10);}}
         catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("시험 종료 대기가 중단되었습니다");}
         finally{super.close();}
     }
@@ -41,6 +41,8 @@ public abstract class P09QueueSupport extends StackContextSupport {
     protected String registeredDlg(String actor){String value=dlg();context.getBean(com.nori.ai.gateway.tcmock.MockDelegationRegistry.class).register(actor,value);return value;}
     protected VerifiedSystemScope scope(String actor){var now=clock().instant();return new VerifiedSystemScope(OwnerSystem.TC,"fixture",new ActorRef(actor),actor,Set.of("EQP_READ","MODEL_READ"),P09TestPorts.PDG,now,now.plusSeconds(60),UUID.randomUUID().toString());}
     protected JobAdmissionService.Accepted admit(String actor,String key,Set<PausePointRegistry.Point> points){hooks().arm(actor,key,new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,points,null,false));return accept(actor,key,"질문",null,dlg());}
+    protected Map<String,Object> workflowFields(){return Map.of("context",Map.of("timezone","UTC","referenceTime",NOW.toString(),"timeWindow",Map.of("from","2026-11-05T23:00:00.123456789Z","to","2026-11-05T23:30:00.987654321Z")),"resourceRefs",List.of(Map.of("type","EQP","ref","EQP-001")));}
+    protected JobAdmissionService.Accepted incident(String key,Set<PausePointRegistry.Point> points){hooks().arm("actor",key,new TestHookRegistry.Scenario(TaskType.INCIDENT_ANALYSIS,points,null,false));return context.getBean(JobAdmissionService.class).accept(scope("actor"),new JobAdmissionService.AdmissionRequest("/v1/query",null,"장애 조회",workflowFields(),key,registeredDlg("actor")));}
     protected JobAdmissionService.Accepted accept(String actor,String key,String question,String conversation,String dlg){context.getBean(com.nori.ai.gateway.tcmock.MockDelegationRegistry.class).register(actor,dlg);return context.getBean(JobAdmissionService.class).accept(scope(actor),new JobAdmissionService.AdmissionRequest("/v1/query",conversation,question,Map.of(),key,dlg));}
     protected String dlg(){return UUID.randomUUID().toString().replace("-","");}
     protected String state(String id){return jdbc().sql("SELECT status FROM gw.job WHERE id=:id").param("id",id).query(String.class).single();}
