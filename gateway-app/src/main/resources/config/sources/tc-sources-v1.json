@@ -1,0 +1,22 @@
+{
+  "ownerSystem": "TC",
+  "loki": {
+    "sourceAllowlistRef": "sources://TC/logs",
+    "baseUrl": "http://loki.monitoring.svc:3100",
+    "apps": ["tc-gateway", "tc-business", "tc-ui-backend", "tc-ui-front"],
+    "namespace": "tc",
+    "retentionPolicy": "UNBOUNDED_UNVERIFIED",
+    "serviceTargetVerified": false
+  },
+  "tempo": {
+    "sourceAllowlistRef": "sources://TC/trace",
+    "services": ["tc-gateway", "tc-business", "tc-ui-backend", "tc-ui-front"],
+    "retentionPolicy": "UNVERIFIED"
+  },
+  "gitlab": {
+    "sourceAllowlistRef": "sources://TC/git",
+    "repositories": [],
+    "deployLineage": [],
+    "readTokenFile": null
+  }
+}
