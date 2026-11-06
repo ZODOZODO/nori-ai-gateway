@@ -1,0 +1,41 @@
+ARG PG_IMAGE_DIGEST
+FROM harbor.nori.local/library/pgvector@sha256:${PG_IMAGE_DIGEST}
+ARG TARGETARCH=amd64
+ARG AGE_VERSION
+ARG AGE_SHA256
+ARG BACKUP_DEST_TYPE
+ARG RCLONE_VERSION
+ARG RCLONE_SHA256
+ARG OPENSSH_CLIENT_VERSION
+USER root
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+RUN [[ "$TARGETARCH" =~ ^(amd64|arm64)$ ]] \
+    && [[ "$AGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    && [[ "$AGE_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && curl --fail --silent --show-error --location --proto '=https' \
+      "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-${TARGETARCH}.tar.gz" -o /tmp/age.tgz \
+    && printf '%s  /tmp/age.tgz\n' "$AGE_SHA256" | sha256sum --check --status \
+    && tar -xzf /tmp/age.tgz -C /tmp \
+    && install -m 0755 /tmp/age/age /usr/local/bin/age \
+    && case "$BACKUP_DEST_TYPE" in \
+      s3) [[ "$RCLONE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+          && [[ "$RCLONE_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+          && curl --fail --silent --show-error --location --proto '=https' \
+            "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${TARGETARCH}.zip" -o /tmp/rclone.zip \
+          && printf '%s  /tmp/rclone.zip\n' "$RCLONE_SHA256" | sha256sum --check --status \
+          && unzip -q /tmp/rclone.zip -d /tmp \
+          && install -m 0755 "/tmp/rclone-v${RCLONE_VERSION}-linux-${TARGETARCH}/rclone" /usr/local/bin/rclone ;; \
+      sftp) test -n "$OPENSSH_CLIENT_VERSION" \
+          && apt-get install -y --no-install-recommends "openssh-client=${OPENSSH_CLIENT_VERSION}" ;; \
+      *) printf '%s\n' BACKUP_DEST_TYPE_UNSUPPORTED >&2; exit 2 ;; \
+      esac \
+    && rm -rf /tmp/age /tmp/age.tgz /tmp/rclone* /var/lib/apt/lists/*
+COPY --chown=root:root ops/backup/aigw-backup.sh ops/backup/aigw-restore.sh ops/backup/job-columns-v1.txt /opt/aigw/
+RUN chmod 0555 /opt/aigw/aigw-backup.sh /opt/aigw/aigw-restore.sh \
+    && chmod 0444 /opt/aigw/job-columns-v1.txt
+USER postgres
+RUN pg_dump --version && pg_restore --version && psql --version && age --version \
+    && case "$BACKUP_DEST_TYPE" in s3) rclone --version ;; sftp) ssh -V ;; *) exit 2 ;; esac
+ENTRYPOINT ["/opt/aigw/aigw-backup.sh"]
