@@ -6756,3 +6756,148 @@ API/wiring/hook/WorkerRestart 및 P11 전체는 미완료이고, 배포·실제 
 부모는 실제 변경 79경로와 삭제 범위, 기존 보고서 prefix, 여섯 회차의 실제 JUnit 191건·XML/OTR 고유 실행·198개 보존 artifact hash·현재 task classpath와 inputFingerprint를 직접 대조했습니다. 모두 일치하며 실패·오류·skip·aborted는 0입니다. 별도 작성한 실제 PG probe에서 started INSERT 제약 실패 시 RUNNING과 이벤트가 함께 rollback되는 것, 손상된 저장 입력이 workflow 호출 없이 CONTRACT_INVALID·Result 1건·단일 terminal로 종료되고 위임 값이 정리되는 것을 확인했습니다. probe 전후 CP는 동일하고 종료 후 해당 PG fixture는 남지 않았습니다.
 
 부모 근거는 scratch `p10-parent-review/r1-root-validation.json`과 `r1-parent-probe.json`입니다. 현재 Plan `7f488addf6a337616f7a0982172be137faab0ebda944ce6ae581ac8cb5d7d8c6`의 P10 본문은 실제 시험 기준 `f8e3d84de8ca2e5c8929cb162d458b70de7fefcc95ef5ba8de97e81d26de9ae1`과 바이트가 같습니다. 이 판정은 P10 격리 소스의 CODE/LOCAL_VALIDATED이며 P10/P11/P12 실제 합류·후속 producer·운영 수용은 별도 미실행 항목으로 유지합니다. 로컬 커밋에는 이 정확한 변경 집합만 포함하며 Spec·ignored Plan·기준선·사용자 보존 파일은 포함하지 않습니다.
+
+
+## P12 Connector CODE/LOCAL_TEST — 2026-11-06 (독립 구현, 부모 검토 대기)
+
+상태는 `ROOT_REVIEW_PENDING`입니다. 이 절은 기존 보고서 전체 943913바이트를 그대로 보존한 append입니다. 기존 prefix SHA256은 `d45872b3d73c4e1747d437488dffe0673901081661149808668d9d1879c6c0ae`입니다.
+
+### 기준과 실제 작업 위치
+
+- AI_ROOT: `C:/workspace_nori/.aigw-worktrees/p12-ai`, branch `aigw/f1-p12`, 시작/현재 HEAD `62517ba2e42629d7d8be431cc30025ce98e08d2f`. 시작 dirty 0이며 C09 `44315e4d861a2100e9703d9b6168244776927b4f` ancestor를 실제 확인했습니다.
+- canonical Spec SHA256: `c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`, baseline seq7 SHA256: `b1040ce78cde516641cdc90da644b03e5d459ddc33668243a935ac4e3d348264`.
+- 최초 Plan pin `7a5e37c8b747a1acbb846ab8804fb6c57c6b483f08a47ee813d6f76b9b424cb5`는 초기 실행 이력으로 보존했습니다. 부모 GO 뒤 현재 pin `f8e3d84de8ca2e5c8929cb162d458b70de7fefcc95ef5ba8de97e81d26de9ae1`를 사용했습니다. `plan-transition.json`은 P12 섹션 실제 byte 불변을 대조합니다. Spec/Plan/R6/기능 계약은 변경하지 않았습니다.
+
+### 구현 내용과 이유
+
+- Loki는 고정 TC 4개 앱과 namespace AND로만 GET query_range를 생성합니다. `UriComponentsBuilder`의 변수 바인딩으로 검색어를 정확 인코딩하고 LogQL 줄 필터의 따옴표·역슬래시·제어문자를 이스케이프합니다. 반개구간 나노초 시각은 축소하지 않습니다.
+- 최신 6시간 창부터 하위 limit 500, 전체 1000줄, 기본 30초 마감을 적용합니다. 시간창을 자르지 않으며 조회하지 않은 창과 limit 때문에 잘린 구간은 PARTIAL/missingRanges로 반환합니다. 라벨을 다시 검사해 허용 밖 app/namespace를 버리고 위반 건수를 반환합니다.
+- 앱별 `SourceRetentionReader.find(LokiSourcePolicy.retentionSourceId(app))`로 각각 분류합니다. 전역 로그 Source 권한 키는 `sources://TC/logs`이며 보존 키는 `sources://TC/logs/<app>`입니다. 네 앱에 하나의 보존 경계를 추정하지 않습니다. 보존 경계 없음은 EMPTY/HIT 모두 RETENTION_UNVERIFIED이고, 범위 밖은 호출 없이 OUT_OF_RETENTION입니다.
+- `LokiRetentionProbe`는 명시된 탐침 창에서 forward limit1로 순수 측정만 수행합니다. `{verifiedOldestAt, probeLimit}`를 반환하며 0건은 Optional.empty입니다. JDBC·persistence·스케줄 의존은 없습니다.
+- Tempo는 TC 서비스만 검색하고 cross-service trace의 WM/미상 서비스 span을 제거합니다. 공식 초 단위 API의 전송 범위는 start floor/end ceil로 넓혀 누락을 막고 실제 span을 원래 나노초 반개구간과 다시 대조합니다. 보존은 UNVERIFIED입니다.
+- GitLab은 승인 repo/ref/경로와 lineage 항목이 없으면 기본 거부합니다. 배포 설정은 실제 승인 전 빈 목록이며 토큰은 파일 참조만 사용합니다. code 검색 결과도 경로를 재검사하고 스니펫을 최대 2000 codepoint로 제한합니다.
+- 계보는 retried job과 전체 페이지를 포함한 성공 package job이 정확히 1개일 때만 trace를 읽습니다. trace는 제한된 행 버퍼로 정규식 sibling 줄만 추출하며 원문을 저장하거나 기록하지 않습니다. 대상 sibling 줄이 정확히 1개이고 commits API가 동일 prefix의 40자 SHA를 반환할 때만 VERIFIED입니다. exec/pipeline SHA나 현재 HEAD 추정은 없습니다.
+- 직결 Source마다 기존 `SourceAuthorizationStep`과 typed `DelegatedCall`로 현재 권한을 다시 확인합니다. 소유 시스템·Source 참조·만료·권한 폐기는 Source 실행 전에 차단합니다. core Allowed의 2필드 계약은 유지했습니다.
+- 전용 `SourceObservability.create`가 private ObservationRegistry와 3태그 meter handler를 생성합니다. 전역 DefaultMeterObservationHandler를 Source registry에 붙이지 않습니다. URL을 포함할 수 있는 HTTP/파서 예외는 관측 전에 고정 메시지·원인 없는 Failure로 바꾸며 wire/debug 설정이 활성화되면 요청 전에 거부합니다.
+- 전송은 요청마다 전용 JDK HttpClient의 try-with-resources 안에서 동기로 수행합니다. Spring 7.0.8의 응답 전체 timeout/stream close와 JDK21 HttpClient.close의 실제 종료 대기를 사용합니다. callback 종료·Observation stop·client 종료가 상위 반환보다 앞섭니다. 중단/마감 뒤 재시도나 추가 Source 요청을 만들지 않습니다.
+- acceptance `LokiDirectQuery`는 고정 TC4/WM2 양성 제어의 건수·라벨·시각만 반환합니다. 운영 Connector의 allowlist를 늘리지 않습니다. acceptance main을 실제 컴파일하고 단위시험도 별도로 실행했습니다.
+
+### 실제 변경 파일
+
+- `docs/ai-rag-gateway-architecture-dev-report.md`
+- `docs/gates/f1/source-labels.md`
+- `gateway-acceptance/build.gradle.kts`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/loki/LokiDirectQuery.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/loki/LokiDirectQueryTest.java`
+- `gateway-app/src/main/resources/config/sources/tc-sources-v1.json`
+- `gateway-integration/build.gradle.kts`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/gitlab/GitLabCodeConnector.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/gitlab/GitLabPipelineLineageReader.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/gitlab/GitLabReadTokenFile.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/gitlab/GitLabSourcePolicy.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/AllowlistClientRequestObservationConvention.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiLogConnector.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiProperties.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiRetentionProbe.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiSourcePolicy.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/SourceHttpClient.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/SourceObservability.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/SourceReadAccess.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/TcSourceAllowlist.java`
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/tempo/TempoTraceConnector.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/ConnectorTestSupport.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/gitlab/GitLabAllowlistTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/gitlab/GitLabFixture.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/gitlab/GitLabPipelineLineageTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiQueryNotRecordedTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiRetentionProbeTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiSelectorInvariantTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiWindowBatchingTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/SourceHttpClientTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/SourceHttpTerminationTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/SourceOwnershipAndCurrentAuthorizationTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/TcSourceAllowlistTest.java`
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/tempo/TempoSpanFilterTest.java`
+
+### 실행한 검증과 결과
+
+- 최신 `:gateway-integration:test --offline --no-daemon`: 실제 58/58 PASS, XML 11개, fail/error/skip/aborted 0. runId `01c43c43-fd0f-4205-bf7e-5538977ef4eb`, fingerprint `1ba85474e1856589781c8bcc50a1caeaad5854941478b2f1206fc728392632c6`. 직후 별도 `test-evidence verify --tasks :gateway-integration:test` exit0입니다.
+- 최신 `:gateway-acceptance:test --offline --no-daemon`: 실제 1/1 PASS, main compile 포함, fail/error/skip/aborted 0. runId `53916513-94d0-4e03-9531-d8e17c8c4480`, fingerprint `77c148421ee34a642cbf9d0fea575dc553d02879ca26052254d75d86c9e31cda`. 직후 별도 `test-evidence verify --tasks :gateway-acceptance:test` exit0입니다.
+- 두 Test와 paired verifier에서 source before/after 불변·정본 hash 불변을 확인했습니다. no-test owning-project CP capture 뒤 실제 dir/jar 파일 hash와 run-binding classpath component를 대조하고 fingerprint를 독립 재계산했습니다. `final-evidence-check.json`에 원시 XML/OTR·summary·binding·current CP 경로를 기록했습니다.
+- 31일 창 496 GET, 고정 selector/인코딩, 총/하위 limit·마감 누락 구간, 보존 밖/겹침/미확정 EMPTY/HIT, 라벨 제거, Source 소유권/현재 권한 폐기, 전역 default meter와 Source 전용 registry 병존, 실패/연결/파서 예외의 sentinel/URL 비노출, redirect/타 authority 차단, 지연 header/body와 실행 중단 시 callback·handler 완료 및 추가 요청0, Tempo 나노초 경계와 WM span 제거, GitLab 기본 거부·경로·페이지·계보 ambiguity/40SHA/CRLF를 검사했습니다.
+- 초기 실행 이력은 원본 보존했습니다. r1은 44건 중 4FAIL(표준 meter가 자동 추가한 error 태그)이며 assertion을 완화하지 않고 전용 실제 meter registry/handler로 고쳤습니다. r2/r5는 각각 generic 추론/HttpHeaders import 충돌의 compile 실패라 옛 XML을 새 실행으로 인정하지 않았습니다. acceptance-r1은 core direct 의존 누락과 scratch CP observer의 unsafe resolution을 정석 수정했습니다. 중간 r3/r4 PASS도 최종 코드 증거로 대체하지 않았습니다.
+- 재위임·commit·push·실제 Source·Docker·PG·TC·모델·운영 작업은 0입니다. 이 개별 로컬 PASS는 actual join 또는 AC/ISO/운영 수용 PASS가 아닙니다.
+
+### P13/P14 및 부모 합류 인계
+
+- P13/공유 wiring 작성자가 `SourceReadAccess(SourceAuthorizationStep, Clock)`와 typed Request를 사용합니다. `TcSourceAllowlist.parse`로 TC owner/고정 선택자를 검증한 GitLab policy를 읽고 현재 인가와 승인 Source gate를 만족한 뒤에만 Client를 생성합니다. 실제 base target·소유자 승인·자격 정보는 아직 확인하지 않았습니다.
+- 관측 wiring은 `SourceObservability.create(MeterRegistry, ObservationHandler<ClientRequestObservationContext>)`가 만드는 전용 registry를 사용합니다. span handler는 고정 convention의 3개 속성만 수출해야 하며 전역 표준 meter/자동 URL handler를 이 registry에 추가하지 않습니다. 실제 OTLP 수출/수집 검증은 P14/P15 후속입니다.
+- P14 scheduler는 앱마다 `LokiRetentionProbe.measure(app)`를 호출하고 값이 있을 때 `LokiSourcePolicy.retentionSourceId(app)`를 upsert의 sourceId로 사용합니다. verifiedOldestAt/probeLimit 두 값과 Gateway Clock probedAt을 그대로 저장합니다. SourceRetentionReaderAdapter도 같은 키를 읽어야 하며 aggregate Source 경계로 합치지 않습니다. 탐침 창의 가장 이른 시각은 실제 Loki 허용 범위를 명시 입력해야 합니다.
+- P13 코드 검색에서 VERIFIED Lineage의 sibling SHA만 과거 코드 ref로 사용할 수 있습니다. UNKNOWN은 승인 ref로만 검색하며 당시 코드로 표시하지 않는 기존 Plan 정책을 따릅니다. 새 fallback 정책을 추가하지 않았습니다.
+- API/hook/worker/shared bean wiring, 실제 Source 승인·연결, scheduler·DB, 실제 배포/운영/ISO-15/P16/F1/F2는 NOT_RUN입니다. 부모 독립 검토·actual join 회귀는 이 세션 밖입니다.
+
+### 공식 기술 근거
+
+- Loki GET/query_range·방향·시각: https://grafana.com/docs/loki/latest/reference/loki-http-api/
+- Tempo 초 단위 search/traces·OTLP JSON: https://grafana.com/docs/tempo/latest/api_docs/
+- GitLab jobs include_retried·페이지·trace: https://docs.gitlab.com/api/jobs/
+- GitLab commits/search: https://docs.gitlab.com/api/commits/ 및 https://docs.gitlab.com/api/search/
+- 실제 Spring tagged RestClient/관측/전체 응답 timeout 구현: https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.8/spring-web/src/main/java/org/springframework/web/client/DefaultRestClient.java 및 https://raw.githubusercontent.com/spring-projects/spring-framework/v7.0.8/spring-web/src/main/java/org/springframework/http/client/JdkClientHttpRequest.java
+- 표준 meter의 자동 error 태그 근거: https://raw.githubusercontent.com/micrometer-metrics/micrometer/v1.16.6/micrometer-core/src/main/java/io/micrometer/core/instrument/observation/DefaultMeterObservationHandler.java
+- JDK close/interrupt/wire logging은 실제 `C:/Program Files/Eclipse Adoptium/jdk-21.0.10.7-hotspot/lib/src.zip`의 java/net/http/HttpClient.java, ResponseSubscribers.java, common/Log.java, common/DebugLogger.java를 직접 읽었습니다.
+
+증거 기본 경로: `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p12-implementation`. 정본/기존 증거는 덮어쓰지 않았고 추가 제품 audit/summary 문서는 만들지 않았습니다.
+
+
+### P12 r6 후속 수정 — GitLab 계보 wire 타입 검증 (2026-11-06)
+
+부모 독립 `ParentLineageWireProbe.java`가 Job ID `1.5`에 대해 HTTP 3건 뒤 VERIFIED가 되는 실제 RED를 재현했습니다(`scratch/p12-parent-review/fractional-red-r1-parent-probe.json`, javac0/java1/inputStable=true). `canConvertToLong()`은 JSON 정수 타입 검사가 아니라 값의 변환 가능 범위를 검사하므로 소수 ID가 정수 1로 축소되는 것이 근본원인입니다.
+
+이 후속 변경은 다음 두 파일에만 한정했습니다. 공유 wiring·core·Spec·업무 정책은 바꾸지 않았습니다.
+
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/gitlab/GitLabPipelineLineageReader.java`: package Job ID는 isIntegralNumber, canConvertToLong, 양수 조건을 모두 확인한 뒤 사용합니다. name/status도 문자열임을 확인하고, 인접 commits 응답의 id는 object의 문자열 필드일 때만 SHA로 검사해 숫자형 40자리 값의 암묵 변환도 차단했습니다.
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/gitlab/GitLabPipelineLineageTest.java`: 소수1.5/1.0·숫자 string·결손/null·음수/0·범위 밖·boolean/object/array Job ID는 UNKNOWN/PACKAGE_JOB_AMBIGUOUS와 HTTP 1건·후속 trace0을 확인합니다. 정수1/Long.MAX_VALUE는 정확한 ID로 trace를 조회해 기존 VERIFIED 양성을 유지합니다. 숫자형40SHA·다른 타입은 UNKNOWN/SHORT_SHA_UNRESOLVED이고 문자열40SHA만 양성인 회귀도 추가했습니다.
+
+`source-freeze-r6.json`은 제품 수정 뒤 Test 시작 전에 동결했습니다. 이번 실제 `:gateway-integration:test`는 60/60 PASS(11 XML, fail/error/skip/aborted0), runId `87db1d5b-7ed9-43f0-92f0-1c8f1de1d081`, fingerprint `bd62edb6d41ccd93fefdfc5cd5f8bf2568e9b5487d8b9005d450a02804f28f4a`입니다. 직후 별도 `test-evidence verify --tasks :gateway-integration:test`도 exit0이며 두 명령의 소스·CP·정본 결속을 보존했습니다.
+
+integration 산출물 변경으로 acceptance도 최신 CP에서 실제 1/1 PASS와 별도 verifier exit0을 다시 얻었습니다. runId `e6f3141c-00e9-48dd-b5a4-d0d455dd55d0`, fingerprint `229609b430c077a48683a0e871426bd63d55b0c82e7ec8a120acc45907010967`입니다. 새 no-test CP capture의 실제 dir/jar 파일 hash와 각 run-binding component를 대조하고 fingerprint를 독립 재계산했습니다. 현재 앱 runtime SHA256은 `e106fe97cc8610eae4549572c367ef9cbbcc4a0c42eb723f04935265f3d0e6fe`이며 두 측정과 같습니다.
+
+integration Test/paired verifier는 Plan `f8e3d84de8ca2e5c8929cb162d458b70de7fefcc95ef5ba8de97e81d26de9ae1`에서 시작·종료했습니다. 안전경계 뒤 부모 GO로 Plan `7f488addf6a337616f7a0982172be137faab0ebda944ce6ae581ac8cb5d7d8c6`를 확인하고 acceptance/현재 CP 후속 검증을 진행했습니다. P12의 두 module build allowed_writes 명시 외 기능·시험·Source 계약 byte는 그대로임을 `plan-transition-r6.json`에 대조했습니다. Spec/baseline/R6는 변경하지 않았습니다.
+
+종전 `result.json`, source-freeze, 59건의 원시 검증과 부모 r2 PASS를 덮어쓰지 않았습니다. 사전 보존한 332개 증거 파일의 hash가 그대로이며 이 절 전 보고서 957627바이트(SHA256 `4f2dc2958d20f92d650fd35366e54babb7be15468ea3e5ab7ca03bf08340d999`)도 완전히 보존한 append입니다. 새 결과는 `scratch/p12-implementation/result-r6.json`, 원시 XML/OTR·현재 CP·hash·명령 exit·FP 검사는 `final-evidence-check-r6.json`에 따로 기록합니다.
+
+상태는 `ROOT_REVIEW_PENDING`입니다. 실제 Source·모델·TC·운영·Docker/PG·배포·commit/push는 0이며 부모의 동일 독립 oracle GREEN과 exact commit은 부모가 수행합니다. 이 로컬 회귀 결과를 actual join·AC/ISO·운영 합격으로 승격하지 않습니다.
+
+#### P12 부모 독립 검증 — 로컬 커밋 대상 확인
+
+부모는 최종 변경 34파일·기존 보고서 prefix·현재 CP와 실제 JUnit 61건 및 두 paired verifier의 XML/OTR 고유 실행과 fingerprint를 독립 대조했습니다. 별도 HTTP oracle로 앱별 보존 경계·현재 인가 철회·실제 meter 고정 태그·Tempo 나노초 범위도 확인했습니다. GitLab 소수 Job ID가 VERIFIED로 확정되는 실제 RED를 먼저 재현했고, 같은 프로그램을 수정하지 않은 GREEN에서 UNKNOWN/PACKAGE_JOB_AMBIGUOUS·HTTP 1건 종료를 확인했습니다. 부모 probe 전후 실제 CP 파일 내용은 같습니다.
+
+근거는 scratch p12-parent-review의 r6-root-validation.json, r6-raw-evidence-review.json, fractional-red-r1-parent-probe.json, fractional-green-r6-parent-probe.json, r3-current-r6-parent-probe.json입니다. 현재 Plan은 P12 build 두 파일의 필수 연결만 명시했고 Source·인가·wire·실패 정책은 그대로입니다. 이 판정과 로컬 커밋은 C11contract 기반 격리 Connector CODE/LOCAL_VALIDATED이며 P10/P11/P12 실제 합류 회귀·실제 Source·운영 수용은 별도로 미실행 상태를 유지합니다.
+
+
+### P12 r7 후속 수정 — Loki 설정의 실제 Constructor Binding (2026-11-06)
+
+시작 위치는 clean C12 `49a0d49eca76e65626be4d97cd738caa89e96502`의 `aigw/f1-p12` worktree입니다. 부모의 실제 RED는 `ParentLokiBindingProbe.java`(SHA256 `df596ac2d0086475f1ef7c239e117d961b4609bb9b7ad1b034fad74963b6c86a`)와 `scratch/p12-parent-review/loki-binding-red-c12-r1-parent-probe.json`의 javac0/java1/CPstable이며, 승인된 per-query-limit=123을 Boot Binder로 읽어도 bound=false였습니다.
+
+근본원인은 public 무인자 생성자와 canonical 생성자가 함께 있어 값 생성자 선택이 명시되지 않은 점과 record component limitPerQuery의 기본 키가 승인 키 per-query-limit와 다른 점입니다. 실제 Boot 4.0.7 JAR의 ConstructorBinding/Name/DefaultValue 애너테이션 및 BindResult API를 javap로 확인한 뒤 표준 바인딩 기능만 사용했습니다.
+
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiProperties.java`: compact canonical constructor에 ConstructorBinding을 지정하고 limitPerQuery component에 Name("per-query-limit")를 지정했습니다. 누락된 설정도 기존 6h/500/1000/30s 기본값을 유지하도록 각 constructor parameter에 동일 DefaultValue를 지정했습니다. 기존 public 무인자·4인자 생성자, record component/accessor 이름, 검증 로직은 유지했습니다.
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiPropertiesTest.java`: 실제 Binder로 승인 키 전체와 nondefault123, 다른 nondefault limits, 빈/부분 설정의 동일 기본값, 0·음수 validation, Duration 오형식·정수 소수/범위 초과 실패를 검사하는 5개 영구 단위시험을 추가했습니다. 수동 Environment 파싱·필드 rename·wrapper·전역 설정·의존 변경은 없습니다.
+
+Plan pin `cc1a74a5e951fbd100c3cf9871f7474c4ab1598ed8e73e75675c2447284425aa` 및 P12 본문 SHA256 `d117d64c1270151d7f290c276bad5c5cec8817fa3ea8ad1f33c7fcad9008ce8a`를 root GO 뒤 대조했고 Spec `c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`는 그대로입니다. Test 시작 전 `source-freeze-r7.json`을 생성하고 spec-guard-r7 exit0을 확인했습니다.
+
+실제 실행 범위는 `:gateway-integration:test --tests com.nori.ai.gateway.integration.loki.LokiPropertiesTest` 한 클래스입니다. **5/5 PASS**, XML1·fail/error/skip/aborted0, runId `d881e7c6-780f-42be-9ab2-9677856d3a3a`, fingerprint `a65c5abd44593a04ce407ecdcc21df439e0f367f9b680ce57b2aa03932138538`입니다. 직후 별도 `test-evidence verify --tasks :gateway-integration:test`는 같은 fixed includePattern으로 exit0을 얻었습니다. 테스트와 verifier의 source before/after·정본·현재 FP filter 결속을 각각 확인했습니다.
+
+no-test 현재 CP export의 실제 dir/jar 파일 hash를 run-binding과 대조하고 FP를 독립 재계산했습니다. 현재 app runtime SHA256 `0396011b7874da722b558f22c60e3210280a26e5be1b36ad856725e9fcfd488a`도 원 측정과 같습니다. 원시 XML/OTR·summary·binding·명령 exit·현재 CP·파일별 hash 경로는 `final-evidence-check-r7.json`에 있습니다. 이전 결과·r6의 61건 원시 증거를 포함한 435개 기존 파일은 hash 불변으로 보존했으며 이번 코드의 current FP PASS로 재사용하지 않았습니다.
+
+이 절 전 C12 보고서 전체 962716바이트(SHA256 `c1f721531cd2fe1e6ea2892326ca4c98bde8bd09373bf3488bc3144bab899b18`)를 보존한 append입니다. 제품 변경은 위 LokiProperties와 새 영구시험뿐이며 이 DevReport append를 포함한 3파일입니다. 기존 C12 commit·r6 결과·보고서는 덮어쓰지 않았습니다.
+
+부모는 RED와 동일한 독립 Binder oracle로 GREEN을 실제 확인했습니다(`scratch/p12-parent-review/loki-binding-green-r7-parent-probe.json`, javac0/java0/inputStable=true). 이 결과는 좁은 5건의 JUnit과 구분합니다.
+
+상태는 `ROOT_REVIEW_PENDING`이며 **전체 Connector/acceptance/P11 actual joined tree 회귀는 PENDING_ROOT_P11_JOIN**입니다. 이전61+이번5를 전체 최신 검증으로 합산하지 않습니다. fix commit·P11 합류 뒤 전체 회귀는 부모가 관리합니다. 실제 Source/모델/TC·Docker/PG·원격·운영·배포·commit/push는 이 세션에서 0입니다.
+
+#### P12 r7 부모 검증 및 로컬 수정 커밋
+
+부모는 실제 Binder 시험 5건의 XML/OTR 고유 실행·정확 필터·별도 verifier와 현재 classpath 내용·fingerprint를 독립 대조했습니다. 승인 키 123이 바인딩되지 않는 실제 RED를 재현한 동일 Java 프로그램으로 수정 후 GREEN도 확인했습니다. 변경 두 소스 파일을 직접 읽었고 기존 생성자·접근자·기본값·실패 검증을 보존한 표준 constructor binding임을 확인했습니다. 기존 보고서 전체와 과거 증거 435개는 hash가 같습니다.
+
+근거는 scratch/p12-parent-review/r7-root-validation.json, r7-raw-evidence-review.json 및 loki-binding-red-c12-r1-parent-probe.json/loki-binding-green-r7-parent-probe.json입니다. 로컬 수정 커밋 범위는 제품 1파일·영구시험 1파일·보고서 append뿐입니다. 이 5건과 과거 61건을 최신 전체 회귀로 합산하지 않으며, 전체 Connector/acceptance와 P10·P11 실제 합류 검증은 다음 고정 source에서 수행합니다. 실제 Source·배포·운영 수용은 미실행입니다.

@@ -1,6 +1,10 @@
 plugins { `java-library`; `java-test-fixtures` }
 dependencies {
     implementation(project(":gateway-core"))
+    implementation("org.springframework:spring-web")
+    implementation("io.micrometer:micrometer-observation")
+    implementation("io.micrometer:micrometer-core")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation(platform(libs.spring.ai.bom))
     implementation(libs.spring.ai.openai)
     implementation(libs.djl.tokenizers)
@@ -15,6 +19,14 @@ dependencies {
     testImplementation(testFixtures(project(":gateway-integration")))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation(libs.djl.tokenizers)
+    testImplementation("ch.qos.logback:logback-classic")
+    testImplementation("io.micrometer:micrometer-core")
+}
+
+// 실제 Source 선언도 Connector 시험의 입력 지문에 포함합니다.
+sourceSets.test {
+    resources.srcDir(rootProject.file("gateway-app/src/main/resources"))
+    resources.include("config/sources/**")
 }
 
 tasks.named<Test>("integrationTest") {
