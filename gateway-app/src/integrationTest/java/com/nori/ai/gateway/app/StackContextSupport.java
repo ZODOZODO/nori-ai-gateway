@@ -62,7 +62,7 @@ public abstract class StackContextSupport {
         properties.putAll(extraApplicationProperties());
         if (applicationType() == WebApplicationType.SERVLET) { properties.put("server.address","127.0.0.1"); properties.put("server.port",0); }
         context = new SpringApplicationBuilder(AiGatewayApplication.class)
-            .sources(com.nori.ai.gateway.app.job.P09TestPorts.class,com.nori.ai.gateway.app.job.P09TestPorts.VerifySeams.class).sources(additionalSources)
+            .sources(com.nori.ai.gateway.app.job.P09TestPorts.class).sources(additionalSources)
             .properties(properties)
             .web(applicationType()).profiles("verify").run(
                 "--spring.flyway.enabled=false",

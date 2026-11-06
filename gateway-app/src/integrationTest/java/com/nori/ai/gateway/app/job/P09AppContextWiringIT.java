@@ -53,7 +53,7 @@ class P09AppContextWiringIT extends P09QueueSupport {
         props.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app"),"spring.flyway.enabled",false));
         props.putAll(Map.of("ai.gateway.capacity.max-running-jobs",1,"ai.gateway.capacity.generation-concurrency",1,"ai.gateway.capacity.queued-depth",4,"ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s","ai.gateway.inference.mode","disabled"));
         props.putAll(Map.of("spring.kafka.bootstrap-servers","127.0.0.1:1","nori.storage.s3.enabled",true,"nori.storage.s3.endpoint","http://127.0.0.1:1","nori.storage.s3.bucket","fixture","nori.storage.s3.access-key","dummy","nori.storage.s3.secret-key","dummy","nori.storage.s3.region","us-east-1"));
-        assertThatThrownBy(()->new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props).run()).hasStackTraceContaining(TcSourceAuthorizationPort.class.getName());
+        assertThatThrownBy(()->new SpringApplicationBuilder(AiGatewayApplication.class).web(WebApplicationType.NONE).profiles("verify").properties(props).run()).hasStackTraceContaining(WorkflowExecutor.class.getName());
         context.close();context=null;failLate=true;
         try{assertThatThrownBy(()->startApplication(extraSources())).hasMessage("후순위 확인 실패");assertThat(createdDispatcher.started()).isFalse();assertThat(createdSweeper.started()).isFalse();}
         finally{failLate=false;}

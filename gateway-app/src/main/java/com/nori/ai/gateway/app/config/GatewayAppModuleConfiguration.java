@@ -10,5 +10,6 @@ import org.springframework.context.annotation.Import;
 @Configuration(proxyBeanMethods = false)
 @Import({CoreBeansConfiguration.class, NormalDatabaseConfiguration.class, PersistenceModuleConfiguration.class,
     IntegrationModuleConfiguration.class, TcMockModuleConfiguration.class, IngressSecurityConfiguration.class,
-    JobConfiguration.class, TestHooksConfiguration.class, com.nori.ai.gateway.app.web.WebConfiguration.class})
+    JobConfiguration.class, TestHooksConfiguration.class, com.nori.ai.gateway.app.web.WebConfiguration.class,
+    com.nori.ai.gateway.app.hooks.MockHooksConfiguration.class, com.nori.ai.gateway.app.hooks.MockStateDirectoryGuard.class})
 public class GatewayAppModuleConfiguration {}

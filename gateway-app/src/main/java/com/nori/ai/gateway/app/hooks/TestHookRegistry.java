@@ -7,8 +7,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.transaction.support.*;
 
 public final class TestHookRegistry {
-    public record Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer) {
-        public Scenario { Objects.requireNonNull(taskType);pauseAt=Set.copyOf(pauseAt); }
+    public record Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer, Optional<SeamRegistry.Directive> seam) {
+        public Scenario { Objects.requireNonNull(taskType);pauseAt=Set.copyOf(pauseAt);seam=Objects.requireNonNull(seam); }
+        public Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer) {
+            this(taskType, pauseAt, haltAt, failSanitizer, Optional.empty());
+        }
     }
     private record Key(String actor,String requestKey){}
     private static final class Armed { final Scenario scenario;final Instant expires;String reservation;
@@ -56,8 +59,12 @@ public final class TestHookRegistry {
     public int reservationCount(){return reservations.get();}
     public void admissionCommitted(){if(clock instanceof ControllableClock controlled)controlled.admissionCommitted();}
     public synchronized boolean resetIfIdle(java.util.function.BooleanSupplier noActiveJobs){
+        return resetIfIdle(noActiveJobs, () -> {});
+    }
+    public synchronized boolean resetIfIdle(java.util.function.BooleanSupplier noActiveJobs,Runnable resetMock){
         // 아직 커밋되지 않은 접수의 결속도 reset으로 지우지 않습니다.
         if(admitting!=0||!noActiveJobs.getAsBoolean())return false;
+        resetMock.run();
         arms.clear();bindings.clear();consumed.clear();pauses.reset();reservations.set(0);if(clock instanceof ControllableClock controlled)controlled.reset();return true;
     }
     public synchronized void freezeAt(Instant at,java.util.function.BooleanSupplier noActiveJobs){

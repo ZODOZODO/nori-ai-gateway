@@ -5,6 +5,8 @@ import com.nori.ai.gateway.core.registry.SchemaContracts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
@@ -65,7 +67,7 @@ class MockAuthorizationContractTest {
         assertThat(adapter.project(node.toString(), Set.of("EQP_READ", "AI_LOG_READ"))).isInstanceOf(Allowed.class);
     }
     @Test void validEmptyGateRequiresBothWireArraysEmpty() {
-        assertThat(adapter.authorize(call, Set.of())).isInstanceOfSatisfying(Allowed.class, a -> assertThat(a.allowed()).isEmpty());
+        assertThat(adapter.authorize(call, Set.of())).isEqualTo(new Allowed(Set.of(), expectedDigest("mock-v1", Set.of())));
         assertThat(adapter.project(valid().toString(), Set.of())).isInstanceOf(Unavailable.class);
         var node = valid(); node.putArray("allowed"); node.putArray("denied");
         assertThat(adapter.project(node.toString(), Set.of())).isEqualTo(new Allowed(Set.of(), "a".repeat(64)));
@@ -89,7 +91,41 @@ class MockAuthorizationContractTest {
     @Test void permissionRevocationChangesCurrentDigestAndAllowedSetWithoutCache() {
         Allowed before = (Allowed) adapter.authorize(call, Set.of("AI_EVENT_READ"));
         scenarios.select("permission-revoked"); Allowed after = (Allowed) adapter.authorize(call, Set.of("AI_EVENT_READ"));
-        assertThat(before.allowed()).containsExactly("AI_EVENT_READ"); assertThat(after.allowed()).isEmpty(); assertThat(after.pdg()).isNotEqualTo(before.pdg());
+        assertThat(before).isEqualTo(new Allowed(Set.of("AI_EVENT_READ"), expectedDigest("mock-v1", Set.of("AI_EVENT_READ"))));
+        assertThat(after).isEqualTo(new Allowed(Set.of(), expectedDigest("mock-v1", Set.of())));
+        assertThat(after.pdg()).isNotEqualTo(before.pdg());
+    }
+    @Test void authorizationDigestUsesResponseAllowedSubsetForEachSource() {
+        for (Set<String> requested : List.of(Set.of("EQP_READ"), Set.of("AI_LOG_READ"), Set.of("AI_LOG_READ", "EQP_READ"))) {
+            assertThat(adapter.authorize(call, requested)).isEqualTo(new Allowed(requested, expectedDigest("mock-v1", requested)));
+        }
+    }
+    @Test void deniedAndUnrequestedCatalogGrantsDoNotChangeDigestForSameAllowedAndRevision() {
+        Allowed baseline = (Allowed) adapter.authorize(call, Set.of("EQP_READ"));
+        scenarios.select("permission-revoked");
+        Allowed sameAllowed = (Allowed) adapter.authorize(call, Set.of("EQP_READ"));
+        Allowed partiallyDenied = (Allowed) adapter.authorize(call, Set.of("EQP_READ", "AI_LOG_READ"));
+        assertThat(baseline).isEqualTo(new Allowed(Set.of("EQP_READ"), expectedDigest("mock-v1", Set.of("EQP_READ"))));
+        assertThat(sameAllowed).isEqualTo(baseline);
+        assertThat(partiallyDenied).isEqualTo(baseline);
+        assertThat(adapter.authorize(call, Set.of("AI_LOG_READ"))).isEqualTo(new Allowed(Set.of(), expectedDigest("mock-v1", Set.of())));
+    }
+    @Test void catalogRevisionChangesDigestEvenForSameAllowedSubsetAndEmptyGate() {
+        for (Set<String> requested : List.of(Set.<String>of(), Set.of("EQP_READ"))) {
+            scenarios.select("default");
+            Allowed before = (Allowed) adapter.authorize(call, requested);
+            scenarios.select("catalog-rev2");
+            Allowed after = (Allowed) adapter.authorize(call, requested);
+            assertThat(after.allowed()).isEqualTo(before.allowed());
+            assertThat(after.pdg()).isEqualTo(expectedDigest("mock-v2", requested)).isNotEqualTo(before.pdg());
+        }
+    }
+    private static String expectedDigest(String revision, Set<String> allowed) {
+        // 정본 계산 구현과 독립된 JDK 해시로 실제 응답 allowed 집합과의 결속을 확인합니다.
+        String canonical = revision + "\n" + String.join("\n", new TreeSet<>(allowed));
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException failure) { throw new AssertionError(failure); }
     }
     @Test void exactlyExpiredDelegationFailsBothEmptyAndSourceRequests() {
         class MutableClock extends Clock {

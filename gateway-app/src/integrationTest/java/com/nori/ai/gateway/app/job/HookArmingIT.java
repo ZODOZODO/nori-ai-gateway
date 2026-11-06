@@ -44,7 +44,8 @@ class HookArmingIT extends P09QueueSupport {
         }
     }
     @Test void reservationRollsBackAndArmingTtlAndClockRulesAreEnforced()throws Exception{
-        pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");hooks().arm("actor","rollback",new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false));
+        var directive=new com.nori.ai.gateway.app.hooks.SeamRegistry.Directive(com.nori.ai.gateway.app.hooks.SeamRegistry.Kind.PERMISSION_MAP_DROP,null,"sources://TC/logs",null);
+        pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");hooks().arm("actor","rollback",new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false,Optional.of(directive)));
         var reserved=new CountDownLatch(1);var rollback=new CountDownLatch(1);
         doAnswer(invocation->{
             invocation.callRealMethod();
@@ -65,7 +66,9 @@ class HookArmingIT extends P09QueueSupport {
             assertThatThrownBy(admission::get).hasCauseInstanceOf(DuplicateKeyException.class);
         }
         assertThat(count("job")).isZero();assertThat(count("conversation")).isZero();assertThat(hooks().armed("actor","rollback")).isPresent();
+        assertThat(hooks().armed("actor","rollback").orElseThrow().seam()).contains(directive);
         doCallRealMethod().when(hooks()).bindOnAdmission(eq("actor"),eq("rollback"),anyString());var accepted=accept("actor","rollback","질문",null,dlg());assertThat(hooks().binding(accepted.jobId())).isPresent();
+        assertThat(hooks().binding(accepted.jobId()).orElseThrow().seam()).contains(directive);
         hooks().arm("other","expire",new TestHookRegistry.Scenario(TaskType.GENERAL_QUERY,Set.of(),null,false));clock().advance(60);assertThat(hooks().armed("other","expire")).isEmpty();
         assertThatThrownBy(()->clock().freezeAt(NOW.minusSeconds(1),false)).isInstanceOf(IllegalArgumentException.class);assertThatThrownBy(()->clock().advance(0)).isInstanceOf(IllegalArgumentException.class);
     }

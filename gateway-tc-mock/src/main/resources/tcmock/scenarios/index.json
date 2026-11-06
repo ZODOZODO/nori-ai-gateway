@@ -6,6 +6,7 @@
   "logout",
   "authz-down",
   "catalog-down",
+  "catalog-rev2",
   "permission-revoked",
   "contract-v2",
   "dlq-partial",

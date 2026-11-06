@@ -49,7 +49,8 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
         var builder=HttpRequest.newBuilder(harness.uri(path)).timeout(Duration.ofSeconds(15)).header("Content-Type","application/json");
         if(path.startsWith("/__test"))builder.header("X-AIGW-Hook-Token",hookToken);
         else{
-            var claims=new HashMap<String,Object>(Map.of("iss","tc-ui-backend","aud","ai-gateway","sys","TC","sub","actor","scope","READ","perm",List.of("MODEL_READ","EQP_READ","EQP_READ"),"pdg",P09TestPorts.PDG));if(job){String delegation=UUID.randomUUID().toString().replace("-","");harness.watch(delegation);claims.put("dlg",delegation);}
+            var claims=new HashMap<String,Object>(Map.of("iss","tc-ui-backend","aud","ai-gateway","sys","TC","sub","actor","scope","READ","perm",List.of("MODEL_READ","EQP_READ","EQP_READ"),"pdg",P09TestPorts.PDG));if(job){String delegation=UUID.randomUUID().toString().replace("-","");harness.watch(delegation);
+                assertThat(send("/__test/tcmock/delegations","POST",json.writeValueAsString(Map.of("sub","actor","dlg",delegation)),null,null,false).statusCode()).isEqualTo(204);claims.put("dlg",delegation);}
             String assertion=signer.sign(claims,at);harness.watch(assertion);
             builder.header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",assertion);if(key!=null)builder.header("Idempotency-Key",key);
         }

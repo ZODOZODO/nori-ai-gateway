@@ -14,21 +14,33 @@ import tools.jackson.databind.JsonNode;
 public final class TestHookController {
     private final TestHookRegistry registry;private final ControllableClock clock;private final PausePointRegistry pauses;
     private final QueueJobRepository jobs;private final JobTimeoutSweeper sweeper;
-    public TestHookController(TestHookRegistry registry,ControllableClock clock,PausePointRegistry pauses,QueueJobRepository jobs,JobTimeoutSweeper sweeper){
+    private final SeamRegistry seams;private final com.nori.ai.gateway.tcmock.MockScenarioStore scenarios;private final com.nori.ai.gateway.tcmock.MockCallCounter calls;
+    public TestHookController(TestHookRegistry registry,ControllableClock clock,PausePointRegistry pauses,QueueJobRepository jobs,JobTimeoutSweeper sweeper,
+            SeamRegistry seams,com.nori.ai.gateway.tcmock.MockScenarioStore scenarios,com.nori.ai.gateway.tcmock.MockCallCounter calls){
         this.registry=registry;this.clock=clock;this.pauses=pauses;this.jobs=jobs;this.sweeper=sweeper;
+        this.seams=seams;this.scenarios=scenarios;this.calls=calls;
     }
     @PostMapping("/arm") public ResponseEntity<Void> arm(@RequestBody JsonNode body){
         fields(body,Set.of("actorSub","requestKey","scenario"));JsonNode scenario=body.required("scenario");
-        fields(scenario,Set.of("taskType","pauseAt","haltAt","failSanitizer"));
+        fields(scenario,Set.of("taskType","pauseAt","haltAt","failSanitizer","seam"));
+        Optional<SeamRegistry.Directive> directive=Optional.empty();
+        if(scenario.has("seam")){
+            var seam=scenario.get("seam");fields(seam,Set.of("kind","capabilityId","sourceId","ownerSystem"));
+            if(!seam.has("kind")||seam.properties().stream().anyMatch(entry->!entry.getValue().isString()))throw new IllegalArgumentException();
+            var value=new SeamRegistry.Directive(SeamRegistry.Kind.valueOf(seam.required("kind").asString()),
+                seam.has("capabilityId")?seam.get("capabilityId").asString():null,seam.has("sourceId")?seam.get("sourceId").asString():null,
+                seam.has("ownerSystem")?com.nori.ai.gateway.core.scope.OwnerSystem.valueOf(seam.get("ownerSystem").asString()):null);
+            seams.validate(value);directive=Optional.of(value);
+        }
         var points=new HashSet<PausePointRegistry.Point>();
         if(scenario.has("pauseAt")){if(!scenario.get("pauseAt").isArray())throw new IllegalArgumentException();for(var p:scenario.get("pauseAt"))points.add(PausePointRegistry.Point.valueOf(p.asString()));}
         var halt=scenario.hasNonNull("haltAt")?PausePointRegistry.Point.valueOf(scenario.get("haltAt").asString()):null;
         registry.arm(body.required("actorSub").asString(),body.required("requestKey").asString(),new TestHookRegistry.Scenario(
-            TaskType.valueOf(scenario.required("taskType").asString()),points,halt,scenario.has("failSanitizer")&&scenario.get("failSanitizer").asBoolean()));
+            TaskType.valueOf(scenario.required("taskType").asString()),points,halt,scenario.has("failSanitizer")&&scenario.get("failSanitizer").asBoolean(),directive));
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/reset") public ResponseEntity<?> reset(){
-        if(!registry.resetIfIdle(this::noActiveJobs))return ResponseEntity.status(409).body(Map.of("error","ACTIVE_JOBS"));
+        if(!registry.resetIfIdle(this::noActiveJobs,()->{scenarios.select("default");calls.reset();}))return ResponseEntity.status(409).body(Map.of("error","ACTIVE_JOBS"));
         return ResponseEntity.noContent().build();
     }
     @GetMapping("/clock") public Map<String,Object> clock(){return Map.of("now",clock.instant().toString(),"mode",clock.mode().name());}

@@ -14,12 +14,12 @@ class WebAppContextWiringIT extends ApiWebSupport {
         jdbc().sql("UPDATE gw.message SET role='assistant' WHERE id=:message").param("message",accepted.messageId()).update();
         pauses().release(point,accepted.jobId());await(()->state(accepted.jobId()).equals("FAILED"));
         assertThat(jdbc().sql("SELECT error_code FROM gw.result WHERE job_id=:job").param("job",accepted.jobId()).query(String.class).single()).isEqualTo("CONTRACT_INVALID");
-        assertThat(observations().workflows).isEmpty();assertThat(observations().authorization).hasValue(1);
+        assertThat(observations().workflows).isEmpty();assertThat(calls().count("authorize")).isEqualTo(1);
         var broken=admit("actor","broken-snapshot",Set.of(point));await(()->pauses().reachedCount(point,broken.jobId())==1);
         jdbc().sql("UPDATE gw.job SET request_input='{\"context\":false}' WHERE id=:job").param("job",broken.jobId()).update();
         pauses().release(point,broken.jobId());await(()->state(broken.jobId()).equals("FAILED"));
         assertThat(jdbc().sql("SELECT error_code FROM gw.result WHERE job_id=:job").param("job",broken.jobId()).query(String.class).single()).isEqualTo("CONTRACT_INVALID");
-        assertThat(observations().workflows).isEmpty();assertThat(observations().authorization).hasValue(2);
+        assertThat(observations().workflows).isEmpty();assertThat(calls().count("authorize")).isEqualTo(2);
     }
     @Test void realSingleReadersAndEvaluatorAreWiredThroughApiSseAndWorker() throws Exception {
         assertThat(context.getBeansOfType(JobRequestInputReader.class)).hasSize(1);assertThat(context.getBean(JobRequestInputReader.class)).isSameAs(context.getBean(JobRepository.class));

@@ -35,7 +35,7 @@ public final class ToolDispatcher {
         if (!OwnerBoundary.toolMatches(registered, scope))
             return reject(step, scope, registered, context, RejectReason.OWNER_MISMATCH, ResultStatus.FAILED, ErrorCode.SYSTEM_SCOPE_MISMATCH, null);
         List<ResourceResolver.ResourceState> states = ResourceInputs.bound(step, registered).stream().map(r -> context.resolver().resolve(r, scope)).toList();
-        DispatchTarget target = seam.inspect(new DispatchTarget(registered, states, context.resolver().source(registered, scope)));
+        DispatchTarget target = seam.inspect(new DispatchTarget(registered, states, context.resolver().source(registered, scope)), scope);
         // 시험 주입 이후의 실제 실행 대상을 다시 검사하며 다른 소유 시스템으로 전환하지 않습니다.
         if (target == null || !OwnerBoundary.toolMatches(target.tool(), scope) || !OwnerBoundary.resourcesMatch(target.resources(), scope))
             return reject(step, scope, registered, context, RejectReason.OWNER_MISMATCH, ResultStatus.FAILED, ErrorCode.SYSTEM_SCOPE_MISMATCH, null);

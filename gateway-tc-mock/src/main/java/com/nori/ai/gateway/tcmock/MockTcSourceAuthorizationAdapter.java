@@ -31,8 +31,8 @@ public final class MockTcSourceAuthorizationAdapter implements TcSourceAuthoriza
         this.clock = Objects.requireNonNull(clock); this.calls = Objects.requireNonNull(calls);
     }
     @Override public Outcome authorize(DelegatedCall call, Set<String> requiredPermCodes) {
-        calls.increment("authorize");
         Set<String> requested = Set.copyOf(requiredPermCodes);
+        calls.recordAuthorization(requested);
         if (requested.stream().anyMatch(p -> !SourcePermissionMap.validPermission(p))) return new Unavailable();
         var scenario = scenarios.current();
         if (scenario.authorizationUnavailable() || delegations.validate(call) == MockDelegationRegistry.Validity.UNAVAILABLE) return new Unavailable();
@@ -41,7 +41,7 @@ public final class MockTcSourceAuthorizationAdapter implements TcSourceAuthoriza
         Set<String> allowed = new HashSet<>(requested); allowed.retainAll(scenario.grantedPermissions());
         Set<String> denied = new HashSet<>(requested); denied.removeAll(allowed);
         var response = new AuthorizationResponse(allowed, denied,
-            PdgCanonical.compute(scenario.catalogRevision(), List.copyOf(scenario.grantedPermissions())), clock.instant());
+            PdgCanonical.compute(scenario.catalogRevision(), List.copyOf(allowed)), clock.instant());
         try { return project(SchemaContracts.JSON.writeValueAsString(response), requested); }
         catch (RuntimeException failure) { return new Unavailable(); }
     }

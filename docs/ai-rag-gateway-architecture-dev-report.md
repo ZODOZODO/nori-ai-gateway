@@ -6901,3 +6901,106 @@ no-test 현재 CP export의 실제 dir/jar 파일 hash를 run-binding과 대조�
 부모는 실제 Binder 시험 5건의 XML/OTR 고유 실행·정확 필터·별도 verifier와 현재 classpath 내용·fingerprint를 독립 대조했습니다. 승인 키 123이 바인딩되지 않는 실제 RED를 재현한 동일 Java 프로그램으로 수정 후 GREEN도 확인했습니다. 변경 두 소스 파일을 직접 읽었고 기존 생성자·접근자·기본값·실패 검증을 보존한 표준 constructor binding임을 확인했습니다. 기존 보고서 전체와 과거 증거 435개는 hash가 같습니다.
 
 근거는 scratch/p12-parent-review/r7-root-validation.json, r7-raw-evidence-review.json 및 loki-binding-red-c12-r1-parent-probe.json/loki-binding-green-r7-parent-probe.json입니다. 로컬 수정 커밋 범위는 제품 1파일·영구시험 1파일·보고서 append뿐입니다. 이 5건과 과거 61건을 최신 전체 회귀로 합산하지 않으며, 전체 Connector/acceptance와 P10·P11 실제 합류 검증은 다음 고정 source에서 수행합니다. 실제 Source·배포·운영 수용은 미실행입니다.
+
+
+### P11 actual P10/P12 합류 후 구현·로컬 검증 후보 — 2026-11-06
+
+상태는 **P11_IMPLEMENTED_LOCAL_TESTED_ROOT_REVIEW_PENDING**입니다. J2 `12f74ee1698c1d39b929e89065e18f4d5cedec87`는 C11contract+C10의 J1과 최신 C12 r7 fix `bb17792e32a3482f5bf05b4bcde37c1da829af79`를 합친 source 기준입니다. 과거 C11 87건·P10 191건·P12 독립 실행을 merged PASS로 승격하지 않고 아래 현재 source의 실제 실행만 집계했습니다. Spec `c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`, 승인 Plan `cc1a74a5e951fbd100c3cf9871f7474c4ab1598ed8e73e75675c2447284425aa`, baseline seq7 `b1040ce78cde516641cdc90da644b03e5d459ddc33668243a935ac4e3d348264`는 읽기 전용으로 유지했습니다. 합류 전·후 spec-guard와 source freeze를 scratch `p11-followup`에 별도 보존했습니다.
+
+기존 두 seam의 SAM/NoOp/lambda를 보존한 scope default overload를 추가하고 PlanValidator/ToolDispatcher의 원래 inspect 위치에서 동일 VerifiedSystemScope를 전달했습니다. 실제 Validator scope→seam→owner 순서와 Dispatcher scope/초기 owner 선차단은 유지했습니다. verify+enabled=true의 concrete SeamRegistry 빈 하나가 기존 job binding의 immutable typed directive만 읽으며, legacy 1arg는 identity이고 다른 Job·Source·capability로 주입이 번지지 않습니다. SourceAuthorizationStep은 기존 2arg/public typed 계약을 보존하고 3arg 삭제 전용 callback만 추가했습니다. 기본 매핑 부재·owner/actor 불일치에서 callback/외부 인가/Source 호출을 허용하지 않고 기존 map singleton을 변경하지 않습니다.
+
+실제 Mock authorization/business/retention Bean과 Source 정책 Bean을 등록하고 P09 auth fake·verify NoOp 대체물만 제거했습니다. 미구현 WorkflowExecutor fake는 P13까지 시험 전용으로 유지합니다. verify hook의 위임 사전등록·revoke·scenario·호출계수·1-job negative seam과 기존 접수 tx rollback/멱등/reset fence를 연결했습니다. Mock 상태는 SHA256(dlg) 요약과 절대 issuedAt/expiresAt/revoked만 저장하고 원 TTL300s를 재기동에 연장하지 않습니다. eager singleton state load를 Recovery 앞에서 수행하며, 최소 state-dir guard가 verify 이외·prod 동시·blank/잘못된 경로를 파일 I/O 전에 거부합니다. P15 전체 ProductionSafetyGuard는 구현하거나 완료로 표시하지 않았습니다. API/하네스는 실제 Mock 위임을 사전등록하고 기존 P10 Job 입력 snapshot·job.started·저장 blockId·payload/JWS/SSE assertion을 유지했습니다.
+
+부모 actual RED 두 건을 근본 수정했습니다. CoreBeansConfiguration의 기존 PlanValidator/ToolDispatcher만 동일 Gateway Clock 인자를 사용하도록 연결했고 미래 2040 Clock의 유효 경계 전·정각·후 실제 validate/dispatch와 동일 객체·선차단을 검증했습니다. Mock TC의 pdg 계산은 catalog 전체 grant 대신 해당 응답 allowed 집합만 사용하며, 빈 Gate는 revision+LF이고 denied/무관한 grant는 제외합니다. MockAuthorizationContractTest는 실제 Adapter→wire projection에서 empty/EQP/AI_LOG/복수정렬/부분 denied/동일 allowed+revision/새 revision을 독립 JDK SHA와 대조합니다. Gateway 측 pdg 재계산은 추가하지 않았습니다. 과거87건은 wire 형식·투영을 검증했으나 실제 응답 allowed와 정본 digest의 결속을 놓쳤다는 검증 한계를 남깁니다.
+
+실행 중 발견한 실패도 보존했습니다. core-r1 새 owner 선차단 시험의 잘못된 errorCode 기대는 기존 trace OWNER_MISMATCH+UNSUPPORTED 응답에 맞췄고, SourceParser 시험의 synthetic key 변경 누락도 시험만 바로잡았습니다. appunit-r1의 기존 CoreSystemBranchGuard는 C11 SourceStep의 TC 상수 분기를 검출했습니다. 검사 제외/상수 숨김 대신 공통 OwnedReference로 실제 Source owner와 scope를 비교하고 foreign owner/actor/미매핑·비정상 ref의 외부 인가0 회귀를 확인했습니다. Guard 시험의 끝 NUL은 Spring property parser가 trim해 실제 유효 경로로 바뀌므로 중간 NUL로 고쳤습니다. r1에서 생성된 본인 io-probe만 scratch 증거로 보존 후 정확 경로 파일·빈 디렉터리만 제거했습니다. appIT-r1은 미인용 dotted -P가 PowerShell에서 분리된 Gradle 설정 실패로 Test/PG0이며 제품 RED/0건 PASS로 계산하지 않습니다. 모든 실패 로그/XML/OTR·paired 결과는 덮어쓰지 않았습니다.
+
+실행 명령은 고정 JDK21·secure child env·canonical AIGW_SPEC_FILE의 `run_gradle.py <새label> --secure-auth ...`이며 각 Test 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks <같은 task>"`를 실행했습니다. IT Test와 verifier 모두 `-I filters-app-final.gradle` 및 단일 문자열 `-Paigw.requireDocker=true`를 동일하게 사용했습니다. PG는 single worker/maxParallelForks=1로 순차 실행하고 실제 외부 Source/모델을 호출하지 않았습니다.
+
+| 실제 Test | JUnit 고유 건수 | runId | inputFingerprint | 직후 별도 verifier |
+|---|---:|---|---|---|
+| `:gateway-core:test` (`core-j2-r4`) | 59 | `e1437b4d-f49d-4c50-96ae-3cadc91926eb` | `8521744af91c53066881bec0956258e2778bb446f90e98048b3a62e44e1ea5e4` | `core-j2-r4-verify` TEST_EVIDENCE_VERIFIED / exit0 |
+| `:gateway-tc-mock:test` (`tcmock-j2-r2`) | 39 | `ef0f8854-27d5-4676-9403-f01fd92f67d2` | `18dab9053fc60be67a5654c3cb40e1719fdb7c29dec23e88a4482210cb3d5e66` | `tcmock-j2-r2-verify` TEST_EVIDENCE_VERIFIED / exit0 |
+| `:gateway-app:test` (`appunit-j2-r2`) | 37 | `bdcb55c7-40b4-4c4d-9130-2bd0f2b155f0` | `03a49a61518e643ef279f630433b5a3373c1663caf9bb3ebdb01fc154bc45bdf` | `appunit-j2-r2-verify` TEST_EVIDENCE_VERIFIED / exit0 |
+| `:gateway-app:integrationTest` (`appit-j2-r2`) | 89 | `a5e10186-9321-4df0-a87d-0f0d75d36ed7` | `9209f955454fdb7d235718d4665874c02679d70824ad2e33fc95533d60bf74bc` | `appit-j2-r2-verify-r2` TEST_EVIDENCE_VERIFIED / exit0 |
+| `:gateway-integration:test` (`connector-j2-r1`) | 65 | `b24d47db-2d5c-4e8e-b067-bf586b819df9` | `2511af414bcc05e006909396b0b5bff1d890fe88b3ba78d5086830f014101428` | `connector-j2-r1-verify` TEST_EVIDENCE_VERIFIED / exit0 |
+| `:gateway-acceptance:test` (`acceptance-j2-r1`) | 1 | `57fb5c6e-a3a1-40ad-9109-5567c189ff39` | `558847b8204b354f936d3015405a007b8a63a277ef6e52eeca08be32e0d3d0bc` | `acceptance-j2-r1-verify` TEST_EVIDENCE_VERIFIED / exit0 |
+
+합계는 실제 고유 JUnit **290건**이며 failure/error/skip/abort=0입니다. 각 task는 actual EXECUTED이고 실행 전후 source hash가 같으며 현재 source·Test.classpath 내용이 원 run-binding과 일치합니다. 원시 XML·OTR·leaf summary·binding·정확 command/exit·file hash·현재 Test inputs/classpath export·runtime manifest를 `p11-followup/validated-proof-r1.json`과 최종 `result-r1.json`에 결속했습니다. runtime manifest SHA=`870497d2198c8dc95df2638dd5119da9328a70bcc62bb309351750e0f05f78b9`입니다.
+
+IT 직후 첫 `appit-j2-r2-verify`는 GitLab SNAPSHOT Maven metadata HEAD401로 Gradle 설정 단계에서 exit1이고 검증 CLI 실행0입니다. source/CP가 같으므로 actual89를 반복하지 않고 `appit-j2-r2-verify-r2 --offline`으로 동일 필터·단일 인용 -P의 verifier만 다시 실행해 통과했습니다. 최초 실패 proof는 보존했으며 성공으로 바꾸지 않았습니다. 이후 Connector/acceptance Test와 각 paired도 캐시에 고정된 같은 artifact를 `--offline`으로 사용했습니다. 마지막 noTest fresh CP export는 첫 export와 경로·runtime 내용이 같고 6개 실제 binding의 classpath 내용을 현재 artifact로 재해시해 대조했습니다.
+
+해당 Gradle401의 세부 원인은 미확정입니다. 부모 별도 읽기 진단 `p11-parent-review/maven-auth-header-diagnostic-r1.json`은 현재 credential로 Authorization Bearer HEAD200·Private-Token HEAD401을 확인했습니다. 이 진단과 offline 검증 성공은 별개 근거이며 자격 부재/토큰 오류를 해결했다고 판단하지 않습니다. credential·전역설정·제품/빌드 설정 변경은 없습니다.
+
+부모 독립 probe도 현재 compiled 제품에서 PASS입니다. 공유 Clock은 기존 RED와 동일 oracle(프로그램 SHA17e66947...)을 사용한 `p11-parent-review/clock-green-j2-r1-parent-probe.json`, pdg는 기존 RED와 동일 oracle(SHA25f4ca21...)의 `mock-pdg-green-j2-r1-parent-probe.json`, 기존 Source 계약은 원 synthetic 프로그램을 보존한 후 합법 ownedref fixture만 갱신한 `owned-source-contract-j2-r1-parent-probe.json`입니다. 부모가 javac0/java0/inputsStable/PG0를 확인했으며 전체 P11 부모 최종 판정·정확 commit은 아직 대기입니다.
+
+Spec/Plan 확정 계약 변경·추가 업무정책·P12 owner 재설계·P13/P14/P15 제품 선구현·운영 호출은 없습니다. 실제 TC/Source/모델 연결, 배포·운영 수용·P15 전체 safety guard·P16/F1 exit/F2는 NOT_RUN입니다. 기존 tc.event.getRecent Manifest의 requiredPermission=[]는 지시대로 변경하지 않았고 실제 Mock 업무 읽기는 별도 AI_EVENT_READ 현재 권한을 재평가합니다. 공통 Registry/Manifest 노출 정합의 후속 P13 검토 책임은 유지됩니다. 이 절은 기존 합류 보고서 전체 prefix를 보존한 append이며 기존 r1/r2/r3 증거와 부모 oracle은 수정하지 않았습니다.
+
+실제 P11 후속 변경 파일(각 바이트 hash는 result-r1.json):
+
+- `docs/contracts/test-hooks-v1.md`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/StackContextSupport.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/harness/HarnessP09TestPorts.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/HarnessObservationsEndpoint.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/HookArmingIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/IdempotentAdmissionIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/JobQueueIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/MockDelegationHookIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/MockStateDurabilityIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09AppContextWiringIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09QueueSupport.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P09TestPorts.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P11AppContextWiringIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/RetentionMockIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/SourceAuthzNegativeSeamIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerAuthorizationOrderIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkerRestartProcessSupport.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/web/ApiInputIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/web/ExpiryRaceIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/web/ResultAccessPathsIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/web/WebAppContextWiringIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/CoreBeansConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/GatewayAppModuleConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/MockDelegationController.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/MockHooksConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/MockScenarioController.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/MockStateDirectoryGuard.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/SeamRegistry.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookController.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookRegistry.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/hooks/MockStateDirectoryGuardTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/hooks/SeamRegistryTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/manifest/CoreSeamDefaultsTest.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/authz/SourceAuthorizationStep.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/dispatch/ToolDispatcher.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/plan/PlanValidator.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/seam/DispatchInjectionSeam.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/seam/PlanInjectionSeam.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/ScopeAwareInjectionSeamTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/authz/SourceAuthorizationStepTest.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockCallCounter.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockTcSourceAuthorizationAdapter.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/TcMockModuleConfiguration.java`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/catalog-rev2.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/index.json`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/MockAuthorizationContractTest.java`
+- `docs/ai-rag-gateway-architecture-dev-report.md` (이 append)
+
+부모 독립 검증 원시 proof SHA256:
+
+- `p11-parent-review/clock-green-j2-r1-parent-probe.json` = `894f3c1c1e0600329398920ba03c8fc6f18b1cef789972961073e8bf20441f96`
+- `p11-parent-review/mock-pdg-green-j2-r1-parent-probe.json` = `620682aa75ac439f54b946554862fbe26b9b3ea13562eed8a3499c0355f5abfe`
+- `p11-parent-review/owned-source-contract-j2-r1-parent-probe.json` = `a35e480c24e6e567c586006c1d62ce58a646dda6a589bba28f434d86888b54ff`
+
+#### P11 후속 부모 검증·P10/P11/P12 합류 로컬 커밋
+
+부모는 현재 합류 소스의 실제 JUnit 290건(core59·Mock39·app단위37·실제PG연결89·Connector65·acceptance1)을 XML과 OTR의 고유 실행으로 대조했습니다. 각 원 Test와 별도 공식 verifier의 정확 필터·runId·현재 classpath 내용·입력 fingerprint·소스 hash·동일 runtime manifest를 확인했으며 failure/error/skip/abort는 모두 0입니다. 과거 격리 실행이나 실패한 시도를 이 290건으로 승격하지 않았습니다.
+
+부모 독립 Java 검사 6개도 같은 현재 compiled 입력에 결속해 확인했습니다. 공유 Gateway Clock과 Mock allowed-only pdg는 수정 전 RED를 재현한 동일 프로그램으로 GREEN을 확인했고, Source 계약·Connector 보존/매 HTTP 인가·설정 바인딩·비정수 GitLab 계보 거부도 통과했습니다. Source의 공통 owner 검증, 원래 scope/seam 순서, 실제 singleton/복구 순서, 위임 절대 TTL·revoke 상태 저장, verify hook 차단과 실패 경로를 직접 읽었습니다.
+
+근거는 scratch/p11-parent-review/j2-final-root-validation.json과 세 원시 결과 대조 파일 및 해당 파일이 결속한 독립 검사입니다. 과거 보고서 전체 prefix와 owner 증거 426개, 보호 대상 483개는 hash가 같습니다. prejoin 보조 목록 첫 경로의 status trim 오기는 원본을 보존한 채 정확 source map과 실제 Git 경로로 대조했으며 제품 변경은 아닙니다. 현재 검증된 48파일만 로컬 커밋하고 원본 main에 fast-forward합니다. 제품/시험 바이트는 검증 뒤 변경하지 않으며 이 부모 보고서 append만 더합니다.
+
+패키지 저장소의 최초 Gradle metadata HEAD401은 검증 CLI 시작 전 실패로 보존했습니다. 동일 cached 입력을 사용한 새 label의 offline verifier는 통과했고, 부모가 같은 URL의 현재 Bearer HEAD200을 별도 확인했습니다. 최초 Gradle401의 세부 원인은 미확정이며 credentials/전역 설정을 고쳤다고 주장하지 않습니다. 새 환경의 전체 의존 해석·CI 검증을 완료로 표시하지 않습니다.
+
+이 판정은 CODE/LOCAL_TEST 범위입니다. P13의 실제 workflow는 아직 미구현이며 시험용 workflow 대체물은 그 phase에서 교체합니다. 실제 TC·Source·모델 연결, 배포·운영 수용·P16·F1 종료·F2는 미실행입니다. P13의 직전 턴 시간창 및 allowTools/allowKnowledge 의미 두 항목은 사용자 답변을 기다리고 있으며, 확정 후 Spec과 Plan에 반영한 뒤 별도 P13 에이전트가 구현합니다.

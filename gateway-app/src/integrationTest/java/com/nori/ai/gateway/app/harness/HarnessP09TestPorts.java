@@ -13,7 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** P11·P13에서 각각 인가·workflow fake를 제거하고 같은 프로세스 시험을 유지합니다. */
 @TestConfiguration(proxyBeanMethods=false)
-@Import({P09TestPorts.class,P09TestPorts.VerifySeams.class,HarnessObservationsEndpoint.class})
+@Import({P09TestPorts.class,HarnessObservationsEndpoint.class})
 public class HarnessP09TestPorts {
     @Bean ReadinessPrecondition recoveredClassificationFixture(JdbcClient jdbc,TestHookRegistry hooks,TransactionTemplate tx){
         return new ReadinessPrecondition(){

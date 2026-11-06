@@ -43,12 +43,12 @@ class ResultAccessPathsIT extends ApiWebSupport {
         }
         // 접근 평가 ALLOW 후에도 P23 전의 원문 리더는 비가용을 균일 404로 응답합니다.
         var source=request("GET","/v1/analyses/"+allowed.jobId()+"/evidence/e-"+allowed.jobId()+"/source","actor",null,null,false);assertThat(source.statusCode()).isEqualTo(404);assertThat(source.body()).isEmpty();
-        assertThat(observations().authorization.get()).isZero();assertThat(observations().workflows).isEmpty();
+        assertThat(calls().count("authorize")).isZero();assertThat(observations().workflows).isEmpty();
         var duplicate=json.readTree(payload);((tools.jackson.databind.node.ObjectNode)duplicate.get("blocks").get(1)).put("id",blockId);
         jdbc().sql("UPDATE gw.result SET payload=CAST(:payload AS jsonb) WHERE job_id=:job").param("payload",json.writeValueAsString(duplicate)).param("job",allowed.jobId()).update();
         var ambiguous=request("GET","/v1/analyses/"+allowed.jobId()+"/blocks/"+blockId+"/export","actor",null,null,false);assertThat(ambiguous.statusCode()).isEqualTo(404);assertThat(ambiguous.body()).isEmpty();
         var current=scope("actor");var wm=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(com.nori.ai.gateway.core.scope.OwnerSystem.WM,current.authenticatedServiceRef(),current.actorRef(),current.sub(),current.perm(),current.pdg(),current.issuedAt(),current.expiresAt(),current.requestId());
-        var foreign=context.getBean(com.nori.ai.gateway.app.job.JobAdmissionService.class).accept(wm,new com.nori.ai.gateway.app.job.JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"export-foreign",dlg()));
+        var foreign=context.getBean(com.nori.ai.gateway.app.job.JobAdmissionService.class).accept(wm,new com.nori.ai.gateway.app.job.JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"export-foreign",registeredDlg("actor")));
         var foreignResponse=request("GET","/v1/analyses/"+foreign.jobId()+"/blocks/"+blockId+"/export","actor",null,null,false);assertThat(foreignResponse.statusCode()).isEqualTo(404);assertThat(foreignResponse.body()).isEmpty();
         jdbc().sql("UPDATE gw.conversation SET expires_at=:expiry WHERE id=:id").param("expiry",java.sql.Timestamp.from(NOW.plusSeconds(1))).param("id",allowed.conversationId()).update();clock().advance(1);
         var expired=request("GET","/v1/analyses/"+allowed.jobId()+"/blocks/"+blockId+"/export","actor",null,null,false);assertThat(expired.statusCode()).isEqualTo(404);assertThat(expired.body()).isEmpty();

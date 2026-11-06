@@ -40,7 +40,7 @@ class ApiInputIT extends ApiWebSupport {
     void everyApiUsesCurrentActorAndBoundOwnerWithUniformEmpty404() throws Exception {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");var accepted=accept("actor","owner","질문",null,dlg());
         var wm=scope("actor");var owner=new com.nori.ai.gateway.core.scope.VerifiedSystemScope(com.nori.ai.gateway.core.scope.OwnerSystem.WM,wm.authenticatedServiceRef(),wm.actorRef(),wm.sub(),wm.perm(),wm.pdg(),wm.issuedAt(),wm.expiresAt(),wm.requestId());
-        var foreign=context.getBean(JobAdmissionService.class).accept(owner,new JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"foreign",dlg()));
+        var foreign=context.getBean(JobAdmissionService.class).accept(owner,new JobAdmissionService.AdmissionRequest("/v1/query",null,"타 시스템 질문",Map.of(),"foreign",registeredDlg("actor")));
         for(String actor:List.of("other","actor"))for(String path:List.of("/v1/analyses/"+(actor.equals("actor")?foreign.jobId():accepted.jobId()),"/v1/conversations/"+(actor.equals("actor")?foreign.conversationId():accepted.conversationId()))) {
             var response=request("GET",path,actor,null,null,false);assertThat(response.statusCode()).isEqualTo(404);assertThat(response.body()).isEmpty();
         }

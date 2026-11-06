@@ -33,7 +33,7 @@ class ExpiryRaceIT extends ApiWebSupport {
         var token=new com.nori.ai.gateway.core.job.CancellationToken();var starts=new java.util.concurrent.atomic.AtomicInteger();
         assertThatThrownBy(()->{guard.assertLive(expires,token);starts.incrementAndGet();}).isInstanceOf(com.nori.ai.gateway.core.expiry.ConversationExpiryGuard.ConversationExpired.class);
         assertThat(starts).hasValue(0);assertThat(token.reason()).contains(com.nori.ai.gateway.core.job.CancellationToken.Reason.EXPIRED);
-        assertThat(observations().workflows).isEmpty();assertThat(observations().authorization).hasValue(0);
+        assertThat(observations().workflows).isEmpty();assertThat(calls().count("authorize")).isEqualTo(0);
         context.getBean(SseHub.class).heartbeat();
         try(var body=stream.body()){assertThat(new String(body.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).contains("job.queued").doesNotContain("heartbeat");}
         finally{release.countDown();}

@@ -13,6 +13,20 @@ import java.util.*;
 /** Spring에 의존하지 않는 Core의 빈 등록 책임을 이 설정에 모읍니다. */
 @Configuration(proxyBeanMethods = false)
 public class CoreBeansConfiguration {
+    @Bean com.nori.ai.gateway.core.authz.SourcePermissionMap sourcePermissionMap() {
+        try (var input = CoreBeansConfiguration.class.getClassLoader().getResourceAsStream("config/source-permissions/tc-v1.json")) {
+            if (input == null) throw new IllegalStateException("Source 권한 매핑이 없습니다");
+            return com.nori.ai.gateway.core.authz.SourcePermissionMap.fromJson(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException failure) { throw new IllegalStateException("Source 권한 매핑을 읽을 수 없습니다"); }
+    }
+    @Bean com.nori.ai.gateway.core.authz.SourceAuthorizationStep sourceAuthorizationStep(com.nori.ai.gateway.core.authz.SourcePermissionMap permissions,
+            com.nori.ai.gateway.core.port.TcSourceAuthorizationPort authorization, Optional<com.nori.ai.gateway.app.hooks.SeamRegistry> seams) {
+        return seams.map(seam -> new com.nori.ai.gateway.core.authz.SourceAuthorizationStep(permissions, authorization, seam::permissionMappingExcluded))
+            .orElseGet(() -> new com.nori.ai.gateway.core.authz.SourceAuthorizationStep(permissions, authorization));
+    }
+    @Bean com.nori.ai.gateway.core.retention.RetentionClassifier retentionClassifier() { return new com.nori.ai.gateway.core.retention.RetentionClassifier(); }
+    @Bean com.nori.ai.gateway.core.retention.TrimCompletenessEvaluator trimCompletenessEvaluator() { return new com.nori.ai.gateway.core.retention.TrimCompletenessEvaluator(); }
+    @Bean com.nori.ai.gateway.core.retention.DlqCompletenessEvaluator dlqCompletenessEvaluator() { return new com.nori.ai.gateway.core.retention.DlqCompletenessEvaluator(); }
     @Bean com.nori.ai.gateway.core.result.ResultAccessEvaluator resultAccessEvaluator() { return new com.nori.ai.gateway.core.result.ResultAccessEvaluator(); }
     @Bean com.nori.ai.gateway.core.result.KnowledgeDocumentStateReader knowledgeDocumentStateReader() { return new com.nori.ai.gateway.core.result.FailClosedKnowledgeDocumentStateReader(); }
     @Bean com.nori.ai.gateway.core.result.EvidenceSourceReader evidenceSourceReader() { return new com.nori.ai.gateway.core.result.FailClosedEvidenceSourceReader(); }
@@ -26,15 +40,15 @@ public class CoreBeansConfiguration {
         return new CapabilityRegistry(loader.loadClasspath("manifests/tc/index.json"),
             loader.loadWorkflowsClasspath("workflows/tc/index.json"), Set.of(ImplementationPhase.PHASE_1), versions);
     }
-    @Bean PlanValidator planValidator(CapabilityRegistry registry, ManifestLoader loader, PlanInjectionSeam seam) {
+    @Bean PlanValidator planValidator(CapabilityRegistry registry, ManifestLoader loader, PlanInjectionSeam seam, Clock clock) {
         var manifests = loader.loadClasspath("manifests/tc/index.json");
         // 중복 Capability를 허용하지 않는 현재 Registry 전체 크기와 비용 합계를 상한으로 사용합니다.
-        return new PlanValidator(registry, seam, Clock.systemUTC(), manifests.size(), manifests.stream().mapToLong(CapabilityManifest::cost).sum());
+        return new PlanValidator(registry, seam, clock, manifests.size(), manifests.stream().mapToLong(CapabilityManifest::cost).sum());
     }
     @Bean ToolResultContractValidator toolResultContractValidator(ContractVersionPolicy versions) { return new ToolResultContractValidator(versions); }
     @Bean ToolDispatcher toolDispatcher(CapabilityRegistry registry, PlanValidator validator, ToolResultContractValidator results,
-            DispatchInjectionSeam seam, List<ToolExecutor> executors) {
-        return new ToolDispatcher(registry, validator, results, seam, executors, Clock.systemUTC());
+            DispatchInjectionSeam seam, List<ToolExecutor> executors, Clock clock) {
+        return new ToolDispatcher(registry, validator, results, seam, executors, clock);
     }
     @Bean
     @ConditionalOnProperty(name = "ai.gateway.test-hooks.enabled", havingValue = "false", matchIfMissing = true)

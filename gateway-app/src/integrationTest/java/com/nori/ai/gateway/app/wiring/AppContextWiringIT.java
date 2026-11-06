@@ -19,6 +19,37 @@ import static org.assertj.core.api.Assertions.*;
 @org.junit.jupiter.api.Tag("stage-F1")
 @org.junit.jupiter.api.Tag("label-MOCK_API")
 class AppContextWiringIT extends StackContextSupport {
+    static final class BoundaryClock extends java.time.Clock {
+        java.time.Instant now=java.time.Instant.parse("2040-01-01T00:00:00Z");
+        public java.time.ZoneId getZone(){return java.time.ZoneOffset.UTC;}
+        public java.time.Clock withZone(java.time.ZoneId zone){return this;}
+        public java.time.Instant instant(){return now;}
+    }
+    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
+    static class BoundaryClockConfiguration { @Bean BoundaryClock boundaryClock(){return new BoundaryClock();} }
+    @Test void actualCoreBeansShareGatewayClockAndRejectAtAndAfterItsExactExpiry() {
+        start(BoundaryClockConfiguration.class);var clock=context.getBean(BoundaryClock.class);
+        var validator=context.getBean(PlanValidator.class);var dispatcher=context.getBean(ToolDispatcher.class);
+        assertThat(context.getBeansOfType(java.time.Clock.class)).hasSize(1);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(validator,"clock")).isSameAs(clock);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(dispatcher,"clock")).isSameAs(clock);
+        var scope=new VerifiedSystemScope(OwnerSystem.TC,"fixture",new ActorRef("actor"),"actor",Set.of("EQP_READ"),"a".repeat(64),clock.now.minusSeconds(1),clock.now.plusSeconds(60),"clock-boundary");
+        var plan=new PlanEnvelope(scope.requestId(),"conversation","질문",List.of(),TaskType.GENERAL_QUERY,List.of());
+        var step=new PlanStep("one","tc.eqp.getOperationalSnapshot",List.of(),List.of(new ResourceRef("EQP","EQP_001")),SchemaContracts.parse("{\"eqp\":\"EQP_001\"}"));
+        for(long nanos:new long[]{-1,0,1}){
+            clock.now=scope.expiresAt().plusNanos(nanos);var reads=new java.util.concurrent.atomic.AtomicInteger();
+            ResourceResolver resolver=new ResourceResolver(){
+                public ResourceState resolve(ResourceRef resource,VerifiedSystemScope actual){reads.incrementAndGet();return new ResourceState(OwnerSystem.TC,"EQP",true);}
+                public SourceBinding source(CapabilityManifest manifest,VerifiedSystemScope actual){return new SourceBinding(OwnerSystem.TC,manifest.sourceAllowlistRef(),true);}
+                public CurrentAuthorization authorize(CapabilityManifest manifest,PlanStep step,VerifiedSystemScope actual){return new CurrentAuthorization(OwnerSystem.TC,manifest.sourceAllowlistRef(),actual.actorRef(),actual.pdg(),true,actual.perm(),Set.of("READ"));}
+                public java.time.ZoneId timezone(VerifiedSystemScope actual){return java.time.ZoneOffset.UTC;}
+            };
+            assertThat(validator.validate(plan,scope,null).accepted()).isEqualTo(nanos<0);
+            var result=dispatcher.dispatch(step,scope,new ExecutionContext(resolver,trace->{}));
+            assertThat(reads.get()).isEqualTo(nanos<0?1:0);
+            assertThat(result.errorCode()).isEqualTo(nanos<0?null:com.nori.ai.gateway.core.result.ErrorCode.SYSTEM_SCOPE_MISMATCH);
+        }
+    }
     @Test void disabledWithoutHooksRejectsAdmissionWithRetryAfterAndKeepsOneClock() {
         start();
         assertThat(context.getBeansOfType(java.time.Clock.class)).hasSize(1);
@@ -68,7 +99,7 @@ class AppContextWiringIT extends StackContextSupport {
                 com.nori.ai.gateway.core.result.ResultAccessEvaluator.class,com.nori.ai.gateway.core.result.KnowledgeDocumentStateReader.class,
                 com.nori.ai.gateway.core.result.EvidenceSourceReader.class,com.nori.ai.gateway.core.expiry.ExpiryCheckpoint.class})
             assertThat(context.getBeansOfType(type)).hasSize(1);
-        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(15);
+        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(20);
         assertThat(context.getBean(PlanInjectionSeam.class)).isExactlyInstanceOf(PlanInjectionSeam.NoOp.class);
         assertThat(context.getBean(DispatchInjectionSeam.class)).isExactlyInstanceOf(DispatchInjectionSeam.NoOp.class);
         assertThat(context.getBeansOfType(ToolExecutor.class)).isEmpty();

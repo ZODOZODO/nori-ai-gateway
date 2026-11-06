@@ -26,7 +26,7 @@ public final class PlanValidator {
         pass(trace, 1);
         List<PlanStep> steps = plan == null ? List.of() : plan.plan();
         Map<PlanStep, CapabilityManifest> tools = new LinkedHashMap<>();
-        for (PlanStep step : steps) registry.find(step.capabilityId()).ifPresent(m -> tools.put(step, seam.inspect(m)));
+        for (PlanStep step : steps) registry.find(step.capabilityId()).ifPresent(m -> tools.put(step, seam.inspect(m, scope)));
         if (tools.values().stream().anyMatch(m -> m != null && !OwnerBoundary.toolMatches(m, scope))) return reject(trace, 2, RejectReason.OWNER_MISMATCH, List.of());
         pass(trace, 2);
         Set<ResourceRef> refs = new LinkedHashSet<>();
