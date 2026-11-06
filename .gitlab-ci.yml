@@ -1,0 +1,166 @@
+workflow:
+  rules:
+    - if: '$CI_SERVER_HOST == "gitlab.noricloud.org"'
+    - when: never
+
+stages: [check, package, verify, build, scan, deploy]
+default:
+  tags: [nori-msa]
+
+# P15final 생산자(task·스크립트·검사 main)와 운영 gate가 없으면 해당 job은 실패합니다.
+.aigw-spec-input:
+  before_script:
+    - 'test -n "$AIGW_APPROVED_SPEC_SHA"'
+    - './gradlew :gateway-eval:run --args="spec-input fetch --api-url $CI_API_V4_URL --project-id $CI_PROJECT_ID --sha $AIGW_APPROVED_SPEC_SHA --baseline docs/gates/spec-baseline.md --out-dir build/spec-input --auth-header JOB-TOKEN --token-env CI_JOB_TOKEN" --no-daemon'
+    - 'export AIGW_SPEC_FILE="$CI_PROJECT_DIR/build/spec-input/$AIGW_APPROVED_SPEC_SHA/spec.md"'
+    - './gradlew :gateway-eval:run --args="spec-guard --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md" --no-daemon'
+
+test:
+  extends: .aigw-spec-input
+  stage: check
+  dependencies: []
+  script:
+    - ./gradlew build --no-daemon
+
+helm-validate:
+  stage: check
+  dependencies: []
+  script:
+    - test -f ops/deploy/aigw-helm.sh
+    - |
+      for release in ai-gateway ai-gateway-restore ai-gateway-db ai-gateway-db-restore; do
+        bash ops/deploy/aigw-helm.sh --release "$release" --mode lint --exec-sha "$AIGW_EXEC_CHART_SHA" --runconfig ops/runconfig/fixtures/lint-verify.json --image-digests ops/runconfig/fixtures/lint-image-digests.json --suite none || exit "$?"
+      done
+  artifacts:
+    paths: [build/helm-validation/]
+
+package:
+  stage: package
+  dependencies: []
+  script:
+    - ./gradlew aigwPackage -Paigw.gitSha=$CI_COMMIT_SHA --no-daemon
+    - test -s build/package/build-identity.json
+  artifacts:
+    paths:
+      - build/package/app.jar
+      - build/package/acceptance/
+      - build/package/runtime-classpath.txt
+      - build/package/build-identity.json
+
+integration-test:
+  extends: .aigw-spec-input
+  stage: verify
+  rules:
+    - if: '$AIGW_CI_IT_MODE == "runner"'
+  tags: ['$AIGW_IT_RUNNER_TAG']
+  dependencies: [package]
+  script:
+    - test -n "$AIGW_IT_RUNNER_TAG"
+    - ./gradlew integrationTest -Paigw.requireDocker=true --no-daemon
+    - './gradlew :gateway-eval:run --args="test-evidence verify --selector integrationTest --required ci/integration-required.txt --require-docker --expect-build-identity build/package/build-identity.json" --no-daemon'
+  artifacts:
+    when: always
+    paths: ['**/build/aigw-evidence/**']
+
+integration-evidence:
+  extends: .aigw-spec-input
+  stage: verify
+  rules:
+    - if: '$AIGW_CI_IT_MODE == "evidence"'
+  dependencies: [package]
+  script:
+    - 'test "$CI_API_V4_URL" = "https://gitlab.noricloud.org/api/v4"'
+    - 'printf ''header = "JOB-TOKEN: %s"\n'' "$CI_JOB_TOKEN" | curl --config - --fail --silent --show-error --proto "=https" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/aigw-it-evidence/$CI_COMMIT_SHA/it-evidence.tgz" --output it-evidence.tgz'
+    - './gradlew :gateway-eval:run --args="ci-evidence verify --sha $CI_COMMIT_SHA --bundle it-evidence.tgz --required ci/integration-required.txt --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md --expect-build-identity build/package/build-identity.json" --no-daemon'
+
+integration-mode-guard:
+  stage: verify
+  dependencies: []
+  rules:
+    - if: '$AIGW_CI_IT_MODE != "runner" && $AIGW_CI_IT_MODE != "evidence"'
+  script:
+    - echo CI_IT_MODE_UNSET >&2
+    - exit 1
+
+build-image:
+  stage: build
+  image:
+    name: '$AIGW_CI_KANIKO_IMAGE'
+    entrypoint: ['']
+  dependencies: [package]
+  script:
+    - |
+      set -eu
+      command -v jq >/dev/null
+      git_sha=$(jq -er '.gitSha | select(test("^[0-9a-f]{40}$"))' build/package/build-identity.json)
+      app_sha=$(jq -er '.appJarSha256 | select(test("^[0-9a-f]{64}$"))' build/package/build-identity.json)
+      runtime_sha=$(jq -er '.runtimeClasspathSha256 | select(test("^[0-9a-f]{64}$"))' build/package/build-identity.json)
+      test "$git_sha" = "$CI_COMMIT_SHA"
+      printf '%s  build/package/app.jar\n' "$app_sha" | sha256sum --check --status
+      printf '%s  build/package/runtime-classpath.txt\n' "$runtime_sha" | sha256sum --check --status
+      migrations_sha=$(find gateway-persistence/src/main/resources/db/migration/gateway -type f -print | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -d ' ' -f 1)
+      mkdir -p build/image-digest
+      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile --destination "harbor.nori.local/nori-tc/ai-gateway:$CI_PIPELINE_ID" --build-arg "GIT_SHA=$git_sha" --build-arg "APP_JAR_SHA256=$app_sha" --build-arg "RUNTIME_CLASSPATH_SHA256=$runtime_sha" --build-arg "MIGRATIONS_SHA256=$migrations_sha" --digest-file build/image-digest/app.digest
+  artifacts:
+    paths: [build/image-digest/app.digest]
+
+build-backup-image:
+  stage: build
+  image:
+    name: '$AIGW_CI_KANIKO_IMAGE'
+    entrypoint: ['']
+  dependencies: []
+  script:
+    - |
+      set -eu
+      : "${AIGW_PG_IMAGE_DIGEST:?}" "${AIGW_AGE_VERSION:?}" "${AIGW_AGE_SHA256:?}" "${AIGW_BACKUP_DEST_TYPE:?}"
+      case "$AIGW_BACKUP_DEST_TYPE" in
+        s3) : "${AIGW_RCLONE_VERSION:?}" "${AIGW_RCLONE_SHA256:?}" ;;
+        sftp) : "${AIGW_OPENSSH_CLIENT_VERSION:?}" ;;
+        *) echo BACKUP_DEST_TYPE_UNSUPPORTED >&2; exit 2 ;;
+      esac
+      mkdir -p build/image-digest
+      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile-backup --destination "harbor.nori.local/nori-tc/ai-gateway-backup:$CI_PIPELINE_ID" --build-arg "PG_IMAGE_DIGEST=$AIGW_PG_IMAGE_DIGEST" --build-arg "AGE_VERSION=$AIGW_AGE_VERSION" --build-arg "AGE_SHA256=$AIGW_AGE_SHA256" --build-arg "BACKUP_DEST_TYPE=$AIGW_BACKUP_DEST_TYPE" --build-arg "RCLONE_VERSION=${AIGW_RCLONE_VERSION:-}" --build-arg "RCLONE_SHA256=${AIGW_RCLONE_SHA256:-}" --build-arg "OPENSSH_CLIENT_VERSION=${AIGW_OPENSSH_CLIENT_VERSION:-}" --digest-file build/image-digest/backup.digest
+  artifacts:
+    paths: [build/image-digest/backup.digest]
+
+build-acceptance-image:
+  stage: build
+  image:
+    name: '$AIGW_CI_KANIKO_IMAGE'
+    entrypoint: ['']
+  dependencies: [package]
+  script:
+    - test -x build/package/acceptance/bin/gateway-acceptance
+    - mkdir -p build/image-digest
+    - '/kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile-acceptance --destination "harbor.nori.local/nori-tc/ai-gateway-acceptance:$CI_PIPELINE_ID" --digest-file build/image-digest/acceptance.digest'
+  artifacts:
+    paths: [build/image-digest/acceptance.digest]
+
+scan-image:
+  stage: scan
+  image:
+    name: '$AIGW_CI_SCAN_IMAGE'
+    entrypoint: ['']
+  dependencies: [package, build-image, build-backup-image, build-acceptance-image]
+  script:
+    - |
+      set -eu
+      for item in app backup acceptance; do
+        digest=$(cat "build/image-digest/$item.digest")
+        printf '%s\n' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+        case "$item" in app) repository=ai-gateway ;; backup) repository=ai-gateway-backup ;; acceptance) repository=ai-gateway-acceptance ;; esac
+        trivy image --severity HIGH,CRITICAL --exit-code 1 "harbor.nori.local/nori-tc/$repository@$digest"
+      done
+      jq -n --arg app "$(cat build/image-digest/app.digest)" --arg backup "$(cat build/image-digest/backup.digest)" --arg acceptance "$(cat build/image-digest/acceptance.digest)" --slurpfile identity build/package/build-identity.json '{app:$app,backup:$backup,acceptance:$acceptance,buildIdentity:$identity[0]}' > image-digests.json
+  artifacts:
+    paths: [image-digests.json]
+
+deploy-verify:
+  stage: deploy
+  dependencies: [scan-image]
+  when: manual
+  allow_failure: false
+  script:
+    - test -f ops/deploy/aigw-helm.sh
+    - 'bash ops/deploy/aigw-helm.sh --release ai-gateway --mode deploy --exec-sha "$AIGW_EXEC_CHART_SHA" --runconfig "$AIGW_RUNCONFIG" --image-digests image-digests.json --suite none'
