@@ -19,14 +19,12 @@ import org.springframework.transaction.*;
 import org.springframework.transaction.support.*;
 
 public final class JobAdmissionService {
-    public record AdmissionRequest(String path,String conversationId,String question,Map<String,Object> context,String idempotencyKey,String delegation) {
+    public record AdmissionRequest(String path,String conversationId,String question,Map<String,Object> requestFields,String idempotencyKey,String delegation) {
         public AdmissionRequest {
             if(!Set.of("/v1/query","/v1/analyses").contains(path)&&!path.matches("/v1/conversations/[^/]+/messages"))throw new IllegalArgumentException("접수 경로가 잘못되었습니다");
             if(question==null||question.isBlank()||delegation==null||!delegation.matches("[A-Za-z0-9_-]{22,128}"))throw new IllegalArgumentException("접수 입력이 잘못되었습니다");
             // 선택 필드의 명시적 null을 멱등 digest에 보존하면서 호출자 Map 변경과 분리합니다.
-            var copiedContext=new LinkedHashMap<>(Objects.requireNonNull(context));
-            copiedContext.keySet().forEach(Objects::requireNonNull);
-            context=Collections.unmodifiableMap(copiedContext);
+            requestFields=com.nori.ai.gateway.core.job.JobRequestInput.immutableFields(requestFields);
             if(idempotencyKey!=null&&idempotencyKey.isBlank())throw new IllegalArgumentException("멱등 키가 비어 있습니다");
         }
         @Override public String toString(){return "AdmissionRequest[보호됨]";}
@@ -81,8 +79,8 @@ public final class JobAdmissionService {
             String jobId=UUID.randomUUID().toString(),messageId=UUID.randomUUID().toString();
             if(hooks.flatMap(h->h.armed(scope.sub(),request.idempotencyKey())).map(TestHookRegistry.Scenario::failSanitizer).orElse(false))throw new IllegalStateException("마스킹 적용을 확인할 수 없습니다");
             var sanitized=sanitizer.sanitize(request.question());
-            if(!messages.insert(scope,conversation,new MessageRepository.Message(messageId,"user",sanitized.text(),"[]","[]",null,null)))throw new Rejected(404,null,0);
-            if(!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,request.idempotencyKey(),digest,request.path()),request.delegation()))throw new Rejected(404,null,0);
+            if(!messages.insert(scope,conversation,new MessageRepository.Message(messageId,"user",sanitized.text(),json.writeValueAsString(request.requestFields().getOrDefault("resourceRefs",List.of())),"[]",null,null)))throw new Rejected(404,null,0);
+            if(!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,request.idempotencyKey(),digest,request.path(),messageId,request.requestFields()),request.delegation()))throw new Rejected(404,null,0);
             if(!events.insert(scope,jobId,"job.queued","{\"jobId\":\""+jobId+"\"}",false))throw new IllegalStateException("접수 이벤트를 저장할 수 없습니다");
             hooks.ifPresent(h->h.bindOnAdmission(scope.sub(),request.idempotencyKey(),jobId));
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
@@ -100,7 +98,7 @@ public final class JobAdmissionService {
         try{pauses.get().hit(point,key);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("접수 대기가 중단되었습니다");}
     }
     private String digest(AdmissionRequest request){
-        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(Arrays.asList(request.path(),request.conversationId(),request.question().strip().replaceAll("\\s+"," "),request.context()))));}
+        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(Arrays.asList(request.path(),request.conversationId(),request.question().strip().replaceAll("\\s+"," "),request.requestFields()))));}
         catch(RuntimeException|NoSuchAlgorithmException failure){throw new IllegalArgumentException("접수 내용을 확인할 수 없습니다");}
     }
 }

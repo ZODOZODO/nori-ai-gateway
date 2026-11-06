@@ -16,6 +16,21 @@ import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScopedRepositoryIT extends PgIntegrationSupport {
+    @Test void requestInputForeignKeyAndObjectConstraintRejectCrossConversationAndNonObjectSnapshots() throws Exception {
+        try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+            String prefix="INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg,request_message_id,request_input) VALUES ";
+            assertThatThrownBy(()->sql.execute(prefix+"('bad-fk','tc','TC','a','QUEUED',CURRENT_TIMESTAMP,'digest','/v1/query',ARRAY[]::text[],'pdg','m-wm','{}')"))
+                .isInstanceOfSatisfying(java.sql.SQLException.class,failure->assertThat(failure.getSQLState()).isEqualTo("23503"));
+            assertThatThrownBy(()->sql.execute(prefix+"('bad-json','tc','TC','a','QUEUED',CURRENT_TIMESTAMP,'digest','/v1/query',ARRAY[]::text[],'pdg','m-tc','[]')"))
+                .isInstanceOfSatisfying(java.sql.SQLException.class,failure->assertThat(failure.getSQLState()).isEqualTo("23514"));
+            try(var rows=sql.executeQuery("SELECT condeferrable,condeferred,confdeltype FROM pg_constraint WHERE conname='job_request_message_fk'")) {
+                assertThat(rows.next()).isTrue();assertThat(rows.getBoolean(1)).isTrue();assertThat(rows.getBoolean(2)).isTrue();assertThat(rows.getString(3)).isEqualTo("a");
+            }
+        }
+        var scope=scope(OwnerSystem.TC,"a");
+        assertThat(bean(JobRepository.class).findRequestInput(scope,"j-tc")).hasValueSatisfying(input->assertThat(input.messageId()).isEqualTo("m-tc"));
+        for(String id:List.of("j-wm","j-other","j-expired","j-edge"))assertThat(bean(JobRepository.class).findRequestInput(scope,id)).isEmpty();
+    }
     private static final Instant NOW = Instant.parse("2026-11-06T00:00:00Z");
     private PgTestDatabase database;
     private ConfigurableApplicationContext context;
@@ -33,8 +48,9 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
         for (var entry : Map.of("tc", scope(OwnerSystem.TC,"a"), "wm", scope(OwnerSystem.WM,"a"), "other", scope(OwnerSystem.TC,"b"),
                 "expired", scope(OwnerSystem.TC,"a"), "edge", scope(OwnerSystem.TC,"a")).entrySet()) {
             assertThat(bean(ConversationRepository.class).insert(entry.getValue(), entry.getKey())).isTrue();
+            assertThat(bean(MessageRepository.class).insert(entry.getValue(),entry.getKey(),message("m-"+entry.getKey()))).isTrue();
             String key = Set.of("expired", "edge").contains(entry.getKey()) ? "key-" + entry.getKey() : "key";
-            assertThat(bean(JobRepository.class).insert(entry.getValue(), new JobRepository.NewJob("j-" + entry.getKey(), entry.getKey(), key, "digest", "B"), null)).isTrue();
+            assertThat(bean(JobRepository.class).insert(entry.getValue(), new JobRepository.NewJob("j-" + entry.getKey(), entry.getKey(), key, "digest", "B", "m-"+entry.getKey(), Map.of()), null)).isTrue();
             populate(entry.getValue(), entry.getKey());
         }
         });
@@ -49,7 +65,6 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
     }
     private void populate(VerifiedSystemScope scope, String conversation) {
         String job = "j-" + conversation;
-        assertThat(bean(MessageRepository.class).insert(scope, conversation, message("m-" + conversation))).isTrue();
         assertThat(bean(JobEventRepository.class).insert(scope, job, "job.queued", "{}", false)).isTrue();
         assertThat(bean(ResultRepository.class).insert(scope, job, result())).isTrue();
         assertThat(bean(EvidenceRepository.class).insert(scope, job, evidence("e-" + conversation))).isTrue();
@@ -80,7 +95,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
             }
             case "Job" -> {
                 assertThat(bean(JobRepository.class).find(scope, job).isPresent()).isEqualTo(allowed);
-                assertThat(bean(JobRepository.class).insert(scope, new JobRepository.NewJob("new-j", conversation, "new-key", "digest", "B"), null)).isEqualTo(allowed);
+                assertThat(bean(JobRepository.class).insert(scope, new JobRepository.NewJob("new-j", conversation, "new-key", "digest", "B", "m-"+conversation, Map.of()), null)).isEqualTo(allowed);
                 assertThat(bean(JobRepository.class).requestCancel(scope, job, "USER_REQUEST")).isEqualTo(allowed);
             }
             case "JobEvent" -> {
@@ -90,7 +105,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
             case "Result" -> {
                 assertThat(bean(ResultRepository.class).find(scope, job).isPresent()).isEqualTo(allowed);
                 String targetJob = allowed ? "result-new" : job;
-                if (allowed) bean(JobRepository.class).insert(scope, new JobRepository.NewJob(targetJob, conversation, null, "digest", "B"), null);
+                if (allowed) bean(JobRepository.class).insert(scope, new JobRepository.NewJob(targetJob, conversation, null, "digest", "B", "m-"+conversation, Map.of()), null);
                 assertThat(bean(ResultRepository.class).insert(scope, targetJob, result())).isEqualTo(allowed);
             }
             case "Evidence" -> {
@@ -128,7 +143,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
         assertThat(bean(JobRepository.class).findByIdempotencyKey(scope, "key-expired")).isEmpty();
         assertThat(bean(JobRepository.class).findByIdempotencyKey(scope, "key-edge")).isEmpty();
         assertThat(bean(JobRepository.class).findByIdempotencyKey(scope, null)).isEmpty();
-        assertThatThrownBy(() -> bean(JobRepository.class).insert(scope, new JobRepository.NewJob("duplicate", "tc", "key", "digest", "B"), null))
+        assertThatThrownBy(() -> bean(JobRepository.class).insert(scope, new JobRepository.NewJob("duplicate", "tc", "key", "digest", "B", "m-tc", Map.of()), null))
             .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
         assertThat(bean(JobRepository.class).find(scope, "duplicate")).isEmpty();
         assertThat(bean(EvidenceRepository.class).find(scope, "j-tc", "e-wm")).isEmpty();

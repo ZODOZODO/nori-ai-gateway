@@ -46,7 +46,10 @@ public final class JobDispatcher implements AutoCloseable {
             if(job.isPresent()&&clock.instant().isAfter(job.get().createdAt().plus(capacity.queueWaitLimit())))return Optional.<JobScopeRecord>empty();
             if(job.isPresent()&&!queue.start(job.get().jobId(),clock.instant()))return Optional.<JobScopeRecord>empty();return job;
         });
-        if(selected!=null)selected.ifPresent(job->{var token=slots.claim(job.jobId());workers.execute(()->worker.run(job,token));});
+        if(selected!=null)selected.ifPresent(job->{
+            publisher.publishQueued(job.jobId());publisher.publishStarted(job.jobId());
+            var token=slots.claim(job.jobId());workers.execute(()->worker.run(job,token));
+        });
     }
     public boolean started(){return started;}
     public Optional<Throwable> failure(){return Optional.ofNullable(failure);}

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HookArmingIT extends P09QueueSupport {
-    @Override protected Class<?>[] extraSources(){return new Class<?>[]{P09AdmissionEndpoint.class,Observation.class};}
+    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,Observation.class};}
     @TestConfiguration(proxyBeanMethods=false) static class Observation{
         @Bean static BeanPostProcessor spyRegistry(){return new BeanPostProcessor(){@Override public Object postProcessAfterInitialization(Object bean,String name){return bean instanceof TestHookRegistry?spy(bean):bean;}};}
     }

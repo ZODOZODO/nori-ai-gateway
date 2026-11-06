@@ -34,7 +34,7 @@ class AuthRejectionAuditIT extends PgIntegrationSupport {
             database.bootstrap(false); database.migrate();
             try (var context = application(database, ClockConfiguration.class)) {
                 var jdbc = context.getBean(JdbcClient.class);
-                assertThat(jdbc.sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1").query(String.class).single()).isEqualTo("4");
+                assertThat(jdbc.sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1").query(String.class).single()).isEqualTo("5");
                 assertThat(jdbc.sql("SELECT count(*) FROM pg_constraint WHERE conrelid = 'gw.audit_event'::regclass AND contype = 'c' AND convalidated").query(Integer.class).single()).isEqualTo(3);
                 var append = context.getBean(AuthRejectionAppendRepository.class);
                 UUID id = UUID.randomUUID();

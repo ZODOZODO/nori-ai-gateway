@@ -42,7 +42,7 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
         assertThat(hook("/__test/arm",Map.of("actorSub","actor","requestKey",key,"scenario",scenario)).statusCode()).isEqualTo(204);
     }
     protected String admit(String key)throws Exception{
-        var response=send("/v1/query","POST","{\"query\":\"시험 질의\"}",key,NOW,true);
+        var response=send("/v1/query","POST",json.writeValueAsString(Map.of("query","시험 질의","context",Map.of("timezone","Asia/Seoul","referenceTime","2026-11-06T09:00:00+09:00"),"resourceRefs",List.of())),key,NOW,true);
         assertThat(response.statusCode()).isEqualTo(202);return json.readTree(response.body()).get("jobId").asString();
     }
     protected HttpResponse<String> send(String path,String method,String body,String key,Instant at,boolean job)throws Exception{
@@ -57,12 +57,14 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
     }
     protected String job(String key)throws Exception{await(()->jdbc.sql("SELECT count(*) FROM gw.job WHERE idempotency_key=:key").param("key",key).query(Integer.class).single()==1);return jdbc.sql("SELECT id FROM gw.job WHERE idempotency_key=:key").param("key",key).query(String.class).single();}
     protected String state(String id){return jdbc.sql("SELECT status FROM gw.job WHERE id=:id").param("id",id).query(String.class).single();}
-    protected int count(String table,String id){if(!Set.of("result","audit_event","job_event").contains(table))throw new IllegalArgumentException();return jdbc.sql("SELECT count(*) FROM gw."+table+" WHERE job_id=:id"+(table.equals("job_event")?" AND type<>'job.queued'":"")).param("id",id).query(Integer.class).single();}
+    protected int count(String table,String id){if(!Set.of("result","audit_event","job_event").contains(table))throw new IllegalArgumentException();return jdbc.sql("SELECT count(*) FROM gw."+table+" WHERE job_id=:id"+(table.equals("job_event")?" AND type IN ('job.completed','job.partial','job.failed','job.cancelled')":"")).param("id",id).query(Integer.class).single();}
+    protected int started(String id){return jdbc.sql("SELECT count(*) FROM gw.job_event WHERE job_id=:id AND type='job.started'").param("id",id).query(Integer.class).single();}
     protected void await(java.util.function.BooleanSupplier test)throws Exception{long deadline=System.nanoTime()+Duration.ofSeconds(15).toNanos();while(!test.getAsBoolean()&&System.nanoTime()<deadline)Thread.sleep(20);assertThat(test.getAsBoolean()).isTrue();}
     protected void haltWithRunningAndQueued()throws Exception{
         arm("running","TERMINAL_PRECOMMIT",List.of("TOOL_IN_FLIGHT"));String running=admit("running");await(()->state(running).equals("RUNNING"));
         arm("queued",null,List.of());admit("queued");assertThat(hook("/__test/pause",Map.of("point","TOOL_IN_FLIGHT","jobId",running,"op","RELEASE")).statusCode()).isEqualTo(204);
         assertThat(harness.awaitExit(Duration.ofSeconds(15))).isEqualTo(137);
+        assertThat(started(running)).isOne();assertThat(started(job("queued"))).isZero();
     }
     @Override @AfterEach protected void close(){try{if(harness!=null){harness.close();assertThat(harness.sentinelCount()).isZero();}}finally{super.close();}}
 }

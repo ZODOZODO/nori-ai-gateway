@@ -39,7 +39,9 @@ public class P09TestPorts {
         observations.workflows.add(job);
         if(observations.blockingCall!=null){var call=observations.blockingCall;job.cancellation().register(call);call.start();call.ended.await();job.cancellation().completed(call);}
         if(pauses.isPresent())pauses.get().hit(PausePointRegistry.Point.TOOL_IN_FLIGHT,job.jobId());
-        return TerminalSpec.outcome(JobStatus.SUCCEEDED,ResultStatus.SUCCESS,null,Map.of("fixture",true,"requestPerm",job.scope().perm().stream().sorted().toList(),"requestPdg",job.scope().pdg(),"requestId",job.scope().requestId(),"issuedAt",job.scope().issuedAt().toString(),"expiresAt",job.scope().expiresAt().toString()));
+        var payload=new LinkedHashMap<String,Object>();payload.put("fixture",true);payload.put("requestPerm",job.scope().perm().stream().sorted().toList());payload.put("requestPdg",job.scope().pdg());payload.put("requestId",job.scope().requestId());payload.put("issuedAt",job.scope().issuedAt().toString());payload.put("expiresAt",job.scope().expiresAt().toString());
+        payload.put("inputMessageId",job.requestInput().messageId());payload.put("inputJobSeq",job.requestInput().jobSeq());payload.put("inputQuestion",job.requestInput().maskedQuestion());payload.put("requestFields",job.requestInput().requestFields());
+        return TerminalSpec.outcome(JobStatus.SUCCEEDED,ResultStatus.SUCCESS,null,payload);
     };}
     @TestConfiguration(proxyBeanMethods=false) @Profile("verify")
     @ConditionalOnProperty(name="ai.gateway.test-hooks.enabled",havingValue="true")

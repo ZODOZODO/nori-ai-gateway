@@ -6,7 +6,7 @@ import java.util.Map;
 
 public record JobContext(String jobId, String conversationId, VerifiedSystemScope scope, String delegation,
         Instant conversationExpiresAt, CancellationToken cancellation, InferenceMode inferenceMode,
-        Map<String,Object> classification) {
-    public JobContext { classification = Map.copyOf(classification); }
+        Map<String,Object> classification, JobRequestInput requestInput) {
+    public JobContext { classification = Map.copyOf(classification); java.util.Objects.requireNonNull(requestInput); }
     @Override public String toString() { return "JobContext[jobId=" + jobId + "]"; }
 }

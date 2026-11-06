@@ -6,6 +6,7 @@ import com.nori.ai.gateway.persistence.repository.*;
 import com.nori.ai.gateway.persistence.testing.PgTestDatabase;
 import java.time.*;
 import java.util.Set;
+import java.util.Map;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -168,7 +169,8 @@ class RetentionBoundaryIT extends PgIntegrationSupport {
         var audit = bean(AuditRepository.class);
         var retention = bean(RetentionMaintenanceRepository.class);
         assertThat(conversations.insert(owner, "conversation")).isTrue();
-        assertThat(bean(JobRepository.class).insert(owner, new JobRepository.NewJob("job", "conversation", null, "digest", "B"), null)).isTrue();
+        assertThat(bean(MessageRepository.class).insert(owner,"conversation",message("message",null))).isTrue();
+        assertThat(bean(JobRepository.class).insert(owner, new JobRepository.NewJob("job", "conversation", null, "digest", "B", "message", Map.of()), null)).isTrue();
         assertThat(audit.insert(owner, event("linked", "conversation", "job"))).isTrue();
         clock.now = BASE.plus(CONVERSATION_TTL);
         assertThat(conversations.find(owner, "conversation")).isEmpty();
@@ -209,7 +211,8 @@ class RetentionBoundaryIT extends PgIntegrationSupport {
             var actualOwner = id.equals("foreign-owner") ? scope(OwnerSystem.WM, "actor", "pdg")
                 : id.equals("foreign-actor") ? scope(OwnerSystem.TC, "other", "pdg") : owner;
             assertThat(conversations.insert(actualOwner, id)).isTrue();
-            assertThat(jobs.insert(actualOwner, new JobRepository.NewJob("job-" + id, id, null, "digest", "B"), null)).isTrue();
+            assertThat(bean(MessageRepository.class).insert(actualOwner,id,message("message-"+id,null))).isTrue();
+            assertThat(jobs.insert(actualOwner, new JobRepository.NewJob("job-" + id, id, null, "digest", "B", "message-"+id, Map.of()), null)).isTrue();
         }
         clock.now = BASE.plus(Duration.ofDays(31));
         for (String id : new String[] {"missing", "foreign-owner", "foreign-actor"}) {

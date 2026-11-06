@@ -13,6 +13,10 @@ import java.util.*;
 /** Spring에 의존하지 않는 Core의 빈 등록 책임을 이 설정에 모읍니다. */
 @Configuration(proxyBeanMethods = false)
 public class CoreBeansConfiguration {
+    @Bean com.nori.ai.gateway.core.result.ResultAccessEvaluator resultAccessEvaluator() { return new com.nori.ai.gateway.core.result.ResultAccessEvaluator(); }
+    @Bean com.nori.ai.gateway.core.result.KnowledgeDocumentStateReader knowledgeDocumentStateReader() { return new com.nori.ai.gateway.core.result.FailClosedKnowledgeDocumentStateReader(); }
+    @Bean com.nori.ai.gateway.core.result.EvidenceSourceReader evidenceSourceReader() { return new com.nori.ai.gateway.core.result.FailClosedEvidenceSourceReader(); }
+    @Bean com.nori.ai.gateway.core.expiry.ExpiryCheckpoint expiryCheckpoint(com.nori.ai.gateway.core.expiry.ConversationExpiryGuard guard,Clock clock) { return new com.nori.ai.gateway.core.expiry.ExpiryCheckpoint(guard,clock); }
     @Bean com.nori.ai.gateway.core.sanitize.ContentSanitizer contentSanitizer() { return new com.nori.ai.gateway.core.sanitize.ContentSanitizer(); }
     @Bean com.nori.ai.gateway.core.expiry.ConversationExpiryGuard conversationExpiryGuard() { return new com.nori.ai.gateway.core.expiry.ConversationExpiryGuard(); }
     @Bean com.nori.ai.gateway.core.job.GenerationSemaphore generationSemaphore(CapacityProfile capacity) { return new com.nori.ai.gateway.core.job.GenerationSemaphore(capacity.generationConcurrency()); }

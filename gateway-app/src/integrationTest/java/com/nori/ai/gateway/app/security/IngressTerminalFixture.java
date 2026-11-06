@@ -25,14 +25,15 @@ public class IngressTerminalFixture {
         private final ConversationRepository conversations;
         private final JobRepository jobs;
         private final CacheRepository cache;
+        private final MessageRepository messages;
         private final Clock clock;
         private final Counters counters;
-        Terminal(ConversationRepository conversations,JobRepository jobs,CacheRepository cache,Clock clock,Counters counters) {
-            this.conversations = conversations; this.jobs = jobs; this.cache = cache; this.clock = clock; this.counters = counters;
+        Terminal(ConversationRepository conversations,JobRepository jobs,CacheRepository cache,Clock clock,Counters counters,MessageRepository messages) {
+            this.messages=messages; this.conversations = conversations; this.jobs = jobs; this.cache = cache; this.clock = clock; this.counters = counters;
         }
-        @PostMapping({"/v1/query","/v1/conversations/{id}/messages","/v1/analyses"})
+        @PostMapping(value={"/v1/query","/v1/conversations/{id}/messages","/v1/analyses"},headers="X-AIGW-Auth-Probe=1")
         ResponseEntity<Map<String,Object>> job(HttpServletRequest request,@RequestBody Map<String,Object> body) { return terminal(request,body,true); }
-        @PostMapping("/v1/conversations")
+        @PostMapping(value="/v1/conversations",headers="X-AIGW-Auth-Probe=1")
         ResponseEntity<Map<String,Object>> conversation(HttpServletRequest request,@RequestBody Map<String,Object> body) { return terminal(request,body,false); }
         private ResponseEntity<Map<String,Object>> terminal(HttpServletRequest request,Map<String,Object> body,boolean job) {
             counters.terminal.incrementAndGet();
@@ -42,7 +43,9 @@ public class IngressTerminalFixture {
             if (!conversations.insert(scope,conversation) || conversations.find(scope,conversation).isEmpty()) throw new IllegalStateException("시험 대화 왕복에 실패했습니다");
             if (job) {
                 String delegation = (String)Objects.requireNonNull(request.getAttribute(ServiceTokenAuthFilter.VERIFIED_DELEGATION_ATTRIBUTE));
-                if (!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,null,"fixture","B"),delegation) || jobs.find(scope,jobId).isEmpty()) throw new IllegalStateException("시험 작업 왕복에 실패했습니다");
+                String messageId=UUID.randomUUID().toString();
+                if(!messages.insert(scope,conversation,new MessageRepository.Message(messageId,"user","인증 경계 시험","[]","[]",null,null)))throw new IllegalStateException("시험 메시지 저장 실패");
+                if (!jobs.insert(scope,new JobRepository.NewJob(jobId,conversation,null,"fixture","B",messageId,Map.of()),delegation) || jobs.find(scope,jobId).isEmpty()) throw new IllegalStateException("시험 작업 왕복에 실패했습니다");
             }
             counters.source.incrementAndGet();
             if (!cache.put(scope,conversation,"fixture",new CacheRepository.Entry("fixture","{}","[]",clock.instant().plusSeconds(30)))) throw new IllegalStateException("시험 캐시 저장에 실패했습니다");

@@ -14,7 +14,7 @@ public final class IdempotentAdmissionLookup {
         return repository.find(scope,key).map(existing->{
             if(!clock.instant().isBefore(existing.expiresAt()))throw new JobAdmissionService.Rejected(404,null,0);
             if(!existing.requestDigest().equals(digest))throw new JobAdmissionService.Rejected(409,"IDEMPOTENCY_KEY_CONFLICT",0);
-            return new JobAdmissionService.Accepted(existing.jobId(),existing.conversationId(),null,0);
+            return new JobAdmissionService.Accepted(existing.jobId(),existing.conversationId(),existing.requestMessageId(),0);
         });
     }
 }

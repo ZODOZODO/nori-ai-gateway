@@ -1,7 +1,7 @@
 package com.nori.ai.gateway.app.harness;
 
 import com.nori.ai.gateway.app.job.P09TestPorts;
-import com.nori.ai.gateway.app.job.P09AdmissionEndpoint;
+import com.nori.ai.gateway.app.job.HarnessObservationsEndpoint;
 import com.nori.ai.gateway.app.hooks.TestHookRegistry;
 import com.nori.ai.gateway.app.job.recovery.ReadinessPrecondition;
 import com.nori.ai.gateway.core.registry.TaskType;
@@ -13,7 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** P11·P13에서 각각 인가·workflow fake를 제거하고 같은 프로세스 시험을 유지합니다. */
 @TestConfiguration(proxyBeanMethods=false)
-@Import({P09TestPorts.class,P09TestPorts.VerifySeams.class,P09AdmissionEndpoint.class})
+@Import({P09TestPorts.class,P09TestPorts.VerifySeams.class,HarnessObservationsEndpoint.class})
 public class HarnessP09TestPorts {
     @Bean ReadinessPrecondition recoveredClassificationFixture(JdbcClient jdbc,TestHookRegistry hooks,TransactionTemplate tx){
         return new ReadinessPrecondition(){
