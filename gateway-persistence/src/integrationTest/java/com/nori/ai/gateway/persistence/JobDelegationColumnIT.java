@@ -10,7 +10,8 @@ class JobDelegationColumnIT extends PgIntegrationSupport {
             database.bootstrap(false); database.migrate();
             try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
                 statement.execute("INSERT INTO gw.conversation VALUES ('c','TC','actor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '1 day','ACTIVE')");
-                try (var insert = connection.prepareStatement("INSERT INTO gw.job(id, conversation_id, owner_system, actor_ref, status, created_at, request_digest, expected_path, delegation_id, request_perm, request_pdg) VALUES ('j','c','TC','actor','QUEUED',CURRENT_TIMESTAMP,'digest','B',?,ARRAY['EQP_READ'],repeat('a',64))")) {
+                statement.executeUpdate("INSERT INTO gw.message(id,conversation_id,owner_system,role,created_at,content_masked,resource_refs,tool_execution_refs) VALUES ('m','c','TC','user',CURRENT_TIMESTAMP,'위임 시험','[]','[]')");
+                try (var insert = connection.prepareStatement("INSERT INTO gw.job(id, conversation_id, owner_system, actor_ref, status, created_at, request_digest, expected_path, delegation_id, request_perm, request_pdg, request_message_id, request_input) VALUES ('j','c','TC','actor','QUEUED',CURRENT_TIMESTAMP,'digest','B',?,ARRAY['EQP_READ'],repeat('a',64),'m','{}')")) {
                     byte[] bytes = new byte[32]; new java.security.SecureRandom().nextBytes(bytes);
                     insert.setString(1, java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)); insert.executeUpdate();
                 }

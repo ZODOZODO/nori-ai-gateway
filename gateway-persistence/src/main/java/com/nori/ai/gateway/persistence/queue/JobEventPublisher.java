@@ -29,6 +29,9 @@ public final class JobEventPublisher {
     public void publishQueued(String jobId) {
         for(Long id:jdbc.sql("SELECT id FROM gw.job_event WHERE job_id=:id AND type='job.queued' AND published_at IS NULL AND NOT external_suppressed").param("id",jobId).query(Long.class).list())publish(id);
     }
+    public void publishStarted(String jobId) {
+        for(Long id:jdbc.sql("SELECT id FROM gw.job_event WHERE job_id=:id AND type='job.started' AND published_at IS NULL AND NOT external_suppressed").param("id",jobId).query(Long.class).list())publish(id);
+    }
     public void republishTerminal() {
         for (Long id : jdbc.sql("SELECT id FROM gw.job_event WHERE published_at IS NULL AND NOT external_suppressed AND type IN ('job.completed','job.partial','job.failed','job.cancelled') ORDER BY id").query(Long.class).list()) publish(id);
     }

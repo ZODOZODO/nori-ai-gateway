@@ -132,7 +132,7 @@ class IngressAuthIT extends StackContextSupport {
     String signed(Map<String,Object> claims) throws Exception { return malformed.sign(JSONObjectUtils.toJSONString(claims)); }
     URI uri(String path) { return URI.create("http://127.0.0.1:" + context.getEnvironment().getProperty("local.server.port") + path); }
     HttpResponse<String> send(String path,String assertion,String token,Map<String,Object> body) throws Exception {
-        var builder = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10)).header("Content-Type","application/json").header("X-Request-Id","client-forged-id");
+        var builder = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10)).header("X-AIGW-Auth-Probe","1").header("Content-Type","application/json").header("X-Request-Id","client-forged-id");
         if (token != null) builder.header("Authorization","Bearer " + token);
         if (assertion != null) builder.header("X-Actor-Assertion",assertion);
         return client.send(builder.POST(HttpRequest.BodyPublishers.ofString(JSONObjectUtils.toJSONString(body))).build(),HttpResponse.BodyHandlers.ofString());
@@ -321,7 +321,7 @@ class IngressAuthIT extends StackContextSupport {
             var values = IngressAuthIT.this.claims(true);
             String assertion = signer.sign(values,NOW);
             var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + context.getEnvironment().getProperty("local.server.port") + properties.getOrDefault("server.servlet.context-path","") + "/v1/query"))
-                .timeout(Duration.ofSeconds(10)).header("Content-Type","application/json").header("Authorization","Bearer " + serviceToken);
+                .timeout(Duration.ofSeconds(10)).header("X-AIGW-Auth-Probe","1").header("Content-Type","application/json").header("Authorization","Bearer " + serviceToken);
             if (bodyMismatch) request.header("X-Actor-Assertion",assertion);
             return client.send(request.POST(HttpRequest.BodyPublishers.ofString(bodyMismatch ? "{\"system\":\"WM\"}" : "{}")).build(),HttpResponse.BodyHandlers.ofString());
         }
@@ -386,7 +386,7 @@ class IngressAuthIT extends StackContextSupport {
             String token = isolated.signing().sign(claims(false),NOW);
             for (String path : List.of("/v1/query;tag=x","/v1/conversations/id;tag=x/messages","/v1/analyses;tag=x")) {
                 var response = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + isolated.application().getEnvironment().getProperty("local.server.port") + "/gateway" + path))
-                    .header("Authorization","Bearer " + isolated.serviceToken()).header("X-Actor-Assertion",token).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString());
+                    .header("Authorization","Bearer " + isolated.serviceToken()).header("X-Actor-Assertion",token).header("X-AIGW-Auth-Probe","1").header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString());
                 assertThat(response.statusCode()).isEqualTo(401); assertThat(isolated.application().getBean(IngressTerminalFixture.Counters.class).downstream()).isZero();
             }
             var spy = (ServiceTokenAuthFilter)isolated.application().getBean("serviceTokenAuthFilterRegistration",FilterRegistrationBean.class).getFilter();

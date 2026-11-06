@@ -24,7 +24,7 @@ class P09AppContextWiringIT extends P09QueueSupport {
     private final String hashSentinel="hash-sentinel-"+UUID.randomUUID();
     @Override protected void prepareSecurityCredentials(){super.prepareSecurityCredentials();try{if("missing".equals(hookFileFailure))java.nio.file.Files.delete(securityDirectory.resolve("hook.sha256"));if("invalid".equals(hookFileFailure))java.nio.file.Files.writeString(securityDirectory.resolve("hook.sha256"),hashSentinel);}catch(java.io.IOException failure){throw new IllegalStateException("시험 훅 파일 변형 실패");}}
     static boolean failLate;static int signals;static JobDispatcher createdDispatcher;static JobTimeoutSweeper createdSweeper;
-    @Override protected Class<?>[] extraSources(){return new Class<?>[]{P09AdmissionEndpoint.class,Observe.class};}
+    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,Observe.class};}
     @TestConfiguration(proxyBeanMethods=false) static class Observe{
         @Bean ReadinessPrecondition later(){return new ReadinessPrecondition(){public int order(){return 20;}public void run(){if(failLate)throw new IllegalStateException("후순위 확인 실패");}};}
         @Bean static BeanPostProcessor startupObservation(){return new BeanPostProcessor(){@Override public Object postProcessAfterInitialization(Object bean,String name){

@@ -16,3 +16,5 @@ request_digest
 expected_path
 request_perm
 request_pdg
+request_message_id
+request_input

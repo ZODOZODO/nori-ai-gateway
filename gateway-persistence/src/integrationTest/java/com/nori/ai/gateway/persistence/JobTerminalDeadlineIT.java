@@ -42,8 +42,9 @@ class JobTerminalDeadlineIT extends PgIntegrationSupport {
                 assertThat(context.getBean(ConversationRepository.class).insert(scope,"deadline-conversation")).isTrue();
                 for(long delta:new long[]{0,1}){
                     String id="deadline-"+delta;
+                    assertThat(context.getBean(com.nori.ai.gateway.persistence.repository.MessageRepository.class).insert(scope,"deadline-conversation",new com.nori.ai.gateway.persistence.repository.MessageRepository.Message("message-"+id,"user","기한 시험","[]","[]",null,null))).isTrue();
                     assertThat(context.getBean(JobRepository.class).insert(scope,
-                        new JobRepository.NewJob(id,"deadline-conversation",null,"digest","/v1/query"),null)).isTrue();
+                        new JobRepository.NewJob(id,"deadline-conversation",null,"digest","/v1/query","message-"+id,Map.of()),null)).isTrue();
                     Boolean started=new TransactionTemplate(manager).execute(tx->new QueueJobRepository(jdbc).start(id,CREATED));
                     assertThat(started).isTrue();
                     // 제어 시계의 microsecond 내림을 거치지 않는 실제 Clock 입력으로 정책 경계를 검사합니다.

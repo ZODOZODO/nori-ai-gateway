@@ -25,7 +25,7 @@ public abstract class P09QueueSupport extends StackContextSupport {
     @Override protected WebApplicationType applicationType(){return WebApplicationType.SERVLET;}
     @Override protected void prepareSecurityCredentials(){super.prepareSecurityCredentials();try{Files.writeString(securityDirectory.resolve("hook.sha256"),java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(hookToken.getBytes(java.nio.charset.StandardCharsets.UTF_8)))+"\n");}catch(Exception failure){throw new IllegalStateException("시험 훅 자격 준비 실패");}}
     @Override protected Map<String,Object> extraApplicationProperties(){return Map.of("ai.gateway.test-hooks.enabled",true,"ai.gateway.test-hooks.token-sha256-file",securityDirectory.resolve("hook.sha256").toString(),"ai.gateway.test-hooks.clock.mode","FROZEN","ai.gateway.test-hooks.clock.initial",NOW.toString());}
-    protected Class<?>[] extraSources(){return new Class<?>[]{P09AdmissionEndpoint.class};}
+    protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class};}
     @BeforeEach protected void setupQueue(){start(extraSources());}
     @Override @AfterEach protected void close(){
         try{if(context!=null){pauses().reset();var call=observations().blockingCall;if(call!=null)call.allowExit.countDown();long deadline=System.nanoTime()+Duration.ofSeconds(5).toNanos();while(context.getBean(SlotLedger.class).activeCount()>0&&System.nanoTime()<deadline)Thread.sleep(10);}}
@@ -47,7 +47,7 @@ public abstract class P09QueueSupport extends StackContextSupport {
     protected URI uri(String path){return URI.create("http://127.0.0.1:"+((WebServerApplicationContext)context).getWebServer().getPort()+path);}
     protected Map<String,Object> claims(String actor,String dlg){var claims=new HashMap<String,Object>(Map.of("iss","tc-ui-backend","aud","ai-gateway","sys","TC","sub",actor,"scope","READ","perm",List.of("EQP_READ","MODEL_READ"),"pdg",P09TestPorts.PDG));if(dlg!=null)claims.put("dlg",dlg);return claims;}
     protected HttpResponse<String> postQuery(String actor,String key,String question)throws Exception{
-        var request=HttpRequest.newBuilder(uri("/v1/query")).timeout(Duration.ofSeconds(15)).header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",signer.sign(claims(actor,dlg()),clock().instant())).header("Idempotency-Key",key).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("query",question)))).build();
+        var request=HttpRequest.newBuilder(uri("/v1/query")).timeout(Duration.ofSeconds(15)).header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",signer.sign(claims(actor,dlg()),clock().instant())).header("Idempotency-Key",key).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(Map.of("query",question,"context",Map.of("timezone","Asia/Seoul","referenceTime","2026-11-06T09:00:00+09:00"),"resourceRefs",List.of())))).build();
         return HttpClient.newHttpClient().send(request,HttpResponse.BodyHandlers.ofString());
     }
     protected HttpResponse<String> hook(String path,String method,String body,String token)throws Exception{

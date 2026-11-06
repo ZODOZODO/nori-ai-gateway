@@ -23,6 +23,7 @@ class ArchitectureRulesTest {
         rules.put("queue.JobTerminalCommitter.commit(java.lang.String,com.nori.ai.gateway.core.job.TerminalSpec)",Set.of("app.job.JobWorker","app.job.JobTimeoutSweeper","app.job.JobCancellationService","app.job.recovery.StartupRecoveryRunner"));
         rules.put("queue.JobEventPublisher.publish(long)",Set.of("persistence.queue.JobTerminalCommitter"));
         rules.put("queue.JobEventPublisher.publishQueued(java.lang.String)",Set.of("app.job.JobDispatcher"));
+        rules.put("queue.JobEventPublisher.publishStarted(java.lang.String)",Set.of("app.job.JobDispatcher"));
         rules.put("queue.JobEventPublisher.terminalCommitted(java.lang.String)",Set.of("persistence.queue.JobTerminalCommitter"));
         rules.put("queue.JobEventPublisher.republishTerminal()",Set.of("app.job.recovery.StartupRecoveryRunner"));
         for(String method:List.of("beforeCommit","afterCommit"))rules.put("queue.TerminalCommitObserver."+method+"(java.lang.String)",Set.of("persistence.queue.JobTerminalCommitter"));

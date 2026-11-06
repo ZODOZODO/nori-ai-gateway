@@ -14,6 +14,25 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class JobQueueIT extends P09QueueSupport {
+    @Test void startedTransitionEventAndPublicationAreAtomicAndLosingOrRolledBackStartsStaySilent() throws Exception {
+        var published=new CopyOnWriteArrayList<com.nori.ai.gateway.persistence.queue.JobEventPublisher.Published>();
+        context.addApplicationListener(event->{if(event instanceof org.springframework.context.PayloadApplicationEvent<?> payload&&payload.getPayload() instanceof com.nori.ai.gateway.persistence.queue.JobEventPublisher.Published value)published.add(value);});
+        var running=admit("actor","started",Set.of(PausePointRegistry.Point.TOOL_IN_FLIGHT));await(()->observations().workflows.size()==1);
+        var times=jdbc().sql("SELECT j.started_at,e.created_at FROM gw.job j JOIN gw.job_event e ON e.job_id=j.id WHERE j.id=:job AND e.type='job.started'").param("job",running.jobId()).query().singleRow();
+        assertThat(times.get("started_at")).isEqualTo(times.get("created_at"));assertThat(startedCount(running.jobId())).isOne();
+        assertThat(published.stream().filter(e->e.jobId().equals(running.jobId())).map(com.nori.ai.gateway.persistence.queue.JobEventPublisher.Published::type)).containsExactly("job.queued","job.started");
+        var queue=context.getBean(com.nori.ai.gateway.persistence.queue.QueueJobRepository.class);var tx=context.getBean(TransactionTemplate.class);
+        assertThatThrownBy(()->queue.start(running.jobId(),NOW)).isInstanceOf(IllegalStateException.class);
+        assertThat(tx.<Boolean>execute(status->queue.start(running.jobId(),NOW))).isFalse();assertThat(startedCount(running.jobId())).isOne();
+        var cancelled=admit("actor","cancel-before-start",Set.of());assertThat(context.getBean(JobCancellationService.class).cancel(scope("actor"),cancelled.jobId())).isTrue();
+        assertThat(tx.<Boolean>execute(status->queue.start(cancelled.jobId(),NOW))).isFalse();assertThat(startedCount(cancelled.jobId())).isZero();
+        var rollback=admit("actor","rollback-start",Set.of());
+        tx.executeWithoutResult(status->{assertThat(queue.start(rollback.jobId(),NOW)).isTrue();status.setRollbackOnly();});
+        assertThat(state(rollback.jobId())).isEqualTo("QUEUED");assertThat(startedCount(rollback.jobId())).isZero();
+        assertThat(published.stream().filter(e->e.jobId().equals(rollback.jobId())&&e.type().equals("job.started"))).isEmpty();
+        pauses().release(PausePointRegistry.Point.TOOL_IN_FLIGHT,running.jobId());
+    }
+    private int startedCount(String job) {return jdbc().sql("SELECT count(*) FROM gw.job_event WHERE job_id=:job AND type='job.started'").param("job",job).query(Integer.class).single();}
     @Test @Tag("AC-28-FIFO") @Tag("AC-28-DEPTH") @Tag("AC-28-FULL") void fifoDepthAndFullQueue()throws Exception{
         var first=admit("actor","first",Set.of(PausePointRegistry.Point.TOOL_IN_FLIGHT));await(()->state(first.jobId()).equals("RUNNING"));
         var ids=new ArrayList<String>();for(int i=0;i<4;i++)ids.add(admit("actor","q"+i,Set.of()).jobId());

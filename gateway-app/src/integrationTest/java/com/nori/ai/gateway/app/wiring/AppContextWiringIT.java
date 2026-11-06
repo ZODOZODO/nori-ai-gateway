@@ -64,9 +64,11 @@ class AppContextWiringIT extends StackContextSupport {
         for (Class<?> type : new Class<?>[]{CoreBeansConfiguration.class, IntegrationModuleConfiguration.class,
                 PersistenceModuleConfiguration.class, TcMockModuleConfiguration.class, ManifestLoader.class,
                 CapabilityRegistry.class, ContractVersionPolicy.class, PlanValidator.class, ToolDispatcher.class,
-                ToolResultContractValidator.class, PlanInjectionSeam.class, DispatchInjectionSeam.class})
+                ToolResultContractValidator.class, PlanInjectionSeam.class, DispatchInjectionSeam.class,
+                com.nori.ai.gateway.core.result.ResultAccessEvaluator.class,com.nori.ai.gateway.core.result.KnowledgeDocumentStateReader.class,
+                com.nori.ai.gateway.core.result.EvidenceSourceReader.class,com.nori.ai.gateway.core.expiry.ExpiryCheckpoint.class})
             assertThat(context.getBeansOfType(type)).hasSize(1);
-        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(11);
+        assertThat(Arrays.stream(CoreBeansConfiguration.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(Bean.class))).hasSize(15);
         assertThat(context.getBean(PlanInjectionSeam.class)).isExactlyInstanceOf(PlanInjectionSeam.NoOp.class);
         assertThat(context.getBean(DispatchInjectionSeam.class)).isExactlyInstanceOf(DispatchInjectionSeam.NoOp.class);
         assertThat(context.getBeansOfType(ToolExecutor.class)).isEmpty();
@@ -130,7 +132,7 @@ class AppContextWiringIT extends StackContextSupport {
         try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
             String latest;
             try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")) {
-                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("4");
+                assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("5");
             }
             try (var update = connection.prepareStatement("UPDATE gw_flyway.flyway_schema_history SET version = '10' WHERE version = ?")) { update.setString(1,latest); assertThat(update.executeUpdate()).isEqualTo(1); }
         }
@@ -179,9 +181,9 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(context.getBeansOfType(com.nori.ai.gateway.app.config.MigrateCommand.class)).isEmpty();
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class)
             .sql("SELECT count(*) FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
-            .query(Integer.class).single()).isEqualTo(5);
+            .query(Integer.class).single()).isEqualTo(6);
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")
-            .query(String.class).list()).containsExactly("1","2","3","3.1","4");
+            .query(String.class).list()).containsExactly("1","2","3","3.1","4","5");
     }
 
     private void withMigrationProperties(String role, Runnable action) {

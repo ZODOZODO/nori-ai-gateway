@@ -26,11 +26,12 @@ public final class JobWorker {
     private final Optional<PausePointRegistry> pauses;
     private final Optional<FaultInjector> faults;
     private final SlotLedger slots;
+    private final com.nori.ai.gateway.core.port.JobRequestInputReader inputs;
     public JobWorker(JobDelegationReader delegations,ScopeAssembler scopes,ConversationExpiryGuard expiry,Clock clock,
             TcSourceAuthorizationPort authorization,WorkflowExecutor workflow,JobTerminalCommitter terminal,JobRepository jobs,
-            InferenceModeProperties inference,Optional<StructuredClassificationHook> classification,Optional<PausePointRegistry> pauses,Optional<FaultInjector> faults,SlotLedger slots){
+            InferenceModeProperties inference,Optional<StructuredClassificationHook> classification,Optional<PausePointRegistry> pauses,Optional<FaultInjector> faults,SlotLedger slots,com.nori.ai.gateway.core.port.JobRequestInputReader inputs){
         this.delegations=delegations;this.scopes=scopes;this.expiry=expiry;this.clock=clock;this.authorization=authorization;this.workflow=workflow;
-        this.terminal=terminal;this.jobs=jobs;this.inference=inference;this.classification=classification;this.pauses=pauses;this.faults=faults;this.slots=slots;
+        this.terminal=terminal;this.jobs=jobs;this.inference=inference;this.classification=classification;this.pauses=pauses;this.faults=faults;this.slots=slots;this.inputs=inputs;
     }
     public void run(JobScopeRecord job,CancellationToken token){
         token.attachWorker(Thread.currentThread());TerminalSpec result;
@@ -54,8 +55,17 @@ public final class JobWorker {
                     faults.ifPresent(f->f.haltAt(job.jobId(),PausePointRegistry.Point.BEFORE_CLASSIFICATION));
                     if(pauses.isPresent())pauses.get().hit(PausePointRegistry.Point.BEFORE_CLASSIFICATION,job.jobId());
                     expiry.assertLive(job.conversationExpiresAt(),clock.instant());
+                    var latest=jobs.find(scope,job.jobId());
+                    if(latest.isPresent()&&latest.get().cancelRequestedAt()!=null)token.signal(CancellationToken.Reason.CANCELLED);
+                    if(token.reason().isPresent())throw new InterruptedException();
+                    var input=inputs.findRequestInput(scope,job.jobId()).orElseThrow(()->{
+                        expiry.assertLive(job.conversationExpiresAt(),clock.instant());
+                        return new IllegalStateException("작업 입력 연결을 확인할 수 없습니다");
+                    });
+                    expiry.assertLive(job.conversationExpiresAt(),clock.instant());
+                    if(token.reason().isPresent())throw new InterruptedException();
                     Map<String,Object> classified=classification.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(job.jobId());
-                    result=workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified));
+                    result=workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified,input));
                     }
                 }
             }

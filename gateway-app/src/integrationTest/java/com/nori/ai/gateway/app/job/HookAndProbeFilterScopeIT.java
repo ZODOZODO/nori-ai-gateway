@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HookAndProbeFilterScopeIT extends P09QueueSupport {
-    @Override protected Class<?>[] extraSources(){return new Class<?>[]{P09AdmissionEndpoint.class,Observation.class};}
+    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,Observation.class};}
     @TestConfiguration(proxyBeanMethods=false) static class Observation{
         @Bean static BeanPostProcessor observe(){return new BeanPostProcessor(){@Override @SuppressWarnings({"rawtypes","unchecked"})public Object postProcessAfterInitialization(Object bean,String name){if(bean instanceof FilterRegistrationBean registration)registration.setFilter(spy(registration.getFilter()));return bean;}};}
     }

@@ -9,18 +9,23 @@ class WorkerRestartProcessIT extends WorkerRestartProcessSupport {
     @Test @Tag("AC-18-WORKER-RUN") void runningProcessHaltsAndRestartCommitsInterruptedOnce()throws Exception{
         arm("run","BEFORE_CLASSIFICATION",List.of());try{admit("run");}catch(java.io.IOException interrupted){assertThat(interrupted).isNotNull();}
         assertThat(harness.awaitExit(Duration.ofSeconds(15))).isEqualTo(137);String id=job("run");assertThat(state(id)).isEqualTo("RUNNING");
+        assertThat(started(id)).isOne();
         launch(NOW.plusSeconds(1));assertThat(state(id)).isEqualTo("FAILED");assertThat(count("result",id)).isOne();assertThat(count("audit_event",id)).isOne();assertThat(count("job_event",id)).isOne();
         var result=send("/v1/analyses/"+id,"GET",null,null,NOW.plusSeconds(1),false);assertThat(result.statusCode()).isEqualTo(200);assertThat(json.readTree(result.body()).get("result").get("errorCode").asString()).isEqualTo("WORKER_INTERRUPTED");
     }
     @Test @Tag("AC-18-WORKER-QUEUED-VALID") void queuedJobResumesWithPersistedPermissionsAndOriginalScope()throws Exception{
         haltWithRunningAndQueued();String queued=job("queued");launch(NOW.plusSeconds(1));await(()->state(queued).equals("SUCCEEDED"));
+        assertThat(started(queued)).isOne();
         var payload=json.readTree(jdbc.sql("SELECT payload::text FROM gw.result WHERE job_id=:id").param("id",queued).query(String.class).single());
         assertThat(payload.get("requestPerm").toString()).isEqualTo("[\"EQP_READ\",\"MODEL_READ\"]");assertThat(payload.get("requestPdg").asString()).isEqualTo(P09TestPorts.PDG);assertThat(payload.get("requestId").asString()).isEqualTo(queued);
         assertThat(payload.get("issuedAt").asString()).isEqualTo(NOW.toString());assertThat(payload.get("expiresAt").asString()).isEqualTo(NOW.plusSeconds(180).plusNanos(1).toString());
+        assertThat(payload.get("inputMessageId").asString()).isEqualTo(jdbc.sql("SELECT request_message_id FROM gw.job WHERE id=:id").param("id",queued).query(String.class).single());
+        assertThat(payload.get("inputQuestion").asString()).isEqualTo("시험 질의");assertThat(payload.get("requestFields").get("context").get("referenceTime").asString()).isEqualTo("2026-11-06T09:00:00+09:00");
         assertThat(count("result",queued)).isOne();var observations=send("/__test/harness-observations","GET",null,null,null,false);assertThat(json.readTree(observations.body()).get("authorization").asInt()).isOne();
     }
     @Test @Tag("AC-18-WORKER-QUEUED-EXPIRED") void queuedAfterOneEightyOneRemainsQueueTimeoutAndRunningIsInterrupted()throws Exception{
         haltWithRunningAndQueued();String queued=job("queued"),running=job("running");launch(NOW.plusSeconds(181));
+        assertThat(started(queued)).isZero();assertThat(started(running)).isOne();
         assertThat(state(queued)).isEqualTo("FAILED");assertThat(jdbc.sql("SELECT error_code FROM gw.result WHERE job_id=:id").param("id",queued).query(String.class).single()).isEqualTo("QUEUE_TIMEOUT");
         assertThat(jdbc.sql("SELECT decision FROM gw.audit_event WHERE job_id=:id").param("id",queued).query(String.class).single()).isEqualTo("QUEUE_TIMEOUT");
         assertThat(jdbc.sql("SELECT error_code FROM gw.result WHERE job_id=:id").param("id",running).query(String.class).single()).isEqualTo("WORKER_INTERRUPTED");
@@ -29,12 +34,14 @@ class WorkerRestartProcessIT extends WorkerRestartProcessSupport {
     @Test @Tag("AC-18-WORKER-RACE-PRECOMMIT") void haltBeforeTerminalCommitRollsBackResultEventAndAudit()throws Exception{
         arm("pre","TERMINAL_PRECOMMIT",List.of());try{admit("pre");}catch(java.io.IOException interrupted){assertThat(interrupted).isNotNull();}
         assertThat(harness.awaitExit(Duration.ofSeconds(15))).isEqualTo(137);String id=job("pre");assertThat(count("result",id)).isZero();assertThat(count("audit_event",id)).isZero();assertThat(count("job_event",id)).isZero();
+        assertThat(started(id)).isOne();
         launch(NOW.plusSeconds(1));assertThat(state(id)).isEqualTo("FAILED");assertThat(count("result",id)).isOne();assertThat(count("audit_event",id)).isOne();
         assertThat(json.readTree(send("/v1/analyses/"+id,"GET",null,null,NOW.plusSeconds(1),false).body()).get("result").get("errorCode").asString()).isEqualTo("WORKER_INTERRUPTED");
     }
     @Test @Tag("AC-18-WORKER-RACE-POSTCOMMIT") void haltAfterCommitKeepsResultAndRepublishesOnlyPendingTerminal()throws Exception{
         arm("post","TERMINAL_POSTCOMMIT",List.of());try{admit("post");}catch(java.io.IOException interrupted){assertThat(interrupted).isNotNull();}
         assertThat(harness.awaitExit(Duration.ofSeconds(15))).isEqualTo(137);String id=job("post");assertThat(state(id)).isEqualTo("SUCCEEDED");assertThat(count("result",id)).isOne();assertThat(count("audit_event",id)).isOne();
+        assertThat(started(id)).isOne();
         assertThat(jdbc.sql("SELECT published_at IS NULL FROM gw.job_event WHERE job_id=:id AND type='job.completed'").param("id",id).query(Boolean.class).single()).isTrue();
         launch(NOW.plusSeconds(1));assertThat(state(id)).isEqualTo("SUCCEEDED");assertThat(count("result",id)).isOne();assertThat(count("job_event",id)).isOne();assertThat(jdbc.sql("SELECT published_at IS NOT NULL FROM gw.job_event WHERE job_id=:id AND type='job.completed'").param("id",id).query(Boolean.class).single()).isTrue();
     }

@@ -38,10 +38,10 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         callerContext.put("timezone","+09:00");
         callerContext.put("referenceTime","2026-10-04T10:00:00+09:00");
         callerContext.put("timeWindow",null);
-        var request=new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",callerContext,"nullable-context",dlg());
+        var request=new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of("context",callerContext),"nullable-context",dlg());
         callerContext.put("timezone","UTC");callerContext.remove("timeWindow");
-        assertThat(request.context()).containsEntry("timezone","+09:00").containsEntry("timeWindow",null);
-        assertThatThrownBy(()->request.context().put("timezone","UTC")).isInstanceOf(UnsupportedOperationException.class);
+        assertThat((Map<String,Object>)request.requestFields().get("context")).containsEntry("timezone","+09:00").containsEntry("timeWindow",null);
+        assertThatThrownBy(()->request.requestFields().put("timezone","UTC")).isInstanceOf(UnsupportedOperationException.class);
         var service=context.getBean(JobAdmissionService.class);
         var first=service.accept(scope("actor"),request);
         assertThat(state(first.jobId())).isEqualTo("QUEUED");
@@ -50,7 +50,7 @@ class IdempotentAdmissionIT extends P09QueueSupport {
         reorderedContext.put("timeWindow",null);
         reorderedContext.put("referenceTime","2026-10-04T10:00:00+09:00");
         reorderedContext.put("timezone","+09:00");
-        var replay=new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",reorderedContext,"nullable-context",dlg());
+        var replay=new JobAdmissionService.AdmissionRequest("/v1/query",null,"질문",Map.of("context",reorderedContext),"nullable-context",dlg());
         assertThat(service.accept(scope("actor"),replay).jobId()).isEqualTo(first.jobId());
         assertThat(counts()).isEqualTo(before);
     }

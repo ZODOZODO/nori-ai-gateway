@@ -26,8 +26,14 @@ public final class QueueJobRepository {
     }
     public boolean start(String jobId, Instant now) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("디스패치 트랜잭션이 필요합니다");
-        return jdbc.sql("UPDATE gw.job SET status='RUNNING',started_at=:now WHERE id=:id AND status='QUEUED'")
-            .param("id",jobId).param("now",Timestamp.from(now)).update() == 1;
+        return jdbc.sql("""
+            WITH started AS (
+                UPDATE gw.job SET status='RUNNING',started_at=:now WHERE id=:id AND status='QUEUED'
+                RETURNING id,owner_system
+            )
+            INSERT INTO gw.job_event(job_id,owner_system,type,payload,created_at,external_suppressed)
+            SELECT id,owner_system,'job.started',jsonb_build_object('jobId',id),:now,false FROM started RETURNING id
+            """).param("id",jobId).param("now",Timestamp.from(now)).query(Long.class).optional().isPresent();
     }
     private static JobScopeRecord map(ResultSet rs, int row) throws SQLException {
         return new JobScopeRecord(OwnerSystem.valueOf(rs.getString(1)),rs.getString(2),

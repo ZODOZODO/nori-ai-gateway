@@ -8,8 +8,18 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AdmissionMaskingIT extends P09QueueSupport {
+    @Test void eventFailureRollsBackMessageJobSnapshotAndConversationInTheSameAdmission() throws Exception {
+        pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");
+        try(var connection=database.connection("aigw_migrator");var sql=connection.createStatement()) {
+            sql.execute("CREATE FUNCTION gw.p10_reject_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '접수 원자성 시험 실패'; END $$");
+            sql.execute("CREATE TRIGGER p10_reject_event BEFORE INSERT ON gw.job_event FOR EACH ROW EXECUTE FUNCTION gw.p10_reject_event()");
+        }
+        var response=postQuery("actor","event-rollback","원자 접수 시험");assertThat(response.statusCode()).isEqualTo(500);assertThat(response.body()).doesNotContain("p10_reject_event");
+        for(String table:java.util.List.of("message","job","job_event","conversation"))assertThat(count(table)).as(table).isZero();
+        assertThat(jdbc().sql("SELECT count(request_input) FROM gw.job").query(Integer.class).single()).isZero();
+    }
     static volatile com.nori.ai.gateway.core.sanitize.ContentSanitizer.Sanitized observed;
-    @Override protected Class<?>[] extraSources(){return new Class<?>[]{P09AdmissionEndpoint.class,Observation.class};}
+    @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,Observation.class};}
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false) static class Observation{
         @org.springframework.context.annotation.Bean static org.springframework.beans.factory.config.BeanPostProcessor sanitizerObservation(){return new org.springframework.beans.factory.config.BeanPostProcessor(){@Override public Object postProcessAfterInitialization(Object bean,String name){
             if(bean instanceof com.nori.ai.gateway.core.sanitize.ContentSanitizer){var sanitizer=spy((com.nori.ai.gateway.core.sanitize.ContentSanitizer)bean);doAnswer(invocation->{var value=(com.nori.ai.gateway.core.sanitize.ContentSanitizer.Sanitized)invocation.callRealMethod();observed=value;return value;}).when(sanitizer).sanitize(anyString());return sanitizer;}return bean;

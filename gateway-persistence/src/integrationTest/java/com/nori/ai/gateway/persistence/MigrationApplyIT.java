@@ -4,6 +4,23 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class MigrationApplyIT extends PgIntegrationSupport {
+    @Test void v5RejectsExistingJobWithoutPartialColumnsOrBackfill() throws Exception {
+        try(var database=rawDatabase()) {
+            database.bootstrap(false);
+            var flyway=org.flywaydb.core.Flyway.configure().dataSource(database.jdbcUrl(),"aigw_migrator",database.passwordFor("aigw_migrator"))
+                .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").target("4").load();flyway.migrate();
+            try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+                sql.execute("INSERT INTO gw.conversation VALUES ('legacy-c','TC','actor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day','ACTIVE')");
+                sql.execute("INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg) VALUES ('legacy-j','legacy-c','TC','actor','QUEUED',CURRENT_TIMESTAMP,'digest','/v1/query',ARRAY[]::text[],repeat('a',64))");
+            }
+            assertThatThrownBy(database::migrate).hasStackTraceContaining("V5 requires an empty gw.job");
+            try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+                try(var rows=sql.executeQuery("SELECT count(*) FROM gw.job WHERE id='legacy-j'")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isOne();}
+                try(var rows=sql.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_schema='gw' AND table_name='job' AND column_name IN ('request_message_id','request_input')")){assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isZero();}
+                try(var rows=sql.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")){assertThat(rows.next()).isTrue();assertThat(rows.getString(1)).isEqualTo("4");}
+            }
+        }
+    }
     @Test void migratorAppliesExactlyV1ToV3AndOwnsAllObjects() throws Exception {
         try (var database = rawDatabase()) {
             database.bootstrap(false);
@@ -37,7 +54,7 @@ class MigrationApplyIT extends PgIntegrationSupport {
                 try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
                     var versions = new java.util.ArrayList<String>();
                     while (rows.next()) { String version = rows.getString(1); versions.add(version); if (checksums.containsKey(version)) assertThat(rows.getInt(2)).isEqualTo(checksums.get(version)); }
-                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4");
+                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4", "5");
                 }
                 try (var rows = statement.executeQuery("SELECT tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
                     int count = 0; while (rows.next()) { count++; assertThat(rows.getString(1)).isEqualTo("aigw_migrator"); } assertThat(count).isEqualTo(16);
