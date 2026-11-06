@@ -1,0 +1,133 @@
+{
+  "id": "permission-revoked",
+  "contractVersion": "1.0",
+  "authorizationUnavailable": false,
+  "delegationInvalid": false,
+  "catalogAvailable": true,
+  "catalogRevision": "mock-v1",
+  "grantedPermissions": [
+    "EQP_READ"
+  ],
+  "eqpSnapshot": {
+    "eqpId": "EQP-001",
+    "connectionState": "CONNECTED",
+    "controlState": "REMOTE",
+    "processState": "RUNNING",
+    "equipmentState": "NORMAL"
+  },
+  "workLots": {
+    "state": "ACTIVE",
+    "activeLots": [
+      {
+        "workId": "WORK-001",
+        "pjId": "PJ-001",
+        "lotId": "LOT-001"
+      }
+    ],
+    "currentLot": "LOT-001"
+  },
+  "events": [
+    {
+      "eventId": "EVENT-001",
+      "occurredAt": "2026-11-06T00:00:00Z",
+      "eventType": "STATE_CHANGED"
+    }
+  ],
+  "dlqs": {
+    "gateway": {
+      "items": [
+        {
+          "entryRef": "entry-001",
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 1,
+        "loadedEntries": 1,
+        "decodeFailures": 0
+      }
+    },
+    "business": {
+      "items": [
+        {
+          "entryRef": "entry-001",
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 1,
+        "loadedEntries": 1,
+        "decodeFailures": 0
+      }
+    }
+  },
+  "commLogs": {
+    "gateway": {
+      "items": [
+        {
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "direction": "IN",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "available": true,
+        "count": 1,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": "2026-11-05T23:50:00Z",
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    },
+    "business": {
+      "items": [
+        {
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "direction": "IN",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "available": true,
+        "count": 1,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": "2026-11-05T23:50:00Z",
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    }
+  },
+  "models": [
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "ROOT",
+      "nodeType": "ROOT",
+      "children": [
+        {
+          "modelId": "MODEL-001",
+          "nodeId": "EVENT-001",
+          "nodeType": "EVENT",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "type": "EQP",
+      "ref": "EQP-001"
+    },
+    {
+      "type": "MODEL",
+      "ref": "MODEL-001"
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "id": "empty",
+  "contractVersion": "1.0",
+  "authorizationUnavailable": false,
+  "delegationInvalid": false,
+  "catalogAvailable": true,
+  "catalogRevision": "mock-v1",
+  "grantedPermissions": [
+    "EQP_READ",
+    "COMM_LOG_READ",
+    "DLQ_READ",
+    "MODEL_READ",
+    "AI_WORKLOT_READ",
+    "AI_EVENT_READ",
+    "AI_LOG_READ",
+    "AI_TRACE_READ",
+    "AI_CODE_READ",
+    "AI_DOC_READ"
+  ],
+  "eqpSnapshot": {
+    "eqpId": "EQP-001",
+    "connectionState": "CONNECTED",
+    "controlState": "REMOTE",
+    "processState": "RUNNING",
+    "equipmentState": "NORMAL"
+  },
+  "workLots": {
+    "state": "ACTIVE",
+    "activeLots": [
+      {
+        "workId": "WORK-001",
+        "pjId": "PJ-001",
+        "lotId": "LOT-001"
+      }
+    ],
+    "currentLot": "LOT-001"
+  },
+  "events": [],
+  "dlqs": {
+    "gateway": {
+      "items": [],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 0,
+        "loadedEntries": 0,
+        "decodeFailures": 0
+      }
+    },
+    "business": {
+      "items": [],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 0,
+        "loadedEntries": 0,
+        "decodeFailures": 0
+      }
+    }
+  },
+  "commLogs": {
+    "gateway": {
+      "items": [],
+      "completeness": {
+        "available": true,
+        "count": 0,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": null,
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    },
+    "business": {
+      "items": [],
+      "completeness": {
+        "available": true,
+        "count": 0,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": null,
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    }
+  },
+  "models": [
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "ROOT",
+      "nodeType": "ROOT",
+      "children": [
+        {
+          "modelId": "MODEL-001",
+          "nodeId": "EVENT-001",
+          "nodeType": "EVENT",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "type": "EQP",
+      "ref": "EQP-001"
+    },
+    {
+      "type": "MODEL",
+      "ref": "MODEL-001"
+    }
+  ]
+}

@@ -6501,3 +6501,99 @@ Spec/Plan/R6/baseline/두 HEAD/빈 staging/보호483/원 P09 85후보/oldV/boots
 - `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p09-parent-terminal-deadline/r1-result.json` — PASS, SHA256 `3627a60df61045b08cca0b762d17259c83bcb625b6c1ed10aa5dd2637b148a98`. 실제 JobTerminalCommitter/PG/raw Instant의 180초 -1ns·정각·+1ns를 SUCCEEDED·SUCCEEDED·TIMED_OUT으로 확인했고 각 감사 1·종결 이벤트 1·delegation NULL을 확인했습니다.
 
 기존 DevReport 원 prefix와 직전 구현 보고 append는 전부 보존하고 이 절만 끝에 추가했습니다. 부모 검증 증거가 기록한 보고서 SHA는 이 절을 추가하기 전의 값이며, 이 추가로 제품 소스·시험·기존 증거 파일은 바뀌지 않았습니다. 커밋은 부모가 별도로 수행합니다.
+
+
+### P11 CONTRACT_READY 후보 — 2026-11-06 / 부모 검토 대기
+
+상태는 **CONTRACT_READY_CANDIDATE_ROOT_REVIEW_PENDING**입니다. P11 phase 전체 완료가 아니며 P12 착수 승인을 자체 선언하지 않습니다. 부모의 독립 source/시험/실제 classpath 확인과 C11contract local commit이 남아 있습니다. 기존 보고서 원 prefix를 바이트 단위로 보존하고 이 절만 append했습니다.
+
+작업 좌표는 AI_ROOT=`C:/workspace_nori/.aigw-worktrees/p11-ai`, branch=`aigw/f1-p11`, base/현재 HEAD C09=`44315e4d861a2100e9703d9b6168244776927b4f`이며 시작 dirty=0입니다. canonical Spec SHA=`c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`, immutable Plan SHA=`7a5e37c8b747a1acbb846ab8804fb6c57c6b483f08a47ee813d6f76b9b424cb5`, baseline seq7 파일 SHA=`b1040ce78cde516641cdc90da644b03e5d459ddc33668243a935ac4e3d348264`를 실제 대조했습니다. 원본 EXEC/다른 lane은 쓰지 않았습니다.
+
+#### 구현과 이유
+
+- P12/P13 소비용 `TcBusinessReadPort`와 nested 업무 DTO·`TcReadResult`, 기존 2필드 `TcSourceAuthorizationPort`를 보존하는 Source 매핑/단계 인가, P14 소비용 `SourceRetentionReader`를 구현했습니다.
+- SourcePermissionMap은 실제 sourceAllowlistRef를 키로 쓰고 미매핑 거부·ANY-of·단계별 현재 권한 재인가·인가 캐시 0을 유지합니다. typed wire4필드의 결손/타입/권한범위/모순/pdg/시각을 기존 SchemaContracts로 검증한 뒤에만 core2필드로 투영합니다. 빈 요청은 Source를 허용하지 않고, 무효 위임과 장애를 구별합니다.
+- 보존 규칙1~6의 반개구간·경계·설정 미확정·건수 trim의 unverifiedRanges·조회 잘림 missingRanges·키별 실패·DLQ SCAN/decode 손실을 typed 결과로 보존합니다.
+- Mock 업무 응답은 typed JSON 왕복과 1.0 schema 검증, 실제 Manifest outputSchema/items 검증 및 동일 SchemaContracts.digest를 사용합니다. 상태·관측 시각·Work/LOT 미확정·독립 키 실패를 빈 성공으로 숨기지 않습니다. 부재 EQP는 EMPTY+null 자료이며 상태를 합성하지 않습니다.
+- Mock 위임은 SHA256 키만 저장하고 발급+300초 절대 TTL·중복재등록 불연장·원자 파일 교체·재생성 시 폐기/만료 보존을 구현했습니다. 이 항목의 증거는 단위 재생성까지이며 실제 자식 JVM 내구성 검증은 아래 미실행입니다.
+- 공통 SchemaContracts/ManifestLoader/PdgCanonical 및 기존 DelegatedCall/Outcome을 재사용했습니다. 신규 타입은 위 외부 읽기/인가/보존 경계를 표현하기 위한 것입니다. Spec/Plan의 확정 계약 변경은 없습니다.
+
+#### 최종 실제 검증
+
+- `:gateway-core:test`(필터 없음): 실제 EXECUTED, 51/51 PASS, skip/error/failure=0, runId=`abeebdc1-a982-4d0d-a6fa-aa077b763009`, fingerprint=`638542ce551031c8075dfe2ffc5b3842f852aa76b73f1e469eceb1e2e8db5358`. 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-core:test"`: TEST_EVIDENCE_VERIFIED·exit0.
+- `:gateway-tc-mock:test`(필터 없음): 실제 EXECUTED, 35/35 PASS, skip/error/failure=0, runId=`4f9ddd0c-207d-49a2-a2c4-7c2ec6dc4599`, fingerprint=`b1e468a958bb030854543b810b4a25ccd3fb124bc402e791bcb27822fd11c52e`. 직후 별도 `:gateway-eval:run --args="test-evidence verify --tasks :gateway-tc-mock:test"`: TEST_EVIDENCE_VERIFIED·exit0.
+- 두 실제 Test 실행 중 source hashes 불변을 확인했습니다. 최종 r2와 별개인 초기 r1/compile 기록도 수정하지 않았으며 stale XML/up-to-date를 새 실제 시험으로 계산하지 않았습니다. 실제 XML·OTR·run-binding·fresh Test.classpath/content manifest·runtime manifest·명령/exit/log/hash는 scratch `p11-contract/result.json`과 연결 파일에 보존했습니다.
+- 테스트 범위는 missing/wrongtype4필드, out-of-request/배열중복/모순, malformed pdg/instant, denied 혼입0, empty gate, +300초 정각·폐기·catalog/store 장애, 현재 이벤트 권한 철회·Source0, 보존 경계/ns·trim·DLQ 손실, Mock 파일 재생성·raw dlg 부재입니다. JDK21·고정 Python venv를 사용했고 credential은 glab에서 메모리로 받아 child env에만 전달했습니다.
+
+#### 실제 변경 파일
+
+- `docs/ai-rag-gateway-architecture-dev-report.md`
+- `docs/contracts/tc-ai-read-api-v1.md`
+- `gateway-app/src/main/resources/config/source-permissions/tc-v1.json`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/authz/SourceAuthorizationStep.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/authz/SourcePermissionMap.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/port/SourceRetentionReader.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/port/TcBusinessReadPort.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/retention/DlqCompletenessEvaluator.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/retention/RetentionClassifier.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/retention/SourceRetentionAttributes.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/retention/TimeWindow.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/retention/TrimCompletenessEvaluator.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/authz/SourceAuthorizationStepTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/retention/CompletenessEvaluatorTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/retention/RetentionClassifierTest.java`
+- `gateway-tc-mock/build.gradle.kts`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockCallCounter.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockDelegationRegistry.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockScenarioStore.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockStateFiles.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockTcBusinessReadAdapter.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockTcSourceAuthorizationAdapter.java`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/authz-down.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/catalog-down.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/comm-down.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/comm-trim.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/contract-v2.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/default.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/dlq-down.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/dlq-partial.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/empty.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/index.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/logout.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/lot-ended.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/lot-multi.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/lot-unknown.json`
+- `gateway-tc-mock/src/main/resources/tcmock/scenarios/permission-revoked.json`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/MockAuthorizationContractTest.java`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/MockBusinessReadContractTest.java`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/MockDelegationRegistryTest.java`
+
+#### 차이·발견 사항·미실행
+
+승인된 부분 handoff 순서에 따라 shared config/JobContext/Worker/TestPorts/API/공통 하네스는 변경하지 않았습니다. P11 전체 wiring·GET 종결·WorkerAuthorizationOrderIT·WorkerRestart·MockDelegationHookIT·실제 halt/restart MockStateDurabilityIT·verify state-dir guard·SeamRegistry/접수 전 hook 결속은 P10 actual join 후 P11 전용 후속에서 구현/검증해야 합니다. P14 persistence retention adapter/스케줄러, P13 Tool/Workflow/종결 조립도 아직 없습니다. 이 미실행은 성공으로 대체하지 않았습니다.
+
+기존 `gateway-app/src/main/resources/manifests/tc/tc.event.getRecent.json`의 requiredPermission은 빈 배열입니다. Source 매핑은 AI_EVENT_READ(mockOnly)이고 Mock getRecentEvents가 매번 실제 authorize해 철회 후 DENIED·Source 증가0임을 단위로 확인했습니다. 기존 Manifest·Registry·PlanValidator·Dispatcher의 노출/실행 전체 정합은 actual join/P13 소비 검토 항목이며 이 회차 그 파일은 수정하지 않았습니다. 새로운 업무/외부 endpoint 정책을 결정하지 않았고 HTTP 경로명은 계약 문서에서 F5a 확정 대상으로 남겼습니다.
+
+자체/부모 코드 읽기에서 인가 예외와 malformed pdg+빈 allowed를 장애로 분류하도록 보정했고, synthetic UNKNOWN EQP 부재 응답을 제거했습니다. 실제 실행 실패는 없었습니다. 최종 source freeze 뒤 제품·시험 코드는 변경하지 않았습니다. `git diff --check`는 통과했습니다. commit/push/MR/외부메시지/SSH/K8s/운영DB/Secrets/Harbor/실제TC·Source·모델/배포·P16/F1/F2는 실행하지 않았습니다.
+
+
+### P11 CONTRACT_READY 후보 r3 — 부모 경계 probe 결함 수정 / 2026-11-06
+
+상태는 계속 **CONTRACT_READY_CANDIDATE_ROOT_REVIEW_PENDING**이며 P11 전체 완료가 아닙니다. 앞 r2 보고와 모든 r2 증거·result.json은 보존합니다. 부모 독립 actual compiled probe `p11-parent-review/comm-red-r2-comm-clock-probe.json`은 compile=0·실행=1·inputsStable=true인 실제 RED입니다. comm-trim 실제 fixture의 itemAt+1h부터 clock을 매 호출 1ns 증가시키면 분류는 Full이지만 항목 필터가 새 clock을 읽어 EMPTY/items0이 되는 결함을 재현했습니다. 앞 comm-red-r1은 수집기 UTF-8 decode 오류이며 제품 RED로 계산하지 않습니다.
+
+근본원인은 같은 조회의 보존 분류와 필터가 각각 Clock.instant()를 읽는 것입니다. `MockTcBusinessReadAdapter.getCommLogs`에서 `queryNow`를 한 번 읽고 보존 판정과 cutoff 필터에 재사용하도록 최소 수정했습니다. `MockBusinessReadContractTest.advancingClockKeepsItemExactlyOnTheFixedQueryBoundary`는 같은 실제 comm-trim fixture·최초 itemAt+1h·매 호출+1ns·요청[itemAt,itemAt+60s)에서 SUCCESS/items1·Source호출1을 영구 회귀로 확인합니다. Spec §7.6의 판정 시각에 고정한 boundary 계약을 복구한 변경이며 확정 계약·외부 업무정책·공개 typed 서명 변경은 없습니다.
+
+실제 추가 변경 파일은 위 제품 파일·회귀시험 파일과 이 DevReport 끝 append뿐입니다. r2 보고서 prefix와 원 Spec/Plan/baseline·기존 proof·부모 RED probe/program을 수정하지 않았습니다.
+
+- `tcmock-final-r3`: `:gateway-tc-mock:test` 필터 없음 actual EXECUTED 36/36 PASS, failure/error/skip=0, source hashes 불변. runId=`f1f5e82b-3a23-48a9-88cd-b52d3cca9c11`, fingerprint=`3af7d1e4fe13e1ae301510c3f34bcc7dacf1d62fb72172dc3b83a6dd73ef44f9`. 직후 별도 공식 `test-evidence verify --tasks :gateway-tc-mock:test`는 TEST_EVIDENCE_VERIFIED·exit0입니다.
+- core main/test와 실제 core Test.classpath의 모든 artifact 바이트는 r2와 같습니다. `core-current-r3-verify`는 기존 core 51건의 run-binding과 actual current fingerprint `638542ce551031c8075dfe2ffc5b3842f852aa76b73f1e469eceb1e2e8db5358` 일치를 공식 verifier로 확인했습니다. core Test를 새로 실행했다고 계산하지 않습니다. 기존 core r2 runId=`abeebdc1-a982-4d0d-a6fa-aa077b763009`를 그대로 재사용합니다.
+- `current-inputs-export-r3`는 실제 두 Test.classpath를 Gradle inputs.files로 결속해 Test 실행 없이 새 `current-test-classpaths-r3.json`과 현재 runtime manifest를 export했습니다. artifact content 재해시 manifest와 XML/OTR/run-binding·source freeze·명령/exit/hash는 scratch `p11-contract/result-r3.json`에 연결합니다.
+
+P10 actual join 뒤 wiring/API/WorkerRestart/hook/실제 halt-restart durability 검증과 부모 독립 재검증·고정 local commit은 여전히 남아 있습니다. 추가 Gradle Test나 외부 Source·PG·Docker·운영 실행은 하지 않았고 commit/push도 하지 않았습니다. 최종 r3 제품·시험 소스는 동결했습니다.
+
+### P11 CONTRACT_READY 부모 독립 검증 PASS — 2026-11-06
+
+부모의 실제 최종 판정은 **P11 CONTRACT_READY 부분 PASS**입니다. 파일40·고유 JUnit87(core51+r3mock36), 실제 XML/OTR·summary·source input·fresh CP 내용/FP 재계산·원 runtime 결속·scope 경계·기존930576바이트 prefix 보존을 확인했습니다.
+증거: `C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p11-parent-review/r3-root-validation.json`, SHA256=`95bd0aad8d22d7ea80fa150cec7d31513074be2e9edda3073a104108a81e3d9d`.
+부모의 동결 clock probe RED→GREEN 및 r3 조합 probe도 PASS이며 제품·시험 소스는 계속 동결합니다.
+API/wiring/hook/WorkerRestart 및 P11 전체는 미완료이고, 배포·실제 Source·모델·운영·P16/F1 수용은 NOT_RUN입니다. 이 절은 기존 보고서 끝 append만이며 exact local commit과 후속 P12 착수는 부모가 별도로 수행합니다.

@@ -1,0 +1,12 @@
+{
+  "sources://TC/eqp-backend": {"requiredPermCodes":["EQP_READ"],"mockOnly":false},
+  "sources://TC/comm-log-backend": {"requiredPermCodes":["COMM_LOG_READ"],"mockOnly":false},
+  "sources://TC/dlq-backend": {"requiredPermCodes":["DLQ_READ"],"mockOnly":false},
+  "sources://TC/model-backend": {"requiredPermCodes":["MODEL_READ"],"mockOnly":false},
+  "sources://TC/worklot-backend": {"requiredPermCodes":["AI_WORKLOT_READ"],"mockOnly":true},
+  "sources://TC/event-backend": {"requiredPermCodes":["AI_EVENT_READ"],"mockOnly":true},
+  "sources://TC/logs": {"requiredPermCodes":["AI_LOG_READ"],"mockOnly":true},
+  "sources://TC/trace": {"requiredPermCodes":["AI_TRACE_READ"],"mockOnly":true},
+  "sources://TC/git": {"requiredPermCodes":["AI_CODE_READ"],"mockOnly":true},
+  "sources://TC/knowledge": {"requiredPermCodes":["AI_DOC_READ"],"mockOnly":true}
+}

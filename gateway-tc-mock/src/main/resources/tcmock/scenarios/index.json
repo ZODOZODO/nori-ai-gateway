@@ -1,0 +1,16 @@
+[
+  "default",
+  "lot-multi",
+  "lot-ended",
+  "lot-unknown",
+  "logout",
+  "authz-down",
+  "catalog-down",
+  "permission-revoked",
+  "contract-v2",
+  "dlq-partial",
+  "dlq-down",
+  "comm-trim",
+  "comm-down",
+  "empty"
+]
