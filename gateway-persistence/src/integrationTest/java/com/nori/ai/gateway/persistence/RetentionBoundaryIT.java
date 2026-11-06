@@ -89,6 +89,32 @@ class RetentionBoundaryIT extends PgIntegrationSupport {
         assertThat(cache.put(owner, "conversation", "key", entry(parentExpiry.plusSeconds(1)))).isFalse();
     }
 
+    @Test void cacheInsertAndConflictUpdateNeverRoundRequestedExpiryIntoTheFuture() {
+        var owner = scope(OwnerSystem.TC, "actor", "pdg");
+        var cache = bean(CacheRepository.class);
+        assertThat(bean(ConversationRepository.class).insert(owner, "conversation")).isTrue();
+        for (long nanos : new long[] {499, 500, 999}) {
+            String key = "nano-key-" + nanos;
+            for (int write = 0; write < 2; write++) {
+                clock.now = BASE;
+                Instant microsecondExpiry = BASE.plusSeconds(10L + write * 10L);
+                Instant requestedExpiry = microsecondExpiry.plusNanos(nanos);
+                // 같은 키의 두 번째 쓰기는 실제 ON CONFLICT 갱신 경로를 검증합니다.
+                assertThat(cache.put(owner, "conversation", key, entry(requestedExpiry))).isTrue();
+                Instant storedExpiry = bean(JdbcClient.class).sql("SELECT expires_at FROM gw.cache_entry "
+                    + "WHERE key_digest = :key AND owner_system = 'TC' AND actor_ref = 'actor' AND pdg = 'pdg'")
+                    .param("key", key).query((rs, row) -> rs.getTimestamp(1).toInstant()).single();
+                assertThat(storedExpiry).isBeforeOrEqualTo(requestedExpiry).isEqualTo(microsecondExpiry);
+                clock.now = storedExpiry.minusNanos(1);
+                assertCacheExpiry(owner, key, storedExpiry);
+                clock.now = storedExpiry;
+                assertThat(cache.find(owner, "conversation", key)).isEmpty();
+                clock.now = requestedExpiry;
+                assertThat(cache.find(owner, "conversation", key)).isEmpty();
+            }
+        }
+    }
+
     @ParameterizedTest @ValueSource(longs = {-1000, -1, 0, 1, 1000})
     void conversationReadsWritesAndPurgeRespectStoredExpiryToTheNanosecond(long offsetNanos) {
         var owner = scope(OwnerSystem.TC, "actor", "pdg");

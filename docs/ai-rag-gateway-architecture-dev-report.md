@@ -6066,3 +6066,29 @@ fixture `PgTestDatabase`는 정본 SHA 확인·HBA read-only mount·고정 이�
 보호 483개, Spec/baseline/approval6, Plan SHA256 `12e29e5215ce117ba869a1d2734594ed61aa3690346c05103cc2fd565dfd4f63`, P06 SQL/HBA·기존 JSON·F0/PREREG/golden/results/evidence 및 기존 Dev report 본문은 불변입니다. 부모 changes만 정확한 로컬 커밋 후보이며 보고서만 이 append로 해시가 바뀝니다. staged/committed 경로·각 blob SHA256·최종 commit SHA와 prefix/보호 대조 결과는 scratch `p07-close/result.json`, `final.md`에 기록합니다. exec에는 커밋을 만들지 않습니다.
 
 approved Harbor digest·운영 용량·backup/PV/inbound·execMerge·실제 Secret 부재 등 기존 P06 외부 게이트는 BLOCKED/NOT_RUN입니다. 실제 배포·수용·전체 COMPLETE로 승격하지 않습니다. 승인 B의 기존 순서로 P08은 다음 독립 세션에서 Plan의 기술 wiring 누락 보완부터 이어갈 수 있으며 이 세션은 P08을 실행하지 않습니다. push/MR/SSH/K8s/Secret/Harbor/Source/전역 설정 변경·하위 에이전트는 없습니다. P04 임시 clone은 사용자 요청에 따라 작업 폴더 밖 `scratch/p04-retired-clean-checkout`으로 가역 이동된 기존 상태이며 원본은 없습니다. 영구삭제는 자동승인 검토에 막혀 실행 0인 상태를 유지하고 이 세션은 추가 삭제/이동하지 않았습니다.
+
+### P07 추가 캐시 요청 만료 쓰기 경계 수정 — 2026-11-06
+
+상태: 이번 추가 경계에 대한 CODE/LOCAL_VALIDATED PASS, 부모 독립 검증 및 로컬 커밋 PENDING. 기존 초기 96 JUnit + 부모 17조건/42blob 검증은 P07 AEC baseline의 역사적 회차로 보존합니다. 이번 회차의 15건과 합산하지 않으며, 현재 소스 전체 96건을 재시험했다는 의미가 아닙니다. Harbor/K8s 배포·실제 Source·운영 수용·DEPLOYMENT/ACCEPTANCE/COMPLETE는 BLOCKED/NOT_RUN을 유지합니다.
+
+#### 원인·최소 수정·영향 범위
+
+- 부모 독립 프로그램의 초기 결과(p07-cache-expiry-probe/initial-result.json)는 storedNotAfterRequested=false, hiddenAtRequestedExpiry=false, storedMinusRequestedNanos=1입니다. 부모 프로그램·실행기·초기 결과를 실행하거나 수정하지 않았습니다.
+- CacheRepository.put의 Entry.expiresAt 원본 Timestamp 바인딩에 JDBC 42.7.11 TimestampUtils의 마이크로초 올림이 적용되어 요청한 캐시 유효기간을 초과했습니다. 기존 query now/cutoff 내림과 구분되는 추가 쓰기 경계입니다. 요청 expiresAt를 ChronoUnit.MICROS로 내린 뒤 바인딩합니다. 1마이크로초 미만 구간의 조기 캐시 미스는 허용된 보수적 수명 준수이며 만료 연장·epsilon·비교 완화는 없습니다.
+- SQL LEAST(request,parent), ON CONFLICT EXCLUDED.expires_at, owner/actor/pdg 조건, 단일 TransactionTemplate 경계를 보존했습니다. 공개 API·생성자·빈·권한·schema/migration·UTC 30일/90일·query cutoff·JSONB 나노초 정책은 변경하지 않았습니다.
+- 변경 파일은 CacheRepository.java, RetentionBoundaryIT.java, 이 Dev report의 끝 append뿐입니다. 기존 보고서 전체 바이트 prefix를 보존했습니다.
+
+#### 실제 검증과 한계
+
+- 첫 Gradle 명령: 정본 spec-guard exit 0 후 코드 편집. SPEC SHA256=c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4, 승인 Plan SHA256=16159d39d5242a128d3bb6f1e3f267b6e0be580d7ad9c85ea8f553817343e4b8를 그대로 유지했습니다.
+- RetentionBoundaryIT에 1개 case를 추가했고 기존 14개 case를 보존했습니다. 499/500/999ns 각각 INSERT·같은 키 UPDATE에서 DB 직접 조회 저장 expiry <= 요청 expiry 및 마이크로초 기대값 일치, 저장 expiry 1ns 직전 조회 가능, 정확 저장 expiry·정확 원래 요청 expiry 조회 차단을 MutableClock/BASE·기존 실제 PG/JDBC fixture로 검증했습니다.
+- 첫 실행은 AssertJ Instant에 없는 isLessThanOrEqualTo 사용으로 컴파일 실패(exit 1), 별도 공식 verifier 호출도 같은 컴파일 선행 실패(exit 1)였습니다. 현재 시험 실행 0이며 수집기에 보인 이전 67건은 이번 증거에서 제외했습니다. isBeforeOrEqualTo로 수정했습니다.
+- 최종 시험 명령: C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway :gateway-persistence:integrationTest -Paigw.requireDocker=true --tests *RetentionBoundaryIT --no-daemon --console=plain.
+- 직후 별도 공식 검증 명령: C:\workspace_nori\nori-ai-gateway\gradlew.bat -p C:\workspace_nori\nori-ai-gateway -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p07-cache-expiry-fix\retention-filter.init.gradle :gateway-eval:run -Paigw.requireDocker=true --args=test-evidence verify --tasks :gateway-persistence:integrationTest --no-daemon --console=plain. 외부 scratch init으로 같은 필터를 재현했습니다.
+- 최종 시험 exit 0, task 실제 EXECUTED, raw XML 15건·OTR 고유 JUnit ID 15건·summary passed 15건; fail/error/skip/abort 0. 공식 verifier exit 0 및 TEST_EVIDENCE_VERIFIED를 별도로 확인했습니다. 표시 이름이 같은 parameterized XML 항목은 OTR 고유 ID로 구분했습니다.
+- runId=ded5072e-ed53-4dca-b767-770604c0f210, inputFingerprint=ec6cffcf125ba2500127fbd253ea2d60bbc81d4e1548f39d136a8c4d14fa175b, runtimeClasspath SHA256=b2d359a23059f99b476d6e1a5ed9bcc0041f2f7064f3d73fc0dba6c33adb3902. 현재 fingerprint/실제 classpath·정본 SQL/HBA SHA·requireDocker=true·동일 필터·SPEC 결속을 직접 대조했습니다.
+- 로컬 candidate 이미지: pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2. 실제 PostgreSQL 18.6 / vector 0.8.7, aigw_app을 사용했습니다. 운영 승인 digest 검증으로 승격하지 않습니다.
+- fixture의 finally 정리와 owner label 검사 경로를 확인했고 실행 중 owner label을 직접 확인했습니다. 종료 뒤 해당 label 컨테이너는 0개였습니다. 다른 자원을 삭제하지 않았습니다.
+- 보호 483개 hash·Spec/Plan·P06 SQL/HBA·V1~V3·승인 문서·기존 root 프로그램/증거 보존을 확인했습니다. commit/push/P08/하위에이전트/SSH/K8s/Secret/Harbor/Source/전역 설정 변경은 수행하지 않았습니다.
+- 생성자/빈/권한/하네스 변경이 없어 관련 없는 전체 67 IT·5 앱 컨텍스트·13 앱 unit·Eval 249는 반복하지 않았습니다. 부모의 실제 독립 프로그램 재실행·최종 검증 및 정확 3파일 로컬 커밋은 후속 부모 책임이며 이번 세션에서는 미실행입니다.
+- scratch 증거: p07-cache-expiry-fix/test-proof.json, result.json, cache-spec-guard.json, cache-retention-it-final*.json, current-fingerprint.json, runtime-classpath.txt 및 raw XML/OTR. 증거 수집기의 첫 XML 표시 이름 중복 판정 실패는 OTR 고유 ID 대조로 바로잡았으며 제품 시험을 재실행하거나 결과를 바꾸지 않았습니다.

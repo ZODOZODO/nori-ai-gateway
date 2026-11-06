@@ -4,6 +4,7 @@ import com.nori.ai.gateway.core.scope.VerifiedSystemScope;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,7 +24,9 @@ public final class CacheRepository extends ScopedJdbc {
             + "conversation_id = EXCLUDED.conversation_id, capability_id = EXCLUDED.capability_id, value = EXCLUDED.value, "
             + "source_deps = EXCLUDED.source_deps, expires_at = EXCLUDED.expires_at")
             .param("key", keyDigest).param("pdg", scope.pdg()).param("conversation", conversationId).param("capability", entry.capabilityId())
-            .param("value", entry.value()).param("deps", entry.sourceDeps()).param("expires", Timestamp.from(entry.expiresAt())).update() == 1);
+            // 요청한 캐시 수명을 넘기지 않도록 JDBC의 마이크로초 올림 전에 만료 시각을 내립니다.
+            .param("value", entry.value()).param("deps", entry.sourceDeps())
+            .param("expires", Timestamp.from(entry.expiresAt().truncatedTo(ChronoUnit.MICROS))).update() == 1);
     }
     public Optional<Entry> find(VerifiedSystemScope scope, String conversationId, String keyDigest) {
         return transaction(() -> scoped(scope, """
