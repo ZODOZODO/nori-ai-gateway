@@ -6714,3 +6714,31 @@ integration Test/paired verifier는 Plan `f8e3d84de8ca2e5c8929cb162d458b70de7fef
 부모는 최종 변경 34파일·기존 보고서 prefix·현재 CP와 실제 JUnit 61건 및 두 paired verifier의 XML/OTR 고유 실행과 fingerprint를 독립 대조했습니다. 별도 HTTP oracle로 앱별 보존 경계·현재 인가 철회·실제 meter 고정 태그·Tempo 나노초 범위도 확인했습니다. GitLab 소수 Job ID가 VERIFIED로 확정되는 실제 RED를 먼저 재현했고, 같은 프로그램을 수정하지 않은 GREEN에서 UNKNOWN/PACKAGE_JOB_AMBIGUOUS·HTTP 1건 종료를 확인했습니다. 부모 probe 전후 실제 CP 파일 내용은 같습니다.
 
 근거는 scratch p12-parent-review의 r6-root-validation.json, r6-raw-evidence-review.json, fractional-red-r1-parent-probe.json, fractional-green-r6-parent-probe.json, r3-current-r6-parent-probe.json입니다. 현재 Plan은 P12 build 두 파일의 필수 연결만 명시했고 Source·인가·wire·실패 정책은 그대로입니다. 이 판정과 로컬 커밋은 C11contract 기반 격리 Connector CODE/LOCAL_VALIDATED이며 P10/P11/P12 실제 합류 회귀·실제 Source·운영 수용은 별도로 미실행 상태를 유지합니다.
+
+
+### P12 r7 후속 수정 — Loki 설정의 실제 Constructor Binding (2026-11-06)
+
+시작 위치는 clean C12 `49a0d49eca76e65626be4d97cd738caa89e96502`의 `aigw/f1-p12` worktree입니다. 부모의 실제 RED는 `ParentLokiBindingProbe.java`(SHA256 `df596ac2d0086475f1ef7c239e117d961b4609bb9b7ad1b034fad74963b6c86a`)와 `scratch/p12-parent-review/loki-binding-red-c12-r1-parent-probe.json`의 javac0/java1/CPstable이며, 승인된 per-query-limit=123을 Boot Binder로 읽어도 bound=false였습니다.
+
+근본원인은 public 무인자 생성자와 canonical 생성자가 함께 있어 값 생성자 선택이 명시되지 않은 점과 record component limitPerQuery의 기본 키가 승인 키 per-query-limit와 다른 점입니다. 실제 Boot 4.0.7 JAR의 ConstructorBinding/Name/DefaultValue 애너테이션 및 BindResult API를 javap로 확인한 뒤 표준 바인딩 기능만 사용했습니다.
+
+- `gateway-integration/src/main/java/com/nori/ai/gateway/integration/loki/LokiProperties.java`: compact canonical constructor에 ConstructorBinding을 지정하고 limitPerQuery component에 Name("per-query-limit")를 지정했습니다. 누락된 설정도 기존 6h/500/1000/30s 기본값을 유지하도록 각 constructor parameter에 동일 DefaultValue를 지정했습니다. 기존 public 무인자·4인자 생성자, record component/accessor 이름, 검증 로직은 유지했습니다.
+- `gateway-integration/src/test/java/com/nori/ai/gateway/integration/loki/LokiPropertiesTest.java`: 실제 Binder로 승인 키 전체와 nondefault123, 다른 nondefault limits, 빈/부분 설정의 동일 기본값, 0·음수 validation, Duration 오형식·정수 소수/범위 초과 실패를 검사하는 5개 영구 단위시험을 추가했습니다. 수동 Environment 파싱·필드 rename·wrapper·전역 설정·의존 변경은 없습니다.
+
+Plan pin `cc1a74a5e951fbd100c3cf9871f7474c4ab1598ed8e73e75675c2447284425aa` 및 P12 본문 SHA256 `d117d64c1270151d7f290c276bad5c5cec8817fa3ea8ad1f33c7fcad9008ce8a`를 root GO 뒤 대조했고 Spec `c232c0ebacc1f70781569bf1c0cdb01070047d09bdb24506cf67cf311c6cbfd4`는 그대로입니다. Test 시작 전 `source-freeze-r7.json`을 생성하고 spec-guard-r7 exit0을 확인했습니다.
+
+실제 실행 범위는 `:gateway-integration:test --tests com.nori.ai.gateway.integration.loki.LokiPropertiesTest` 한 클래스입니다. **5/5 PASS**, XML1·fail/error/skip/aborted0, runId `d881e7c6-780f-42be-9ab2-9677856d3a3a`, fingerprint `a65c5abd44593a04ce407ecdcc21df439e0f367f9b680ce57b2aa03932138538`입니다. 직후 별도 `test-evidence verify --tasks :gateway-integration:test`는 같은 fixed includePattern으로 exit0을 얻었습니다. 테스트와 verifier의 source before/after·정본·현재 FP filter 결속을 각각 확인했습니다.
+
+no-test 현재 CP export의 실제 dir/jar 파일 hash를 run-binding과 대조하고 FP를 독립 재계산했습니다. 현재 app runtime SHA256 `0396011b7874da722b558f22c60e3210280a26e5be1b36ad856725e9fcfd488a`도 원 측정과 같습니다. 원시 XML/OTR·summary·binding·명령 exit·현재 CP·파일별 hash 경로는 `final-evidence-check-r7.json`에 있습니다. 이전 결과·r6의 61건 원시 증거를 포함한 435개 기존 파일은 hash 불변으로 보존했으며 이번 코드의 current FP PASS로 재사용하지 않았습니다.
+
+이 절 전 C12 보고서 전체 962716바이트(SHA256 `c1f721531cd2fe1e6ea2892326ca4c98bde8bd09373bf3488bc3144bab899b18`)를 보존한 append입니다. 제품 변경은 위 LokiProperties와 새 영구시험뿐이며 이 DevReport append를 포함한 3파일입니다. 기존 C12 commit·r6 결과·보고서는 덮어쓰지 않았습니다.
+
+부모는 RED와 동일한 독립 Binder oracle로 GREEN을 실제 확인했습니다(`scratch/p12-parent-review/loki-binding-green-r7-parent-probe.json`, javac0/java0/inputStable=true). 이 결과는 좁은 5건의 JUnit과 구분합니다.
+
+상태는 `ROOT_REVIEW_PENDING`이며 **전체 Connector/acceptance/P11 actual joined tree 회귀는 PENDING_ROOT_P11_JOIN**입니다. 이전61+이번5를 전체 최신 검증으로 합산하지 않습니다. fix commit·P11 합류 뒤 전체 회귀는 부모가 관리합니다. 실제 Source/모델/TC·Docker/PG·원격·운영·배포·commit/push는 이 세션에서 0입니다.
+
+#### P12 r7 부모 검증 및 로컬 수정 커밋
+
+부모는 실제 Binder 시험 5건의 XML/OTR 고유 실행·정확 필터·별도 verifier와 현재 classpath 내용·fingerprint를 독립 대조했습니다. 승인 키 123이 바인딩되지 않는 실제 RED를 재현한 동일 Java 프로그램으로 수정 후 GREEN도 확인했습니다. 변경 두 소스 파일을 직접 읽었고 기존 생성자·접근자·기본값·실패 검증을 보존한 표준 constructor binding임을 확인했습니다. 기존 보고서 전체와 과거 증거 435개는 hash가 같습니다.
+
+근거는 scratch/p12-parent-review/r7-root-validation.json, r7-raw-evidence-review.json 및 loki-binding-red-c12-r1-parent-probe.json/loki-binding-green-r7-parent-probe.json입니다. 로컬 수정 커밋 범위는 제품 1파일·영구시험 1파일·보고서 append뿐입니다. 이 5건과 과거 61건을 최신 전체 회귀로 합산하지 않으며, 전체 Connector/acceptance와 P10·P11 실제 합류 검증은 다음 고정 source에서 수행합니다. 실제 Source·배포·운영 수용은 미실행입니다.
