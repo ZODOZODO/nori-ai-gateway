@@ -7384,3 +7384,14 @@ P15 완료/F1 운영 PASS로 표시하지 않는다. 실제 CI·push·K8s·Secre
 - EXEC 차트 최종 로컬 커밋: `fdbaae0b7a95d000cd8df8a6635ce1141f07bfd5`. AI는 이 절까지 포함해 로컬 커밋한 후 clean-tree `aigwPackage -Paigw.gitSha=<HEAD>` 양성 검증을 수행한다. 현재 이 절 작성 시점의 양성 패키징은 아직 NOT_RUN이며 후속 결과 절에서 실제 결과를 기록한다.
 - Spec `90ba8a73…`, 기준선 seq8/`1bea13bf…`, 기존 F0 JSON·PREREG·측정/실패 증거 및 기존 DevReport prefix는 불변이다. 기존 1,086,628바이트 prefix SHA `d41befeb760ea2267950f3c5af3e98cba96ea84317c4bab950b8802df6f06446`를 그대로 보존하고 append했다. 변경 파일 UTF-8/LF와 git diff --check를 확인했다.
 - 종료 범위는 P15 CODE/LOCAL_VALIDATED/LOCAL_COMMITTED와 패키징이다. 원격 CI/Harbor build·push·scan, 승인 digest 재시험, K8s 배포·Secret 변경·운영 경보 수신은 미실행이며 기존 운영 gate 조건을 유지한다. P16 수용 시험과 F1 exit는 착수하지 않는다.
+
+
+## P15 최종 패키징 양성 검증·로컬 종료 (2026-11-09)
+
+- AI 구현 커밋 7e933171a7e27a2a415a5884f1e929666dccac51, EXEC 차트 커밋 fdbaae0b7a95d000cd8df8a6635ce1141f07bfd5.
+- 실제 명령: aigwPackage -Paigw.gitSha=7e933171a7e27a2a415a5884f1e929666dccac51 --offline --no-daemon --max-workers=2 → BUILD SUCCESSFUL, exit 0, source·정본 입력 동결. git status --porcelain이 빈 상태에서 생성됐고 build/package/build-identity.json의 gitSha와 HEAD가 일치한다. 기존 missing/dirty guard 음성 결과를 유지하며 clean-tree 양성 checkpoint를 닫았다.
+- 부모 검증: build/package/app.jar는 실제 bootJar archive와 바이트가 같은 180,305,230바이트 파일이다. SHA-256 d1619b8cda92681819acf7528a9c543829d295a628e0c3e98f5d97db68ac8269, Boot JarLauncher/앱 진입 클래스/BOOT-INF 구조를 확인했다. runtime classpath 정본·package 파일·identity의 SHA는 모두 e07547eaff8e5ce3f8e1c3dc1689b20555c9aea353acdf060657d9afae989e52다.
+- 수용 배포본: 147개 jar·Linux/Windows launcher가 존재하고 Windows wildcard classpath가 유지된다. 실제 패키징된 .bat를 시험 입력 없는 격리 child env에서 실행 → exit 3, 블록 SHA/base64를 직접 해독한 RUN 1건이 ABORTED/SPEC_INPUT_MISSING이며 실제 suite 실행 0건이다. 호스트 DEBUG에 따른 wrapper echo를 제거한 child env로 증거 블록 경계까지 검증했다. 이 결과는 P16 수용 시험 PASS가 아니다.
+- 원시 명령 receipt p15-implementation/root-p15-clean-package-r1.json, 부모 증명 p15-parent-review/root-p15-clean-package-r1-proof.json, launcher 원시 출력 root-p15-clean-package-r1-acceptance-nodebug.out을 scratch에 보존했다. 본 결과 문서 커밋 뒤 최종 HEAD에 대한 build identity 재결속 결과는 root-p15-final-identity-r1 receipt로 별도 보존한다. 앱/수용 코드 재변경이나 시험 전체 반복은 없다.
+- 현재 사용자 지정 종료 범위(P15 구현·허용 로컬 검증·실패 2건 처리·부모 검증·로컬 커밋·패키징)는 완료했다. 전체 274건 실행의 기존 272 PASS와 수정 두 클래스 10 PASS를 실행별로 보존했으며 단일 전체 277 PASS 실행으로 표시하지 않는다.
+- 정본 Plan의 P15 항목에 CODE/LOCAL_VALIDATED/LOCAL_COMMITTED 종료와 P16 NOT_STARTED를 반영했다. 이 상태 기록은 Spec의 계약·baseline seq8을 바꾸지 않는다. Plan이 요구하는 원격 CI/Harbor·승인 digest·K8s·운영 gate 실측은 미실행으로 유지하므로 전체 운영 완료 체크 두 개를 선표기하지 않는다. 사용자 원본의 미커밋 Spec 및 AI 원본의 미추적 측정 자료는 포함하지 않는다.
