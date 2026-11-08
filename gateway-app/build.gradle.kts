@@ -2,7 +2,10 @@ import java.security.MessageDigest
 import java.util.zip.ZipFile
 import org.gradle.process.CommandLineArgumentProvider
 
-plugins { application }
+plugins {
+    application
+    alias(libs.plugins.spring.boot)
+}
 application { mainClass = "com.nori.ai.gateway.app.AiGatewayApplication" }
 dependencies {
     implementation(project(":gateway-core"))
@@ -18,6 +21,7 @@ dependencies {
     implementation(platform(libs.otel.instrumentation.bom.alpha))
     implementation(libs.otel.logback)
     implementation(libs.nimbus.jose.jwt)
+    implementation(libs.djl.tokenizers)
     add("integrationTestImplementation", libs.nimbus.jose.jwt)
     add("integrationTestImplementation", libs.protobuf)
     add("integrationTestImplementation", libs.json.schema.validator)
@@ -45,7 +49,13 @@ tasks.named<Test>("integrationTest") {
     val pgImage = providers.environmentVariable("AIGW_PG_TEST_IMAGE").orElse("").get()
     inputs.property("aigw.pgTestImage", pgImage)
     systemProperty("aigw.pgTestImage", pgImage)
-    for ((key, path) in mapOf("pgBootstrapSha256" to "ops/postgres/bootstrap.sql", "pgHbaSha256" to "ops/postgres/acceptance-pg_hba.conf")) {
+    // P15 BackupScriptIT: 승인 backup 이미지(-Paigw.backupImage, 없으면 Dockerfile-backup 로컬 빌드)와 이미지 context 입력 바이트를 시험 지문에 결속한다.
+    val backupImage = providers.gradleProperty("aigw.backupImage").orElse("").get()
+    inputs.property("aigw.backupImage", backupImage)
+    systemProperty("aigw.backupImage", backupImage)
+    for ((key, path) in mapOf("pgBootstrapSha256" to "ops/postgres/bootstrap.sql", "pgHbaSha256" to "ops/postgres/acceptance-pg_hba.conf",
+            "backupDockerfileSha256" to "deploy/docker/Dockerfile-backup", "backupScriptSha256" to "ops/backup/aigw-backup.sh",
+            "restoreScriptSha256" to "ops/backup/aigw-restore.sh", "backupJobColumnsSha256" to "ops/backup/job-columns-v1.txt")) {
         val source = rootProject.file(path)
         val digest = MessageDigest.getInstance("SHA-256").digest(source.readBytes()).joinToString("") { "%02x".format(it) }
         inputs.file(source)
@@ -55,6 +65,8 @@ tasks.named<Test>("integrationTest") {
     doFirst {
         if (!pgImage.matches(Regex("[^\\s/@]+(?:/[^\\s/@]+)*:[^\\s/@:]+@sha256:[0-9a-f]{64}")))
             throw GradleException("고정된 PostgreSQL 시험 이미지가 필요합니다")
+        if (backupImage.isNotEmpty() && !backupImage.matches(Regex("harbor\\.nori\\.local/nori-tc/ai-gateway-backup@sha256:[0-9a-f]{64}")))
+            throw GradleException("aigw.backupImage 는 harbor.nori.local/nori-tc/ai-gateway-backup@sha256:<64hex> 형식만 허용합니다")
     }
 }
 

@@ -36,3 +36,4 @@ jackson = { module = "com.fasterxml.jackson.core:jackson-databind" }
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }

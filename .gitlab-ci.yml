@@ -8,19 +8,20 @@ default:
   tags: [nori-msa]
 
 # P15final 생산자(task·스크립트·검사 main)와 운영 gate가 없으면 해당 job은 실패합니다.
+# gradlew 는 레포에 실행 권한 없이(100644) 저장되어 있으므로 bash 로 실행한다(작업 트리 chmod 0 — package 의 dirty 검사 유지).
 .aigw-spec-input:
   before_script:
     - 'test -n "$AIGW_APPROVED_SPEC_SHA"'
-    - './gradlew :gateway-eval:run --args="spec-input fetch --api-url $CI_API_V4_URL --project-id $CI_PROJECT_ID --sha $AIGW_APPROVED_SPEC_SHA --baseline docs/gates/spec-baseline.md --out-dir build/spec-input --auth-header JOB-TOKEN --token-env CI_JOB_TOKEN" --no-daemon'
+    - 'bash ./gradlew :gateway-eval:run --args="spec-input fetch --api-url $CI_API_V4_URL --project-id $CI_PROJECT_ID --sha $AIGW_APPROVED_SPEC_SHA --baseline docs/gates/spec-baseline.md --out-dir build/spec-input --auth-header JOB-TOKEN --token-env CI_JOB_TOKEN" --no-daemon'
     - 'export AIGW_SPEC_FILE="$CI_PROJECT_DIR/build/spec-input/$AIGW_APPROVED_SPEC_SHA/spec.md"'
-    - './gradlew :gateway-eval:run --args="spec-guard --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md" --no-daemon'
+    - 'bash ./gradlew :gateway-eval:run --args="spec-guard --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md" --no-daemon'
 
 test:
   extends: .aigw-spec-input
   stage: check
   dependencies: []
   script:
-    - ./gradlew build --no-daemon
+    - bash ./gradlew build --no-daemon
 
 helm-validate:
   stage: check
@@ -38,7 +39,7 @@ package:
   stage: package
   dependencies: []
   script:
-    - ./gradlew aigwPackage -Paigw.gitSha=$CI_COMMIT_SHA --no-daemon
+    - bash ./gradlew aigwPackage -Paigw.gitSha=$CI_COMMIT_SHA --no-daemon
     - test -s build/package/build-identity.json
   artifacts:
     paths:
@@ -56,8 +57,8 @@ integration-test:
   dependencies: [package]
   script:
     - test -n "$AIGW_IT_RUNNER_TAG"
-    - ./gradlew integrationTest -Paigw.requireDocker=true --no-daemon
-    - './gradlew :gateway-eval:run --args="test-evidence verify --selector integrationTest --required ci/integration-required.txt --require-docker --expect-build-identity build/package/build-identity.json" --no-daemon'
+    - bash ./gradlew integrationTest -Paigw.requireDocker=true --no-daemon
+    - 'bash ./gradlew :gateway-eval:run --args="test-evidence verify --selector integrationTest --required ci/integration-required.txt --require-docker --expect-build-identity build/package/build-identity.json" --no-daemon'
   artifacts:
     when: always
     paths: ['**/build/aigw-evidence/**']
@@ -71,7 +72,7 @@ integration-evidence:
   script:
     - 'test "$CI_API_V4_URL" = "https://gitlab.noricloud.org/api/v4"'
     - 'printf ''header = "JOB-TOKEN: %s"\n'' "$CI_JOB_TOKEN" | curl --config - --fail --silent --show-error --proto "=https" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/aigw-it-evidence/$CI_COMMIT_SHA/it-evidence.tgz" --output it-evidence.tgz'
-    - './gradlew :gateway-eval:run --args="ci-evidence verify --sha $CI_COMMIT_SHA --bundle it-evidence.tgz --required ci/integration-required.txt --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md --expect-build-identity build/package/build-identity.json" --no-daemon'
+    - 'bash ./gradlew :gateway-eval:run --args="ci-evidence verify --sha $CI_COMMIT_SHA --bundle it-evidence.tgz --required ci/integration-required.txt --spec $AIGW_SPEC_FILE --baseline docs/gates/spec-baseline.md --expect-build-identity build/package/build-identity.json" --no-daemon'
 
 integration-mode-guard:
   stage: verify
@@ -120,7 +121,7 @@ build-backup-image:
         *) echo BACKUP_DEST_TYPE_UNSUPPORTED >&2; exit 2 ;;
       esac
       mkdir -p build/image-digest
-      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile-backup --destination "harbor.nori.local/nori-tc/ai-gateway-backup:$CI_PIPELINE_ID" --build-arg "PG_IMAGE_DIGEST=$AIGW_PG_IMAGE_DIGEST" --build-arg "AGE_VERSION=$AIGW_AGE_VERSION" --build-arg "AGE_SHA256=$AIGW_AGE_SHA256" --build-arg "BACKUP_DEST_TYPE=$AIGW_BACKUP_DEST_TYPE" --build-arg "RCLONE_VERSION=${AIGW_RCLONE_VERSION:-}" --build-arg "RCLONE_SHA256=${AIGW_RCLONE_SHA256:-}" --build-arg "OPENSSH_CLIENT_VERSION=${AIGW_OPENSSH_CLIENT_VERSION:-}" --digest-file build/image-digest/backup.digest
+      /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile-backup --destination "harbor.nori.local/nori-tc/ai-gateway-backup:$CI_PIPELINE_ID" --build-arg "PG_IMAGE_REPOSITORY=harbor.nori.local/library/pgvector" --build-arg "PG_IMAGE_DIGEST=$AIGW_PG_IMAGE_DIGEST" --build-arg "AGE_VERSION=$AIGW_AGE_VERSION" --build-arg "AGE_SHA256=$AIGW_AGE_SHA256" --build-arg "BACKUP_DEST_TYPE=$AIGW_BACKUP_DEST_TYPE" --build-arg "RCLONE_VERSION=${AIGW_RCLONE_VERSION:-}" --build-arg "RCLONE_SHA256=${AIGW_RCLONE_SHA256:-}" --build-arg "OPENSSH_CLIENT_VERSION=${AIGW_OPENSSH_CLIENT_VERSION:-}" --digest-file build/image-digest/backup.digest
   artifacts:
     paths: [build/image-digest/backup.digest]
 

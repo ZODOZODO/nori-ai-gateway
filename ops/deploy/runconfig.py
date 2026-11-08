@@ -11,6 +11,10 @@ class InputError(Exception):
     pass
 
 
+APP_RELEASES = ('ai-gateway', 'ai-gateway-restore')
+RESTORE_KEYS = ('purpose', 'profile', 'execChartSha', 'pgImage', 'restore', 'seaweed', 'netpol', 'egressProbe')
+
+
 def fail(code):
     raise InputError(code)
 
@@ -81,12 +85,14 @@ def validate(data, release, mode, exec_sha=None):
         fail('RUNCONFIG_PROFILE_MISMATCH')
     if deploy and data.get('purpose') != 'deploy':
         fail('RUNCONFIG_NOT_APPROVED:purpose')
-    if data.get('purpose') == 'deploy' and profile == 'restore':
+    if data.get('profile') == 'restore':
+        # §11.9 복원 runconfig = 공통 키·restore.*·seaweed.s3Endpoint 만. 첫 위반 leaf 이름만 낸다(값 0).
         for key in data:
-            if key not in ('purpose', 'profile', 'execChartSha', 'pgImage', 'restore', 'seaweed'):
-                fail('RUNCONFIG_KEY_CONFLICT:' + key)
-        if set(data.get('seaweed', {})) - {'s3Endpoint'}:
-            fail('RUNCONFIG_KEY_CONFLICT:seaweed')
+            if key not in RESTORE_KEYS:
+                fail('RUNCONFIG_KEY_CONFLICT:' + next((path for path, _ in leaves({key: data[key]})), key))
+        for key in data.get('seaweed', {}) if isinstance(data.get('seaweed'), dict) else ():
+            if key != 's3Endpoint':
+                fail('RUNCONFIG_KEY_CONFLICT:seaweed.' + key)
     required = ['execChartSha', 'pgImage.tag', 'pgImage.digest']
     size_key = 'restore.pvcSizeGi' if profile == 'restore' else 'pvcSizeGi'
     required += [size_key]
@@ -106,12 +112,71 @@ def validate(data, release, mode, exec_sha=None):
     if exec_sha and data['purpose'] != 'lint' and item(data, 'execChartSha', deploy) != exec_sha:
         fail('EXEC_SHA_MISMATCH')
     if deploy:
-        for name in ['exec-chart-ref', 'postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']:
+        gates = ['exec-chart-ref', 'postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']
+        if release in APP_RELEASES:
+            gates.append('netpol-targets')
+        for name in gates:
             approval('docs/gates/f1/' + name + '.md', name, True)
-    return {
+    if release in APP_RELEASES:
+        return app_values(data)
+    values = {
         'pgImage': {'tag': item(data, 'pgImage.tag', deploy), 'digest': item(data, 'pgImage.digest', deploy)},
         'persistence': {'size': '' if missing_size else str(int(item(data, size_key, deploy))) + 'Gi'},
     }
+    if release == 'ai-gateway-db':
+        values['backup'] = backup_values(data, deploy)
+    return values
+
+
+def value(data, key):
+    node = data
+    for part in key.split('.'):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def backup_values(data, deploy):
+    """주 DB release 의 백업 CronJob 값. lint 누락 키는 차트 required 로 넘겨 RENDER_REQUIRED_backup.<key> 로 실패시킨다."""
+    enabled = value(data, 'backup.enabled')
+    out = {'enabled': enabled is not None and enabled['value'] is True}
+    for key in ('type', 'schedule', 'destination', 'ageRecipient', 'retentionDays'):
+        node = value(data, 'backup.' + key)
+        if node is None:
+            if deploy and out['enabled']:
+                fail('RUNCONFIG_MISSING:backup.' + key)
+            continue
+        out[key] = node['value']
+    return out
+
+
+def app_values(data):
+    """앱 차트 값: 승인 참조를 그대로 붙인 NetworkPolicy 대상·egress probe 대상과 비밀 아닌 연결 값. 플래그·Secret 이름은 aigw-helm.sh 가 suite 로 정한다."""
+    values = {}
+    targets = value(data, 'netpol.targets') or {}
+    values['netpol'] = {'targets': {key: dict(node['value'], approvalRef=node['approvalRef']) for key, node in targets.items()}}
+    probe = value(data, 'egressProbe.targets')
+    if probe is not None:
+        values['egressProbe'] = {'targets': [dict(target, approvalRef=probe['approvalRef']) for target in probe['value']]}
+    inference = {key: value(data, 'inference.' + key)['value'] for key in ('proxyBaseUrl', 'proxyPort') if value(data, 'inference.' + key) is not None}
+    if inference:
+        values['inference'] = inference
+    kafka = {key: value(data, 'kafka.' + key)['value'] for key in ('bootstrapServers', 'topic', 'groupId') if value(data, 'kafka.' + key) is not None}
+    if kafka:
+        values['kafka'] = kafka
+    if value(data, 'seaweed.s3Endpoint') is not None:
+        values['seaweed'] = {'s3Endpoint': value(data, 'seaweed.s3Endpoint')['value']}
+    if value(data, 'seaweed.fixturePrefix') is not None:
+        values['fixtureCatalog'] = {'prefix': value(data, 'seaweed.fixturePrefix')['value']}
+    readback = {key: value(data, 'acceptance.readback.' + key) for key in ('loki', 'tempo', 'metrics')}
+    present = {key: node for key, node in readback.items() if node is not None}
+    if present:
+        refs = {node['approvalRef'] for node in present.values()}
+        if len(present) != 3 or len(refs) != 1:
+            fail('RUNCONFIG_INVALID:acceptance.readback')
+        values['acceptance'] = {'readback': dict({key: node['value'] for key, node in present.items()}, approvalRef=refs.pop())}
+    return values
 
 
 def main():

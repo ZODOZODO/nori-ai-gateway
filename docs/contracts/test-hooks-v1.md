@@ -39,3 +39,11 @@ P10 합류 뒤 `/v1/query`와 결과 GET은 제품 API를 사용합니다. P09 w
 위 경로는 모두 기존 verify+enabled 조건과 동일한 hook 토큰 필터를 사용합니다. 위임은 Gateway Clock의 발급 시각+300초 절대 TTL이며 재등록·reset·프로세스 재기동으로 연장되지 않습니다. `ai.gateway.tcmock.state-dir`의 delegations.json은 SHA256 키와 sub/issuedAt/expiresAt/revoked만, scenario.json은 선택 ID만 원자 저장합니다. 초기 파일 읽기는 eager singleton 생성에서 수행되어 RecoveryModeRouter 실행보다 앞섭니다. state-dir는 verify에서만 허용하고 prod 동시 활성·빈 값·잘못된 경로는 singleton 파일 I/O 전에 거부합니다.
 
 seam directive는 기존 접수 전 arm과 Job별 tx 결속 수명을 공유합니다. 같은 Job의 반복 inspect는 일관되며 다음 Job·다른 Source/Capability에는 적용하지 않습니다. 기존 singleton Manifest/SourcePermissionMap을 수정하거나 ThreadLocal로 전파하지 않습니다. 비 terminal 또는 접수 tx가 있으면 reset은409이며, 성공 reset은 Mock 시나리오·계수·seam을 초기화하지만 위임의 TTL/폐기는 보존합니다.
+
+## P15 추가 계약
+
+| 경로 | 입력·응답 |
+|---|---|
+| POST `/__test/egress-probe` | `{targetId}` 만 사용(본문의 다른 필드·호스트·포트 무시). 차트가 렌더한 `{release}-egress-probe` ConfigMap 파일(`ai.gateway.test-hooks.egress-targets-file`, JSON 배열 `[{id,host,port,expect}]`)의 id 이면 Gateway Pod 안에서 TCP connect 1회(timeout 3s, 본문 송신 0) → 200 `{targetId, connected, errorClass}`(errorClass = null·`TIMEOUT`·`REFUSED`·`UNRESOLVED`·`NO_ROUTE`·`IO_ERROR`, 주소 반환 0). 목록 밖 id·targetId 부재 404 |
+
+hook 은 verify+enabled 조건에 더해 목록 파일 설정이 있을 때만 등록된다(차트 verify 렌더는 항상 마운트, 형식 위반 파일은 기동 실패). 판정(ALLOWED/BLOCKED 대조)은 수용 하네스 `EgressProbeClient` 쪽 AC-35-EGRESS(P21) 몫이다.

@@ -41,6 +41,10 @@ def rendered(path, release):
     require(release in RELEASES)
     content = source()
     objects = list(yaml.safe_load_all(Path(path).read_text(encoding='utf-8')))
+    # P15 백업 CronJob 은 주 DB release 에만 최대 1개(release-backup)이며 HBA 검사 대상 밖이다.
+    backups = [obj for obj in objects if isinstance(obj, dict) and obj.get('kind') == 'CronJob']
+    require(len(backups) <= (1 if release == 'ai-gateway-db' else 0) and all(obj['metadata']['name'] == release + '-backup' for obj in backups))
+    objects = [obj for obj in objects if obj not in backups]
     require(len(objects) == 6 and all(isinstance(obj, dict) for obj in objects))
     names = {(obj['kind'], obj['metadata']['name']): obj for obj in objects}
     require(len(names) == 6)

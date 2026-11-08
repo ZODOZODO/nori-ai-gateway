@@ -27,3 +27,16 @@ python3 -B ops/deploy/runconfig-selftest.py
 승인 운영자만 `--mode deploy --exec-sha "$AIGW_EXEC_CHART_SHA" --runconfig "$AIGW_RUNCONFIG"`를 실행합니다. 배포 전 exec-chart-ref·postgres-image·corpus-inventory·pvc-capacity·pvc-protection·backup-destination의 실제 승인과 자격 검사를 요구합니다. `--wait --timeout 600s` 후 해당 StatefulSet rollout·bootstrap 완료, 실제 HBA 경로/정본 SHA/규칙 검사, status=deployed와 양의 revision을 모두 확인해야 성공 증거를 기록합니다. restore는 RESTORE 자격 단계로 검사합니다. acceptance-ro가 활성인 두 검증 DB hook에는 해당 Secret이 필수이며 `--acceptance-role disabled`일 때만 검사·참조를 생략하고 false를 전달합니다. overlay는 항상 유지합니다. HBA는 정본 파일로만 주입하며 runconfig로 임의 HBA·서버 옵션을 추가하지 않습니다. 2026-11-06 승인 A로 역할 접속 계약은 확정되었고, 실제 운영 승인·배포 게이트는 계속 BLOCKED/NOT_RUN입니다. 기존 세션 종료와 양쪽 release 자격 정리는 자격 runbook 절차를 따릅니다.
 
 selftest 소스 배치: 기본값은 Gateway checkout과 같은 부모 디렉터리의 `../nori-tc-exec`입니다. 컨테이너 등에서 exec checkout을 다른 위치(예: `/exec`)에 두었다면 `AIGW_SELFTEST_EXEC_DIR=/exec bash ops/gates/aigw-runtime-credentials-selftest.sh` 및 `AIGW_SELFTEST_EXEC_DIR=/exec python3 -B ops/deploy/runconfig-selftest.py`처럼 기존 지원 변수를 지정합니다. 실제 exec 소스 checkout(HEAD와 DB 차트 포함)이 필요하며, 이 변수는 selftest 입력 경로만 지정합니다. sibling 배치에서는 지정하지 않아도 됩니다.
+
+## P15 앱 release·백업 입력
+
+앱 release(`ai-gateway`·`ai-gateway-restore`)는 `--image-digests <image-digests.json>`(`app`·`backup`·`acceptance` = `sha256:<64hex>`, `buildIdentity`)과 `--suite none|<§11.9 배포 suite>`가 필수입니다. 같은 runconfig 에 `netpol.targets.<key>`·`egressProbe.targets`·`inference.*`·`kafka.*`·`seaweed.{s3Endpoint,fixturePrefix}`·`acceptance.readback.*`를 `{value, approvalRef}`로 둡니다. Secret 이름과 suite 별 플래그는 스크립트의 §11.9 고정값이며 runconfig 로 바꾸지 않습니다. `profile=restore` 파일은 공통 키·`restore.*`·`seaweed.s3Endpoint`·`netpol`·`egressProbe` 밖 leaf 가 있으면 `RUNCONFIG_KEY_CONFLICT:<leaf>` 입니다. 주 DB 의 백업 CronJob 은 `backup.enabled=true` 와 `backup.{type,schedule,destination,ageRecipient,retentionDays}`, `--image-digests` 의 `backup` digest 로만 렌더합니다(lint fixture 는 enabled 를 두지 않고 lint 모드가 내부에서 켜서 양성·음성을 확인).
+
+```bash
+bash ops/deploy/aigw-helm.sh --release ai-gateway --mode lint --exec-dir ../nori-tc-exec --runconfig ops/runconfig/fixtures/lint-verify.json --image-digests ops/runconfig/fixtures/lint-image-digests.json --suite none
+bash ops/deploy/aigw-helm.sh --release ai-gateway-restore --mode lint --exec-dir ../nori-tc-exec --runconfig ops/runconfig/fixtures/lint-verify.json --image-digests ops/runconfig/fixtures/lint-image-digests.json --suite none
+bash ops/deploy/aigw-helm.sh --release ai-gateway-db --mode render --exec-dir ../nori-tc-exec --runconfig ops/runconfig/negative-missing-backup.json --image-digests ops/runconfig/fixtures/lint-image-digests.json --expect-fail RENDER_REQUIRED_backup.destination
+bash ops/deploy/aigw-helm.sh --release ai-gateway-restore --mode render --exec-dir ../nori-tc-exec --runconfig ops/runconfig/fixtures/negative-restore-ingest.json --image-digests ops/runconfig/fixtures/lint-image-digests.json --suite none --expect-fail RUNCONFIG_KEY_CONFLICT:ingest.enabled
+```
+
+lint 는 안에서 guard 음성(용량 schema·digest 누락·prod·release/DB 불일치·ingest/Source 읽기·복원 플래그·backup point·SPEC SHA 불일치)과 §11.9 렌더 행렬(행마다 Deployment Secret volume·추론 모드 env·egress 대상·수용 Job Secret·spec-verify 해제 SHA)·재배포 0 suite 의 Deployment 렌더 불변을 확인합니다. `lint-spec-bytes.md`·`lint-spec-baseline.md`·`lint-fixture-catalog.yaml`·`lint-image-digests.json` 은 LINT-ONLY 이며 deploy 는 `--baseline docs/gates/spec-baseline.md` 만 받습니다.

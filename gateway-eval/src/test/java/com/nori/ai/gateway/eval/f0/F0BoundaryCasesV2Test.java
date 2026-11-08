@@ -61,16 +61,26 @@ class F0BoundaryCasesV2Test {
         assertThat(F0TestRoot.cases(regenerated)).isEqualTo(Files.readString(root.resolve("eval/f0/output-boundary-cases.jsonl")));
     }
 
-    @Test void repositoryV2LimitsCiteTheActualApprovedSchemaLines() throws Exception {
+    @Test void repositoryV2LimitsPreserveHistoricalRefsAndMatchCurrentApprovedContract() {
         Path root = Path.of(System.getProperty("aigw.rootDir"));
         ArgLimits approved = ArgLimits.load(root.resolve("eval/f0/v2/arg-limits-v2.json"));
         assertThat(approved.versioned()).isTrue(); assertThat(approved.unresolved()).isEmpty();
-        for (String field : List.of("from", "to", "q")) for (JsonNode evidence : approved.get(field).evidence()) {
-            assertThat(evidence.path("kind").asText()).isEqualTo("SCHEMA");
-            String ref = evidence.path("ref").asText(); int colon = ref.lastIndexOf(':');
-            String line = Files.readAllLines(root.getParent().resolve(ref.substring(0, colon)), java.nio.charset.StandardCharsets.UTF_8).get(Integer.parseInt(ref.substring(colon + 1)) - 1);
-            if (field.equals("q")) assertThat(line).contains("최대 256 Unicode 코드포인트", "원문 코드포인트 수");
-            else assertThat(line).contains("최장 35 CODEPOINT", "나노초", "같은 instant", "엄격한 실제 달력");
+        ArgLimitsSpecEvidence.historical(root, true);
+        ArgLimitsSpecEvidence.timeAndQuery(ArgLimitsSpecEvidence.current(root), approved);
+    }
+
+    @Test void currentContractRejectsChangedLimitsUnitsAndDuplicatedOrUnrelatedParagraphs() {
+        Path root = Path.of(System.getProperty("aigw.rootDir"));
+        String current = ArgLimitsSpecEvidence.current(root);
+        ArgLimits approved = ArgLimits.load(root.resolve("eval/f0/v2/arg-limits-v2.json"));
+        for (String changed : List.of(current.replace("최장 35 CODEPOINT", "최장 36 CODEPOINT"),
+                current.replace("최대 256 Unicode 코드포인트", "최대 257 Unicode 코드포인트"),
+                current.replace("최대 256 Unicode 코드포인트", "최대 256 UTF-16 코드 유닛"),
+                current.replace("나노초 값과 같은 instant를 보존", "밀리초까지만 보존"),
+                current.replace("`FAILED`/`INPUT_BUDGET_EXCEEDED`", "`FAILED`/`OTHER_CODE`"),
+                current.replace("- **시간:**", "- **다른 문단:**") + "\n- **시간:** 최장 35 CODEPOINT 나노초 같은 instant 엄격한 실제 달력",
+                current.replace("- **시간:**", "- **시간:** 잘못된 중복\n- **시간:**"))) {
+            assertThatThrownBy(() -> ArgLimitsSpecEvidence.timeAndQuery(changed, approved)).isInstanceOf(AssertionError.class);
         }
     }
 }

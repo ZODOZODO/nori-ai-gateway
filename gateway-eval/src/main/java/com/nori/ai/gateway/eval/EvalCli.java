@@ -1,6 +1,8 @@
 package com.nori.ai.gateway.eval;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nori.ai.gateway.eval.ci.BuildIdentityManifest;
+import com.nori.ai.gateway.eval.ci.CiEvidence;
 import com.nori.ai.gateway.eval.f0.AnswerTokenCounter;
 import com.nori.ai.gateway.eval.f0.F0RunnerCli;
 import com.nori.ai.gateway.eval.f0.GitReader;
@@ -32,7 +34,7 @@ public final class EvalCli {
         // F0 하네스·F3 profile 은 자체 플래그를 쓰므로 공통 인자 해석 전에 분기합니다.
         if (arguments[0].equals("f0")) { new F0RunnerCli(new MeasurementSession.Context(root, env, GitReader.process(), Clock.systemUTC(), AnswerTokenCounter::python), out).execute(arguments); return; }
         if (arguments[0].equals("f3")) { EmbeddingProfile.execute(arguments, root, out); return; }
-        String command = arguments[0]; boolean nested = Set.of("spec-input", "test-evidence", "record", "perf", "f0", "f3").contains(command);
+        String command = arguments[0]; boolean nested = Set.of("spec-input", "test-evidence", "record", "perf", "f0", "f3", "ci-evidence").contains(command);
         String operation = nested && arguments.length > 1 ? arguments[1] : "";
         if (nested && operation.startsWith("--")) throw new EvalException(2, "UNKNOWN_COMMAND");
         Args args = new Args(arguments, nested ? 2 : 1, Set.of("--require-executed", "--require-docker"));
@@ -59,7 +61,8 @@ public final class EvalCli {
             }
             case "test-evidence" -> {
                 if (!operation.equals("verify")) throw new EvalException(2, "UNKNOWN_COMMAND");
-                args.only("--tasks", "--selector", "--required", "--require-docker", "--spec", "--baseline");
+                args.only("--tasks", "--selector", "--required", "--require-docker", "--spec", "--baseline", "--expect-build-identity");
+                BuildIdentityManifest identity = args.optional("--expect-build-identity") == null ? null : BuildIdentityManifest.load(path(args.required("--expect-build-identity")));
                 new SpecGuard(env).check(spec(args), null, baseline);
                 List<String> tasks = new ArrayList<>(); Map<String,List<String>> classes = new LinkedHashMap<>();
                 if (args.optional("--tasks") != null) tasks.addAll(List.of(args.required("--tasks").split(",")));
@@ -72,7 +75,9 @@ public final class EvalCli {
                         if (parts.length == 2) classes.put(task, List.of(parts[1].split(",")));
                     }
                 }
-                new TestEvidenceVerifier().verify(root, tasks, args.flag("--require-docker"), classes); out.println("TEST_EVIDENCE_VERIFIED");
+                new TestEvidenceVerifier().verify(root, tasks, args.flag("--require-docker"), classes);
+                if (identity != null) identity.verifyTaskSummaries(root, tasks, env.get("CI_COMMIT_SHA"));
+                out.println("TEST_EVIDENCE_VERIFIED");
             }
             case "ingest", "gate", "record", "perf" -> {
                 args.only("--stage", "--parent-run-id", "--input", "--source", "--spec", "--baseline", "--leaf", "--run-id", "--field", "--samples", "--criteria", "--out", "--catalog");
@@ -92,7 +97,19 @@ public final class EvalCli {
                     new PerfReporter().report(stage, args.required("--leaf"), parent, args.all("--samples").stream().map(this::path).toList(), path(args.required("--criteria")), path(args.required("--out")), root, binding, catalog, manifest);
                 }
             }
-            case "ci-evidence" -> throw new EvalException(2, "COMMAND_NOT_IMPLEMENTED_IN_P01");
+            case "ci-evidence" -> {
+                args.only("--out", "--spec", "--baseline", "--required", "--sha", "--bundle", "--expect-build-identity");
+                CiEvidence evidence = new CiEvidence(root, CiEvidence.processes());
+                switch (operation) {
+                    case "pack" -> { SpecBinding binding = new SpecGuard(env).check(spec(args), null, baseline); out.println("CI_EVIDENCE_PACKED " + evidence.pack(path(args.required("--out")), path(args.value("--required", "ci/integration-required.txt")), binding).getFileName()); }
+                    case "verify" -> {
+                        SpecBinding binding = new SpecGuard(env).check(spec(args), null, baseline);
+                        evidence.verify(path(args.required("--bundle")), args.required("--sha"), path(args.required("--required")), binding, BuildIdentityManifest.load(path(args.required("--expect-build-identity"))));
+                        out.println("CI_EVIDENCE_VERIFIED");
+                    }
+                    default -> throw new EvalException(2, "UNKNOWN_COMMAND");
+                }
+            }
             default -> throw new EvalException(2, "UNKNOWN_COMMAND");
         }
     }

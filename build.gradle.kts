@@ -218,3 +218,42 @@ project(":gateway-eval") {
     }
     }
 }
+
+// 패키징 정본: 한 번의 Gradle 호출에서 bootJar·수용 배포본·runtime classpath를 함께 만들어 신원이 갈라지지 않게 합니다.
+val aigwPackageDir = layout.buildDirectory.dir("package")
+val aigwPackage by tasks.registering(Sync::class) {
+    val app = project(":gateway-app")
+    into(aigwPackageDir)
+    // bootJar 출력만 사용합니다. plain jar·installDist·Boot 배포 task 산출은 이미지에 들어가지 않습니다.
+    from(app.tasks.named<Jar>("bootJar").flatMap { it.archiveFile }) { rename { "app.jar" } }
+    from(app.tasks.named("writeRuntimeClasspath")) { rename { "runtime-classpath.txt" } }
+    from(project(":gateway-acceptance").tasks.named("installDist")) { into("acceptance") }
+}
+val aigwBuildIdentity by tasks.registering {
+    val gitSha = providers.gradleProperty("aigw.gitSha")
+    val appJar = aigwPackageDir.map { it.file("app.jar") }
+    val runtimeClasspath = aigwPackageDir.map { it.file("runtime-classpath.txt") }
+    val identity = aigwPackageDir.map { it.file("build-identity.json") }
+    dependsOn(aigwPackage)
+    inputs.property("aigw.gitSha", gitSha.orElse(""))
+    inputs.files(appJar, runtimeClasspath)
+    outputs.file(identity)
+    // 작업 트리 상태는 Gradle 입력으로 추적되지 않으므로 매번 다시 판정합니다.
+    outputs.upToDateWhen { false }
+    doLast {
+        val output = identity.get().asFile
+        output.delete()
+        val sha = gitSha.orNull ?: throw GradleException("BUILD_IDENTITY_GIT_SHA_MISSING")
+        if (!sha.matches(Regex("[0-9a-f]{40}"))) throw GradleException("BUILD_IDENTITY_GIT_SHA_INVALID")
+        // 다른 commit 이나 수정된 트리에서 만든 jar 에 그 SHA 를 붙이지 않습니다.
+        val head = providers.exec { workingDir(rootDir); commandLine("git", "rev-parse", "HEAD") }.standardOutput.asText.get().trim()
+        if (head != sha) throw GradleException("BUILD_IDENTITY_HEAD_MISMATCH")
+        val status = providers.exec { workingDir(rootDir); commandLine("git", "status", "--porcelain") }.standardOutput.asText.get()
+        if (status.isNotBlank()) throw GradleException("BUILD_IDENTITY_DIRTY_TREE")
+        val jarSha = fileSha(appJar.get().asFile)
+        val classpathSha = fileSha(runtimeClasspath.get().asFile)
+        if (jarSha == "MISSING" || classpathSha == "MISSING") throw GradleException("BUILD_IDENTITY_INPUT_MISSING")
+        output.writeText(json(mapOf("gitSha" to sha, "appJarSha256" to jarSha, "runtimeClasspathSha256" to classpathSha)) + "\n", Charsets.UTF_8)
+    }
+}
+aigwPackage { finalizedBy(aigwBuildIdentity) }

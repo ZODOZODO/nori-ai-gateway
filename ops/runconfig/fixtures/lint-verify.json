@@ -31,7 +31,7 @@
       "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
     },
     "destination": {
-      "value": "s3://lint-only.invalid/backup",
+      "value": "https://lint-only.invalid/aigw-backup/verify",
       "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
     },
     "ageRecipient": {
@@ -41,6 +41,176 @@
     "retentionDays": {
       "value": 7,
       "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "schedule": {
+      "value": "15 3 * * *",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "netpol": {
+    "targets": {
+      "dns": {
+        "value": {
+          "namespace": "kube-system",
+          "podSelector": {
+            "app": "lint-only-dns"
+          },
+          "port": 53
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "loki": {
+        "value": {
+          "namespace": "lint-only-observability",
+          "podSelector": {
+            "app": "lint-only-loki"
+          },
+          "port": 3100
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "tempo": {
+        "value": {
+          "namespace": "lint-only-observability",
+          "podSelector": {
+            "app": "lint-only-tempo"
+          },
+          "port": 3200
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "alloy": {
+        "value": {
+          "namespace": "lint-only-observability",
+          "podSelector": {
+            "app": "lint-only-alloy"
+          },
+          "port": 4318
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "gitlab": {
+        "value": {
+          "cidr": "198.51.100.10/32",
+          "port": 443
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "metrics": {
+        "value": {
+          "namespace": "lint-only-observability",
+          "podSelector": {
+            "app": "lint-only-metrics"
+          },
+          "port": 9090
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "inference": {
+        "value": {
+          "cidr": "198.51.100.20/32",
+          "port": 18080
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "seaweed": {
+        "value": {
+          "cidr": "198.51.100.30/32",
+          "port": 8333
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "kafka": {
+        "value": {
+          "namespace": "lint-only-kafka",
+          "podSelector": {
+            "app": "lint-only-broker"
+          },
+          "port": 9092
+        },
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      }
+    }
+  },
+  "egressProbe": {
+    "targets": {
+      "value": [
+        {
+          "id": "db-main",
+          "host": "ai-gateway-db",
+          "port": 5432,
+          "expect": "ALLOWED"
+        },
+        {
+          "id": "inference-proxy",
+          "host": "198.51.100.20",
+          "port": 18080,
+          "expect": "ALLOWED"
+        },
+        {
+          "id": "external-blocked",
+          "host": "198.51.100.99",
+          "port": 443,
+          "expect": "BLOCKED"
+        },
+        {
+          "id": "cluster-blocked",
+          "host": "lint-only-service.lint-only.svc",
+          "port": 80,
+          "expect": "BLOCKED"
+        }
+      ],
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "inference": {
+    "proxyBaseUrl": {
+      "value": "http://198.51.100.20:18080",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "proxyPort": {
+      "value": 18080,
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "kafka": {
+    "bootstrapServers": {
+      "value": "lint-only-broker.lint-only-kafka:9092",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "topic": {
+      "value": "lint-only-topic",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "groupId": {
+      "value": "lint-only-group",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "seaweed": {
+    "s3Endpoint": {
+      "value": "http://198.51.100.30:8333",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    },
+    "fixturePrefix": {
+      "value": "lint-only/fixtures/",
+      "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+    }
+  },
+  "acceptance": {
+    "readback": {
+      "loki": {
+        "value": "http://lint-only-loki.lint-only-observability:3100",
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "tempo": {
+        "value": "http://lint-only-tempo.lint-only-observability:3200",
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      },
+      "metrics": {
+        "value": "http://lint-only-metrics.lint-only-observability:9090",
+        "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
+      }
     }
   }
 }

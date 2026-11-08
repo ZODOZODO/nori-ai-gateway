@@ -12,5 +12,7 @@ import org.springframework.context.annotation.Import;
     IntegrationModuleConfiguration.class, TcMockModuleConfiguration.class, IngressSecurityConfiguration.class,
     JobConfiguration.class, com.nori.ai.gateway.app.job.WorkflowExecutionConfiguration.class, TestHooksConfiguration.class, com.nori.ai.gateway.app.web.WebConfiguration.class,
     com.nori.ai.gateway.app.hooks.MockHooksConfiguration.class, com.nori.ai.gateway.app.hooks.MockStateDirectoryGuard.class,
-    SourceConnectorConfiguration.class, com.nori.ai.gateway.app.observability.ObservabilityConfiguration.class, com.nori.ai.gateway.app.ops.OpsConfiguration.class})
+    SourceConnectorConfiguration.class, com.nori.ai.gateway.app.observability.ObservabilityConfiguration.class, com.nori.ai.gateway.app.ops.OpsConfiguration.class,
+    com.nori.ai.gateway.app.safety.ProductionSafetyGuard.class, com.nori.ai.gateway.app.hooks.EgressProbeHook.class,
+    com.nori.ai.gateway.app.ops.backup.BackupStatusMetrics.class})
 public class GatewayAppModuleConfiguration {}

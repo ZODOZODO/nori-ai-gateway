@@ -13,8 +13,18 @@ public final class EvidenceRepositoryFs {
     public List<JsonNode> readAll(String stage) {
         Path directory = root.resolve("evidence").resolve(stage);
         if (!Files.isDirectory(directory)) return List.of();
-        try (var files = Files.walk(directory)) { return files.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".json")).sorted().map(Json::read).toList(); }
+        try (var children = Files.list(directory)) {
+            List<Path> records = new ArrayList<>();
+            for (Path namespace : children.filter(p -> recordNamespace(p.getFileName().toString()) && Files.isDirectory(p)).toList()) {
+                try (var files = Files.walk(namespace)) { files.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".json")).forEach(records::add); }
+            }
+            return records.stream().sorted().map(Json::read).toList();
+        }
         catch (IOException e) { throw new EvalException(5, "EVIDENCE_READ_FAILED"); }
+    }
+    private static boolean recordNamespace(String namespace) {
+        // 운영 원본은 명시 ingest 후 정본만 읽는다. 정본 내부의 손상·미등록 레코드는 기존 검증으로 거부한다.
+        return Set.of("runs", "measurements", "perf", "user-run").contains(namespace) || LeafCatalog.validLeafId(namespace);
     }
     public Path store(JsonNode record) {
         String stage = Json.required(record, "stage");

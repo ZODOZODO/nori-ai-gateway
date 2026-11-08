@@ -7208,3 +7208,179 @@ native core-r2는 UP-TO-DATE로 최초 core-r1의 결과를 재사용한 실행�
 P14의 코드/로컬 검증은 PASS다. 실제 경보 배치(G-ALERT), 실제 운영 OTLP 수신 확인(G-OBS-READBACK), CI/Source/배포 및 P16/F1 종료는 미실행이고 PASS로 세지 않는다. 다음은 별도 Opus 5.5 P15 구현이며 P16 이후는 진행하지 않는다.
 
 자격 확인 보정: 앞 절의 glab gitlab.com 401은 그 자격에 한정한 결과다. 부모가 별도의 기존 Windows Git Credential Manager 자격을 메모리 안에서만 사용해 Bearer API 및 실제 private starter Maven metadata HEAD 200을 확인했다. 값 출력/저장·전역 설정 변경 0이며 로컬 의존 해석이 사용자 신규 계정 제공 때문에 차단된 상태는 아니다. 이 권한을 운영 읽기 전용 또는 CI 전용 자격으로 간주하지 않는다.
+
+
+## P15 컨테이너·helm·NetworkPolicy·CI 최종 구현 CODE/LOCAL_VALIDATED — 2026-11-07 (독립 Opus 5.5 세션, 부모 판정 대기)
+
+상태: P15 COMPLETE 아님, F1 운영 PASS 아님. 실제 CI·push·Harbor 승인 digest·K8s 배포·승인 운영 gate(G-CI-DOCKER, G-BACKUP-DEST, G-NETPOL-TARGETS, G-SOURCE-SVC, G-ALERT)는 NOT_RUN/BLOCKED다. 커밋·push·이미지 push·클러스터 변경 0. 입력: AI worktree `p15final-ai`(HEAD 0f56bd3, 미커밋 작업), EXEC worktree `p15final-exec`(HEAD 0ed7701, 작업 트리만 변경), 정본 Spec 90ba8a73…·Plan bc0a025a…(r4 입력 결속 반영)·기준선 seq8. `tc-sources-v1.json` 변경 0(G-SOURCE-SVC 미답).
+
+### 변경(요약)
+
+- 패키징: `gradle/libs.versions.toml` spring-boot plugin alias, `gateway-app/build.gradle.kts` Boot plugin·djl tokenizers·integrationTest 의 `aigw.backupImage`(형식 `harbor.nori.local/nori-tc/ai-gateway-backup@sha256:<64hex>` 외 실패)와 Dockerfile-backup·backup/restore 스크립트·job-columns 의 `inputs.file`+`aigw.*Sha256`, 루트 `aigwPackage`(Sync)·`aigwBuildIdentity`(gitSha 부재/형식/HEAD 불일치/dirty → 실패, 이전 파일 삭제).
+- 앱: `app.safety.{ProductionSafetyGuard,NativeTokenizerOfflineCheck}`, `app.hooks.EgressProbeHook`, `app.ops.backup.BackupStatusMetrics`, `GatewayAppModuleConfiguration` @Import 3개(component scan 없음 — 부모가 Plan §7 공유 DI 규칙 허용 확인).
+- eval: `eval.ci.{BuildIdentityManifest,TarGz,CiEvidence}`, `EvalCli` 허용 두 지점. 부모 재현(manifest 추가 필드·미등록 모듈 요약 raw 필드·gzip CRC 손상·뒤 gzip member) 보정: gzip member 1개(FLG 0)·CRC32/ISIZE·후행 0, tar 끝 표시 정확·typeflag '0'·link/prefix/중복 0, 부호화·해제 16 MiB 상한, manifest 고정 9 필드·정규 바이트(중복 키 거부), 등록 task 요약만, 요약 = `{summary, records}`·taskPath/module 일치. `processes()` 는 시간 제한이 출력 읽기까지 적용(별도 reader, 64 KiB 상한), 실패 시 자식·후손 종료 대기, 인터럽트 보존.
+- `ci/integration-required.txt`: 모듈당 1줄 + 쉼표 FQCN(P01 test-evidence 파서가 같은 모듈 여러 줄이면 마지막 줄만 보는 기존 동작에 맞춤). persistence 8·integration 1·app 38 = 47 클래스.
+- 수용 하네스 `gateway-acceptance`: application·installDist 배포본, `AcceptanceMain`(System.out/err 폐기 격리·예상 밖 예외 → `ACCEPTANCE_HARNESS_FAILED`·exit 0 = 실패/skip/abort 0·OTR 무효 → RUN ABORTED `OTR_*`), `SpecInputVerifier`(압축 2 MiB·해제 4 MiB — 초과도 `SPEC_INPUT_MISSING`), `EvidenceBlockWriter`(중복·고아 finished 거부), `OracleQueries.retentionProbe(lokiApp)` = `LokiSourcePolicy.retentionSourceId`, `RubricViewer`(해시 일치 서술을 열람한 대상만 판정), Windows 시작 스크립트 classpath = `%APP_HOME%\lib\*`(jar 147개 절대 경로가 cmd 8191자 제한 초과 — ⑩ 실측).
+- 백업/복원: `deploy/docker/Dockerfile-backup`(필수 `PG_IMAGE_REPOSITORY`, ENTRYPOINT 제거, rclone 확인 `env -u`), `ops/backup/aigw-backup.sh`(같은 snapshot 세션 A·`pg_dump --snapshot --exclude-table-data=gw.job | age`·job sanitised `\copy TO PROGRAM age`·암호화 manifest·tar bundle·s3/sftp 업로드·보존 정리·`gw.backup_run`), `aigw-restore.sh`(정확 3 일반 파일 목록·순서 확인 뒤 추출, manifest 고정 형태 정규식, 대상 검사 exit 7, TOC 제외 = vector 확장·그 COMMENT·public 스키마 ACL/COMMENT·pg_control_system() ACL 만, `--exit-on-error` 단계별 exit 8, receipt).
+- EXEC 차트: prod 렌더 차단, egress `expect`, egress-probe ConfigMap 필드 제한, migrate Job PropertiesLauncher+MigrateApplication, `DJL_CACHE_DIR`, GitLab token env 제거, 수용 Job·NetworkPolicy 를 `templates/tests/` 로, `acceptance.buildIdentityJson`, metrics 대상, `db-chart/templates/backup-cronjob.yaml`·백업 values.
+- ops: `runconfig.py`(앱 release 값·`profile=restore` 의 leaf 단위 `RUNCONFIG_KEY_CONFLICT`·백업 값), `verify.schema.json` 확장, `aigw-helm.sh`(앱 release lint/render/deploy/suite-only, `--image-digests`·`--suite`·`--spec-file`·`--baseline`·`--fixture-catalog`·복원 입력, lint 안의 guard 음성·§11.9 렌더 행렬·재배포 0 Deployment 불변, DB 백업 CronJob 양성/음성), `app_render.py`, `hba_policy.py`(주 DB 백업 CronJob 1개 허용), fixture 6종(LINT-ONLY), `ops/monitoring/aigw-backup-prometheusrule.yaml`(label `release=monitoring`; P14 `aigw-alerts.yaml` 은 HEAD 그대로), 문서 `docs/runbooks/aigw-backup-restore.md`·`docs/gates/f1/netpol-targets.md`(NOT_RUN)·`docs/contracts/test-hooks-v1.md` egress-probe 행·`ops/runconfig/README.md` 절 추가.
+
+### 실제 실행(raw: scratch `p15-implementation/` 의 `<label>.json|log`, ops 는 `ops-runs/<label>.*`)
+
+| 명령 | label | 결과 |
+|---|---|---|
+| ⑤ `:gateway-app:test --tests "*ProductionSafetyGuardTest"` | p15-r2-app-safety-r1 / -verify-r1 | 6/0/0/0 EXECUTED, paired `TEST_EVIDENCE_VERIFIED` (이전 p15-app-unit-r1 56/1 실제 결함 → r2 56/0 은 as-run 이력) |
+| ⑥ `:gateway-app:integrationTest -Paigw.requireDocker=true --tests "*Backup*IT" --tests "*EgressProbeHookIT"` | p15-r2-app-it-backup-r1 / -verify-r1 | 6/0/0/0 EXECUTED(EgressProbeHookIT 1, BackupColumnCoverageIT 1, BackupScriptIT 4), source·정본 동결 true, paired(같은 필터 init·`--require-docker`) `TEST_EVIDENCE_VERIFIED` |
+| ⑦ `:gateway-eval:test --tests "*CiEvidence*"` | p15-r2-eval-ci-r2 / -verify-r2 | 19/0/0/0 EXECUTED, paired VERIFIED |
+| ⑧ `:gateway-acceptance:test` | p15-r2-acceptance-unit-r1 / -verify-r1 | 24/0/0/0 EXECUTED, paired VERIFIED (r2 는 시작 스크립트만 바뀌어 Test UP-TO-DATE — 새 PASS 로 세지 않음) |
+| ⑨ `aigwPackage`(gitSha 없음) | p15-r2-package-nosha-r1 | `BUILD_IDENTITY_GIT_SHA_MISSING` 실패, `build-identity.json` 0 |
+| ⑨ `aigwPackage -Paigw.gitSha=<HEAD>`(미커밋 트리) | p15-r2-package-dirty-r1·r2 | `BUILD_IDENTITY_DIRTY_TREE` 실패, identity 0. 양성(clean commit)은 root 커밋 뒤 NOT_RUN |
+| ⑩ `build\package\acceptance\bin\gateway-acceptance.bat`(env·마운트 0) | p15-r2-acceptance-bat-r2 | exit 3, 증거 블록 1개 = RUN ABORTED `SPEC_INPUT_MISSING`(SHA 일치), java stderr 0, Launcher 0. r1 은 cmd "입력 줄이 너무 깁니다" exit 255 → 위 classpath 보정 |
+| ① `aigw-helm.sh --release ai-gateway --mode lint … --suite none` | ops-runs/r3-c1-app-main-lint | exit 0 (guard 음성 10종·행렬 F1/F2/F3-PROBE/F3/F3-ACL/F4/F4-PERF·재배포 0 불변·SPEC SHA 불일치 음성) |
+| ①' `--release ai-gateway-restore` | r3-c1p-app-restore-lint | exit 0 (행렬 F4-RESTORE·복원 음성) |
+| ② `--release ai-gateway-db --mode render --runconfig ops/runconfig/negative-missing-backup.json --expect-fail RENDER_REQUIRED_backup.destination` | r3-c2-db-missing-backup | `EXPECTED_FAILURE:RENDER_REQUIRED_backup.destination` exit 0 |
+| 복원 runconfig ingest `--expect-fail RUNCONFIG_KEY_CONFLICT:ingest.enabled` | r3-c1p-restore-ingest | EXPECTED exit 0 |
+| M-10 `--suite F1` SPEC 부재 / 다른 바이트 / lint 기준선 일치 | r3-m10-missing·mismatch·match | 2 `SPEC_INPUT_MISSING` / 3 `SPEC_BASELINE_MISMATCH` / 0 |
+| deploy 에 비정본 `--baseline`, catalog 허용 디렉터리 밖 | r3-deploy-baseline·r3-fixcat-outside | 2 `BASELINE_DEPLOY_FIXED` / 2 `FIXTURE_CATALOG_INVALID` |
+| DB main/restore lint, 기존 `runconfig-selftest.py`·`aigw-runtime-credentials-selftest.sh` | r2-c0-*·r2-*-selftest | 모두 exit 0 (P06 회귀 0) |
+| native: `eclipse-temurin:21-jre-jammy`(로컬 Docker Hub 이미지 digest 199aebeb…, harbor base 아님) `--network none --read-only`, Dockerfile 과 같은 PropertiesLauncher 명령 | p15-r2-native-check-r1 / -neg-r1 | `NATIVE_TOKENIZER_OFFLINE_CHECK_OK` exit 0 / offline 속성 없으면 `…_FAILED:OFFLINE_MODE_REQUIRED` exit 1 |
+| migrate Job 진입점(`-Dloader.main=…MigrateApplication`) DB 없이 | p15-r2-migrate-entry-r1 | Spring Boot 기동 뒤 DB 부재로 exit 1(클래스 해석 오류 0). 실제 migrate NOT_RUN |
+
+BackupScriptIT 가 실제로 확인한 것(로컬 Dockerfile 빌드 이미지, 로컬 시험 pin age 1.2.1·rclone 1.68.2 — 승인값 아님): 이미지 context 4 파일 SHA = Gradle 결속값, 동시 쓰기 중 commit 된 쓰기 ≥1(executeUpdate 성공 뒤 계수·worker 실패 전파·join), 원본 독립 표 지문/행 수 = 복원 대상(audit_event 는 commit 순서 접두사 집합), receipt 행 수 = 원본, `delegation_id` non-NULL 0, dlg sentinel 복호 스트림 0, `/work` 잔류 0, Job→요청 Message 연관, 실제 reader `JobRepository.findRequestInput` 으로 비단순 요청 입력 왕복 일치, `SEQUENCE SET` last_value 보존·aigw_app 새 INSERT, 비어 있지 않은 대상 exit 7·표 지문 불변, 목적지 실패 FAILED 행·지표·다른 override exit 2·복귀, 손상 ACL TOC exit 8(`P15_TOC_PROBE failedStep=pre-data`, 이후 단계 0), 변형 묶음 7종(추가·중복·순서·link·manifest 추가 필드·중복 키·타입) exit 8 `BUNDLE`·대상 쓰기 0·작업 디렉터리 잔류 0. 실제 TOC 제외 = `EXTENSION - vector`, `COMMENT - EXTENSION vector` 2건.
+
+### 실패·RCA(보존)
+
+- p15-app-it-backup-r1: 시험 컴파일 오류(Timestamp 모호) 0 tests. r2: 5/1 — order3 이 receipt 디렉터리를 만들지 않아 `ARGUMENT_MISSING`(시험 결함).
+- p15-r2-eval-ci-r1: 19/1 — `CiEvidenceProcessTest` timeout 시험의 `@TempDir` 정리에서 Windows "다른 프로세스가 사용 중"(자식 생존 단언은 PASS). 진단 재실행 PASS(간헐). 자식 작업 디렉터리를 `java.io.tmpdir` 로 바꿈.
+- ops 1차: 용량 음성 기대 사유를 guard 문구로 잡았으나 차트 schema(const 1)가 먼저 거부 → 기대 사유를 schema 메시지로 교정. DB main lint `HBA_POLICY_INVALID`(백업 CronJob 이 kind 집합 밖) → hba_policy 에 주 DB 백업 CronJob 1개만 허용. P06 selftest 가 DB 렌더에 `--image-digests` 를 주지 않으므로 DB 는 선택 입력, lint fixture 에 `backup.enabled` 를 두지 않고 lint 모드가 내부에서 켜서 확인.
+- ⑩ r1: Windows cmd 줄 길이 초과(위 보정).
+
+### 편차·미완료·위험
+
+- 미구현 NOT_RUN: ③ `ops/gates/aigw-stage-gate.sh`+selftest, ④ `aigw-verify-credentials.sh`+selftest+runbook, ④' `aigw-backup-alert-injection.sh`+selftest, rollback 리허설 스크립트, `--set-extra`(F3-RULEVER — 차트 schema 에 sanitize 값 없음). suite-only 는 `helm upgrade --reuse-values` 경로와 lint 의 Deployment 불변 확인만 있고 Pod 전후 비교는 stage gate 몫(미구현).
+- 수용 하네스: retention 조회 키는 단위 시험(바인딩 값)으로만 확인 — 실제 DB read-back 은 P16 배포 회차. 하네스 오류 레코드는 suite 가 없으면 stage 가 없어 ingest 불가(업무 증거를 만들지 않으려는 선택). RubricViewMode 는 P16 F1-RUBRIC fixture claims 전까지 항상 `RUBRIC_FIXTURE_CLAIMS_UNDEFINED` ABORTED — viewer 완료 아님. Windows 시작 스크립트 wildcard classpath 는 jar 순서를 디렉터리 순서에 맡긴다(Linux sh 는 기존 순서).
+- 백업: sftp 목적지 시험 서버 미구현(승인 이미지 유형이 sftp 면 BackupScriptIT 가 명시 실패). 승인 digest(`-Paigw.backupImage`) 경로는 미보유로 NOT_RUN. 복원 loopback 대상 제한은 Plan/caller 대조 전이라 변경 0.
+- ⑨ 양성(clean commit 의 `build-identity.json`)은 root 로컬 커밋 뒤 같은 세션에서 확인 필요. dirty guard 우회 0.
+- `ops/deploy/__pycache__/runconfig.cpython-312.pyc` 는 이 세션의 `py_compile` 부산물(미추적·미무시) — 삭제는 root 결정.
+
+### P15 r3·r4 보정과 남은 스크립트 구현 — 2026-11-07 (append, 위 r2 기록은 그 시점 이력으로 보존)
+
+판정: CODE/LOCAL_VALIDATED 범위만. 운영 배포·실제 클러스터·실제 자격·경보 수신은 0회(NOT_RUN). P15 COMPLETE·F1 운영 PASS 를 주장하지 않는다.
+
+**r3 보정**
+- `TarGz`: 각 헤더가 writer 헤더 바이트와 정확히 같아야 하고(linkname·uname·prefix 등 숨김 0), 내용 뒤 패딩은 0 바이트만 허용한다. 시험 `hiddenBytesInPaddingOrUnusedHeaderFieldsAreRejected`.
+- `CiEvidence.processes`: 하나의 마감 시각으로 종료와 출력 읽기를 함께 묶는다. 읽기 IOException 은 실패로 전파한다. finally 에서 후손 종료·소유 스트림 close·reader join·자식 wait 를 하고 인터럽트를 보존한다.
+- p15-r3-eval-ci-r1: 21/0/0/0 EXECUTED → verify TEST_EVIDENCE_VERIFIED.
+- `ops/deploy/__pycache__/runconfig.cpython-312.pyc` 단일 파일을 삭제했다. 빈 디렉터리는 남아 있다.
+
+**r4 자격 보정(부모 재현: cleanup exit 0 뒤 test- 공개키·수용 토큰 해시·hook Secret 잔류)**
+- `verify_credentials.py` cleanup 순서:
+  1. 부작용 전 판정 — release 조회(오류 ≠ 부재), 입력 의미 검사(아래), Secret 조회, JWKS·토큰 형식 검사와 신뢰 제거 결과 계산, P06 `hba_policy.py live`.
+  2. 수용 Job 두 개만 삭제.
+  3. 각 DB 에서 NOLOGIN 후 그 역할 세션만 종료(P06 admin TCP 경로, SQL 은 stdin).
+  4. disabled 재배포 후 역할 0·기존 자격 접속 비-OK 확인.
+  5. 수용 Secret 4종 삭제.
+  6. JWKS 에서 test-·수용 kid 제거, 수용 토큰 해시 제거(무관 키·토큰 보존, 비면 Secret 삭제), hook Secret 삭제.
+  7. 실행 중 앱마다 `RESTART_OR_UNINSTALL_REQUIRED` 출력.
+- install(provision·rotate) 도 부작용 전에 HBA live 를 돌린다. 재배포 뒤 실제 접속 분류는 `ai_gateway` SELECT = OK 이고 `postgres`·`template1` 의 TCP·Unix 가 모두 HBA_REJECT 여야 한다(비밀번호는 exec stdin).
+- check 항목 출력은 MATCH/MISSING 만이다. 사유는 stderr 고정 코드로 낸다. Secret 조회 오류는 `SECRET_QUERY_FAILED:<이름>`·exit 1 이다.
+- 부모 r4 검토 반영:
+  - 입력 의미 검사: `AIGW_EXEC_CHART_SHA` 형식, `app_render.py digests`, release 별 `runconfig.py <runconfig> <release> deploy … <exec sha>`, 런타임 자격 check(읽기 전용)를 Secret 변경 전에 돈다. 무효 입력은 exit 2, 런타임 자격 미준비는 `DB_RUNTIME_CREDENTIALS_NOT_READY:<release>` exit 1.
+  - cleanup 의 신뢰 JSON 파싱을 삭제 앞으로 옮겼다(형식 오류면 변경 0이라 재시도 가능).
+  - install 의 JWKS·토큰 형식 오류도 고정 코드로 낸다.
+- runbook `docs/runbooks/aigw-verify-credentials.md` 추가.
+
+**남은 스크립트(Plan P15 ③·④'·L-6)**
+- `ops/gates/aigw-stage-gate.sh`(`stage_gate.py`): §11.9 행렬 17 suite.
+  - 입력 → runconfig profile → 이미지 신원 → spec-guard(≠0 → 3) → 부모 회차(새 부모는 stdout `AIGW_PARENT_RUN_ID=` 정확히 1줄, 기존 부모는 manifest 의 앱·수용 digest·buildIdentity 대조 → `PARENT_IDENTITY_MISMATCH` 2).
+  - 검증 자격(12) → 런타임 자격(13) → deploy|suite-only. suite-only 는 앱 Pod uid·template hash·restartCount 전후 대조, 실패 시 11.
+  - 실제 앱 Pod imageID ≠ 입력이면 `DEPLOYED_DIGEST_MISMATCH` 11 이다. 기존 부모·suite-only 에도 같은 검사가 걸린다.
+  - `helm test --logs`: 시간 제한 = 입력+120초. 증거 블록·helm 상태 줄만 저장하고 `.sha256` 을 남긴다.
+  - acceptance ingest. F4-RESTORE 는 RTO MEASUREMENT 를 ops ingest 한다. gate 는 F3-PROBE·F4-PERF·F4-RESTORE-PREP·F4-RESTORE-MUTATE 에서만 생략한다.
+  - 종료 코드는 수집·보고 뒤에만 전파한다.
+- 부모 r4 검토 반영(stage gate):
+  - F4-RESTORE 의 gate 생략을 제거했다.
+  - PARENT 레코드 `runId` = parentRunId 다(GateEvaluator 의 부모 조회 키).
+  - 새 부모 manifest 는 helm test 뒤에 쓴다. 수용 Job Pod(`job-name=<release>-acceptance`, hook-delete-policy before-hook-creation 이라 남음)의 실제 imageID 를 넣고, 못 읽으면 입력값 대체 없이 `UNVERIFIED` 로 둔다.
+  - ops 레코드는 파일 하나에 객체 하나다(`evidence_record.py seal` 단일 객체). eval `readAll` 이 단계 아래 모든 .json 을 레코드 객체로 검증하기 때문이다. 배열 파일이면 실제 gate 가 `EVIDENCE_INVALID` rc 2 임을 재현했다.
+- `ops/gates/aigw-backup-alert-injection.sh`:
+  - Job 정의는 `kubectl create --dry-run | python | kubectl create -f -` 파이프로만 다닌다(디스크 0).
+  - 주입 전 `max(id)` 를 기준으로 잡고 새 행이 정확히 1건(FAILED:UPLOAD)인지 본다. 복귀 뒤에도 새 행 정확히 1건(SUCCESS)이어야 한다. 기준 조회 실패는 `BACKUP_RUN_QUERY_FAILED` 이고 Job 생성 0 이다.
+  - Prometheus firing 은 수신 확인이 아니다. G-ALERT 미승인(`docs/gates/f1/alerting.md` NOT_RUN) 상태에서는 관측이 모두 참이어도 LEAF result = `NOT_RUN`(`ALERT_RECEIPT_PATH_UNAPPROVED`)·exit 2 이고, 하나라도 거짓이면 FAIL·exit 1 이다(PASS 경로 없음).
+- `ops/gates/aigw-rollback-rehearsal.sh`(`rollback_rehearsal.py`):
+  - A → B → `helm rollback N` 순서로 돈다. revision N·N+1·N+2, Pod imageID = A, Flyway 최신 V 불변을 확인한다.
+  - 같은 스키마 두 번째 이미지가 없거나, 스키마가 다르거나, label 이 없으면 NOT_RUN exit 2 다.
+  - 부모 r4 재현 반영: 401 의 `WWW-Authenticate` realm 이 레지스트리와 같은 scheme·host·port 가 아니면 자격을 보내지 않는다(`REGISTRY_AUTH_REALM_REJECTED`).
+- `aigw-helm.sh` lint 의 suite-only 재사용 렌더(F1-RUBRIC)가 새 chart guard `RUBRIC_TARGETS_REQUIRED` 에 맞도록 `acceptance.rubricTargets=[]` 를 넘긴다. 같은 guard 의 음성 렌더도 추가했다.
+- 공유 selftest stub `selftest_kubectl_stub.py` 에 `pods` 시퀀스와 `selector_pods`(selector 고정 응답)를 추가했다.
+
+**실행(raw: scratch `p15-implementation/ops-runs/<label>.*`, 모두 aigw-p06-tools 컨테이너 network none·원본 읽기 전용, 실제 클러스터 0)**
+- r7 ops 재실행(차트 sanitize·rubric 변경 뒤):
+  - exit 0: 앱 main/restore lint, DB main/restore lint, 백업 목적지 누락 EXPECTED_FAILURE, 복원 ingest KEY_CONFLICT EXPECTED, M-10 일치, runconfig-selftest, runtime-credentials-selftest.
+  - 기대 실패: M-10 부재 2·불일치 3, F4-RESTORE 입력 2, deploy 비정본 baseline 2, catalog 밖 2, `SET_EXTRA_NOT_ALLOWED` 2건.
+- selftest: r7-stage-gate-selftest-r2 PASS 34(timeout 강제 종료 ≥120 초 포함), r7-verify-creds-selftest-r2 PASS 42, r7-alert-selftest-r2 PASS 9, r7-rollback-selftest-r2 PASS 12.
+- 실제 eval 통합(r7-stage-gate-replay.json):
+  - stage gate selftest 가 정본 SPEC(90ba8a73…) 바이트로 4 시나리오의 OPS/RUN 파일·정제 로그·eval 호출 순서를 내보냈다. 호스트 `:gateway-eval:installDist` 의 실제 `EvalCli` 로 같은 순서를 재생했다.
+  - ingest·gate 는 전부 rc 0 이었다.
+  - f1-normal·f4-restore: PARENT(runId = parentRunId)·ACCEPTANCE RUN COMPLETED·`ops:restore-rto` 가 저장됐고 보고서에 `PARENT_MANIFEST_MISSING` 이 없다.
+  - f1-no-block: eval 이 `ACCEPTANCE_EVIDENCE_MISSING` ABORTED 를 만들었다.
+  - f1-verify-missing: 배포 전 중단이라 부모 manifest 가 없어 보고서는 `PARENT_MANIFEST_MISSING` 이다. Plan 은 manifest 를 "배포 뒤" 로 정하므로 사유 코드는 RUN ABORTED 레코드에만 남는다.
+
+**발견(P15 허용 쓰기 밖 — root 결정 필요)**
+- eval `EvidenceRepositoryFs.readAll` 은 `evidence/<stage>/` 아래 모든 .json 을 읽고, `GateEvaluator` 는 각각을 레코드로 검증한다. 그런데 레포에 이미 커밋된 `evidence/F1/gates/p06-*.json` 과 Plan 이 같은 경로로 정한 운영 기록이 그 아래에 놓인다. 운영 기록은 `aigw-helm.sh` deploy 기록, verify-credentials check, rollback 리허설이다.
+- 재현: 실제 EvalCli 로 `gate --stage F1` 을 돌리면 레코드만 있을 때 rc 0, `p06-local-verification.json` 1개를 더하면 `EVIDENCE_HASH_MISMATCH` rc 5 다.
+- 레포 전체 Grep 에서 eval 에 gates/ 제외 처리는 없다. P16 F1 gate 를 막는 사전 결함이다. eval 수정(P15 허용 두 지점 밖) 또는 증거 경로 변경 중 무엇을 할지는 root 결정이다.
+
+**미완료·NOT_RUN**
+- 운영: stage gate·자격 provision/cleanup·경보 주입·rollback 리허설의 실제 실행.
+- G-ALERT 수신 확인 경로가 없다(경보 leaf 는 NOT_RUN 만 가능).
+- ⑨ clean packaging 양성은 root 로컬 커밋 뒤에 확인한다.
+- 사용자 결정 대기: G-SOURCE-SVC(로그4/trace3)·metadata corpus·외부 백업 위치. tc-sources 변경 0.
+- 빌드 부산물 `gateway-eval/build/install/`(installDist, 미추적 build 디렉터리) 가 생겼다.
+
+
+## P15 최종 결함 보정 — Sol 세션 로컬 결과(2026-11-09, 운영/P16 미실행)
+
+정본 SPEC SHA `90ba8a739c303312065824f9923642812f5e427a5f05a8b13142f792c1ad0550`, root 기술범위 보완 Plan SHA `ca2cad51a97480b004b4a411b75e2bfaa2415af27c6f70e7e8250c789e0afeda`, baseline seq8을 기준으로 보정했다. 이 절은 기존 전체 1,080,666바이트(SHA `5c3a1cd766c6b4707a7746147a7c7fff9a372b0c01dcb20a1019011c7dbc3bc6`) 뒤에만 추가한다. 원래 1,059,900바이트 prefix SHA `2d8cccdc6be967b735e52466d000208f48d41081e1fb555d1f4f6a731b51b5a7`도 보존한다.
+
+변경과 영향:
+
+- `ops/gates/rollback_rehearsal.py`: 승인 HTTPS Harbor origin만 허용하고 임의 registry override, userinfo/다른 host/port/scheme/제어 문자 및 승인 밖 realm을 거부한다. 공통 opener에서 인증 전·Basic·Bearer 응답의 모든 redirect를 거부해 Authorization 복제 전송을 막는다. 응답을 닫고 인증/JSON/HTTP 오류는 고정 사유로 변환한다.
+- `ops/gates/aigw-rollback-rehearsal-selftest.sh`: 실제 urllib opener의 HTTPError/redirect 처리를 거치는 HTTPS fixture로 교체했다. socket.create_connection/socket.connect/connect_ex, HTTP(S)Connection.connect, HTTPHandler.http_open, urlopen의 실제 전송을 차단하고 Docker `--network none`을 함께 적용했다. 실제 자격/클러스터/외부 네트워크 사용은 없다.
+- `gateway-eval/.../report/EvidenceRepositoryFs.java`, `LeafCatalog.java`: 단계 직계 namespace를 먼저 선별하고 runs/measurements/leaf문법 디렉터리/perf/user-run만 순회한다. 운영 gates/ops/단계 루트 artifact는 조회하지 않는다. 선택된 namespace의 모든 JSON을 최종 전역 정렬 후 파싱하며 기존 GateEvaluator/EvidenceRecord 검증과 store 경로·바이트·해시는 유지한다. LeafCatalog의 기존 ID 문법만 package-private helper로 공유했다.
+- `gateway-eval/.../EvidenceRepositoryFsTest.java`, `PerfReporterTest.java`: 운영 artifact 전후 판정/바이트 동일성, 정본 내부 malformed JSON·해시·kind누락·미등록 leaf 거부, 명시 ops ingest, 직접 USER_RUN/PERF 소비를 검증한다. `evidence/README.md`에 조회 경계를 기록했다.
+- `ops/gates/stage_gate.py`: full/paired freeze 종료 뒤 CRLF를 LF로만 정규화했다. 로직 변경은 없다.
+
+실행 기록(모든 receipt/원시 XML/OTR/paired는 scratch `p15-implementation/`의 새 label로 보존):
+
+| 검증 | 명령/label | 실제 결과 |
+|---|---|---|
+| rollback 보안 회귀 | tools 컨테이너 network none, `bash ops/gates/aigw-rollback-rehearsal-selftest.sh`, `ops-runs/sol-r3-rollback-selftest.*` | 92건 PASS, exit0, sourceStable=true, 실제 전송0. r1은 fixture no_label 상태 격리 오류로 실패했고 r2 88PASS 후 고정오류 경계4개를 더해 최종92PASS |
+| 최소 reader/PERF | `-I sol-eval-reader-filter.init.gradle :gateway-eval:test --offline --no-daemon --max-workers=2`, `sol-eval-reader-min-r2` | 9/9 PASS, 실제 EXECUTED. r1 1실패는 새 단언의 Jackson LongNode/IntNode 동등성 차이였고 canonical 비교로 바로잡음 |
+| 전체 eval 1회 | `:gateway-eval:test :gateway-eval:installDist --offline --no-daemon --max-workers=2`, `sol-eval-full-r1` | 274건 중272PASS/2FAIL, 오류/skip0, exit1. source/policy stable. 이 실패 때문에 해당 호출의 installDist는 실행되지 않음 |
+| 전체 원시 결속 | `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"`, `sol-eval-full-verify-r1` | TEST_EVIDENCE_VERIFIED, exit0. 실패를 포함한 원시결과/신원 결속 검증이며 전체PASS가 아님 |
+| eval 배포본 빌드 | `:gateway-eval:installDist --offline --no-daemon --max-workers=2`, `sol-eval-install-r1` | exit0, source/policy stable |
+| 실제 CLI 연결/운영 artifact 재현 | `sol_cli_replay.py`, `sol-cli-replay-r1.json` | 5시나리오 PASS: stage OPS/PARENT/ABORTED/RTO·정제 acceptance와 실제 alert producer OPS를 ingest/gate. 커밋된 p06 운영 JSON 동시 존재 전후 보고서·정본바이트 동일, 정본 runs 손상은 INVALID_JSON exit2. 소스·실제 installDist classpath SHA 안정 |
+| alert producer export | scratch 파생 selftest `sol-alert-export-selftest-r2.*` | 실제 승인 SPEC 바이트·stub kubectl/gradlew·loopback Prometheus, network none에서9PASS. 원본 레코드의 NOT_RUN/ALERT_RECEIPT_PATH_UNAPPROVED 유지. r1은 최소 fixture에 bootstrap.sql이 없어 AI_ROOT_REQUIRED로 실패했고 fixture에 그 정본만 추가 |
+| 기존 F0 실패2건만 재실행 | `-I sol-eval-f0-env-filter.init.gradle :gateway-eval:test`, `sol-eval-f0-env-r1` | 2FAIL. 전체 회귀 추가실행0. 최초 sibling 부재를 원본을 가리키는 로컬 junction3개로 보정했으나 현재 SPEC 줄번호와 기존 arg-limits 근거가 어긋남을 확인 |
+
+남은 검증 한계:
+
+기존 `ArgLimitsSchemaTest.repositoryLimitsMatchInvestigatedCodeEvidenceAndHumanDocument`와 `F0BoundaryCasesV2Test.repositoryV2LimitsCiteTheActualApprovedSchemaLines`는 worktree 부모의 sibling 정본을 읽는다. full 최초 실패는 sibling 경로 부재였다. 로컬 junction으로 실제 정본을 읽게 한 뒤에는 기존 F0 JSON의 SPEC 고정 참조1203/1207/1208줄이 현 승인 SPEC의 해당 문구를 가리키지 않아 실패했다. F0 artifact/Spec/기대값을 범위 밖에서 수정하거나 이2건을 PASS 처리하지 않았다. 정본 원본 파일은 수정하지 않았다. junction 경로/대상은 `sol-test-sibling-junctions-r1.json`에 기록했다.
+
+P15 완료/F1 운영 PASS로 표시하지 않는다. 실제 CI·push·K8s·Secret·승인 이미지 digest 재시험·G-ALERT 수신·P16은 NOT_RUN이다. G-ALERT 수신 미확정은 NOT_RUN을 유지하고 Source JSON·Spec·버전은 변경하지 않았다. clean packaging 양성은 root 검토·로컬 commit 뒤의 checkpoint로 남긴다. 이 세션은 commit/push를 하지 않았다.
+
+
+## P15 부모 검증·실패 2건 해소 및 로컬 커밋 준비 (2026-11-09)
+
+- 사용자 지시: 실패 두 건의 원인 수정, 독립 검증, 로컬 커밋과 최종 패키징까지 수행하고 P16 착수 전에 종료한다. 구현자는 기존 gpt-6.1-sol/high 한 세션이며 부모가 실제 코드와 원시 결과를 별도로 대조했다.
+- 원인: F0 이력 JSON의 조사 당시 SPEC 줄번호를 가변 최신 문서의 현재 줄번호로 사용했다. 분리 worktree에서는 sibling 파일 위치 가정도 실패했다. 측정 자료의 인자 계약과 실제 Gateway 동작 결함으로 판정하지 않는다.
+- 실제 추가 변경: `gateway-eval/src/test/java/com/nori/ai/gateway/eval/f0/ArgLimitsSchemaTest.java`, `F0BoundaryCasesV2Test.java`, 신규 `ArgLimitsSpecEvidence.java`만이다. 이력 JSON의 정확 SHA·human 문서 이력행·기준선 1/2 연결은 보존하고, 현재 계약은 기존 SpecGuard가 검증한 승인 SHA 바이트의 유일 §14.5와 필드별 승인 문단에서 확인한다. 시간 문법·35 CODEPOINT·나노초/instant 보존, 검색어 256 코드포인트·원문 보존·초과 거부·호출 0건·재시도 정책을 검증한다. 과거 문서 원문이 없으므로 당시 줄 내용을 검증했다는 주장은 하지 않는다.
+- 입력 경로: `AIGW_SPEC_FILE`과 worker에 실제 제공된 `aigw.specPath`를 기존 resolver 우선순위대로 사용한다. Gradle `-P`가 worker로 자동 전달된다고 가정하지 않는다. 잘못된 우선 경로는 정상 env로 우회하지 않고 실패한다. TC CODE/DB 근거 세 파일의 기존 경로:줄 단언은 유지하며 분리 시험 환경의 명시 sibling junction 세 개는 `sol-test-sibling-junctions-r1.json`에 기록했다.
+- 원시 실행 이력: 전체 `sol-eval-full-r1`은 274건 중 272 PASS/2 FAIL로 그대로 보존했다. 수정 후 두 클래스 `sol-f0-contract-r2`는 기존 관련 7건과 신규 음성/입력 경로 3건을 포함해 10/10 PASS, 오류·skip·abort 0이며 `sol-f0-contract-verify-r2`는 TEST_EVIDENCE_VERIFIED다. 전체 실행을 다시 했거나 원래 실패 결과를 PASS로 덮어썼다고 표시하지 않는다.
+- 부모는 XML testcase, OTR TEST 시작/종료와 성공·실패 수, runId, input fingerprint, runtime classpath 및 시험/paired 양쪽의 source·정본 입력 동결을 직접 대조했다. 예전 전체 실행 이후 소스 변경은 위 시험 세 파일뿐이고 이전 실패 두 method가 새 실행에 포함돼 PASS한 것을 확인했다. 증명: scratch `p15-parent-review/raw-sol-close-proof-r1.json`, SHA-256 `7127e75f8112a1eb94c3811c98e21abcf0b1b1d695dda98ce2f522c70b3ec151`.
+- P15 최종 보정 검증: rollback 실제 urllib handler를 통한 인증 전송 차단 92 PASS/실제 네트워크 호출 0, reader/PERF 최소회귀 9 PASS, 실제 CLI ingest/gate 재현 5시나리오 PASS를 원시 출력과 현재 파일 SHA로 대조했다. 운영 artifact 동반 여부에 따른 판정/정본 바이트 불변과 손상 정본의 INVALID_JSON 거부가 유지된다. F1 gate의 실제 상태 NOT_RUN은 정상 판정이며 F1 운영 PASS로 바꾸지 않았다.
+- 기존 부모의 백업/복원·egress 6 IT, safety 6건, CI 경계 21건의 원시 결속 증명은 각각 `raw-backup-pair-proof-r1.json`, `raw-safety-pair-proof-r1.json`, `raw-ci-pair-proof-r3.json`에 보존돼 있다. 백업 IT 이후 변경된 소스 중 앱/백업 코드 변경 0, 앱 runtime classpath 불변을 확인해 무관한 Docker/DB 전체 시험을 반복하지 않았다. 전체 eval은 이후 CI/reader 변경을 포함해 실행됐다.
+- EXEC 차트 최종 로컬 커밋: `fdbaae0b7a95d000cd8df8a6635ce1141f07bfd5`. AI는 이 절까지 포함해 로컬 커밋한 후 clean-tree `aigwPackage -Paigw.gitSha=<HEAD>` 양성 검증을 수행한다. 현재 이 절 작성 시점의 양성 패키징은 아직 NOT_RUN이며 후속 결과 절에서 실제 결과를 기록한다.
+- Spec `90ba8a73…`, 기준선 seq8/`1bea13bf…`, 기존 F0 JSON·PREREG·측정/실패 증거 및 기존 DevReport prefix는 불변이다. 기존 1,086,628바이트 prefix SHA `d41befeb760ea2267950f3c5af3e98cba96ea84317c4bab950b8802df6f06446`를 그대로 보존하고 append했다. 변경 파일 UTF-8/LF와 git diff --check를 확인했다.
+- 종료 범위는 P15 CODE/LOCAL_VALIDATED/LOCAL_COMMITTED와 패키징이다. 원격 CI/Harbor build·push·scan, 승인 digest 재시험, K8s 배포·Secret 변경·운영 경보 수신은 미실행이며 기존 운영 gate 조건을 유지한다. P16 수용 시험과 F1 exit는 착수하지 않는다.

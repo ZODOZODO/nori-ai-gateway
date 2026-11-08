@@ -21,7 +21,7 @@ class PerfReporterTest {
     }
     ObjectNode measurement(String stage,String parent,String id,List<Map<String,Object>> samples,Map<String,Object> extra){Map<String,Object> values=new LinkedHashMap<>();values.put("kind","MEASUREMENT");values.put("measurementId",id);values.put("stage",stage);values.put("parentRunId",parent);values.put("runId",UUID.randomUUID().toString());values.put("samples",samples);values.put("buildIdentity",f.identity(stage));values.putAll(extra);return f.record(values);}
     Path sample(ObjectNode record,String name){Path file=directory.resolve("samples/"+name+".json");Json.write(file,record);return file;}
-    ObjectNode report(String stage,String leaf,List<Path> files,Path criteria){return new PerfReporter().report(stage,leaf,"p",files,criteria,directory.resolve("out"),directory,f.binding(),f.catalog,f.parent(stage,"p"));}
+    ObjectNode report(String stage,String leaf,List<Path> files,Path criteria){return new PerfReporter().report(stage,leaf,"p",files,criteria,directory.resolve("evidence/"+stage+"/perf"),directory,f.binding(),f.catalog,f.parent(stage,"p"));}
     Map<String,Object> limits(){return Map.of("chunkCount",100L,"indexingMs",100L,"dbBytes",100L,"indexBytes",100L,"memoryBytes",100L);}
     List<Map<String,Object>> f3samples(){return List.of(Map.of("path","VECTOR","round",1,"latencyMs",10),Map.of("path","KEYWORD","round",1,"latencyMs",20));}
     @Test void computesNearestRankOnlyFromMatchingParentRawSamplesAndIndexMeasurement() throws Exception {
@@ -30,6 +30,10 @@ class PerfReporterTest {
         Path search=sample(measurement("F3","p","f3:search-latency-samples",f3samples(),Map.of()),"search");Path index=sample(measurement("F3","p","f3:index-resources",List.of(),Map.of("resources",limits())),"index");Path other=sample(measurement("F3","other-parent","f3:search-latency-samples",List.of(Map.of("path","VECTOR","round",1,"latencyMs",9999)),Map.of()),"other");
         ObjectNode result=report("F3","AC-23-PERF",List.of(directory.resolve("samples")),criteria);assertThat(result.path("result").asText()).isEqualTo("PASS");assertThat(result.path("metrics").path("VECTOR").path("p95Ms").asInt()).isEqualTo(10);assertThat(result.path("parentRunId").asText()).isEqualTo("p");
         assertThat(search).exists();assertThat(index).exists();assertThat(other).exists();
+        EvidenceRepositoryFs repository = new EvidenceRepositoryFs(directory); repository.store(f.parent("F3", "p"));
+        assertThat(repository.readAll("F3").stream().map(Json::canonicalString).toList()).contains(Json.canonicalString(result));
+        var gate = new GateEvaluator().evaluate("F3", "p", repository.readAll("F3"), f.catalog, com.nori.ai.gateway.eval.spec.SpecBaseline.parseChain(f.baseline));
+        assertThat(gate.leaves().stream().filter(l -> l.leafId().equals("AC-23-PERF")).findFirst().orElseThrow().result()).isEqualTo("PASS");
     }
     @Test void absentCriteriaProducesNoRecordAndMissingResourceEvidenceNeverPasses() throws Exception {
         Path search=sample(measurement("F3","p","f3:search-latency-samples",f3samples(),Map.of()),"search");assertThat(report("F3","AC-23-PERF",List.of(search),directory.resolve("absent.md"))).isNull();

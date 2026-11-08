@@ -1,5 +1,7 @@
+# 저장소 경로·digest 모두 G-PG-IMAGE 승인값(runconfig pgImage)으로만 받는다. 기본값 없음.
+ARG PG_IMAGE_REPOSITORY
 ARG PG_IMAGE_DIGEST
-FROM harbor.nori.local/library/pgvector@sha256:${PG_IMAGE_DIGEST}
+FROM ${PG_IMAGE_REPOSITORY}@sha256:${PG_IMAGE_DIGEST}
 ARG TARGETARCH=amd64
 ARG AGE_VERSION
 ARG AGE_SHA256
@@ -37,5 +39,7 @@ RUN chmod 0555 /opt/aigw/aigw-backup.sh /opt/aigw/aigw-restore.sh \
     && chmod 0444 /opt/aigw/job-columns-v1.txt
 USER postgres
 RUN pg_dump --version && pg_restore --version && psql --version && age --version \
-    && case "$BACKUP_DEST_TYPE" in s3) rclone --version ;; sftp) ssh -V ;; *) exit 2 ;; esac
-ENTRYPOINT ["/opt/aigw/aigw-backup.sh"]
+    && case "$BACKUP_DEST_TYPE" in s3) env -u RCLONE_VERSION -u RCLONE_SHA256 rclone --version ;; sftp) ssh -V ;; *) exit 2 ;; esac
+# rclone 은 RCLONE_* 환경 변수를 자기 플래그로 읽으므로(RCLONE_VERSION → --version) 빌드 인자를 확인 명령에서 뺀다.
+# ENTRYPOINT 없음: CronJob 은 /opt/aigw/aigw-backup.sh, 복원은 docker run … /opt/aigw/aigw-restore.sh 를 명령으로 지정한다.
+ENV AIGW_BACKUP_DEST_TYPE=${BACKUP_DEST_TYPE}

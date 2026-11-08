@@ -14,9 +14,10 @@ public final class LeafCatalog {
         this.data = data;
         for (String group : List.of("leaves", "atoms")) for (JsonNode n : data.path(group)) {
             String id = Json.required(n, "id");
-            if (!id.matches("(?:AC|ISO)-[0-9]{2}(?:-[A-Z0-9]+)*") || leaves.put(id, n) != null) throw new EvalException(2, "CATALOG_INVALID");
+            if (!validLeafId(id) || leaves.put(id, n) != null) throw new EvalException(2, "CATALOG_INVALID");
         }
     }
+    static boolean validLeafId(String id) { return id.matches("(?:AC|ISO)-[0-9]{2}(?:-[A-Z0-9]+)*"); }
     public static LeafCatalog load(Path path) {
         if (path != null) return new LeafCatalog(Json.read(path));
         try (var input = LeafCatalog.class.getResourceAsStream("/com/nori/ai/gateway/eval/leaf-catalog-v2.json")) {

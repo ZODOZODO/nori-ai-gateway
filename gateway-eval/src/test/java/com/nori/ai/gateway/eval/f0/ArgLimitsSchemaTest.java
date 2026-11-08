@@ -89,16 +89,17 @@ class ArgLimitsSchemaTest {
         ArgLimits limits = ArgLimits.load(ROOT.resolve("eval/f0/arg-limits-v1.json"));
         assertThat(limits.unresolved()).containsExactly("from", "to", "q");
         assertThat(limits.get("eqp").maxChars()).isEqualTo(64); assertThat(limits.get("t").maxChars()).isEqualTo(3);
-        // CODE·SCHEMA 근거 경로:줄이 워크스페이스에 실재하고 그 줄이 등록 상한을 담고 있어야 합니다.
+        ArgLimitsSpecEvidence.historical(ROOT, false);
+        ArgLimitsSpecEvidence.classification(ArgLimitsSpecEvidence.current(ROOT), limits.get("t"));
+        // TC 리소스의 CODE·DB SCHEMA 근거는 기존 정본 경로:줄 검증을 유지한다.
         Path workspace = ROOT.getParent();
-        for (String field : List.of("t", "eqp")) for (JsonNode e : limits.get(field).evidence()) {
+        for (String field : List.of("eqp")) for (JsonNode e : limits.get(field).evidence()) {
             String ref = e.path("ref").asText(); int colon = ref.lastIndexOf(':');
             List<String> lines = Files.readAllLines(workspace.resolve(ref.substring(0, colon)), StandardCharsets.UTF_8);
             String line = lines.get(Integer.parseInt(ref.substring(colon + 1)) - 1);
             if (field.equals("eqp") && ref.endsWith("TcEqpEntity.java:56")) assertThat(line).contains("eqp_id").contains("length = 64");
             if (field.equals("eqp") && ref.endsWith("V1__baseline.sql:420")) assertThat(line).contains("eqp_id").contains("VARCHAR(64)");
             if (field.equals("eqp") && ref.endsWith("EqpCreateRequest.java:33")) { assertThat(line).contains("@NotBlank"); assertThat(lines.get(Integer.parseInt(ref.substring(colon + 1)))).contains("String eqpId"); }
-            if (field.equals("t")) assertThat(line).contains("KQ/LQ/INC/GQ/UNS");
         }
         String doc = Files.readString(ROOT.resolve("docs/gates/f0/arg-limits.md"), StandardCharsets.UTF_8);
         for (String field : ArgLimits.FIELDS) {
@@ -111,5 +112,22 @@ class ArgLimitsSchemaTest {
         BoundaryCases.Result regenerated = BoundaryCases.generate(limits, RegistryFixture.load(ROOT.resolve("eval/golden/tc-registry-fixture-v1.json")));
         assertThat(Files.readString(ROOT.resolve("eval/f0/output-boundary-cases.jsonl"), StandardCharsets.UTF_8)).isEqualTo(F0TestRoot.cases(regenerated));
         assertThat(Json.read(ROOT.resolve("eval/f0/output-boundary-cases.blocked.json")).path("unresolvedFields")).extracting(JsonNode::asText).containsExactly("from", "to", "q");
+    }
+    @Test void classificationEvidenceRejectsMovedEnumAndDuplicateSection() {
+        String current = ArgLimitsSpecEvidence.current(ROOT);
+        ArgLimits.Limit limit = ArgLimits.load(ROOT.resolve("eval/f0/arg-limits-v1.json")).get("t");
+        assertThatThrownBy(() -> ArgLimitsSpecEvidence.classification(current.replace("`t` ∈ KQ/LQ/INC/GQ/UNS =", "`t` ∈ KQ/LQ/INC/GQ =") + "\nKQ/LQ/INC/GQ/UNS", limit)).isInstanceOf(AssertionError.class);
+        assertThatThrownBy(() -> ArgLimitsSpecEvidence.classification(current + "\n" + ArgLimitsSpecEvidence.section(current), limit)).isInstanceOf(AssertionError.class);
+        assertThatThrownBy(() -> ArgLimitsSpecEvidence.classification(current.replace("### 14.5 ", "### 99.5 "), limit)).isInstanceOf(AssertionError.class);
+    }
+    @Test void currentSpecUsesTheExistingResolverAndRejectsInvalidPropertyWithoutSiblingFallback() throws Exception {
+        String current = ArgLimitsSpecEvidence.current(ROOT);
+        Path approved = new com.nori.ai.gateway.eval.spec.SpecInputResolver(System.getenv()).resolve(null, System.getProperty("aigw.specPath"));
+        assertThat(ArgLimitsSpecEvidence.current(ROOT, Map.of(), approved.toString())).isEqualTo(current);
+        Path changed = directory.resolve("changed-spec.md"); Files.writeString(changed, current + "\n변조\n", StandardCharsets.UTF_8);
+        assertThatThrownBy(() -> ArgLimitsSpecEvidence.current(ROOT, Map.of("AIGW_SPEC_FILE", approved.toString()), changed.toString()))
+            .isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("SPEC_BASELINE_MISMATCH"));
+        assertThatThrownBy(() -> ArgLimitsSpecEvidence.current(ROOT, Map.of("AIGW_SPEC_FILE", approved.toString()), directory.resolve("missing.md").toString()))
+            .isInstanceOfSatisfying(EvalException.class, e -> assertThat(e.getMessage()).isEqualTo("SPEC_INPUT_MISSING"));
     }
 }
