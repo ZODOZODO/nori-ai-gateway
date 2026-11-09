@@ -7405,3 +7405,214 @@ P15 완료/F1 운영 PASS로 표시하지 않는다. 실제 CI·push·K8s·Secre
 - 실제 검증: 기존 검증된 eval installDist의 spec-guard --spec <정본> --baseline <seq9> 실행 exit 0. scratch p16-preflight/baseline9-spec-guard-r1.json 및 원시 out/err에 명령·해시·결과를 기록했다. 신규 제품/시험 코드 수정이나 전체 시험 재실행은 없었다.
 - 독립 P16 gpt-6.1-sol/medium 읽기 조사 결과, 기존 catalog F1 suite는 35 leaf, F1-RUBRIC은 2 component이며 실제 src/main suite 클래스는 아직 없다. F1 suite·fixture·기존 하네스/rubric 연결과 로컬 검증이 다음 구현 범위다. ISO-04의 단일 알고리즘 위반 신뢰 fixture 및 수동 rubric 입력의 실제 배포 배선은 운영 수용 전에 확인해야 하며, 로컬 fixture로 운영 PASS를 만들지 않는다.
 - 현재 P16 구현·로컬 검증은 아직 미실행이며 완료로 표시하지 않는다. 현재 요청은 P16뿐이고 P17/F2 이후 코드는 착수하지 않았다. Kubernetes/Secret/DB/PVC·원격 CI/push/MR·모델/Source 호출·원격 Spec publish/protected 변수 변경 0. F1~F4 실제 수용/exit는 NOT_RUN으로 유지한다.
+
+
+## P16 배포 제외 구현 착수·통신로그 workflow 계약 결정 대기 (2026-11-09)
+
+- 사용자 요청: 배포를 제외한 P16 구현·로컬 검증만 수행한다. 독립 gpt-6.1-sol/medium 한 세션이 담당하고 부모는 실제 계약·호출 흐름을 대조했다. 배포·운영 gate 미확보를 코드 착수 차단 사유로 쓰지 않았다. F2 이후 작업은 시작하지 않았다.
+- 현재 변경은 acceptance/src/main의 기존 AcceptanceMain.java, GatewayClient.java, HookClient.java, OracleQueries.java와 신규 F1Assertions.java, F1Fixture.java, F1RubricTargets.java, F1SecurityChecks.java 총 8파일이다. 최종 구현/검증 전 중간 상태로 보존하며 compile·test·운영 실행·커밋은 아직 0이다.
+- 실제 코드에서 확인한 보정 필요점: (1) SeamRegistry.Kind에 UNSUPPORTED가 없어 AC-17-U 단일 상태 주입 불가, (2) 기존 OWNER_OVERRIDE는 Plan 검사에도 적용돼 Dispatcher 직전 교차 owner 차단을 검사하는 AC-21-TOOL이 조기에 거부됨, (3) PlanValidator의 고정 단계·reason Trace는 rejection에 있지만 TerminalOutcomeAssembler가 최종 결과에 투영하지 않음. 기존 권한/격리 정책 완화로 고치지 않으며, 최소 seam·판정 Trace 연결 보정은 다음 Plan 범위 확정 후 수행한다.
+- 별도 제품 계약 누락: AC-46-TRIM은 F1 필수인데 TcBusinessReadPort.getCommLogs와 sources://TC/comm-log-backend의 COMM_LOG_READ 정의만 있고 실제 Manifest/BusinessToolExecutor/고정 workflow 호출 경로가 없다. Spec §6.3의 장애분석은 Snapshot→Loki/Tempo→DLQ→선택 Git/Knowledge로 정의되어 있다. 직접 Mock 포트만 호출한 기존 RetentionMockIT 성공을 Gateway 수용 PASS로 사용하지 않는다.
+- 사용자 결정 질문을 현재 대화에 전달했다. 권장은 TC 통신로그를 별도 BUSINESS READ Capability로 등록하고 장애분석 workflow에 연결하는 방식이다. 기존 Loki app 로그와 TC Redis 통신로그는 원천/인가/보존 규칙이 달라 대체·합치지 않는다. 새 경로는 기존 EQP·시간창 바인딩과 COMM_LOG_READ·위임 경계로 gateway/business를 각 1회 조회하므로 기본 장애분석은 Tool 단계가 1개, 내부 READ가 2회 추가된다. 기본 조회 동작과 Spec의 고정 workflow가 달라져 사용자 확정 전 구현을 중단했다.
+- 최소 정석 연결은 신규 Manifest+index, BusinessToolExecutor 분기와 INCIDENT_ANALYSIS workflow 변경이다. source별 엄격 outputSchema에 상태/관측치/completeness/retentionMeta{missingRanges,unverifiedRanges}를 보존하면 기존 contract validator→BlockBuilder→최종 blocks.content.rows 전달 경로를 재사용할 수 있다. 공통 ToolResultMetadata API 확장은 필요하지 않고 BUSINESS 캐시는 기존 금지를 유지할 수 있다. 실제 TC HTTP type=eqp/mes 연결은 F5a 책임이다.
+- 다음 작업은 사용자 계약 확정→정본 Spec/Plan·R6 정합→최소 코드 보정과 P16 suite 구현 재개→실제 로컬 검증/부모 검증/커밋이다. 현재 상태는 IMPLEMENTATION_INCOMPLETE/DECISION_PENDING이며 코드/로컬 검증 완료나 F1 PASS가 아니다. 실환경 leaf/exit는 NOT_RUN이다. 기존 Spec/Plan/seq9·증거·보고서 prefix와 사용자 원본 파일은 변경하지 않았다.
+
+
+## P16 — F1 suite 구현·로컬 검증 최종 보고 (배포 제외)
+
+구현 담당 결과는 **CODE / LOCAL_VALIDATED**입니다. 아래 결과는 로컬 단위·격리 PG·loopback 시험과 패키지 발견 검증이며, F1 운영 수용 PASS가 아닙니다. 부모의 독립 raw 검증도 통과했으며 최종 커밋은 부모가 담당합니다. 구현자는 커밋하지 않았습니다. 기존 중단 기록을 포함한 1,099,670바이트(prefix SHA-256 `8708ac3abcc8876f1eff77db064bbef1b560f264a667041518c9fe81783a119a`)를 그대로 보존하고 이 절만 추가했습니다.
+
+### 승인 입력과 범위
+
+- 시험 HEAD: `e163a5008823ba50072aeaf3bea133a4962ee09c`.
+- 정본 Spec: 원본 EXEC `docs/task/ai-rag-gateway-architecture.md`, SHA-256 `ab898263d55a3bac4a91797e6363e57094b38edd337e97740c581a5b5e869f17`.
+- 정본 Plan: 원본 EXEC `docs/task/ai-rag-gateway-architecture-plan.md`, SHA-256 `5c1cb0ec4e2faa3f4cc8f18f7ba7674078ebb69c50b9b7f6c62850c03d612b6e`.
+- 기준선 seq11: `docs/gates/spec-baseline.md`, SHA-256 `015a4ac1b701986a91032656d27ece7f3e1a74714ea300cc6102f322eff19f70`.
+- 사용자 확정 순서인 F4 구현·로컬 검증 후 최초 Kubernetes 배포를 유지했습니다. 이번 범위는 P16이며, F2 이후 작업과 운영 배포는 진행하지 않았습니다. 통신로그 READ 연결과 AC-46 Source 단계 판정/전체 집계 유지도 승인된 seq11 계약대로 구현했습니다. 독립 구현 세션에서는 Spec/Plan/기준선, catalog, 공통 ToolResultMetadata/API, WorkflowOutcome/Executor, 기존 인가·캐시 API, 운영 설정·차트는 수정하지 않았습니다.
+
+### 구현 내용과 실제 판정 경로
+
+- `gateway-acceptance/src/main`에 F1의 35개 atomic leaf를 갖는 배포용 `F1Suite`와 fixture·실제 HTTP client·서명 입력·Job/hook/SQL oracle를 구현했습니다. 각 leaf의 suite/stage/label/leaf 태그를 정본 catalog와 대조합니다. 운영 자격·Source 관측을 갖추지 못한 경우 NOT_RUN으로 구분하며, 실제 제품 응답·audit·실행 기록 없이 PASS를 만들지 않습니다.
+- JWS 누락/변조·인증 음성은 실제 요청, HTTP 오류, audit 1건, Job/Mock 호출 변화 없음, 응답/DB/로그 residue를 대조합니다. 누락 sub/perm, 61초 수명과 60초+1ns 경계, 실재 conversation에 대한 같은 GET의 양성/추가 dlg 음성, 실제 전송한 잘못된 service token까지 검사합니다. RSA 단일 알고리즘 위반 입력은 실제 배포에서 공급할 별도 signer/trusted public JWKS 파일 경로까지 연결하고, 로컬에서는 실제 RSA 서명/신뢰키 결속을 검증했습니다. 비밀 원문은 출력·보고하지 않습니다.
+- AC-41의 고정 SQL을 terminal Job 전체 행 및 Tool/Evidence/cache까지 확장해 메모리 scanner로만 검사합니다. 같은 key_digest의 다른 owner/actor/pdg cache 행이 덮이지 않도록 전체 복합 정렬의 순번으로 전수 검사하고 회귀를 추가했습니다. Tool payload는 고정 SQL에서 메모리 typed projection으로만 읽으며 원문 반환 API를 만들지 않았습니다.
+- `tc.commLogs.search`를 BUSINESS/READ/PHASE_1, COMM_LOG_READ, 캐시 비활성으로 추가하고 INC snapshot 다음에 연결했습니다. 기존 permission/delegation/expiry/beforeRead 경계를 재사용해 gateway/business 각각 1회 조회합니다. 엄격한 source별 output에 completeness/retentionMeta/missingRanges/unverifiedRanges/warnings를 담고 최종 블록까지 보존합니다. DENIED/FAILED를 계약 오류나 EMPTY로 덮지 않는 경로도 검증했습니다. 공통 metadata에는 확정 missingRanges만 유지합니다.
+- 승인된 UNSUPPORTED seam, Plan 신원은 유지하는 DISPATCH_OWNER_OVERRIDE, UNSUPPORTED rejection의 고정 validationTrace 투영을 보정했습니다. 기존 OWNER_OVERRIDE와 clarification-only 비노출 분기는 유지했습니다. AC-21-TOOL은 첫 snapshot 실제 성공 뒤 comm 호출 전에 Dispatcher OWNER_MISMATCH가 난 audit를 검사합니다. VERSION fixture는 resolveResource만 정상 1.0으로 두고 대상 업무 READ의 2.0 위반이 Tool까지 도달하도록 보정했습니다.
+- verify·enabled·hook 인증 경계 안에 optional SourceRequestProbe와 별도 읽기 controller를 연결했습니다. 실제 송신 직전 carrier를 메모리에서만 파싱해 정규화한 app/namespace/window의 digest·enum·count를 Job/capability별로 캡처합니다. 실제 loopback 수신 digest와 인증된 hook 응답을 대조했습니다. 원문 query/URL/EQP/window는 보관·반환하지 않습니다. retry/실패 요청 횟수, 완료 0회와 관측 부재의 구분, job/thread 격리, overflow, 성공 idle reset/실패 active reset 보존, prod 미생성, hook 인증 거부를 검사했습니다. 기존 public 생성자·OTLP·SourceHttpClient/core/API는 유지했습니다.
+- AC-36 실제 호출 0회, AC-45의 정확한 누락 합집합 및 실제 전송 window digest, ISO-15의 selector/app 경계와 Evidence/Citation 범위를 검사하는 소비 경로를 연결했습니다. 임의 관측 JSON 파일이나 정적 selector 함수 결과를 실제 호출 증거로 사용하지 않습니다.
+- F1-RUBRIC은 대상 RUN의 F1 stage/suite·정본 Spec·buildIdentity·parent를 현재 실행과 결속하고, 두 fixture/leaf를 정확히 매핑합니다. 대상 jobId 경로 문법, 인증 GET의 동일 jobId/SUCCEEDED/result, narrative hash를 검증한 뒤 기존 viewer를 사용합니다. 실제 수동 rubric verdict는 생성하지 않았습니다.
+
+### 최종 로컬 검증
+
+원시 명령·XML·OTR·run-binding·fingerprint·현재 CP·실행 전후 소스와 정본 입력 SHA는 다음 scratch에 고유 label로 보존했습니다.
+
+`C:/Users/DongGeon/AppData/Local/Temp/claude/468c18f2647c2504/2a367916-708b-4d0e-8a9d-62501d362a92/scratchpad/p16-implementation`
+
+| 모듈 | 실제 Test / paired label | 실행 / 통과 | XML / OTR | runId / fingerprint |
+| --- | --- | --- | --- | --- |
+| core | `p16-core-final-r1` / `p16-core-final-verify-r1` | 21 / 21 | 6 / 1 | `588b64b0-bfbc-4865-86c5-6240069a2ed9` / `6898aed46952f466525333115cd6421c0c417068484df62a8bdf30f7590252cd` |
+| app | `p16-app-final-r2` / `p16-app-final-verify-r2` | 19 / 19 | 5 / 1 | `bba6f364-93c0-496d-9b5d-efb6fb376df0` / `e3f9e31ac3cdf0efd8d28770994dfaf4d630caa97fe958fba808b2bb619b8975` |
+| tc-mock | `p16-mock-final-r1` / `p16-mock-final-verify-r1` | 13 / 13 | 1 / 1 | `1a672f96-787f-4d88-8a44-c8b1eba76710` / `40f61fc4d7f900cb8db9ca000ee63a9a2a855ef02152983c17a444564d6fdaf6` |
+| acceptance | `p16-acceptance-final-r1` / `p16-acceptance-final-verify-r1` | 37 / 37 | 11 / 1 | `84a6dad9-ca2f-4ac6-9f2a-5d38b09ee352` / `2a5a1840919182e3e22466f11c77b0292ec4cb38c06e6ccf116573ad41f3529f` |
+| app integration | `p16-it-final-r4` / `p16-it-final-verify-r4` | 9 / 9 | 3 / 1 | `cd5be6a0-9198-483e-9ffa-64fd7800bdba` / `4e8dd305b650a6e4629259c47febe1e5ce4eb477a44be20ca0af2e2a0c72ae74` |
+
+RuntimeClasspath SHA-256: `0677a90c31222421d3ee58f977388a2365c7fce6eb574f0af55614038f9f58d5`.
+
+`p16-package-final-r1`: acceptance build/installDist exit 0. `p16-packaged-discovery-r1.json`: installed JAR discovery 35 / execution 0; receipt SHA-256 `992a3ce4b6aa01d66fa4d079b0146a3512d7e0d0cba070a30f08a25c38510024`.
+
+각 최종 Test 직후 같은 필터/조건의 별도 `test-evidence verify`를 실행해 통과했습니다. 관련 unit 90개와 최종 필수 Docker 통합 9개는 fail/error/skip/abort가 모두 0입니다. 최종 통합은 P16 4개, 영향 WorkflowMock 2개, manifest/core 조립·Source Registrar/factory 관련 wiring 3개를 선별했습니다. 전체 PG/eval 대형 suite를 반복하지 않았습니다. 각 개별 Gradle 실행 중 소스 및 정본 입력은 동결됐습니다. core 최종 시험 뒤의 P16IT/CommLog unit 변경, app 최종 시험 뒤의 P16IT 변경은 앞선 시험이 소비하지 않는 파일임을 부모가 실제 fingerprint/classpath로 확인했습니다. 따라서 모든 시험이 최종 전체 소스와 처음부터 같았다고 주장하지 않으며, 소비 범위가 변하지 않은 앞선 unit 결과와 최종 IT를 결합합니다.
+
+부모는 XML 26파일/OTR 99개 test ID의 SUCCESS, 5개 paired, 최신 Spec/baseline/현재 CP/실행 중 소스 동결과 비소비 변경 범위를 독립 대조했습니다. 근거는 `scratchpad/p16-parent-review/root-all-pairs-final.json`, SHA-256 `cfe2b09e04888d478da5a1786f4ce6da4596391b00068ceeb67c119a58e3db66`입니다.
+
+설치본의 `lib/*`와 scratch probe만으로 JUnit launcher discovery를 수행해 catalog의 35개 leaf 및 태그 closure를 확인했습니다. F1Suite codeSource는 실제 설치본 `gateway-acceptance.jar`였고, 설치 JAR 147개 해시가 전후 동일했습니다. leaf 실행은 0건이며 운영 증거 ingest도 0건입니다. 부모도 설치 JAR을 독립 대조하고 동일 discovery를 직접 실행했습니다.
+
+### 실패·명령 차이와 보정 이력
+
+- 초기 seq10/중간 compile 결과는 역사로 보존하고 최종 계약 판정에 사용하지 않았습니다. seq11의 `p16-all-compile-r2`는 관련 main/test/integrationTest 컴파일 진단 exit 0입니다.
+- `p16-app-final-r1`: 19개 중 신규 CommLogToolExecutorTest 3개가 짧은 DelegatedCall fixture 때문에 생성자에서 실패했습니다. fixture를 기존 최소 22자 계약에 맞춘 뒤 r2에서 19개 모두 통과했습니다. 제품의 위임 검증을 완화하지 않았습니다.
+- `p16-it-final-r1`: 14개 중 12개 통과/2개 실패였습니다. 신규 시험에서 source별로 다른 comm-trim fixture를 같다고 가정한 기대값과, Dispatcher 거부 후 최종 toolSummary가 남는다고 가정한 기대값 오류였습니다. 제품을 바꾸지 않고 gateway exact nano 범위/business 미검증·빈 범위, 첫 조회/comm 실행 0/정확한 audit status/error/tool_id를 대조하도록 시험만 보정했습니다. r1 원시 실패와 다른 12개 통과 기록은 보존했습니다.
+- `p16-it-final-r2`와 paired는 9개 실제 실행/통과였으나 Plan 필수 `-Paigw.requireDocker=true`가 누락된 명령이므로 최종 승인 명령 근거로 삼지 않았습니다. 사후에 명령·fingerprint·원시 결과를 수정하지 않았습니다.
+- `p16-it-final-r3`: 인용하지 않은 PowerShell 인자가 `-Paigw`와 `.requireDocker=true`로 나뉘어 Gradle 명령 해석에서 exit 1이 났고 시험은 실행되지 않았습니다. wrapper의 NOT_REPORTED와 남아 있던 r2 XML을 구분해, 잔여 XML을 r3 시험 성공으로 사용하지 않았습니다.
+- 최종 `p16-it-final-r4`와 paired에 리터럴 단일 인자 `'-Paigw.requireDocker=true'`를 모두 적용했습니다. metadata.command 배열에 앞 공백 없이 해당 한 항목이 있는지 검사했습니다. 소스는 바꾸지 않았고 동일 9개 필터만 재실행했습니다. 최종 판정은 r4 실제 EXECUTED 결과와 r4 paired에 근거합니다. 관련 unit 90개와 성공한 패키징을 다시 실행하지 않았습니다.
+
+### 미실행·잔여 수용 조건
+
+실제 Kubernetes/Harbor/원격 CI·push·Secret/SSH·운영 DB 변경·실제 Source/모델 호출은 수행하지 않았습니다. F1 35개 leaf의 실제 배포 수용, 실제 RSA 신뢰 입력, 운영 로그 readback/Source 관측, 운영 SQL oracle, 수동 rubric 승인은 미실행입니다. 로컬 성공을 ACCEPTANCE/F1 운영 PASS로 기록하거나 ingest하지 않았으며 `evidence/F1` 변경도 없습니다.
+
+ISO-15-WINDOW는 현재 승인 Tool inputLimits에 최대 조회 창 계약이 없으므로 임의 기간을 만들지 않고 `MAX_WINDOW_UNDEFINED / NOT_RUN`으로 유지합니다. 이는 운영 수용 미확보 항목이며 PASS가 아닙니다. 배포 입력·운영 승인·실제 Source fixture·수동 reviewer 입력을 확보한 뒤 F4 이후 승인 순서에서 실제 수용을 별도 수행해야 합니다.
+
+### 실제 변경 파일
+
+- `docs/ai-rag-gateway-architecture-dev-report.md`
+- `docs/contracts/test-hooks-v1.md`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/AcceptanceMain.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/GatewayClient.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/HookClient.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/OracleQueries.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/RubricViewMode.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/OracleQueriesTest.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkflowMockIT.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkflowSourceFixture.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/wiring/AppContextWiringIT.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/config/SourceConnectorConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/MockHooksConfiguration.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/SeamRegistry.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/TestHookRegistry.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/BusinessToolExecutor.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/DirectSourceToolExecutor.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/job/WorkflowExecutionConfiguration.java`
+- `gateway-app/src/main/resources/manifests/tc/index.json`
+- `gateway-app/src/main/resources/workflows/tc/INCIDENT_ANALYSIS.json`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/hooks/SeamRegistryTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/manifest/InputLimitsNotNarrowerTest.java`
+- `gateway-core/src/main/java/com/nori/ai/gateway/core/workflow/TerminalOutcomeAssembler.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/DomainFixtures.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/ManifestDigestTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/TerminalOutcomeAssemblerTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/WorkflowExecutorTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/WorkflowOptionalStepContractTest.java`
+- `gateway-core/src/test/java/com/nori/ai/gateway/core/WorkflowPlanBuilderTest.java`
+- `gateway-tc-mock/src/main/java/com/nori/ai/gateway/tcmock/MockTcBusinessReadAdapter.java`
+- `gateway-tc-mock/src/test/java/com/nori/ai/gateway/tcmock/MockBusinessReadContractTest.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1Assertions.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1Fixture.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1JobChecks.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1RubricTargets.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1Runtime.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1SecurityChecks.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/F1SourceChecks.java`
+- `gateway-acceptance/src/main/java/com/nori/ai/gateway/acceptance/suite/F1Suite.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/F1LocalFixture.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/F1RubricBindingTest.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/F1SourceChecksTest.java`
+- `gateway-acceptance/src/test/java/com/nori/ai/gateway/acceptance/F1SuiteTest.java`
+- `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/P16WorkflowCompletenessIT.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/SourceObservationController.java`
+- `gateway-app/src/main/java/com/nori/ai/gateway/app/hooks/SourceRequestProbe.java`
+- `gateway-app/src/main/resources/manifests/tc/tc.commLogs.search.json`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/hooks/SourceProbeProfileTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/hooks/SourceRequestProbeTest.java`
+- `gateway-app/src/test/java/com/nori/ai/gateway/app/job/CommLogToolExecutorTest.java`
+
+### 실행한 최종 명령과 원시 receipt
+
+**`p16-core-final-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\core-filter.init.gradle :gateway-core:test --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-core-final-verify-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\core-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-core:test" --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-app-final-r2.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\app-filter.init.gradle :gateway-app:test --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-app-final-verify-r2.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\app-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:test" --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-mock-final-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\mock-filter.init.gradle :gateway-tc-mock:test --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-mock-final-verify-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\mock-filter.init.gradle :gateway-eval:run "--args=test-evidence verify --tasks :gateway-tc-mock:test" --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-acceptance-final-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai :gateway-acceptance:test --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-acceptance-final-verify-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai :gateway-eval:run "--args=test-evidence verify --tasks :gateway-acceptance:test" --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-it-final-r4.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\it-final-filter.init.gradle -Paigw.requireDocker=true :gateway-app:integrationTest --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-it-final-verify-r4.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai -I C:\Users\DongGeon\AppData\Local\Temp\claude\468c18f2647c2504\2a367916-708b-4d0e-8a9d-62501d362a92\scratchpad\p16-implementation\it-final-filter.init.gradle -Paigw.requireDocker=true :gateway-eval:run "--args=test-evidence verify --tasks :gateway-app:integrationTest" --offline --no-daemon --max-workers=2 --console=plain
+```
+
+**`p16-package-final-r1.json` — exit 0**
+
+```text
+C:\workspace_nori\.aigw-worktrees\p16-ai\gradlew.bat -p C:\workspace_nori\.aigw-worktrees\p16-ai :gateway-acceptance:build :gateway-acceptance:installDist --offline --no-daemon --max-workers=2 --console=plain
+```
+
+
+## P16 부모 검증·로컬 종료 판정 (2026-11-09, 배포 제외)
+
+P16의 이번 요청 범위는 CODE/LOCAL_VALIDATED로 마무리합니다. 구현 커밋은 4397bbcfba2fd238da380fab949df84e3bf3d97f입니다. 실제 F1 수용/exit PASS를 뜻하지 않으며 P17/F2 코드는 시작하지 않았습니다.
+
+- 사용자 승인 두 건을 root가 정본에 반영했습니다. seq10은 TC 통신로그 READ를 별도 Capability로 장애분석에 연결하는 계약이고, seq11은 AC-46의 대상 Source 단계 EMPTY/SUCCESS와 전체 응답 집계를 분리하는 계약입니다. 독립 구현자는 그 확정 계약을 소비했습니다.
+- 통신로그 두 Source의 호출·보존 경고·확정 누락/미확인 구간 구분, Gateway 최종 블록의 나노초 경계, 검증기 6단계 거부 trace, Dispatcher 소유자 불일치 차단, verify 전용 실제 Loki 요청 digest/count 관측의 생산/조회·수명·격리를 실제 코드/등록 조건/호출 흐름과 대조했습니다. BUSINESS 캐시 금지, 기존 인가·내용 비노출·전체 상태 집계는 유지했습니다. 관측 계약 문구는 현재 대상인 Loki query_range로 명확히 했습니다.
+- 최종 99건(core21/app19/mock13/acceptance37/통합9)은 원시 XML 26파일과 OTR 99 TEST ID 모두 SUCCESS, fail/error/skip/abort 0입니다. 5개 공식 paired의 실행 필터·runId·fingerprint·정본 Spec/기준선·현재 runtime classpath를 독립 대조했습니다. 최종 통합은 test/paired 양쪽의 단일 인자 -Paigw.requireDocker=true도 확인했습니다. 근거 root-all-pairs-final.json SHA cfe2b09e04888d478da5a1786f4ce6da4596391b00068ceeb67c119a58e3db66.
+- 앞선 core 결과 뒤의 P16IT/CommLog unit, 다른 unit 결과 뒤의 P16IT 수정은 해당 실제 classpath가 소비하지 않는 시험 파일임을 확인했습니다. 각 개별 실행 및 paired 중 입력은 동결됐습니다. 현재 620개 실행 소스 입력은 최종 통합 실행 당시 바이트와 같으며 구현 커밋 후에도 확인했습니다. 로컬 시험은 당시 작업트리/기준 커밋 e163a50에 결속된 이력이며 새 배포 이미지나 원격 CI 검증으로 재표시하지 않습니다.
+- 설치 lib 147개 JAR의 바이트를 대조한 뒤 부모가 그 배포본만 사용해 discovery를 직접 실행했습니다. 실제 gateway-acceptance.jar에서 정본 catalog의 35개 leaf가 발견됐고 전후 JAR은 불변입니다. 실행 leaf 및 운영 증거 ingest는 0건입니다. 근거 root-packaged-discovery-r1.json, discovery receipt SHA 992a3ce4b6aa01d66fa4d079b0146a3512d7e0d0cba070a30f08a25c38510024.
+- app 최초 3건 실패와 IT 최초 2건 실패, 필수 옵션을 빠뜨린 IT r2, PowerShell이 옵션을 나눈 r3(시험 실행0/잔여 XML 미사용)를 이력으로 보존했습니다. 최종 r4만 필수 조건을 갖춘 통합 통과 근거입니다. 원시 실패를 삭제하거나 이전 PASS를 새 회차에 재사용하지 않았습니다.
+- 원본 AI 945파일/EXEC 521파일과 사용자 미추적 F0 자료를 사전 보호 snapshot에 대조했습니다. 기존 DevReport 1,099,670bytes/SHA 8708ac3abcc8876f1eff77db064bbef1b560f264a667041518c9fe81783a119a는 그대로입니다. 독립자 인계 원본 de28c7b05c71ec6c7308bed40e081c7034fb0d08ec6147e3efc0200f74035aef는 scratch에 보존하고 이번 새 추가분의 표 머리글/구분자 인코딩만 교정했습니다.
+- 시험 당시 Plan SHA는 5c1cb0ec4e2faa3f4cc8f18f7ba7674078ebb69c50b9b7f6c62850c03d612b6e입니다. 부모 검증 후 P16 CODE/LOCAL_VALIDATED 종료 사실만 Plan에 추가했고 종료 Plan SHA는 ae309bb7bce871ac639fede55c956da91fd7351e1059db1f0a1ec5646cc327c8입니다. Spec SHA ab898263d55a3bac4a91797e6363e57094b38edd337e97740c581a5b5e869f17와 seq11 기준선은 바꾸지 않았습니다. 실제 AC/ISO·F1 exit 체크를 PASS로 올리지 않았습니다.
+
+운영 미실행: 실제 K8s/Secret/PVC·Harbor 승인 이미지/백업·외부 Source/LLM·수동 rubric·원격 CI/push/MR·Spec publish/protected 변수 갱신입니다. ISO-15-WINDOW의 최대 조회 창 계약은 미확정이므로 해당 실제 leaf는 MAX_WINDOW_UNDEFINED/NOT_RUN이며 실수용 전에 확정해야 합니다. TC 실제 HTTP type=eqp/mes 연동은 기존 F5a 책임을 유지합니다. F4 코드/로컬 검증 뒤 최초 배포·실수용을 수행하는 사용자 순서도 유지합니다.
