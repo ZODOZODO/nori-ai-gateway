@@ -7395,3 +7395,13 @@ P15 완료/F1 운영 PASS로 표시하지 않는다. 실제 CI·push·K8s·Secre
 - 원시 명령 receipt p15-implementation/root-p15-clean-package-r1.json, 부모 증명 p15-parent-review/root-p15-clean-package-r1-proof.json, launcher 원시 출력 root-p15-clean-package-r1-acceptance-nodebug.out을 scratch에 보존했다. 본 결과 문서 커밋 뒤 최종 HEAD에 대한 build identity 재결속 결과는 root-p15-final-identity-r1 receipt로 별도 보존한다. 앱/수용 코드 재변경이나 시험 전체 반복은 없다.
 - 현재 사용자 지정 종료 범위(P15 구현·허용 로컬 검증·실패 2건 처리·부모 검증·로컬 커밋·패키징)는 완료했다. 전체 274건 실행의 기존 272 PASS와 수정 두 클래스 10 PASS를 실행별로 보존했으며 단일 전체 277 PASS 실행으로 표시하지 않는다.
 - 정본 Plan의 P15 항목에 CODE/LOCAL_VALIDATED/LOCAL_COMMITTED 종료와 P16 NOT_STARTED를 반영했다. 이 상태 기록은 Spec의 계약·baseline seq8을 바꾸지 않는다. Plan이 요구하는 원격 CI/Harbor·승인 digest·K8s·운영 gate 실측은 미실행으로 유지하므로 전체 운영 완료 체크 두 개를 선표기하지 않는다. 사용자 원본의 미커밋 Spec 및 AI 원본의 미추적 측정 자료는 포함하지 않는다.
+
+
+## 배포 시점 정정·P16 진행 범위 재정렬 (2026-11-09)
+
+- 사용자 결정: 실제 Kubernetes 배포는 F4까지 코드 구현과 허용된 로컬 검증을 마친 뒤 수행한다. 중간 실환경 gate PASS를 다음 코드 단계 선행으로 적용한 이전 해석을 정정했다.
+- Specify: 정본 SPEC header·§16·§27.4에 해당 확정 계약을 먼저 반영하고 Plan 바이트 불변을 확인했다. Plan: 이후 §6의 코드 DAG/실환경 exit 적용 범위와 P16 코드/실환경 선행·수용 suite 준비 책임을 분리했다. 기존 AC/ISO·환경 라벨·임계값·기술/보안/실행 승인 조건을 삭제하지 않았다. 실제 Source/모델/운영 입력은 실제 연결 전 요구하며 코드 작업을 차단하는 조건으로 쓰지 않는다.
+- R6: seq9 SPEC SHA ea89cce7d3a95af3b24610f8fdbcf82f909abe79bd29f3d23f05591cc3431e02, baseline SHA 336190f18bc5c70197654f37dcc7347b2aff945ad25f0b988d511f9297713696. seq1~8과 기존 승인·증거·원시 결과·DevReport prefix는 그대로 보존했다. 운영 환경 시점 변경은 보수적으로 ALL/measurementAffecting=true로 기록했고 과거 시험을 새 기준선 PASS로 승격하지 않았다.
+- 실제 검증: 기존 검증된 eval installDist의 spec-guard --spec <정본> --baseline <seq9> 실행 exit 0. scratch p16-preflight/baseline9-spec-guard-r1.json 및 원시 out/err에 명령·해시·결과를 기록했다. 신규 제품/시험 코드 수정이나 전체 시험 재실행은 없었다.
+- 독립 P16 gpt-6.1-sol/medium 읽기 조사 결과, 기존 catalog F1 suite는 35 leaf, F1-RUBRIC은 2 component이며 실제 src/main suite 클래스는 아직 없다. F1 suite·fixture·기존 하네스/rubric 연결과 로컬 검증이 다음 구현 범위다. ISO-04의 단일 알고리즘 위반 신뢰 fixture 및 수동 rubric 입력의 실제 배포 배선은 운영 수용 전에 확인해야 하며, 로컬 fixture로 운영 PASS를 만들지 않는다.
+- 현재 P16 구현·로컬 검증은 아직 미실행이며 완료로 표시하지 않는다. 현재 요청은 P16뿐이고 P17/F2 이후 코드는 착수하지 않았다. Kubernetes/Secret/DB/PVC·원격 CI/push/MR·모델/Source 호출·원격 Spec publish/protected 변수 변경 0. F1~F4 실제 수용/exit는 NOT_RUN으로 유지한다.
