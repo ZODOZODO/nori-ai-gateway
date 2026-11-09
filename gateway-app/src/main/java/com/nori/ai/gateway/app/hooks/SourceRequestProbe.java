@@ -1,8 +1,10 @@
 package com.nori.ai.gateway.app.hooks;
 
 import com.nori.ai.gateway.integration.loki.LokiSourcePolicy;
+import com.nori.ai.gateway.persistence.queue.TerminalCommitObserver;
 import io.micrometer.observation.*;
 import org.springframework.http.client.observation.ClientRequestObservationContext;
+import org.springframework.transaction.support.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -11,7 +13,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** 실제 송신 직전의 구조만 digest로 남깁니다. URI·질문·시간창 원문은 이 객체에 저장하지 않습니다. */
-public final class SourceRequestProbe implements ObservationHandler<ClientRequestObservationContext> {
+public final class SourceRequestProbe implements ObservationHandler<ClientRequestObservationContext>, TerminalCommitObserver {
     public static final int MAX_JOBS=128,MAX_ATTEMPTS=1024;
     public record Attempt(String digest,String state,String outcome) {}
     public record Observation(String capabilityId,String status,int count,List<Attempt> attempts) {}
@@ -22,6 +24,7 @@ public final class SourceRequestProbe implements ObservationHandler<ClientReques
     private record Binding(String jobId,String capabilityId,Data data) {}
     private record Pending(Data data,int index) {}
     private final Map<String,Map<String,Data>> jobs=new HashMap<>();
+    private final Set<String> terminal=new HashSet<>();
     private final ThreadLocal<Binding> current=new ThreadLocal<>();
     private final TestHookRegistry hooks;
     public SourceRequestProbe(TestHookRegistry hooks){this.hooks=hooks;hooks.onIdleReset(this::reset);}
@@ -41,7 +44,18 @@ public final class SourceRequestProbe implements ObservationHandler<ClientReques
         if(hooks.binding(jobId).isEmpty())return new Snapshot(jobId,"MISSING",List.of());
         synchronized(this){var data=jobs.get(jobId);if(data==null)return new Snapshot(jobId,jobs.size()>=MAX_JOBS?"OVERFLOW":"MISSING",List.of());var observations=new ArrayList<Observation>();data.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry->observations.add(new Observation(entry.getKey(),entry.getValue().status,entry.getValue().attempts.size(),List.copyOf(entry.getValue().attempts))));return new Snapshot(jobId,"RECORDED",List.copyOf(observations));}
     }
-    private synchronized void reset(){jobs.clear();}
+    public synchronized boolean terminal(String jobId){return terminal.contains(jobId);}
+    /** 종결 행이 다른 연결에 보이기 전에 표시하여 DB terminal 직후 조회가 RUNNING으로 보이지 않게 하고, 종결 tx가 롤백되면 되돌립니다. */
+    @Override public void beforeCommit(String jobId){
+        // hooks 잠금을 probe 잠금 안에서 잡지 않습니다. idle reset은 hooks→probe 순서로 잠급니다.
+        if(hooks.binding(jobId).isEmpty())return;
+        synchronized(this){terminal.add(jobId);}
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
+            @Override public void afterCompletion(int status){if(status!=STATUS_COMMITTED)synchronized(SourceRequestProbe.this){terminal.remove(jobId);}}
+        });
+    }
+    @Override public void afterCommit(String jobId){}
+    private synchronized void reset(){jobs.clear();terminal.clear();}
     @Override public boolean supportsContext(io.micrometer.observation.Observation.Context context){return context instanceof ClientRequestObservationContext;}
     @Override public void onStart(ClientRequestObservationContext context) {
         var binding=current.get();if(binding==null)return;
