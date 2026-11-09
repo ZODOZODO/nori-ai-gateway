@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.*;
 class CoreSeamDefaultsTest {
     private ApplicationContextRunner runner(java.time.Clock clock) {return new ApplicationContextRunner().withUserConfiguration(CoreBeansConfiguration.class,com.nori.ai.gateway.tcmock.TcMockModuleConfiguration.class)
         .withBean(java.time.Clock.class,()->clock)
+        .withBean(com.nori.ai.gateway.core.budget.PromptTokenCounting.class,()->messages->{throw new AssertionError("빈 등록 시험에서 실제 계수가 발생했습니다");})
         .withBean(com.nori.ai.gateway.core.cache.ToolResultCache.Store.class,()->org.mockito.Mockito.mock(com.nori.ai.gateway.core.cache.ToolResultCache.Store.class))
         .withBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder.class,()->new com.nori.ai.gateway.core.workflow.WorkflowExecutor.ExecutionRecorder(){
             public void record(com.nori.ai.gateway.core.job.JobContext job,com.nori.ai.gateway.core.dispatch.ToolDispatcher.InvocationRecord invocation){throw new AssertionError("빈 등록 시험에서 실제 호출이 발생했습니다");}

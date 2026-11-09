@@ -46,6 +46,10 @@ public class CoreBeansConfiguration {
     @Bean com.nori.ai.gateway.core.audit.AuditFieldAllowlist auditFieldAllowlist(com.nori.ai.gateway.core.sanitize.ContentSanitizer sanitizer, CapabilityRegistry registry) { return new com.nori.ai.gateway.core.audit.AuditFieldAllowlist(sanitizer, registry); }
     @Bean com.nori.ai.gateway.core.expiry.ConversationExpiryGuard conversationExpiryGuard() { return new com.nori.ai.gateway.core.expiry.ConversationExpiryGuard(); }
     @Bean com.nori.ai.gateway.core.job.GenerationSemaphore generationSemaphore(CapacityProfile capacity) { return new com.nori.ai.gateway.core.job.GenerationSemaphore(capacity.generationConcurrency()); }
+    @Bean com.nori.ai.gateway.core.budget.TokenBudgetPolicy tokenBudgetPolicy() { return com.nori.ai.gateway.core.budget.TokenBudgetPolicy.current(); }
+    @Bean com.nori.ai.gateway.core.budget.PromptReducer promptReducer(com.nori.ai.gateway.core.budget.PromptTokenCounting counter, com.nori.ai.gateway.core.budget.TokenBudgetPolicy policy) { return new com.nori.ai.gateway.core.budget.PromptReducer(counter, policy); }
+    @Bean com.nori.ai.gateway.core.budget.PreCallBudgetAssert preCallBudgetAssert(com.nori.ai.gateway.core.budget.PromptTokenCounting counter, com.nori.ai.gateway.core.budget.TokenBudgetPolicy policy) { return new com.nori.ai.gateway.core.budget.PreCallBudgetAssert(counter, policy); }
+    @Bean com.nori.ai.gateway.core.budget.TruncationDetector truncationDetector() { return new com.nori.ai.gateway.core.budget.TruncationDetector(); }
     @Bean ManifestLoader manifestLoader() { return new ManifestLoader(); }
     @Bean ContractVersionPolicy contractVersionPolicy() { return new ContractVersionPolicy(); }
     @Bean CapabilityRegistry capabilityRegistry(ManifestLoader loader, ContractVersionPolicy versions) {

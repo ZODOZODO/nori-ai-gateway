@@ -153,6 +153,27 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(org.springframework.test.util.ReflectionTestUtils.getField(conversations,"clock")).isSameAs(clock);
         assertThat(context.getBeansOfType(com.nori.ai.gateway.app.security.ServiceTokenAuthFilter.class)).isEmpty();
     }
+    @Test void preCallBudgetAssertCountsAGoldenRowWithTheActualTokenizerBean() {
+        start();
+        for (Class<?> type : List.of(com.nori.ai.gateway.core.budget.TokenBudgetPolicy.class, com.nori.ai.gateway.core.budget.PromptReducer.class,
+                com.nori.ai.gateway.core.budget.PreCallBudgetAssert.class, com.nori.ai.gateway.core.budget.TruncationDetector.class,
+                com.nori.ai.gateway.core.budget.PromptTokenCounting.class, com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter.class,
+                com.nori.ai.gateway.integration.tokenizer.QwenChatTemplateRenderer.class)) assertThat(context.getBeansOfType(type)).as(type.getName()).hasSize(1);
+        var guard = context.getBean(com.nori.ai.gateway.core.budget.PreCallBudgetAssert.class);
+        var counting = context.getBean(com.nori.ai.gateway.core.budget.PromptTokenCounting.class);
+        var policy = context.getBean(com.nori.ai.gateway.core.budget.TokenBudgetPolicy.class);
+        assertThat(counting).isExactlyInstanceOf(com.nori.ai.gateway.integration.tokenizer.PromptTokenCounter.class);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(guard, "counter")).isSameAs(counting);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(guard, "policy")).isSameAs(policy);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(com.nori.ai.gateway.core.budget.PromptReducer.class), "counter")).isSameAs(counting);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(counting, "tokenizer")).isSameAs(context.getBean(com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(counting, "renderer")).isSameAs(context.getBean(com.nori.ai.gateway.integration.tokenizer.QwenChatTemplateRenderer.class));
+        assertThat(policy.budget(com.nori.ai.gateway.core.budget.CallType.COMPOSER).requestMaxTokens()).isEqualTo(5_248);
+        // P03 v4 token-golden TG01-KO(20261104T044320Z-diag-v2-t0-b): Ollama usage.prompt_tokens = 40
+        var golden = List.of(new com.nori.ai.gateway.core.budget.ChatMessage(com.nori.ai.gateway.core.budget.ChatMessage.Role.SYSTEM, "너는 TC 설비 도우미다."),
+            new com.nori.ai.gateway.core.budget.ChatMessage(com.nori.ai.gateway.core.budget.ChatMessage.Role.USER, "포토 설비의 오늘 상태를 간단히 알려줘."));
+        assertThat(guard.check(com.nori.ai.gateway.core.budget.CallType.CLASSIFY, golden, 5_120)).isEqualTo(new com.nori.ai.gateway.core.budget.PreCallBudgetAssert.Allowed(40));
+    }
 
     @Test void actualApplicationRejectsMissingHistoryBeforeLaterRunner() throws Exception {
         database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),
