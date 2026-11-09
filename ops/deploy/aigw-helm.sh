@@ -134,7 +134,7 @@ if [[ $app == 1 ]]; then
     --set-string credentialsRef.serviceTokens=ai-gateway-service-tokens --set-string credentialsRef.actorJwks=ai-gateway-actor-jwks
     --set-string credentialsRef.dbApp=ai-gateway-db-app --set-string credentialsRef.dbMigrator=ai-gateway-db-migrator
     --set-string credentialsRef.gitlabRead=ai-gateway-gitlab-read --set-string credentialsRef.testHooks=ai-gateway-test-hooks
-    --set-string credentialsRef.inferenceProxy=ai-gateway-inference-proxy-token --set-string credentialsRef.seaweedRead=ai-gateway-seaweedfs-read
+    --set-string credentialsRef.seaweedRead=ai-gateway-seaweedfs-read
     --set-string credentialsRef.acceptanceSigner=ai-gateway-acceptance-signer --set-string credentialsRef.acceptanceClient=ai-gateway-acceptance-client
     --set-string credentialsRef.acceptanceDbRead=ai-gateway-db-acceptance-ro --set-string credentialsRef.acceptanceFixtureWriter=ai-gateway-acceptance-fixture-writer)
   # suite → 추론·Source 읽기·ingest·fixture catalog 플래그(§11.9). 복원 release 는 values-restore 가 정한다.
@@ -212,7 +212,7 @@ if [[ $app == 1 ]]; then
   fi
   helm lint "$package" "${common[@]}" "${extra[@]}" >"$tmp/lint.log" 2>&1 || error HELM_LINT_FAILED
   helm template "$release" "$package" "${common[@]}" "${extra[@]}" >"$tmp/render.yaml" 2>"$tmp/error" || error HELM_RENDER_FAILED
-  python3 -B ops/deploy/app_render.py matrix "$tmp/render.yaml" "$release" "$suite" "${spec_sha:-}" || exit 1
+  python3 -B ops/deploy/app_render.py matrix "$tmp/render.yaml" "$release" "$suite" "${spec_sha:-}" "$tmp/values.json" || exit 1
   if [[ $mode == lint ]]; then
     # guard 음성: 각각 기대 사유로만 실패해야 한다(하나라도 다르면 exit 1).
     negative() {  # $1 = 기대 사유, 나머지 = 추가 helm 인자
@@ -231,6 +231,14 @@ if [[ $app == 1 ]]; then
       negative PRODUCTION_RENDER_BLOCKED -f "$chart/values-prod.yaml"
       negative MAIN_RELEASE_CONFLICT --set restoreMode=true
       negative MAIN_RELEASE_CONFLICT --set-string db.release=ai-gateway-db-restore
+      # 추론 endpoint 직접 호출(SPEC §26.1): baseUrl 은 scheme://host:port 만, baseUrl 포트·inference.port·netpol 추론 대상 포트가 같아야 한다.
+      negative INFERENCE_BASE_URL_REQUIRED --set inference.enabled=true --set-string inference.baseUrl=
+      negative INFERENCE_BASE_URL_INVALID --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1/v1
+      negative INFERENCE_BASE_URL_INVALID --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1/
+      negative INFERENCE_BASE_URL_INVALID --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference
+      negative INFERENCE_PORT_REQUIRED --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=0
+      negative INFERENCE_PORT_CONFLICT --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=2 --set netpol.targets.inference.port=2
+      negative INFERENCE_PORT_CONFLICT --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=1 --set netpol.targets.inference.port=2
     else
       negative RESTORE_FLAGS_CONFLICT --set inference.enabled=true
       negative RESTORE_BACKUP_POINT_REQUIRED --set-string recovery.backupPointAt=
@@ -244,7 +252,7 @@ if [[ $app == 1 ]]; then
     for row in "${rows[@]}"; do
       suite_args "$row" row_args "$tmp/lint-spec.json" "$catalog"
       helm template "$release" "$package" "${common[@]}" "${row_args[@]}" >"$tmp/row.yaml" 2>"$tmp/error" || error "RENDER_MATRIX_FAILED:$row" 1
-      python3 -B ops/deploy/app_render.py matrix "$tmp/row.yaml" "$release" "$row" "$lint_spec_sha" || error "RENDER_MATRIX_MISMATCH:$row" 1
+      python3 -B ops/deploy/app_render.py matrix "$tmp/row.yaml" "$release" "$row" "$lint_spec_sha" "$tmp/values.json" || error "RENDER_MATRIX_MISMATCH:$row" 1
       if [[ $row == F1 || $row == F4 ]]; then
         # 재배포 0 suite(suite-only)는 수용 Job 값만 바꾼다: 같은 행의 Deployment 렌더가 바이트 그대로여야 한다.
         before=$(python3 -B ops/deploy/app_render.py deployment-sha "$tmp/row.yaml" "$release")

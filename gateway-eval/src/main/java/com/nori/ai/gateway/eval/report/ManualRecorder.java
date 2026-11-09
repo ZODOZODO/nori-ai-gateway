@@ -32,12 +32,7 @@ public final class ManualRecorder {
         if (fields.size() != schema.size()) throw new EvalException(2, "USER_RUN_FIELD_MISSING");
         String verdict;
         if (mode.equals("rubric")) verdict = (String) fields.get("verdict");
-        else verdict = switch (leaf) {
-            case "AC-35-FW" -> Boolean.TRUE.equals(fields.get("tcpConnectFailed")) && Long.valueOf(0).equals(fields.get("proxyReceived")) && fields.get("sourceHostClass").equals("LAN") ? "PASS" : "FAIL";
-            case "AC-35-LOCAL" -> ((List<?>)fields.get("listenAddresses")).equals(List.of("127.0.0.1:11434")) ? "PASS" : "FAIL";
-            case "AC-35-TOKEN" -> Long.valueOf(401).equals(fields.get("httpStatus")) && Long.valueOf(0).equals(fields.get("forwardedRequests")) && fields.get("sourceHostClass").equals("APPROVED_NODE") ? "PASS" : "FAIL";
-            default -> "NOT_RUN";
-        };
+        else verdict = "NOT_RUN";
         JsonNode manifest = repository.readAll(stage).stream().filter(n -> n.path("status").asText().equals("PARENT") && n.path("parentRunId").asText().equals(parent)).findFirst().orElseThrow(() -> new EvalException(2, "PARENT_MANIFEST_MISSING"));
         List<String> labels = new ArrayList<>(); catalog.leaf(leaf).path("labelsByStage").path(stage).forEach(n -> labels.add(n.asText()));
         Map<String,Object> record = new LinkedHashMap<>(); record.put("kind", "LEAF"); record.put("stage", stage); record.put("leafId", leaf); record.put("parentRunId", parent); record.put("runId", run);

@@ -48,7 +48,6 @@ PY
     tmp=$(mktemp -d); trap 'rm -rf -- "$tmp"' EXIT
     required=('ai-gateway-db-superuser:password' 'ai-gateway-db-migrator:password' 'ai-gateway-db-app:password' 'ai-gateway-db-backup:password' 'ai-gateway-gitlab-read:token')
     [[ $stage == RESTORE ]] || required+=("ai-gateway-backup-destination:$backup_fields")
-    [[ $stage == F1 || $stage == RESTORE ]] || required+=('ai-gateway-inference-proxy-token:token')
     [[ $stage != F3 && $stage != F4 && $stage != RESTORE ]] || required+=('ai-gateway-seaweedfs-read:access-key,secret-key')
     missing=0
     for spec in "${required[@]}"; do

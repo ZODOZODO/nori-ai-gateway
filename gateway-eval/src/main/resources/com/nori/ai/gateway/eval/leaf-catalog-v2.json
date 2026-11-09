@@ -441,9 +441,6 @@
       "id": "AC-35",
       "atomic": false,
       "children": [
-        "AC-35-TOKEN",
-        "AC-35-FW",
-        "AC-35-LOCAL",
         "AC-35-EGRESS"
       ],
       "gates": [
@@ -3972,83 +3969,6 @@
       }
     },
     {
-      "id": "AC-35-TOKEN",
-      "parentIds": [
-        "AC-35"
-      ],
-      "gates": [
-        "F2"
-      ],
-      "gateText": "F2",
-      "labelsByStage": {
-        "F2": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F2": [
-          {
-            "componentId": "ACC:F2",
-            "producer": "ACCEPTANCE",
-            "suite": "F2"
-          },
-          {
-            "componentId": "UR",
-            "producer": "USER_RUN",
-            "task": "record user-run"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-35-FW",
-      "parentIds": [
-        "AC-35"
-      ],
-      "gates": [
-        "F2"
-      ],
-      "gateText": "F2",
-      "labelsByStage": {
-        "F2": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F2": [
-          {
-            "componentId": "UR",
-            "producer": "USER_RUN",
-            "task": "record user-run"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-35-LOCAL",
-      "parentIds": [
-        "AC-35"
-      ],
-      "gates": [
-        "F2"
-      ],
-      "gateText": "F2",
-      "labelsByStage": {
-        "F2": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F2": [
-          {
-            "componentId": "UR",
-            "producer": "USER_RUN",
-            "task": "record user-run"
-          }
-        ]
-      }
-    },
-    {
       "id": "AC-35-EGRESS",
       "parentIds": [
         "AC-35"
@@ -6885,8 +6805,7 @@
       "AC-43-COMP",
       "AC-22-LIVE",
       "AC-22-GQ-BYPASS-DATA",
-      "AC-22-GQ-BYPASS-XSYS",
-      "AC-35-TOKEN"
+      "AC-22-GQ-BYPASS-XSYS"
     ],
     "F2-RUBRIC": [
       "AC-22-LIVE",
@@ -6896,11 +6815,6 @@
     "F2-OUTAGE": [
       "AC-33-LOADING",
       "AC-44"
-    ],
-    "record user-run": [
-      "AC-35-TOKEN",
-      "AC-35-FW",
-      "AC-35-LOCAL"
     ],
     "F3": [
       "AC-23-NW",

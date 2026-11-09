@@ -142,7 +142,7 @@
           "expect": "ALLOWED"
         },
         {
-          "id": "inference-proxy",
+          "id": "inference-endpoint",
           "host": "198.51.100.20",
           "port": 18080,
           "expect": "ALLOWED"
@@ -164,11 +164,11 @@
     }
   },
   "inference": {
-    "proxyBaseUrl": {
+    "baseUrl": {
       "value": "http://198.51.100.20:18080",
       "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
     },
-    "proxyPort": {
+    "port": {
       "value": 18080,
       "approvalRef": "ops/runconfig/fixtures/LINT-ONLY.md"
     }

@@ -67,7 +67,7 @@ class EvidenceRepositoryFsTest {
     @Test void directUserRunIsReadWhileOpsRequiresExplicitIngest() throws Exception {
         TestSupport f = new TestSupport(directory);
         ObjectNode manifest = f.parent("F1", "p");
-        ObjectNode user = f.record(Map.of("kind", "LEAF", "stage", "F2", "leafId", "AC-35-FW", "runId", "user", "parentRunId", "p",
+        ObjectNode user = f.record(Map.of("kind", "LEAF", "stage", "F2", "leafId", "AC-35-EGRESS", "runId", "user", "parentRunId", "p",
             "producer", "USER_RUN", "componentId", "USER_RUN", "result", "PASS", "buildIdentity", f.identity("F2")));
         Path source = directory.resolve("evidence/F1/ops/parent.json"); Json.write(source, manifest);
         EvidenceRepositoryFs repository = new EvidenceRepositoryFs(directory);

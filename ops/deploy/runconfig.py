@@ -159,7 +159,7 @@ def app_values(data):
     probe = value(data, 'egressProbe.targets')
     if probe is not None:
         values['egressProbe'] = {'targets': [dict(target, approvalRef=probe['approvalRef']) for target in probe['value']]}
-    inference = {key: value(data, 'inference.' + key)['value'] for key in ('proxyBaseUrl', 'proxyPort') if value(data, 'inference.' + key) is not None}
+    inference = {key: value(data, 'inference.' + key)['value'] for key in ('baseUrl', 'port') if value(data, 'inference.' + key) is not None}
     if inference:
         values['inference'] = inference
     kafka = {key: value(data, 'kafka.' + key)['value'] for key in ('bootstrapServers', 'topic', 'groupId') if value(data, 'kafka.' + key) is not None}

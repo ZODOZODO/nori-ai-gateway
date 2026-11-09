@@ -11,7 +11,7 @@ import yaml
 
 HEX64 = re.compile(r'^[0-9a-f]{64}$')
 COMMON_SECRETS = {'ai-gateway-service-tokens', 'ai-gateway-actor-jwks', 'ai-gateway-db-app', 'ai-gateway-gitlab-read', 'ai-gateway-test-hooks'}
-INFERENCE_SECRET, SEAWEED_SECRET = 'ai-gateway-inference-proxy-token', 'ai-gateway-seaweedfs-read'
+SEAWEED_SECRET = 'ai-gateway-seaweedfs-read'
 # §11.9 배포 행: (release, inference, srcRead, ingest, fixCat, fixture-writer). 재배포 0 행은 suite-only 로만 실행한다.
 ROWS = {
     'none': ('ai-gateway', False, False, False, False, False),
@@ -110,8 +110,18 @@ def env(container):
     return {e['name']: e.get('value') for e in container.get('env', [])}
 
 
-def matrix(render, release, suite, spec_sha):
-    """렌더 결과가 §11.9 그 행과 정확히 같은지: Deployment Secret volume·추론 모드 env·egress 대상·수용 Job Secret·spec-verify."""
+def egress_rule(target):
+    """runconfig.py 가 만든 netpol 대상 하나를 차트(`aigw.peer`·networkpolicy.yaml)와 같은 TCP egress 규칙으로: cidr 이면 ipBlock, 아니면 namespace·pod selector."""
+    if target.get('cidr'):
+        peer = {'ipBlock': {'cidr': target['cidr']}}
+    else:
+        peer = {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': target['namespace']}}, 'podSelector': {'matchLabels': target['podSelector']}}
+    return {'to': [peer], 'ports': [{'protocol': 'TCP', 'port': target['port']}]}
+
+
+def matrix(render, release, suite, spec_sha, values_file):
+    """렌더 결과가 §11.9 그 행과 정확히 같은지: Deployment Secret volume·추론 모드 env·egress 대상·수용 Job Secret·spec-verify.
+    egress 기대값은 그 실행의 runconfig 해석 결과(values_file = runconfig.py 출력)의 netpol 대상에서 계산한다."""
     if suite not in ROWS or ROWS[suite][0] != release and not (suite == 'none' and release == 'ai-gateway-restore'):
         fail('SUITE_UNSUPPORTED')
     row = ROWS['F4-RESTORE'] if release == 'ai-gateway-restore' else ROWS[suite]
@@ -120,8 +130,6 @@ def matrix(render, release, suite, spec_sha):
     deployment = one(docs, 'Deployment', release)
     pod = deployment['spec']['template']
     expected = set(COMMON_SECRETS)
-    if inference:
-        expected.add(INFERENCE_SECRET)
     if src_read:
         expected.add(SEAWEED_SECRET)
     if secrets(pod) != expected:
@@ -133,12 +141,17 @@ def matrix(render, release, suite, spec_sha):
               'AI_GATEWAY_SANITIZE_VERIFY_RULE_SET': 'mask-v1r' if suite == 'F3-RULEVER' else 'mask-v1'}
     if any(values.get(key) != expected_value for key, expected_value in checks.items()):
         fail('RENDER_MATRIX_MISMATCH:deployment-env')
+    # 추론 연결은 endpoint env 하나뿐이다(SPEC §26.1 — 추론 자격 Secret·토큰 파일 env 0).
+    if {key for key in values if key.startswith('AI_GATEWAY_INFERENCE_')} != {'AI_GATEWAY_INFERENCE_MODE'} | ({'AI_GATEWAY_INFERENCE_BASEURL'} if inference else set()):
+        fail('RENDER_MATRIX_MISMATCH:deployment-env')
     target = 'ai-gateway-db-restore' if release == 'ai-gateway-restore' else 'ai-gateway-db'
     if pod['metadata']['labels'].get('aigw.nori/db-target') != target:
         fail('RENDER_MATRIX_MISMATCH:db-target')
-    egress = json.dumps(one(docs, 'NetworkPolicy', release)['spec'].get('egress', []), sort_keys=True)
-    for present, marker in ((inference, '198.51.100.20/32'), (src_read, '198.51.100.30/32'), (ingest, 'lint-only-broker')):
-        if (marker in egress) != present:
+    targets = json.loads(Path(values_file).read_text(encoding='utf-8'))['netpol']['targets']
+    rules = {key: egress_rule(targets[key]) for key in ('inference', 'seaweed', 'kafka') if key in targets}
+    egress = one(docs, 'NetworkPolicy', release)['spec'].get('egress', [])
+    for present, key in ((inference, 'inference'), (src_read, 'seaweed'), (ingest, 'kafka')):
+        if (present and key not in rules) or (key in rules and (rules[key] in egress) != present):
             fail('RENDER_MATRIX_MISMATCH:egress')
     if any(d.get('kind') == 'CronJob' for d in docs):
         fail('RENDER_MATRIX_MISMATCH:cronjob')
@@ -149,6 +162,9 @@ def matrix(render, release, suite, spec_sha):
         return
     if len(job) != 1:
         fail('RENDER_MATRIX_MISMATCH:acceptance-job')
+    # 수용 pod 는 어느 suite 에서도 추론 endpoint 에 닿지 않는다(SPEC §26.1 임차 원칙 — 수용 pod 추론 egress 0).
+    if 'inference' in rules and rules['inference'] in one(docs, 'NetworkPolicy', release + '-acceptance')['spec'].get('egress', []):
+        fail('RENDER_MATRIX_MISMATCH:acceptance-egress')
     job_pod = job[0]['spec']['template']
     job_secrets = secrets(job_pod)
     base = {'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client', 'ai-gateway-db-acceptance-ro'}

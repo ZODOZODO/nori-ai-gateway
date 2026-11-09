@@ -1,7 +1,1 @@
-{
-  "AC-35-FW": {"tcpConnectFailed":"boolean","proxyReceived":"integer","sourceHostClass":"host-class"},
-  "AC-35-LOCAL": {"listenAddresses":"addresses"},
-  "AC-35-TOKEN": {"httpStatus":"integer","forwardedRequests":"integer","sourceHostClass":"host-class"},
-  "AC-33-LOADING": {"restartAt":"instant","readinessTransitions":"readiness"},
-  "AC-24-RESTORE": {"startedAt":"instant","readyAt":"instant"}
-}
+{}

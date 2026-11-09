@@ -36,7 +36,7 @@
 | AC-32 | 부모: SCHEMA, LENGTH, RETRYOK | F2 | — | P21 집계 | — | 이번 |
 | AC-33 | 부모: LOADING, PERSIST, CTX | F2, F4 | — | P21, P29 집계 | — | 이번 |
 | AC-34 | 원자 | F5b | — | — | TC_LIVE | 후속 |
-| AC-35 | 부모: TOKEN, FW, LOCAL, EGRESS | F2 | — | P21 집계 | — | 이번 |
+| AC-35 | 부모: EGRESS(2026-11-09 대체(임차 원칙), 이력: TOKEN, FW, LOCAL, EGRESS — TOKEN·FW·LOCAL 2026-11-09 폐기) | F2 | — | P21 집계 | — | 이번 |
 | AC-36 | 원자 | F1, F4, F5a | P11, P12, P13, P14(보존 탐침 저장·스케줄·소비, N13) | P16, P29 | M(설정 확정 Source)+RL(verifiedOldestAt) | 이번(F1·F4) / 후속(F5a) |
 | AC-37 | 부모: CMP, OUT-NORMAL, OUT-MAX, OUT-ESCAPE | F0 | — | P03 집계 | — | 이번 |
 | AC-38 | 부모: F0, F2, F4 | F0, F2, F4 | — | P03, P21, P29 | — | 이번 |
@@ -45,7 +45,7 @@
 | AC-41 | 원자 | F1, F5a | P07, P09, P14 | P16 | M, L0(`delegation_id` terminal NULL·백업 표현 제외 포함) | 이번(F1) / 후속(F5a) |
 | AC-42 | 부모: READ, AUTHZ | F5a | — | — | TC_LIVE | 후속 |
 | AC-43 | 부모: CLS, COMP | F2 | — | P21 집계 | — | 이번 |
-| AC-44 | 원자 | F2, F4 | P19 | P21, P29 | 실제 Ollama 중지(사용자 실행), M | 이번 |
+| AC-44 | 원자 | F2, F4 | P19 | P21, P29 | readiness stub 무응답(`LS`, 추론 서버 무접촉 — 2026-11-09 대체, 이력: 실제 Ollama 중지(사용자 실행)), M | 이번 |
 | AC-45 | 원자 | F1, F4, F5a | P11, P12 | P16, P29 | M+RL | 이번(F1·F4) / 후속(F5a) |
 | AC-46 | 부모: EMPTY, HIT, TRIM | F1, F4, F5a | — | P16, P29 집계 | — | 이번(F1·F4) / 후속(F5a) |
 | ISO-01 | 원자 | F4 | P20, P26 | P29 | M+FX(WM 음성), LL | 이번 |
@@ -64,7 +64,7 @@
 | ISO-14 | 부모: USER, STREAM, SUMMARY, CACHE | F4, F5b(STREAM) | — | P29 집계 | — | 이번(F4) / 후속(F5b STREAM) |
 | ISO-15 | 부모: QUERY, INJECT, WINDOW | F1(QUERY·WINDOW), F4 | — | P16, P29 집계 | — | 이번 |
 
-### 12.2 leaf 216개
+### 12.2 leaf 213개 (2026-11-09 대체(임차 원칙): 216 − 폐기 3(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL) = 213. 폐기 3행은 아래 표에 이력으로 남기며 수에 넣지 않는다)
 
 | leaf | 부모 | §27.2 게이트·라벨 | 구현 | 이번 판정 | Source·LLM | 범위 |
 |---|---|---|---|---|---|---|
@@ -199,13 +199,13 @@
 | AC-32-SCHEMA | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
 | AC-32-LENGTH | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
 | AC-32-RETRYOK | AC-32 | F2[LLM_STUB] | P20 | P21 | LS | 이번 |
-| AC-33-LOADING | AC-33 | F2, F4 | P19 | P21, P29 | 실제 재시작(사용자) 또는 readiness stub — 사용 수단 라벨 기록 | 이번 |
+| AC-33-LOADING | AC-33 | F2, F4 | P19 | P21, P29 | readiness stub(`LS`, 추론 서버 무접촉 — 2026-11-09 대체, 이력: 실제 재시작(사용자) 또는 readiness stub — 사용 수단 라벨 기록) | 이번 |
 | AC-33-PERSIST | AC-33 | F2, F4 | P19 | P21, P29 | readiness stub + 제어 시계 | 이번 |
 | AC-33-CTX | AC-33 | F2, F4 | P19 | P21, P29 | readiness stub(모델 재로드 금지) | 이번 |
-| AC-35-TOKEN | AC-35 | F2 | P15, P17 | P21 | 실제 proxy·노드 SNAT 하네스 Pod | 이번(G-JETSON-NET 선행) |
-| AC-35-FW | AC-35 | F2 | P17 | P21 | 실제 방화벽, LAN 호스트(사용자) | 이번 |
-| AC-35-LOCAL | AC-35 | F2 | P17 | P21 | Jetson listen 관찰(사용자) | 이번 |
-| AC-35-EGRESS | AC-35 | F2 | P15 | P21 | 실제 NetworkPolicy, Gateway Pod 내 `EgressProbeHook`(고정 대상 id·양성 제어) | 이번 |
+| AC-35-TOKEN | AC-35 | — (2026-11-09 폐기(임차 원칙) — 수·게이트 제외, 이력: F2) | — (이력: P15, P17) | — (이력: P21) | 이력: 실제 proxy·노드 SNAT 하네스 Pod | 폐기(이력: 이번(G-INFER-NET 선행)) |
+| AC-35-FW | AC-35 | — (2026-11-09 폐기(임차 원칙) — 수·게이트 제외, 이력: F2) | — (이력: P17) | — (이력: P21) | 이력: 실제 방화벽, LAN 호스트(사용자) | 폐기(이력: 이번) |
+| AC-35-LOCAL | AC-35 | — (2026-11-09 폐기(임차 원칙) — 수·게이트 제외, 이력: F2) | — (이력: P17) | — (이력: P21) | 이력: 추론 서버 listen 관찰(사용자) | 폐기(이력: 이번) |
+| AC-35-EGRESS | AC-35 | F2 | P15 | P21 | 실제 NetworkPolicy, Gateway Pod 내 `EgressProbeHook`(고정 대상 id·양성 제어 = 추론 endpoint `192.168.0.160:11434`·DB — 2026-11-09) | 이번 |
 | AC-37-CMP | AC-37 | F0[LLM_LIVE, Gateway 없음] | P02 | P03 | 실제 Ollama, LL, 정확도 = 문항당 회차 1 표본(분모 = 문항 수)·지연 = R=5 전 회차 | 이번 |
 | AC-37-OUT-NORMAL | AC-37 | F0 | P02 | P03 | 실제 Ollama·공식/GGUF tokenizer 계수 + `f0 boundary-gen` 실제 생성(완결 JSON·인자 정확 일치), LL | 이번 |
 | AC-37-OUT-MAX | AC-37 | F0 | P02 | P03 | 같음 + G-ARG-LIMITS 등록 최대 길이 | 이번(UNRESOLVED 있으면 NOT_RUN) |
@@ -293,7 +293,7 @@
 | AC-03 | 2 | AC-30 | 3 |
 | AC-10 | 2 | AC-32 | 3 |
 | AC-15 | 2 | AC-33 | 3 |
-| AC-16 | 2 | AC-35 | 4 |
+| AC-16 | 2 | AC-35 | 1 (2026-11-09 대체, 이력 4) |
 | AC-17 | 5 | AC-37 | 4 |
 | AC-18 | 8 | AC-38 | 3 |
 | AC-19 | 3 | AC-39 | 3 |
@@ -312,7 +312,7 @@
 | | | ISO-14 | 4 |
 | | | ISO-15 | 3 |
 
-AC 하위 합 155 + ISO 하위 합 61 = **216**. 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
+AC 하위 합 152 + ISO 하위 합 61 = **213**(2026-11-09 대체(임차 원칙): AC-35 하위 4 → 1, AC 하위 합 155 − 3 = 152, 전체 216 − 3 = 213. 원자 23·상위 61 은 그대로 — AC-35 는 하위 1개를 가진 부모로 남는다. 이력: AC 하위 합 155 + ISO 하위 합 61 = 216). 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
 
 ### 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력, leaf·원자 ID 추가·삭제 0)
 
@@ -326,9 +326,9 @@ AC 하위 합 155 + ISO 하위 합 61 = **216**. 원자 AC 19개(AC-01, 04, 05, 
 | F1 | AC-46-EMPTY, AC-46-HIT | `ACC:F1` + `RB:F1-RUBRIC` |
 | F2 | AC-22-STUB-TOOL, AC-22-STUB-SYSTEM, AC-22-GQ-HELP, AC-29, AC-30-EQ, AC-30-WM, AC-30-ABSENT, AC-31, AC-32-SCHEMA, AC-32-LENGTH, AC-32-RETRYOK, AC-33-PERSIST, AC-33-CTX, AC-35-EGRESS, AC-38-F2, AC-43-CLS, AC-43-COMP | `ACC:F2` |
 | F2 | AC-22-LIVE, AC-22-GQ-BYPASS-DATA, AC-22-GQ-BYPASS-XSYS | `ACC:F2` + `RB:F2-RUBRIC` |
-| F2 | AC-33-LOADING, AC-44 | `ACC:F2-OUTAGE`(각각 `LOADING`·`STOPPED` 회차) |
-| F2 | AC-35-TOKEN | `ACC:F2` + `UR` |
-| F2 | AC-35-FW, AC-35-LOCAL | `UR` |
+| F2 | AC-33-LOADING, AC-44 | `ACC:F2-OUTAGE`(각각 `LOADING`·`STOPPED` 회차 — readiness stub, 추론 서버 무접촉, 2026-11-09) |
+| — (2026-11-09 폐기(임차 원칙), 이력: F2) | AC-35-TOKEN | 없음(이력: `ACC:F2` + `UR`) |
+| — (2026-11-09 폐기(임차 원칙), 이력: F2) | AC-35-FW, AC-35-LOCAL | 없음(이력: `UR`) |
 | F3 | AC-23-NW, AC-23-NH, AC-23-SW, AC-23-SH, AC-23-FILTER, AC-23-REVOKE, AC-23-VEC-EXACT, AC-23-VEC-FILTERK, AC-23-KW-SUBSTR, AC-23-KW-ID, AC-23-KW-SHORT, AC-23-KW-META, AC-23-KW-ZERO, AC-23-KW-DENY, AC-23-ING-IDEM, AC-23-ING-PRECOMMIT, AC-23-ING-POSTCOMMIT, AC-23-ING-DELETE, AC-23-REBUILD, AC-23-ING-SANITIZE, AC-23-QUERYFAIL, ISO-06-V-MISSING, ISO-06-V-TAMPER, ISO-06-K-MISSING, ISO-06-K-TAMPER | `ACC:F3`(실제 SeaweedFS·Kafka·전용 PG) |
 | F3 | AC-23-ING-ACL | `ACC:F3-ACL` |
 | F3 | AC-23-ING-RULEVER | `ACC:F3-RULEVER` |
@@ -342,7 +342,7 @@ AC 하위 합 155 + ISO 하위 합 61 = **216**. 원자 AC 19개(AC-01, 04, 05, 
 | F4 | AC-24-RESTORE | `ACC:F4-RESTORE` + `OP:restore-rto` |
 | F4 | AC-24-BACKUP-ALERT | `OP:backup-alert` |
 
-- 대조(LeafCatalogTest 가 기계 검사): 이 표의 F0~F4 행 leaf 집합 = §6·P03·P16·P21·P25·P29 필수 leaf 목록(SPEC §27.2 매핑)과 단계별로 정확히 같고, 이번 범위 원자 13개(AC-01·04·05·29·31·36·41·44·45, ISO-01·02·03·09) 모두 그 원자가 속한 단계 행에 있다. leaf 216·원자 23·상위 61 수는 그대로다(새 leaf·원자 0, 새 시험 클래스는 기존 leaf 의 component·실패 경계 보강용이며 ID 를 늘리지 않음).
+- 대조(LeafCatalogTest 가 기계 검사): 이 표의 F0~F4 행 leaf 집합 = §6·P03·P16·P21·P25·P29 필수 leaf 목록(SPEC §27.2 매핑)과 단계별로 정확히 같고, 이번 범위 원자 13개(AC-01·04·05·29·31·36·41·44·45, ISO-01·02·03·09) 모두 그 원자가 속한 단계 행에 있다. leaf 216·원자 23·상위 61 수는 그대로다(새 leaf·원자 0, 새 시험 클래스는 기존 leaf 의 component·실패 경계 보강용이며 ID 를 늘리지 않음). **2026-11-09 대체(임차 원칙):** leaf 수는 213(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL 폐기 3 제외)·원자 23·상위 61 이다. 위 "leaf 216" 과 "ID 수216" 은 이력이다. 폐기 3 leaf 는 어떤 단계 행에도 권위 component 를 두지 않으며, catalog·`LeafCatalogTest` 정합은 P15 "2026-11-09 임차 원칙 반영 코드 정합 책임" 이다.
 
 ---
 

@@ -6,7 +6,7 @@ Status: NOT_RUN
 
 `bash ops/gates/aigw-runtime-credentials.sh provision-db`는 superuser/migrator/app/backup 네 역할 Secret이 없는 경우에만 OpenSSL CSPRNG 32바이트의 base64 값을 stdin 파이프로 생성합니다. 기존 Secret은 PRESENT로 건너뜁니다. 조회 권한·통신 오류를 NotFound로 해석하지 않습니다. `--from-file=password=/dev/stdin`을 사용하며 비밀번호는 argv에 없습니다. 동시 provision 경쟁 시 create 실패를 전파하고 재실행하면 기존 Secret을 보존합니다.
 
-`check --stage F1|F2|F3|F4|RESTORE`는 DB 네 역할의 password·GitLab token을 검사합니다. F1~F4는 백업 목적지의 s3 access-key/secret-key 또는 sftp ssh-private-key/known-hosts, F2~F4는 proxy token, F3/F4/RESTORE는 Seaweed access-key/secret-key가 필요합니다. RESTORE는 proxy·백업 목적지를 요구하지 않습니다. 모든 누락을 표시하고 exit 13을 반환합니다. 증거는 evidence/<stage>/gates/runtime-credentials-check-<UTC+고유값>.json에 이름·필드·PRESENT/MISSING만 기록합니다. 원시 Secret JSON은 조회하지 않습니다. 존재 검사는 identity 권한·proxy 값의 일치를 증명하지 않습니다.
+`check --stage F1|F2|F3|F4|RESTORE`는 DB 네 역할의 password·GitLab token을 검사합니다. F1~F4는 백업 목적지의 s3 access-key/secret-key 또는 sftp ssh-private-key/known-hosts, F3/F4/RESTORE는 Seaweed access-key/secret-key가 필요합니다. 추론 자격 Secret은 어느 단계에도 없습니다(F2~F4 = F1 + SeaweedFS read(F3~), Plan §11.9). RESTORE는 백업 목적지를 요구하지 않습니다. 모든 누락을 표시하고 exit 13을 반환합니다. 증거는 evidence/<stage>/gates/runtime-credentials-check-<UTC+고유값>.json에 이름·필드·PRESENT/MISSING만 기록합니다. 원시 Secret JSON은 조회하지 않습니다. 존재 검사는 identity 권한·값의 유효성을 증명하지 않습니다.
 
 검증 수용 자격(service-tokens, actor-jwks, test-hooks, acceptance-signer/client/db-acceptance-ro)은 Plan §11.7의 별도 G-VERIFY-CREDS 생산자(P15)가 준비합니다. provision-db가 acceptance-ro를 임의 생성하지 않습니다. 검증 DB hook은 활성 상태에서 acceptance-ro password를 필수 Secret 환경변수로 받으며 배포 스크립트도 필드 존재를 검사합니다. `--acceptance-role disabled`는 Secret 검사·hook 환경변수 참조를 생략하고 bootstrap에 false를 전달합니다. 역할 정리는 기존 SQL의 REVOKE/DROP 책임이며 HBA overlay는 유지합니다. 2026-11-06 승인 A로 접속 경계가 확정되었고 실제 운영 배포 게이트는 계속 BLOCKED/NOT_RUN입니다.
 
@@ -14,7 +14,7 @@ Status: NOT_RUN
 
 회전 실패 시 추가 회전을 중지하고 앱 트래픽과 백업/마이그레이션 실행을 정지하는 운영 절차를 따릅니다. 새 Secret은 이미 바뀌었을 수 있으므로 Secret만 되돌리지 않습니다. 실패한 release의 bootstrap Job 원인을 값 출력 없이 확인하고 현재 Secret을 사용하는 hook을 재실행·완료 확인합니다. 양쪽 DB와 앱 접속 확인 후 해당 workload만 재시작합니다. 기존 값으로 복구하려면 운영자가 관리하는 승인된 비밀 저장소의 값을 파이프로 Secret과 양쪽 DB에 동일하게 반영해야 합니다. 이 스크립트는 이전 비밀번호를 보관하지 않습니다.
 
-GitLab·SeaweedFS·백업 목적지는 각 원천 게이트 소유자가 이미 승인한 자격을 등록합니다. proxy 토큰 회전은 운영자가 CSPRNG 값을 Secret과 사용자 sudo 세션의 /etc/aigw/proxy-token에 같은 값으로 파이프 주입하는 별도 승인 절차입니다. 저장소·로그·채팅에 값을 남기지 않습니다. 실제 일치는 P19 readiness의 PROXY_REJECTED 부재로 확인하며 이번 단계에는 추론 서버 접근을 하지 않습니다.
+GitLab·SeaweedFS·백업 목적지는 각 원천 게이트 소유자가 이미 승인한 자격을 등록합니다. 저장소·로그·채팅에 값을 남기지 않습니다. 추론 서버는 Gateway가 빌려 쓰는 공유 자원이며 Gateway는 기존 endpoint(`inference.baseUrl`)를 자격 없이 직접 호출합니다(SPEC §26.1). 추론 자격 Secret·토큰 회전 절차는 없고, 비 2xx(401·403 포함)·파싱 불가 응답은 P19 readiness가 `INFERENCE_UNAVAILABLE`(사유 `ENDPOINT_ERROR`)로 분류합니다. 이번 단계에는 추론 서버 접근을 하지 않습니다.
 
 selftest는 격리 임시 디렉터리와 가짜 kubectl/git만 사용합니다. 실제 클러스터 자격을 읽지 않으며 운영 게이트 증거가 아닙니다.
 

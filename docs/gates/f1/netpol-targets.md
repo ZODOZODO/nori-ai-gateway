@@ -14,7 +14,7 @@ Gateway·수용 pod NetworkPolicy 의 실제 egress 대상 확인 기록이다. 
 | `alloy` | 앱(OTLP) | `alloy-gateway` namespace·pod label, 4318 |
 | `gitlab` | 앱(Source) | ipBlock CIDR 또는 in-cluster selector, 포트 |
 | `metrics` | 수용(readback) | G-OBS-READBACK 이 확인한 metric 읽기 API 의 namespace·pod label·포트 |
-| `inference` | 앱(F2~)·F2 계열 수용 | 추론 proxy ipBlock `192.168.0.160/32`, proxy 포트(`inference.proxyPort` 와 같아야 함) |
+| `inference` | 앱(F2~) — 수용 pod 는 어느 suite 에서도 0 | 추론 endpoint ipBlock `192.168.0.160/32`, 포트(`inference.port` 와 같아야 함 — 서버 기존 endpoint `http://192.168.0.160:11434`, SPEC §26.1) |
 | `seaweed` | 앱(F3~)·fixture-writer 수용 | SeaweedFS S3 ipBlock, S3 포트 |
 | `kafka` | 앱(F3~) | `mes-cluster` broker selector·포트 |
 
@@ -22,7 +22,7 @@ Gateway·수용 pod NetworkPolicy 의 실제 egress 대상 확인 기록이다. 
 
 ## egress probe 대상(runconfig `egressProbe.targets`)
 
-`ALLOWED` ≥ 2(주 DB Service 5432, F2 이후 추론 proxy)와 `BLOCKED` ≥ 2(allowlist 밖 외부 주소 1, allowlist 밖 클러스터 Service 1 — 예 namespace `tc` 의 `tc-ui-front` Service 포트)를 `{id, host, port, expect, approvalRef}` 로 적는다.
+`ALLOWED` ≥ 2(주 DB Service 5432, F2 이후 추론 endpoint `192.168.0.160:11434`)와 `BLOCKED` ≥ 2(allowlist 밖 외부 주소 1, allowlist 밖 클러스터 Service 1 — 예 namespace `tc` 의 `tc-ui-front` Service 포트)를 `{id, host, port, expect, approvalRef}` 로 적는다.
 
 ## Source 선언과의 관계
 

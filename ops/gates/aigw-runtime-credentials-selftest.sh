@@ -124,7 +124,9 @@ with open(os.environ['TEST_LOG'],'a') as log: log.write(json.dumps(record)+'\n')
         run([script,'check','--stage',stage],0)
         evidence=sorted((work/'evidence'/stage/'gates').glob('*.json'))[-1]
         names={r['name'] for r in json.loads(evidence.read_text())['items']}
-        assert ('ai-gateway-inference-proxy-token' in names)==(stage in ['F2','F3','F4'])
+        # 추론 자격 Secret 은 어느 단계에도 없다(SPEC §26.1 임차 원칙, Plan §11.9): F2~F4 = F1 + SeaweedFS read(F3~).
+        base={'ai-gateway-db-superuser','ai-gateway-db-migrator','ai-gateway-db-app','ai-gateway-db-backup','ai-gateway-gitlab-read'}
+        assert names==base|({'ai-gateway-backup-destination'} if stage!='RESTORE' else set())|({'ai-gateway-seaweedfs-read'} if stage in ['F3','F4','RESTORE'] else set()),(stage,names)
         assert ('ai-gateway-seaweedfs-read' in names)==(stage in ['F3','F4','RESTORE'])
         assert ('ai-gateway-backup-destination' in names)==(stage!='RESTORE')
         run([script,'check','--stage',stage],13,extra={'SECRET_TEST':'absent'})
