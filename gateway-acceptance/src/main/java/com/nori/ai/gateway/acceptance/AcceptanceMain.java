@@ -84,7 +84,7 @@ public final class AcceptanceMain {
         Path otr;
         try { otr = Files.createTempDirectory(temporary, "aigw-otr-"); } catch (IOException e) { throw new IllegalStateException("OTR_DIRECTORY"); }
         try {
-            F1RubricTargets.clear();
+            F1RubricTargets.clear(); AcceptanceMeasurements.clear();
             EvidenceBlockWriter.Extraction extraction;
             try {
                 runner.run(suite, otr);
@@ -100,6 +100,12 @@ public final class AcceptanceMain {
                 return 4;
             }
             var records = new ArrayList<ObjectNode>(extraction.leaves());
+            // 측정 시험(F3-PROBE 등)이 모은 정제 값만 MEASUREMENT 레코드로 낸다(leaf·벡터 0).
+            for (var measurement : AcceptanceMeasurements.snapshot()) {
+                var fields = new LinkedHashMap<String,Object>();
+                fields.put("kind", "MEASUREMENT"); fields.put("measurementId", measurement.measurementId()); fields.put("values", measurement.values());
+                records.add(EvidenceBlockWriter.record(context, fields));
+            }
             var completed = new LinkedHashMap<String,Object>();
             completed.put("kind", "RUN"); completed.put("status", "COMPLETED"); completed.put("executedTestCount", extraction.executed());
             completed.put("values", Map.of("leafRecordCount", extraction.leaves().size(), "passed", extraction.passed(), "failed", extraction.failed(), "skipped", extraction.skipped(), "aborted", extraction.aborted()));
@@ -108,7 +114,7 @@ public final class AcceptanceMain {
             EvidenceBlockWriter.write(out, records);
             // skip·abort 만 있는 실행도 성공이 아니다(leaf 는 NOT_RUN 으로 남는다).
             return extraction.failed() == 0 && extraction.aborted() == 0 && extraction.skipped() == 0 ? 0 : 1;
-        } finally { F1RubricTargets.clear(); delete(otr); }
+        } finally { F1RubricTargets.clear(); AcceptanceMeasurements.clear(); delete(otr); }
     }
 
     static void launch(String suite, Path otrDirectory) {

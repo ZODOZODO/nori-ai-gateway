@@ -21,7 +21,8 @@ import java.util.regex.Pattern;
  */
 public final class AllowlistLogFilter extends Filter<ILoggingEvent> {
     static final Set<String> PRODUCT_CODES = Set.of("RESTORE_PATH_REQUIRED", "RETENTION_PROBE_FAILED", "RETENTION_PURGE_FAILED",
-        "EXPIRY_CANCEL_FAILED", "AUDIT_WRITE_FAILED");
+        "EXPIRY_CANCEL_FAILED", "AUDIT_WRITE_FAILED", "INFERENCE_ALERT_RAISED_MODEL_LOADING", "INFERENCE_ALERT_RAISED_INFERENCE_UNAVAILABLE",
+        "INFERENCE_ALERT_RAISED_MODEL_CONTEXT_MISMATCH", "INFERENCE_ALERT_RAISED_MODEL_DIGEST_MISMATCH", "INFERENCE_ALERT_CLEARED");
     static final String PRODUCT_LOGGER_PREFIX = "com.nori.ai.gateway.";
     /** OTel appender가 capture하는 MDC 키다. 값은 {@link #allowsMdc}의 닫힌 값만 통과한다. */
     static final String MDC_KEYS = "requestId,conversationId,jobId,traceId,ownerSystem,status,errorCode,decision";

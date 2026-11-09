@@ -45,6 +45,8 @@ seam directive는 기존 접수 전 arm과 Job별 tx 결속 수명을 공유합�
 | 경로 | 입력·응답 |
 |---|---|
 | POST `/__test/egress-probe` | `{targetId}` 만 사용(본문의 다른 필드·호스트·포트 무시). 차트가 렌더한 `{release}-egress-probe` ConfigMap 파일(`ai.gateway.test-hooks.egress-targets-file`, JSON 배열 `[{id,host,port,expect}]`)의 id 이면 Gateway Pod 안에서 TCP connect 1회(timeout 3s, 본문 송신 0) → 200 `{targetId, connected, errorClass}`(errorClass = null·`TIMEOUT`·`REFUSED`·`UNRESOLVED`·`NO_ROUTE`·`IO_ERROR`, 주소 반환 0). 목록 밖 id·targetId 부재 404 |
+| POST `/__test/embedding-probe` | (P19, `ai.gateway.inference.mode=enabled` 일 때만 등록) 요청 본문 미사용. 실제 `InferenceClient.embed(["probe"])` 1회 → 200 `{dimension, modelDigest}`(`modelDigest` = readiness 가 마지막으로 읽은 `/api/ps` 의 bge-m3 digest, 없으면 null). 임베딩 실패 503 `{reason}`(`TRANSPORT`·`EMPTY_RESPONSE`). 벡터 값·입력·주소 반환 0 |
+| POST `/__test/readiness-stub` | (P19, 라벨 LLM_STUB, `ai.gateway.inference.mode=enabled` 일 때만 등록) 정확히 `{kind}`(문자열). `MODEL_LOADING`(bge-m3 만 상주)·`MODEL_CONTEXT_MISMATCH`(qwen3:4b ctx 4096·기대 digest)·`MODEL_DIGEST_MISMATCH`(qwen3:4b ctx 8192·기대와 다른 digest)·`INFERENCE_UNAVAILABLE`(무응답) 은 고정 `/api/ps` 응답을 실제 readiness 판정 경로의 입력으로 고정하고(`OFF` 전까지 30s 주기 확인에도 유지), `OFF` 는 고정을 풀어 실제 endpoint 로 되돌린다. 전환 직후 1회 확인 → 200 `{state}`(`READY`·위 4 상태). 고정 4 kind 는 추론 서버 요청 0(`OFF` 직후 확인만 실제 `/api/ps` 1회). kind 부재·추가 필드·목록 밖 kind 400 |
 
 hook 은 verify+enabled 조건에 더해 목록 파일 설정이 있을 때만 등록된다(차트 verify 렌더는 항상 마운트, 형식 위반 파일은 기동 실패). 판정(ALLOWED/BLOCKED 대조)은 수용 하네스 `EgressProbeClient` 쪽 AC-35-EGRESS(P21) 몫이다.
 

@@ -422,7 +422,8 @@
       "children": [
         "AC-33-LOADING",
         "AC-33-PERSIST",
-        "AC-33-CTX"
+        "AC-33-CTX",
+        "AC-33-DIGEST"
       ],
       "gates": [
         "F2",
@@ -3969,6 +3970,41 @@
       }
     },
     {
+      "id": "AC-33-DIGEST",
+      "parentIds": [
+        "AC-33"
+      ],
+      "gates": [
+        "F2",
+        "F4"
+      ],
+      "gateText": "F2, F4",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
       "id": "AC-35-EGRESS",
       "parentIds": [
         "AC-35"
@@ -6799,6 +6835,7 @@
       "AC-32-RETRYOK",
       "AC-33-PERSIST",
       "AC-33-CTX",
+      "AC-33-DIGEST",
       "AC-35-EGRESS",
       "AC-38-F2",
       "AC-43-CLS",
@@ -6894,6 +6931,7 @@
       "AC-30-WM",
       "AC-30-ABSENT",
       "AC-33-CTX",
+      "AC-33-DIGEST",
       "AC-36",
       "AC-38-F4",
       "AC-45",

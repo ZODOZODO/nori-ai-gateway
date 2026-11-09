@@ -6,6 +6,8 @@ import com.nori.ai.gateway.app.job.recovery.ReadinessGate;
 import com.nori.ai.gateway.app.observability.AuditRecorder;
 import com.nori.ai.gateway.core.audit.AuditEvent;
 import com.nori.ai.gateway.core.job.InferenceReadiness;
+import com.nori.ai.gateway.core.result.AdmissionErrorCode;
+import com.nori.ai.gateway.integration.inference.InferenceReadinessService;
 import com.nori.ai.gateway.core.sanitize.ContentSanitizer;
 import com.nori.ai.gateway.core.scope.VerifiedSystemScope;
 import com.nori.ai.gateway.persistence.maintenance.QueueMaintenanceRepository;
@@ -42,6 +44,7 @@ public final class JobAdmissionService {
     private final QueueMaintenanceRepository control;
     private final IdempotentAdmissionLookup lookup;
     private final InferenceReadiness readiness;
+    private final Optional<InferenceReadinessService> inferenceStates;
     private final ReadinessGate recovery;
     private final CapacityProfile capacity;
     private final QueueJobRepository queue;
@@ -58,11 +61,11 @@ public final class JobAdmissionService {
     private final java.util.concurrent.atomic.AtomicInteger uniqueFallbacks=new java.util.concurrent.atomic.AtomicInteger();
     public int uniqueFallbackCount(){return uniqueFallbacks.get();}
     public JobAdmissionService(PlatformTransactionManager manager,QueueMaintenanceRepository control,IdempotentAdmissionLookup lookup,
-            InferenceReadiness readiness,CapacityProfile capacity,QueueJobRepository queue,ConversationRepository conversations,
+            InferenceReadiness readiness,Optional<InferenceReadinessService> inferenceStates,CapacityProfile capacity,QueueJobRepository queue,ConversationRepository conversations,
             MessageRepository messages,JobRepository jobs,JobEventRepository events,ContentSanitizer sanitizer,
             Optional<TestHookRegistry> hooks,Optional<PausePointRegistry> pauses,org.springframework.context.ApplicationEventPublisher publisher,ReadinessGate recovery,AuditRecorder audit){
         transactions=new TransactionTemplate(manager);transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
-        this.control=control;this.lookup=lookup;this.readiness=readiness;this.capacity=capacity;this.queue=queue;this.conversations=conversations;
+        this.control=control;this.lookup=lookup;this.readiness=readiness;this.inferenceStates=inferenceStates;this.capacity=capacity;this.queue=queue;this.conversations=conversations;
         this.messages=messages;this.jobs=jobs;this.events=events;this.sanitizer=sanitizer;this.hooks=hooks;this.pauses=pauses;this.publisher=publisher;this.recovery=recovery;this.audit=Objects.requireNonNull(audit);
     }
     public Accepted accept(VerifiedSystemScope scope,AdmissionRequest request){
@@ -73,7 +76,8 @@ public final class JobAdmissionService {
             control.lockControl();
             // READ COMMITTED의 새 문장 snapshot으로 직전 커밋을 먼저 확인합니다.
             var existing=lookup.find(scope,request.idempotencyKey(),digest);if(existing.isPresent())return existing.get();
-            if(!recovery.ready()||!readiness.ready())throw new Rejected(503,"INFERENCE_UNAVAILABLE",60);
+            if(!recovery.ready())throw new Rejected(503,"INFERENCE_UNAVAILABLE",60);
+            var inferenceBlock=inferenceBlock();if(inferenceBlock.isPresent())throw new Rejected(503,inferenceBlock.get().name(),60);
             int queued=queue.count("QUEUED");if(queued>=capacity.queuedDepth())throw new Rejected(503,"QUEUE_FULL",60);
             hooks.ifPresent(TestHookRegistry::beginAdmission);
             String conversation=request.conversationId();
@@ -97,6 +101,11 @@ public final class JobAdmissionService {
             // 최후 방어는 실패 tx가 완전히 rollback된 뒤에만 재조회합니다.
             return lookup.find(scope,request.idempotencyKey(),digest).orElseThrow(()->duplicate);
         }
+    }
+    /** 추론 활성 시 readiness 상태 이름의 errorCode, 비활성 단계는 기존 INFERENCE_UNAVAILABLE 이다(SPEC §14.6 닫힌 네 값). */
+    private Optional<AdmissionErrorCode> inferenceBlock(){
+        if(inferenceStates.isPresent())return inferenceStates.get().admissionBlock();
+        return readiness.ready()?Optional.empty():Optional.of(AdmissionErrorCode.INFERENCE_UNAVAILABLE);
     }
     private void pause(PausePointRegistry.Point point,String key){
         if(pauses.isEmpty())return;

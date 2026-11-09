@@ -41,7 +41,7 @@ public final class ManualRecorder {
         record.put("labels", labels); record.put("result", verdict); record.put("buildIdentity", manifest.path("buildIdentity"));
         ObjectNode result = EvidenceRecord.create(binding, record); EvidenceRecord.validate(result, catalog); repository.store(result); return result;
     }
-    private Object typed(String type, String value) {
+    static Object typed(String type, String value) {
         try {
             return switch (type) {
                 case "boolean" -> { if (!Set.of("true", "false").contains(value)) throw invalid(); yield Boolean.parseBoolean(value); }
@@ -54,7 +54,7 @@ public final class ManualRecorder {
                 case "addresses", "readiness" -> {
                     JsonNode values = Json.parse(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)); if (!values.isArray()) throw invalid();
                     List<String> list = new ArrayList<>(); for (JsonNode item : values) {
-                        if (!item.isTextual() || !(type.equals("addresses") ? item.asText().matches("(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::\\]):[0-9]{1,5}") : Set.of("READY", "MODEL_LOADING", "INFERENCE_UNAVAILABLE", "MODEL_CONTEXT_MISMATCH").contains(item.asText()))) throw invalid();
+                        if (!item.isTextual() || !(type.equals("addresses") ? item.asText().matches("(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::\\]):[0-9]{1,5}") : Set.of("READY", "MODEL_LOADING", "INFERENCE_UNAVAILABLE", "MODEL_CONTEXT_MISMATCH", "MODEL_DIGEST_MISMATCH").contains(item.asText()))) throw invalid();
                         list.add(item.asText());
                     } yield list;
                 }

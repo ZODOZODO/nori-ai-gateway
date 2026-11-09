@@ -18,7 +18,9 @@ public final class AppProcessHarness implements AutoCloseable {
     private Process process;private int port;
     public AppProcessHarness(String sentinel){watch(sentinel);}
     public void watch(String sentinel){if(sentinel!=null&&!sentinel.isBlank()&&!sentinels.contains(sentinel))sentinels.add(sentinel);}
-    public Process launch(Path state,Map<String,String> properties,String fingerprintOverride)throws Exception{
+    public Process launch(Path state,Map<String,String> properties,String fingerprintOverride)throws Exception{return launch(state,properties,fingerprintOverride,Map.of());}
+    /** environment 는 최소 OS 변수 위에 시험이 명시한 자식 환경변수만 더한다(예: 자동 채택 금지 확인용 OPENAI_*). */
+    public Process launch(Path state,Map<String,String> properties,String fingerprintOverride,Map<String,String> environment)throws Exception{
         String classpath=System.getProperty("aigw.harness.classpath"),javaExe=System.getProperty("aigw.harness.javaExe");
         if(classpath==null||classpath.isBlank()||javaExe==null||!Files.isRegularFile(Path.of(javaExe)))throw new IllegalStateException("현재 Test task의 하네스 인자가 필요합니다");
         Files.createDirectories(state);Files.deleteIfExists(state.resolve("harness-ready.json"));
@@ -34,6 +36,7 @@ public final class AppProcessHarness implements AutoCloseable {
         for(String name:List.of("PATH","Path","SystemRoot","SYSTEMROOT","WINDIR","TEMP","TMP","USERPROFILE","HOME","LANG","LC_ALL")){
             String value=System.getenv(name);if(value!=null)env.put(name,value);
         }
+        env.putAll(environment);
         builder.redirectErrorStream(true);process=builder.start();children.add(process);var child=process;
         readers.submit(()->{try(var input=new java.io.BufferedReader(new java.io.InputStreamReader(child.getInputStream(),StandardCharsets.UTF_8))){String line;while((line=input.readLine())!=null){boolean found=false;for(String sentinel:sentinels)found|=line.contains(sentinel);if(found)sentinelCount.incrementAndGet();}}catch(java.io.IOException failure){if(child.isAlive())throw new IllegalStateException("자식 출력 검사에 실패했습니다");}});
         return process;

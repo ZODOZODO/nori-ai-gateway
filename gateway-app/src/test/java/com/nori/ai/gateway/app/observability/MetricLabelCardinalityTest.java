@@ -48,6 +48,22 @@ class MetricLabelCardinalityTest {
                 MetricsCatalog.RETENTION_PURGED_ROWS + "[tag(kind=conversation)]", "hikaricp.connections.pending[tag(pool=HikariPool-1)]");
     }
 
+    @Test void inferenceReadinessAlertAndRejectionLabelsIncludeTheDigestMismatchAndNothingElse() {
+        var registry = new SimpleMeterRegistry();
+        registry.config().meterFilter(MetricsCatalog.filter(REGISTRY));
+        Counter.builder("aigw.jobs.rejected").tags("owner_system", "TC", "reason", "MODEL_DIGEST_MISMATCH").register(registry).increment();
+        io.micrometer.core.instrument.Gauge.builder("aigw.inference.readiness.state", () -> 1).tag("state", "MODEL_DIGEST_MISMATCH").register(registry);
+        io.micrometer.core.instrument.Gauge.builder("aigw.inference.readiness.state", () -> 0).tag("state", "READY").register(registry);
+        io.micrometer.core.instrument.Gauge.builder("aigw.inference.alert", () -> 1).tag("state", "MODEL_DIGEST_MISMATCH").register(registry);
+        // 경보는 비READY 상태만, 사유(ENDPOINT_ERROR)는 state 라벨 값이 아니다.
+        io.micrometer.core.instrument.Gauge.builder("aigw.inference.alert", () -> 0).tag("state", "READY").register(registry);
+        io.micrometer.core.instrument.Gauge.builder("aigw.inference.readiness.state", () -> 0).tag("state", "ENDPOINT_ERROR").register(registry);
+        Counter.builder("aigw.jobs.rejected").tags("owner_system", "TC", "reason", "MODEL_DIGEST").register(registry).increment();
+        assertThat(registry.getMeters().stream().map(meter -> meter.getId().getName() + meter.getId().getTags())).containsExactlyInAnyOrder(
+            "aigw.jobs.rejected[tag(owner_system=TC), tag(reason=MODEL_DIGEST_MISMATCH)]", "aigw.inference.readiness.state[tag(state=MODEL_DIGEST_MISMATCH)]",
+            "aigw.inference.readiness.state[tag(state=READY)]", "aigw.inference.alert[tag(state=MODEL_DIGEST_MISMATCH)]");
+    }
+
     @Test void sourceTimerKeepsOnlyTheThreeSourceTagsAndUsesTheCatalogBuckets() {
         var registry = new SimpleMeterRegistry();
         registry.config().meterFilter(MetricsCatalog.filter(REGISTRY));
