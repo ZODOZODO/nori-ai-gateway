@@ -27,6 +27,7 @@ public class WorkflowSourceFixture {
         final java.util.concurrent.ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();
         final SimpleMeterRegistry meters=new SimpleMeterRegistry();
         final AtomicInteger logs=new AtomicInteger(),traces=new AtomicInteger(),stopped=new AtomicInteger();
+        final List<String> requestDigests=new CopyOnWriteArrayList<>();
         final List<String> codeRefs=new CopyOnWriteArrayList<>(),pipelines=new CopyOnWriteArrayList<>();
         final AtomicInteger lineageTraces=new AtomicInteger(),commits=new AtomicInteger();
         volatile List<String> traceVersions=List.of();
@@ -40,13 +41,15 @@ public class WorkflowSourceFixture {
         volatile Runnable afterStop=()->{};
         volatile java.util.function.Consumer<String> afterHttpStop=ignored->{};
         final SourceObservability observations;
-        public Server() throws java.io.IOException {
+        public Server() throws java.io.IOException {this(Optional.empty());}
+        public Server(Optional<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probe) throws java.io.IOException {
             server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
             server.createContext("/",exchange->{
                 String body;
                 if(exchange.getRequestURI().getPath().startsWith("/loki/")) {
                     logs.incrementAndGet();var query=query(exchange.getRequestURI());String selector=query.get("query");
                     String app=LokiSourcePolicy.APPS.stream().filter(value->selector.contains("app=\""+value+"\"")).findFirst().orElseThrow();
+                    try{requestDigests.add(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest((app+"\n"+"tc"+"\n"+query.get("start")+"\n"+query.get("end")).getBytes(java.nio.charset.StandardCharsets.UTF_8))));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
                     // 실제 전달된 나노초 창의 첫 instant만 응답하므로 서버 fixture가 창을 축소하지 않습니다.
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("status","success","data",Map.of("resultType","streams","result",List.of(Map.of("stream",Map.of("app",app,"namespace","tc"),"values",List.of(List.of(query.get("start"),logText)))))));
                 } else if(exchange.getRequestURI().getPath().equals("/api/search")) {
@@ -74,7 +77,9 @@ public class WorkflowSourceFixture {
             server.setExecutor(executor);server.start();
             observations=SourceObservability.create(meters,new ObservationHandler<ClientRequestObservationContext>() {
                 @Override public boolean supportsContext(Observation.Context context){return context instanceof ClientRequestObservationContext;}
+                @Override public void onStart(ClientRequestObservationContext context){probe.ifPresent(value->value.onStart(context));}
                 @Override public void onStop(ClientRequestObservationContext context) {
+                    probe.ifPresent(value->value.onStop(context));
                     stopped.incrementAndGet();
                     afterStop.run();
                     afterHttpStop.accept(context.getCarrier().getURI().getPath());
@@ -97,7 +102,7 @@ public class WorkflowSourceFixture {
         void blockNext(){entered=new CountDownLatch(1);release=new CountDownLatch(1);ended=new CountDownLatch(1);blockNextStop.set(true);}
         @Override public void close(){release.countDown();server.stop(0);executor.close();meters.close();}
     }
-    @Bean Server workflowSourceServer() throws java.io.IOException{return new Server();}
+    @Bean Server workflowSourceServer(org.springframework.beans.factory.ObjectProvider<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probe) throws java.io.IOException{return new Server(Optional.ofNullable(probe.getIfAvailable()));}
     // P14 실제 보존 reader Bean과 함께 등록되므로 이 fixture의 고정 관측을 명시 우선합니다(Source 조립 경로 시험은 실제 reader를 씁니다).
     @Bean @org.springframework.context.annotation.Primary SourceRetentionReader workflowTestRetention(Clock clock){return source->Optional.of(new SourceRetentionReader.VerifiedOldest(P09QueueSupport.NOW.minus(Duration.ofDays(7)),clock.instant()));}
     @Bean LokiLogConnector workflowLoki(Server server,SourceAuthorizationStep authorization,Clock clock,SourceRetentionReader retention,LokiProperties properties){return new LokiLogConnector(new SourceHttpClient(server.base(),"loki",server.observations),new SourceReadAccess(authorization,clock),retention,properties,clock);}

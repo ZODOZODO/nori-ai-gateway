@@ -109,7 +109,7 @@ class AppContextWiringIT extends StackContextSupport {
         assertThat(context.getBean(DispatchInjectionSeam.class)).isExactlyInstanceOf(DispatchInjectionSeam.NoOp.class);
         assertThat(context.getBeansOfType(ToolExecutor.class).values()).extracting(ToolExecutor::toolKind).containsExactlyInAnyOrder(ToolKind.BUSINESS,ToolKind.LOG,ToolKind.TRACE,ToolKind.GIT);
         var loader=context.getBean(ManifestLoader.class);var manifests=loader.loadClasspath("manifests/tc/index.json");
-        assertThat(manifests).hasSize(9);
+        assertThat(manifests).hasSize(10);
         var now=Instant.now();var scope=new VerifiedSystemScope(OwnerSystem.TC,"service",new ActorRef("actor"),"actor",Set.of("EQP_READ","DLQ_READ","MODEL_READ","AI_LOG_READ","AI_TRACE_READ","AI_CODE_READ","AI_DOC_READ"),"digest",now.minusSeconds(1),now.plusSeconds(60),"request");
         var registry=context.getBean(CapabilityRegistry.class);var view=registry.view(scope);
         assertThat(view.ownerSystem()).isEqualTo(scope.boundSystem());

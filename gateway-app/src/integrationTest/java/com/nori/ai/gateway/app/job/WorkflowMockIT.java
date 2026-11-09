@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 class WorkflowMockIT extends P09QueueSupport {
     @Override protected Class<?>[] extraSources(){return new Class<?>[]{HarnessObservationsEndpoint.class,WorkflowSourceFixture.class};}
     @Override protected com.nori.ai.gateway.core.scope.VerifiedSystemScope scope(String actor) {
-        var original=super.scope(actor);return new com.nori.ai.gateway.core.scope.VerifiedSystemScope(original.boundSystem(),original.authenticatedServiceRef(),original.actorRef(),original.sub(),Set.of("EQP_READ","MODEL_READ","DLQ_READ","AI_LOG_READ","AI_TRACE_READ","AI_CODE_READ","AI_DOC_READ"),original.pdg(),original.issuedAt(),original.expiresAt(),original.requestId());
+        var original=super.scope(actor);return new com.nori.ai.gateway.core.scope.VerifiedSystemScope(original.boundSystem(),original.authenticatedServiceRef(),original.actorRef(),original.sub(),Set.of("EQP_READ","COMM_LOG_READ","MODEL_READ","DLQ_READ","AI_LOG_READ","AI_TRACE_READ","AI_CODE_READ","AI_DOC_READ"),original.pdg(),original.issuedAt(),original.expiresAt(),original.requestId());
     }
     @Override protected Map<String,Object> claims(String actor,String delegation){var values=new HashMap<>(super.claims(actor,delegation));values.put("perm",scope(actor).perm().stream().sorted().toList());return values;}
     protected JobAdmissionService.Accepted admit(TaskType task,String key,String conversation,Map<String,Object> fields) {
@@ -40,7 +40,7 @@ class WorkflowMockIT extends P09QueueSupport {
         var pdgs=jdbc().sql("SELECT DISTINCT pdg FROM gw.cache_entry WHERE conversation_id=:conversation").param("conversation",first.conversationId()).query(String.class).list();assertThat(pdgs).doesNotContain(P09TestPorts.PDG).allSatisfy(value->assertThat(value).matches("[0-9a-f]{64}"));
         calls().reset();var second=admit(TaskType.INCIDENT_ANALYSIS,"cache-second",first.conversationId(),workflowFields());await(()->state(second.jobId()).equals("SUCCEEDED"));
         assertThat(server.logs).hasValue(4);assertThat(server.traces).hasValue(4);assertThat(calls().authorizationRequests()).contains(Set.of("AI_LOG_READ"),Set.of("AI_TRACE_READ"));
-        assertThat(jdbc().sql("SELECT capability_id FROM gw.tool_execution WHERE job_id=:job").param("job",second.jobId()).query(String.class).list()).containsExactlyInAnyOrder("tc.eqp.getOperationalSnapshot","tc.dlq.list");
+        assertThat(jdbc().sql("SELECT capability_id FROM gw.tool_execution WHERE job_id=:job").param("job",second.jobId()).query(String.class).list()).containsExactlyInAnyOrder("tc.eqp.getOperationalSnapshot","tc.commLogs.search","tc.dlq.list");
         var secondIds=jdbc().sql("SELECT id FROM gw.evidence WHERE job_id=:job ORDER BY id").param("job",second.jobId()).query(String.class).list();assertThat(secondIds).hasSameSizeAs(firstIds).doesNotContainAnyElementsOf(firstIds);
         assertThat(payload(first.jobId()).toString()).isEqualTo(saved);assertThat(payload(second.jobId()).path("evidence")).hasSize(secondIds.size());
         for(var accepted:List.of(first,second)) {
@@ -109,7 +109,7 @@ class WorkflowMockIT extends P09QueueSupport {
     }
     @Test void runtimeOverlongLogTermsAndARealMissingResourceReturnOnlyClarificationWithoutLosingCallHistory() throws Exception {
         var server=context.getBean(WorkflowSourceFixture.Server.class);server.logText="EQP-001 ERROR_"+"A".repeat(256);var longQ=admit(TaskType.INCIDENT_ANALYSIS,"long-summary-q",null,workflowFields());await(()->state(longQ.jobId()).equals("FAILED"));
-        var invalid=payload(longQ.jobId());assertThat(invalid.properties().stream().map(Map.Entry::getKey)).containsExactly("clarification");assertThat(invalid.path("clarification").path("reason").asString()).isEqualTo("INPUT_BUDGET_EXCEEDED");assertThat(server.logs).hasValue(4);assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job").param("job",longQ.jobId()).query(Integer.class).single()).isEqualTo(4);assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence WHERE job_id=:job").param("job",longQ.jobId()).query(Integer.class).single()).isZero();
+        var invalid=payload(longQ.jobId());assertThat(invalid.properties().stream().map(Map.Entry::getKey)).containsExactly("clarification");assertThat(invalid.path("clarification").path("reason").asString()).isEqualTo("INPUT_BUDGET_EXCEEDED");assertThat(server.logs).hasValue(4);assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job").param("job",longQ.jobId()).query(Integer.class).single()).isEqualTo(5);assertThat(jdbc().sql("SELECT count(*) FROM gw.evidence WHERE job_id=:job").param("job",longQ.jobId()).query(Integer.class).single()).isZero();
         calls().reset();var missing=admit(TaskType.LIVE_QUERY,"missing-resource",null,fields("EQP-NOT-FOUND","2026-11-05T23:00:00Z","2026-11-05T23:30:00Z"));await(()->state(missing.jobId()).equals("FAILED"));var absent=payload(missing.jobId());assertThat(absent.properties().stream().map(Map.Entry::getKey)).containsExactly("clarification");assertThat(absent.path("clarification").path("reason").asString()).isEqualTo("RESOURCE_NOT_FOUND");assertThat(calls().count("getEqpSnapshot")).isZero();assertThat(jdbc().sql("SELECT count(*) FROM gw.tool_execution WHERE job_id=:job").param("job",missing.jobId()).query(Integer.class).single()).isZero();
     }
 

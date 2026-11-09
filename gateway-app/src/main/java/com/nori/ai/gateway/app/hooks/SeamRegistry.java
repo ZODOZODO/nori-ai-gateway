@@ -10,7 +10,7 @@ import java.util.*;
 import tools.jackson.databind.node.ObjectNode;
 
 public final class SeamRegistry implements PlanInjectionSeam, DispatchInjectionSeam {
-    public enum Kind { PLANNED, DISABLED, PHASE_INACTIVE, SIDE_EFFECTS, OWNER_OVERRIDE, RESOURCE_OWNER_OVERRIDE,
+    public enum Kind { PLANNED, UNSUPPORTED, DISABLED, PHASE_INACTIVE, SIDE_EFFECTS, OWNER_OVERRIDE, DISPATCH_OWNER_OVERRIDE, RESOURCE_OWNER_OVERRIDE,
         SOURCE_ALLOWLIST_REF_OVERRIDE, PERMISSION_MAP_DROP }
     public record Directive(Kind kind, String capabilityId, String sourceId, OwnerSystem ownerSystem) {
         public Directive { Objects.requireNonNull(kind); }
@@ -27,7 +27,7 @@ public final class SeamRegistry implements PlanInjectionSeam, DispatchInjectionS
             if (directive.capabilityId() != null || directive.ownerSystem() != null || directive.sourceId() == null || permissions.find(directive.sourceId()).isEmpty())
                 throw new IllegalArgumentException("주입 대상이 잘못되었습니다");
         } else if (directive.capabilityId() == null || !capabilities.contains(directive.capabilityId()) || directive.sourceId() != null
-                || ((directive.kind() == Kind.OWNER_OVERRIDE || directive.kind() == Kind.RESOURCE_OWNER_OVERRIDE
+                || ((directive.kind() == Kind.OWNER_OVERRIDE || directive.kind() == Kind.DISPATCH_OWNER_OVERRIDE || directive.kind() == Kind.RESOURCE_OWNER_OVERRIDE
                      || directive.kind() == Kind.SOURCE_ALLOWLIST_REF_OVERRIDE) ? directive.ownerSystem() != OwnerSystem.WM : directive.ownerSystem() != null))
             throw new IllegalArgumentException("주입 대상이 잘못되었습니다");
     }
@@ -42,6 +42,7 @@ public final class SeamRegistry implements PlanInjectionSeam, DispatchInjectionS
         ObjectNode copy = SchemaContracts.JSON.valueToTree(manifest);
         switch (directive.get().kind()) {
             case PLANNED -> copy.put("availability", "PLANNED");
+            case UNSUPPORTED -> copy.put("availability", "UNSUPPORTED");
             case DISABLED -> copy.put("availability", "DISABLED");
             case PHASE_INACTIVE -> copy.put("implementationPhase", "PHASE_2");
             case SIDE_EFFECTS -> copy.put("requiresApproval", true);
@@ -61,6 +62,13 @@ public final class SeamRegistry implements PlanInjectionSeam, DispatchInjectionS
             case RESOURCE_OWNER_OVERRIDE -> new DispatchTarget(target.tool(), target.resources().stream()
                 .map(resource -> resource == null ? null : new ResourceResolver.ResourceState(OwnerSystem.WM, resource.type(), resource.exists())).toList(), target.source());
             case OWNER_OVERRIDE -> new DispatchTarget(inspect(target.tool(), scope), target.resources(), target.source());
+            case DISPATCH_OWNER_OVERRIDE -> {
+                ObjectNode copy = SchemaContracts.JSON.valueToTree(target.tool());
+                copy.put("ownerSystem", "WM").put("toolId", target.tool().toolId().replaceFirst("^tc\\.", "wm."))
+                    .put("capabilityId", target.tool().capabilityId().replaceFirst("^tc\\.", "wm."))
+                    .put("sourceAllowlistRef", target.tool().sourceAllowlistRef().replace("sources://TC/", "sources://WM/"));
+                yield new DispatchTarget(SchemaContracts.JSON.treeToValue(copy, CapabilityManifest.class), target.resources(), target.source());
+            }
             default -> target;
         };
     }

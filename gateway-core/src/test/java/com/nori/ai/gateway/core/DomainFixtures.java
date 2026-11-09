@@ -18,7 +18,7 @@ final class DomainFixtures {
     static final Instant NOW = Instant.parse("2026-11-05T00:00:00Z");
     static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
     static final String ID = "tc.eqp.getOperationalSnapshot";
-    static VerifiedSystemScope scope() { return scope(OwnerSystem.TC, Set.of("EQP_READ", "DLQ_READ", "AI_LOG_READ", "AI_TRACE_READ", "AI_CODE_READ", "AI_DOC_READ", "MODEL_READ")); }
+    static VerifiedSystemScope scope() { return scope(OwnerSystem.TC, Set.of("EQP_READ", "COMM_LOG_READ", "DLQ_READ", "AI_LOG_READ", "AI_TRACE_READ", "AI_CODE_READ", "AI_DOC_READ", "MODEL_READ")); }
     static VerifiedSystemScope scope(OwnerSystem owner, Set<String> perms) {
         return new VerifiedSystemScope(owner, "service", new ActorRef("actor"), "actor", perms, "digest", NOW.minusSeconds(60), NOW.plusSeconds(60), "request");
     }

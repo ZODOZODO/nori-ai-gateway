@@ -34,7 +34,7 @@ P10 합류 뒤 `/v1/query`와 결과 GET은 제품 API를 사용합니다. P09 w
 | POST `/__test/tcmock/scenario` | 정확히 `{id}` → 등록된 시나리오 선택204, 미등록/추가 필드400 |
 | GET `/__test/tcmock/scenario` | `{id}`만 반환 |
 | GET `/__test/tcmock/calls` | operation별 호출 건수만 반환 |
-| POST `/__test/arm`의 `scenario.seam` | optional `{kind,capabilityId?,sourceId?,ownerSystem?}`. PLANNED/DISABLED/PHASE_INACTIVE/SIDE_EFFECTS는 알려진 capabilityId만, OWNER_OVERRIDE/RESOURCE_OWNER_OVERRIDE/SOURCE_ALLOWLIST_REF_OVERRIDE는 알려진 capabilityId와 ownerSystem=WM만, PERMISSION_MAP_DROP은 알려진 sourceId만 허용 |
+| POST `/__test/arm`의 `scenario.seam` | optional `{kind,capabilityId?,sourceId?,ownerSystem?}`. PLANNED/UNSUPPORTED/DISABLED/PHASE_INACTIVE/SIDE_EFFECTS는 알려진 capabilityId만, OWNER_OVERRIDE/DISPATCH_OWNER_OVERRIDE/RESOURCE_OWNER_OVERRIDE/SOURCE_ALLOWLIST_REF_OVERRIDE는 알려진 capabilityId와 ownerSystem=WM만, PERMISSION_MAP_DROP은 알려진 sourceId만 허용 |
 
 위 경로는 모두 기존 verify+enabled 조건과 동일한 hook 토큰 필터를 사용합니다. 위임은 Gateway Clock의 발급 시각+300초 절대 TTL이며 재등록·reset·프로세스 재기동으로 연장되지 않습니다. `ai.gateway.tcmock.state-dir`의 delegations.json은 SHA256 키와 sub/issuedAt/expiresAt/revoked만, scenario.json은 선택 ID만 원자 저장합니다. 초기 파일 읽기는 eager singleton 생성에서 수행되어 RecoveryModeRouter 실행보다 앞섭니다. state-dir는 verify에서만 허용하고 prod 동시 활성·빈 값·잘못된 경로는 singleton 파일 I/O 전에 거부합니다.
 
@@ -47,3 +47,7 @@ seam directive는 기존 접수 전 arm과 Job별 tx 결속 수명을 공유합�
 | POST `/__test/egress-probe` | `{targetId}` 만 사용(본문의 다른 필드·호스트·포트 무시). 차트가 렌더한 `{release}-egress-probe` ConfigMap 파일(`ai.gateway.test-hooks.egress-targets-file`, JSON 배열 `[{id,host,port,expect}]`)의 id 이면 Gateway Pod 안에서 TCP connect 1회(timeout 3s, 본문 송신 0) → 200 `{targetId, connected, errorClass}`(errorClass = null·`TIMEOUT`·`REFUSED`·`UNRESOLVED`·`NO_ROUTE`·`IO_ERROR`, 주소 반환 0). 목록 밖 id·targetId 부재 404 |
 
 hook 은 verify+enabled 조건에 더해 목록 파일 설정이 있을 때만 등록된다(차트 verify 렌더는 항상 마운트, 형식 위반 파일은 기동 실패). 판정(ALLOWED/BLOCKED 대조)은 수용 하네스 `EgressProbeClient` 쪽 AC-35-EGRESS(P21) 몫이다.
+
+DISPATCH_OWNER_OVERRIDE는 Plan 단계 원본을 유지하며 해당 Job의 지정 capability를 Dispatcher 직전에만 WM 소유로 투영합니다. 기존 OWNER_OVERRIDE의 Plan/Dispatch 동작은 유지합니다.
+
+`GET /__test/source-observations/{jobId}`는 verify+enabled 및 기존 hook 토큰 인증 아래 실제 접수된 terminal Job의 Loki query_range 관측을 반환합니다. 실제 송신 직전 carrier에서 app·namespace·start/end를 정규화한 SHA-256과 건수·고정 상태만 메모리에 보존하며 URI·검색어·시간 원문·자격을 반환하거나 기록하지 않습니다. Job/capability별 완료 0회와 관측 부재를 구별하고, 미완료·오형식·상한 초과는 실패로 처리합니다. 다른 스레드·보존 탐침은 해당 Job에 섞지 않고 기존 idle reset 성공 시 함께 제거합니다. active reset 거부 시 관측은 보존합니다.

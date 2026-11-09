@@ -192,6 +192,15 @@ public class SourceConnectorConfiguration {
         public SourceObservability sourceObservability(MeterRegistry meters, OpenTelemetry openTelemetry) {
             return SourceObservability.create(meters, new SourceSpans(openTelemetry.getTracer("com.nori.ai.gateway.source")));
         }
+        public SourceObservability sourceObservability(MeterRegistry meters, OpenTelemetry openTelemetry, org.springframework.beans.factory.ObjectProvider<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probes) {
+            var probe=probes.getIfAvailable();if(probe==null)return sourceObservability(meters,openTelemetry);
+            var spans=new SourceSpans(openTelemetry.getTracer("com.nori.ai.gateway.source"));
+            return SourceObservability.create(meters,new ObservationHandler<ClientRequestObservationContext>() {
+                @Override public boolean supportsContext(Observation.Context context){return context instanceof ClientRequestObservationContext;}
+                @Override public void onStart(ClientRequestObservationContext context){spans.onStart(context);probe.onStart(context);}
+                @Override public void onStop(ClientRequestObservationContext context){try{probe.onStop(context);}finally{spans.onStop(context);}}
+            });
+        }
         public SourceHttpClient sourceHttpClient(SourceNode node, SourceObservability observability) {
             return new SourceHttpClient(node.baseUrl().orElseThrow(), node.sourceId(), observability);
         }

@@ -16,6 +16,8 @@ public final class TerminalOutcomeAssembler {
             return TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,rejected.errorCode(),Map.of("clarification",rejected.clarification()));
         }
         var payload=new LinkedHashMap<String,Object>();payload.put("blocks",outcome.blocks());payload.put("evidence",outcome.evidence());payload.put("trace",outcome.trace());
+        // 거부 사유는 닫힌 enum과 순번만 보존하며 확인 요청의 별도 비노출 분기는 그대로 둡니다.
+        outcome.rejection().filter(value->value.status()==ResultStatus.UNSUPPORTED).ifPresent(value->payload.put("validationTrace",value.trace()));
         var summary=new ArrayList<Map<String,Object>>();
         for(var stage:outcome.stages()) {
             var result=stage.result();

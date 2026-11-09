@@ -8,8 +8,9 @@ import org.springframework.context.annotation.*;
 @Configuration(proxyBeanMethods = false)
 @Profile("verify")
 @ConditionalOnProperty(name = "ai.gateway.test-hooks.enabled", havingValue = "true")
-@Import({MockDelegationController.class, MockScenarioController.class})
+@Import({MockDelegationController.class, MockScenarioController.class, SourceObservationController.class})
 public class MockHooksConfiguration {
+    @Bean @Profile("!prod") SourceRequestProbe sourceRequestProbe(TestHookRegistry hooks){return new SourceRequestProbe(hooks);}
     @Bean SeamRegistry seamRegistry(TestHookRegistry hooks, ManifestLoader loader, SourcePermissionMap permissions) {
         return new SeamRegistry(hooks, loader, permissions);
     }

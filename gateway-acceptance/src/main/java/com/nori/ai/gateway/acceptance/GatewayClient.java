@@ -47,13 +47,32 @@ public final class GatewayClient {
 
     /** Job 생성 요청: Mock 위임 등록 → Gateway 시계로 서명 → 접수. 응답 상태와 본문을 돌려준다. */
     public HttpResponse<String> submit(String path, String fixtureRequestId, Map<String,Object> claims, String dlg, String jsonBody) {
+        return submitObserved(path,fixtureRequestId,claims,dlg,jsonBody).response();
+    }
+    public record Submission(HttpResponse<String> response, Set<String> sentinels) {
+        public Submission { sentinels=Set.copyOf(sentinels); }
+        @Override public String toString(){return "Submission[보호됨]";}
+    }
+    public Submission submitObserved(String path, String fixtureRequestId, Map<String,Object> claims, String dlg, String jsonBody) {
         hooks.registerDelegation(String.valueOf(claims.get("sub")), dlg);
         var signed = new LinkedHashMap<>(claims); signed.put("dlg", dlg);
-        var request = authorized(path, signed).header("Idempotency-Key", idempotencyKey(fixtureRequestId)).header("Content-Type", "application/json")
+        String assertion=signer.sign(signed,hooks.clockNow());
+        var request = HttpRequest.newBuilder(base.resolve(path)).timeout(Duration.ofSeconds(30)).header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",assertion).header("Idempotency-Key", idempotencyKey(fixtureRequestId)).header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8)).build();
-        return send(request, path);
+        return new Submission(send(request, path),Set.of(dlg,serviceToken,assertion));
     }
     public HttpResponse<String> get(String path, Map<String,Object> claims) { return send(authorized(path, claims).GET().build(), path); }
+
+    /** 인입 음성 시험은 헤더를 정확히 하나씩 깨뜨려야 하므로 자동 보정 없이 전송합니다. */
+    public HttpResponse<String> request(String path, String assertion, String token, String body) {
+        return request("POST", path, assertion, token, body);
+    }
+    public HttpResponse<String> request(String method, String path, String assertion, String token, String body) {
+        var request = HttpRequest.newBuilder(base.resolve(path)).timeout(Duration.ofSeconds(30)).header("Content-Type", "application/json");
+        if (assertion != null) request.header("X-Actor-Assertion", assertion);
+        if (token != null) request.header("Authorization", "Bearer " + token);
+        return send(request.method(method, method.equals("GET") ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), path);
+    }
 
     private HttpRequest.Builder authorized(String path, Map<String,Object> claims) {
         Instant now = hooks.clockNow();

@@ -84,6 +84,7 @@ public final class AcceptanceMain {
         Path otr;
         try { otr = Files.createTempDirectory(temporary, "aigw-otr-"); } catch (IOException e) { throw new IllegalStateException("OTR_DIRECTORY"); }
         try {
+            F1RubricTargets.clear();
             EvidenceBlockWriter.Extraction extraction;
             try {
                 runner.run(suite, otr);
@@ -99,13 +100,15 @@ public final class AcceptanceMain {
                 return 4;
             }
             var records = new ArrayList<ObjectNode>(extraction.leaves());
-            records.add(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "COMPLETED", "executedTestCount", extraction.executed(),
-                "values", Map.of("leafRecordCount", extraction.leaves().size(), "passed", extraction.passed(), "failed", extraction.failed(),
-                    "skipped", extraction.skipped(), "aborted", extraction.aborted()))));
+            var completed = new LinkedHashMap<String,Object>();
+            completed.put("kind", "RUN"); completed.put("status", "COMPLETED"); completed.put("executedTestCount", extraction.executed());
+            completed.put("values", Map.of("leafRecordCount", extraction.leaves().size(), "passed", extraction.passed(), "failed", extraction.failed(), "skipped", extraction.skipped(), "aborted", extraction.aborted()));
+            if (suite.equals("F1")) completed.put("rubricTargets", F1RubricTargets.snapshot());
+            records.add(EvidenceBlockWriter.record(context, completed));
             EvidenceBlockWriter.write(out, records);
             // skip·abort 만 있는 실행도 성공이 아니다(leaf 는 NOT_RUN 으로 남는다).
             return extraction.failed() == 0 && extraction.aborted() == 0 && extraction.skipped() == 0 ? 0 : 1;
-        } finally { delete(otr); }
+        } finally { F1RubricTargets.clear(); delete(otr); }
     }
 
     static void launch(String suite, Path otrDirectory) {

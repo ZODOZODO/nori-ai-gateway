@@ -7,6 +7,17 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class OracleQueriesTest {
+    @Test void terminalJobAndEveryDuplicateCacheDigestRowAreScanned() {
+        var queries=new OracleQueries(database->(Connection)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
+            if(!m.getName().equals("prepareStatement"))return null;String sql=(String)a[0];
+            return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{PreparedStatement.class},(sp,sm,sa)->{
+                if(!sm.getName().equals("executeQuery"))return null;List<String[]> rows=sql.contains("FROM gw.cache_entry")?List.of(new String[]{"cache_entry:1","credential-sentinel"},new String[]{"cache_entry:2","{}"}):sql.contains("FROM gw.job t")?List.<String[]>of(new String[]{"job:terminal","credential-sentinel"}):List.of();var iterator=rows.iterator();
+                return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{ResultSet.class},new java.lang.reflect.InvocationHandler(){String[] row;public Object invoke(Object rp,java.lang.reflect.Method rm,Object[] ra){return switch(rm.getName()){case "next"->{boolean has=iterator.hasNext();if(has)row=iterator.next();yield has;}case "getString"->row[(int)ra[0]-1];default->null;};}});
+            });
+        }));
+        var report=queries.residueScan(Set.of("credential-sentinel"));assertThat(report.matches()).extracting(com.nori.ai.gateway.tcmock.verify.ResidueScanner.Match::location).contains("cache_entry:1","job:terminal");assertThat(report.toString()).doesNotContain("credential-sentinel");
+        assertThat(OracleQueries.Query.RESIDUE_CACHE_ENTRY.sql).contains("row_number() OVER (ORDER BY key_digest, owner_system, actor_ref, pdg)");
+    }
     /** SQL 은 enum 상수뿐이고 공개 API 어디에도 SQL 문자열 입력이 없다. */
     @Test void onlyNamedFixedQueriesExistAndNoneReadsVectorsOrBodiesOut() {
         for (var method : OracleQueries.class.getDeclaredMethods()) if (Modifier.isPublic(method.getModifiers()))
@@ -15,7 +26,8 @@ class OracleQueriesTest {
             String sql = query.sql.toLowerCase(Locale.ROOT);
             assertThat(sql).startsWith("select ").doesNotContain(";", "embedding", "vector", " kn.", "insert", "update", "delete", "drop", "alter", "grant");
             // 행 본문(row_to_json)은 residue 검사 안에서만 메모리로 쓰이며 반환 타입은 건수·위치뿐이다.
-            if (!query.name().startsWith("RESIDUE_")) assertThat(sql).doesNotContain("row_to_json", "content_masked", "payload");
+            if (!query.name().startsWith("RESIDUE_")&&!query.name().equals("TOOL_PROJECTION")) assertThat(sql).doesNotContain("row_to_json", "content_masked", "payload");
+            if(query.name().equals("TOOL_PROJECTION"))assertThat(sql).isEqualTo("select payload::text from gw.tool_execution where job_id = ? and capability_id = ? order by created_at, id");
         }
         assertThat(OracleQueries.DATABASES).containsExactlyInAnyOrder("ai_gateway", "postgres", "template1");
         var queries = new OracleQueries(database -> { throw new SQLException("unused", "08001"); });

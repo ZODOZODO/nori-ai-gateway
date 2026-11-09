@@ -18,11 +18,16 @@ public final class OracleQueries {
     public static final String DATABASE = "ai_gateway";
     static final Set<String> DATABASES = Set.of(DATABASE, "postgres", "template1");
     static final Set<String> JOB_STATUSES = Set.of("QUEUED", "RUNNING", "SUCCEEDED", "PARTIAL", "FAILED", "CANCELLED", "TIMED_OUT");
-    static final List<String> RESIDUE_TABLES = List.of("conversation", "message", "job_event", "result", "audit_event");
+    static final List<String> RESIDUE_TABLES = List.of("conversation", "message", "job", "job_event", "result", "audit_event", "tool_execution", "evidence", "cache_entry");
 
     enum Query {
         JOB_COUNT_BY_STATUS("SELECT count(*) FROM gw.job WHERE status = ?"),
         NON_TERMINAL_JOB_COUNT("SELECT count(*) FROM gw.job WHERE status IN ('QUEUED','RUNNING')"),
+        JOB_COUNT("SELECT count(*) FROM gw.job"),
+        AUTH_REJECTION("SELECT count(*) FROM gw.audit_event WHERE request_id = ? AND event_type = 'AUTH_REJECTED' AND decision = ? AND status = ?"),
+        TOOL_PROJECTION("SELECT payload::text FROM gw.tool_execution WHERE job_id = ? AND capability_id = ? ORDER BY created_at, id"),
+        OWNER_BLOCK_COUNT("SELECT count(*) FROM gw.audit_event WHERE job_id = ? AND event_type = 'TOOL_BLOCKED' AND decision = 'OWNER_MISMATCH'"),
+        SOURCE_BLOCK_COUNT("SELECT count(*) FROM gw.audit_event WHERE job_id = ? AND event_type = 'TOOL_BLOCKED' AND decision = 'SOURCE_NOT_ALLOWED'"),
         JOB_DELEGATION_NON_NULL("SELECT count(*) FROM gw.job WHERE delegation_id IS NOT NULL"),
         RESULT_ROW_COUNT("SELECT count(*) FROM gw.result WHERE job_id = ?"),
         EVENT_COUNT("SELECT count(*) FROM gw.job_event WHERE job_id = ? AND type = ?"),
@@ -31,6 +36,10 @@ public final class OracleQueries {
         JOB_TIMINGS("SELECT id, status, created_at, started_at, terminal_at FROM gw.job WHERE id = ANY (?) ORDER BY id"),
         RESIDUE_CONVERSATION("SELECT 'conversation:' || id, row_to_json(t)::text FROM gw.conversation t"),
         RESIDUE_MESSAGE("SELECT 'message:' || id, row_to_json(t)::text FROM gw.message t"),
+        RESIDUE_JOB("SELECT 'job:' || id, row_to_json(t)::text FROM gw.job t"),
+        RESIDUE_TOOL_EXECUTION("SELECT 'tool_execution:' || id, row_to_json(t)::text FROM gw.tool_execution t"),
+        RESIDUE_EVIDENCE("SELECT 'evidence:' || id, row_to_json(t)::text FROM gw.evidence t"),
+        RESIDUE_CACHE_ENTRY("SELECT 'cache_entry:' || row_number() OVER (ORDER BY key_digest, owner_system, actor_ref, pdg), row_to_json(t)::text FROM gw.cache_entry t"),
         RESIDUE_JOB_EVENT("SELECT 'job_event:' || id, row_to_json(t)::text FROM gw.job_event t"),
         RESIDUE_RESULT("SELECT 'result:' || job_id, row_to_json(t)::text FROM gw.result t"),
         RESIDUE_AUDIT_EVENT("SELECT 'audit_event:' || id, row_to_json(t)::text FROM gw.audit_event t");
@@ -39,6 +48,11 @@ public final class OracleQueries {
     }
     public record RetentionProbe(Optional<Instant> verifiedOldestAt, Optional<Instant> probeLimitAt, Instant probedAt) {}
     public record JobTiming(String jobId, String status, Instant createdAt, Optional<Instant> startedAt, Optional<Instant> terminalAt) {}
+    public record Range(Instant from, Instant to) {}
+    public record CommSource(String source, String status, int itemCount, Set<String> warnings, List<Range> missing, List<Range> unverified,
+            long count, long maximum, Optional<Instant> oldest, long retentionHours, boolean applied, boolean deletionPathsExcluded) {}
+    public record ToolObservation(String status, String errorCode, int itemCount, Set<String> warnings, Set<String> apps, Set<String> namespaces,
+            List<Range> missing, List<CommSource> sources, int blockCount, int evidenceCount, int claimCount, int citationCount, int composerInputCount) {}
 
     private final Connector connector;
     public OracleQueries(Connector connector) { this.connector = connector; }
@@ -72,6 +86,33 @@ public final class OracleQueries {
         return count(Query.JOB_COUNT_BY_STATUS, status);
     }
     public int nonTerminalJobCount() { return Math.toIntExact(count(Query.NON_TERMINAL_JOB_COUNT)); }
+    public long jobCount() { return count(Query.JOB_COUNT); }
+    public long ownerBlockCount(String job) { return count(Query.OWNER_BLOCK_COUNT,id(job)); }
+    public long sourceBlockCount(String job) { return count(Query.SOURCE_BLOCK_COUNT,id(job)); }
+    /** Tool 본문은 메모리에서만 투영하며 로그 텍스트·자격·업무 행은 밖으로 반환하지 않습니다. */
+    public List<ToolObservation> tools(String job,String capability) {
+        if(capability==null||!capability.matches("tc\\.[A-Za-z0-9.]{1,100}"))throw new IllegalArgumentException("CAPABILITY_INVALID");
+        return query(Query.TOOL_PROJECTION,rows->{var observations=new ArrayList<ToolObservation>();while(rows.next()) {
+            try {
+                var root=CanonicalJson.MAPPER.readTree(rows.getString(1));var result=root.path("result");
+                int itemCount=0;var apps=new TreeSet<String>();var namespaces=new TreeSet<String>();var sources=new ArrayList<CommSource>();
+                for(var block:result.path("blocks"))for(var item:block.path("content").path("items")) {
+                    itemCount++;if(item.has("app"))apps.add(item.path("app").asText());if(item.has("namespace"))namespaces.add(item.path("namespace").asText());
+                    if(capability.equals("tc.commLogs.search")) {
+                        var complete=item.path("completeness");String oldest=complete.path("oldestRetainedAt").asText("");
+                        sources.add(new CommSource(item.path("source").asText(),item.path("status").asText(),item.path("items").size(),strings(item.path("warnings")),ranges(item.path("retentionMeta").path("missingRanges")),ranges(item.path("retentionMeta").path("unverifiedRanges")),complete.path("count").asLong(-1),complete.path("maxEntriesPerKey").asLong(-1),oldest.isEmpty()?Optional.empty():Optional.of(Instant.parse(oldest)),complete.path("retentionHours").asLong(-1),complete.path("appliedValuesVerified").asBoolean(),complete.path("otherDeletionPathsExcluded").asBoolean()));
+                    }
+                }
+                observations.add(new ToolObservation(root.path("status").asText(),root.path("errorCode").asText(""),itemCount,strings(result.path("warnings")),Set.copyOf(apps),Set.copyOf(namespaces),ranges(result.path("metadata").path("missingRanges")),List.copyOf(sources),result.path("blocks").size(),result.path("evidence").size(),result.path("claims").size(),result.path("citations").size(),result.path("composerInputs").size()));
+            }catch(java.io.IOException|java.time.DateTimeException invalid){throw new IllegalStateException("ORACLE_TOOL_INVALID");}
+        }return List.copyOf(observations);},id(job),capability);
+    }
+    private static Set<String> strings(com.fasterxml.jackson.databind.JsonNode values){var result=new TreeSet<String>();values.forEach(value->result.add(value.asText()));return Set.copyOf(result);}
+    private static List<Range> ranges(com.fasterxml.jackson.databind.JsonNode values){var result=new ArrayList<Range>();for(var value:values){String from=value.path("from").asText(value.path("startAt").asText());String to=value.path("to").asText(value.path("endAt").asText());result.add(new Range(Instant.parse(from),Instant.parse(to)));}return List.copyOf(result);}
+    public long authRejectionCount(String requestId, String decision, int status) {
+        if (decision == null || !decision.matches("[A-Z_]{1,64}") || status < 400 || status > 599) throw new IllegalArgumentException("AUTH_REJECTION_INVALID");
+        return count(Query.AUTH_REJECTION, id(requestId), decision, Integer.toString(status));
+    }
     public long jobDelegationNonNull() { return count(Query.JOB_DELEGATION_NON_NULL); }
     public long resultRowCount(String jobId) { return count(Query.RESULT_ROW_COUNT, id(jobId)); }
     public long eventCount(String jobId, String type) {
@@ -102,7 +143,8 @@ public final class OracleQueries {
     /** 고정 표의 행 텍스트를 메모리에서만 sentinel 검사한다. 반환 = 일치 건수·위치(표:ID). */
     public ResidueScanner.Report residueScan(Set<String> sentinels) {
         var sources = new LinkedHashMap<String,String>();
-        for (Query query : List.of(Query.RESIDUE_CONVERSATION, Query.RESIDUE_MESSAGE, Query.RESIDUE_JOB_EVENT, Query.RESIDUE_RESULT, Query.RESIDUE_AUDIT_EVENT))
+        for (Query query : List.of(Query.RESIDUE_CONVERSATION, Query.RESIDUE_MESSAGE, Query.RESIDUE_JOB, Query.RESIDUE_TOOL_EXECUTION,
+                Query.RESIDUE_EVIDENCE, Query.RESIDUE_CACHE_ENTRY, Query.RESIDUE_JOB_EVENT, Query.RESIDUE_RESULT, Query.RESIDUE_AUDIT_EVENT))
             query(query, rows -> { while (rows.next()) sources.put(rows.getString(1), rows.getString(2)); return null; });
         return ResidueScanner.scan(sources, sentinels);
     }

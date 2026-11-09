@@ -11,9 +11,19 @@
       "cacheable": false
     },
     {
-      "stepId": "logs",
+      "stepId": "commLogs",
       "dependsOn": [
         "snapshot"
+      ],
+      "optional": false,
+      "includeWhen": [],
+      "capabilityId": "tc.commLogs.search",
+      "cacheable": false
+    },
+    {
+      "stepId": "logs",
+      "dependsOn": [
+        "commLogs"
       ],
       "optional": false,
       "includeWhen": [],

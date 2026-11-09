@@ -1,0 +1,296 @@
+{
+  "toolId": "tc.commLogs.search",
+  "capabilityId": "tc.commLogs.search",
+  "contractVersion": "1.0",
+  "ownerSystem": "TC",
+  "toolKind": "BUSINESS",
+  "sourceAllowlistRef": "sources://TC/comm-log-backend",
+  "availability": "IMPLEMENTED",
+  "implementationPhase": "PHASE_1",
+  "description": "설비별 Gateway·Business 통신 로그와 Source별 보존 완전성 조회",
+  "exampleQuestions": [],
+  "riskLevel": "READ",
+  "operation": "READ",
+  "sideEffects": "NONE",
+  "resourceScope": "AUTHENTICATED_ACTOR",
+  "resourceTypes": [
+    "EQP"
+  ],
+  "requiredPermission": [
+    "COMM_LOG_READ"
+  ],
+  "requiredActorScope": "READ",
+  "requiresApproval": false,
+  "supportsAsync": false,
+  "supportsCancel": false,
+  "idempotent": true,
+  "retryPolicy": {
+    "maxAttempts": 1,
+    "backoffMs": 0
+  },
+  "inputSchemaRef": "schema://TC/tc.commLogs.search/input/1.0",
+  "outputSchemaRef": "schema://TC/tc.commLogs.search/output/1.0",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "eqp": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "x-resourceType": "EQP"
+      },
+      "from": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 35
+      },
+      "to": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 35
+      }
+    },
+    "required": [
+      "eqp",
+      "from",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "enum": [
+                "gateway",
+                "business"
+              ]
+            },
+            "status": {
+              "enum": [
+                "SUCCESS",
+                "EMPTY",
+                "PARTIAL",
+                "OUT_OF_RETENTION",
+                "SOURCE_UNAVAILABLE"
+              ]
+            },
+            "observedAt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 35
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "occurredAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 35
+                  },
+                  "direction": {
+                    "type": "string"
+                  },
+                  "messageType": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "occurredAt",
+                  "direction",
+                  "messageType"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "completeness": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "available": {
+                  "type": "boolean"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "maxEntriesPerKey": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "oldestRetainedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "retentionHours": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "appliedValuesVerified": {
+                  "type": "boolean"
+                },
+                "otherDeletionPathsExcluded": {
+                  "type": "boolean"
+                },
+                "truncatedRanges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "startAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      },
+                      "endAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      }
+                    },
+                    "required": [
+                      "startAt",
+                      "endAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "available",
+                "count",
+                "maxEntriesPerKey",
+                "oldestRetainedAt",
+                "retentionHours",
+                "appliedValuesVerified",
+                "otherDeletionPathsExcluded",
+                "truncatedRanges"
+              ],
+              "additionalProperties": false
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "RETENTION_UNVERIFIED",
+                  "LLM_UNAVAILABLE"
+                ]
+              }
+            },
+            "retentionMeta": {
+              "type": "object",
+              "properties": {
+                "missingRanges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "startAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      },
+                      "endAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      }
+                    },
+                    "required": [
+                      "startAt",
+                      "endAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "unverifiedRanges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "startAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      },
+                      "endAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 35
+                      }
+                    },
+                    "required": [
+                      "startAt",
+                      "endAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "missingRanges",
+                "unverifiedRanges"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "source",
+            "status",
+            "observedAt",
+            "items",
+            "completeness",
+            "warnings",
+            "retentionMeta"
+          ],
+          "additionalProperties": false
+        },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "additionalProperties": false
+  },
+  "schemaDigest": "ca60ed4fee196fcfd6efd3905049a0a2af5a230b102d2b55718d7cd00676448b",
+  "timeoutMs": 10000,
+  "maxResourcesPerCall": 1,
+  "inputLimits": {
+    "eqp": {
+      "maxChars": 64,
+      "charUnit": "CODEPOINT",
+      "format": "TC_EQP_ID",
+      "status": "CONFIRMED"
+    },
+    "from": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    },
+    "to": {
+      "maxChars": 35,
+      "charUnit": "CODEPOINT",
+      "format": "DATETIME:uuuu-MM-dd'T'HH:mm:ss.SSSSSSSSSxxx",
+      "status": "CONFIRMED"
+    }
+  },
+  "auditPolicy": "METADATA_ONLY",
+  "adapterVersion": "mock-contract-1.0",
+  "sourceFreshnessPolicy": "LIVE",
+  "outputRefType": "RESULT",
+  "cost": 1
+}

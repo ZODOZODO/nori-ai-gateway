@@ -25,7 +25,7 @@ class WorkflowPlanBuilderTest {
     @Test void processorGraphProjectionKeepsRuntimeQAbsentAndCanonicalCacheFlags() {
         var job=job(TaskType.INCIDENT_ANALYSIS,Map.of("resourceRefs",List.of(Map.of("type","EQP","ref","EQP_001")),"options",Map.of("allowKnowledge",false)));
         var result=builder.build(workflow(TaskType.INCIDENT_ANALYSIS),registry.view(job.scope()),job,Map.of("from","2026-11-04T00:00Z","to","2026-11-04T01:00Z"));
-        assertThat(result.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","logs","trace","dlq","summary","git");
+        assertThat(result.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","dlq","summary","git");
         var git=result.toolPlan().plan().getLast();assertThat(git.dependsOn()).containsExactly("dlq");assertThat(git.arguments().has("q")).isFalse();
         assertThat(result.steps().stream().filter(step->step.definition().cacheable())).extracting(step->step.definition().stepId()).containsExactly("logs","trace","git");
     }

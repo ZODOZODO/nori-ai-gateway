@@ -23,6 +23,7 @@ public final class BusinessToolExecutor implements ToolExecutor {
             case "tc.event.getRecent" -> project(manifest,scope,business.getRecentEvents(call,eqp,window(step,context,scope)));
             case "tc.model.read" -> project(manifest,scope,business.readModel(call,Optional.ofNullable(args.get("modelId")).filter(value->!value.isNull()).map(value->value.asString())));
             case "tc.dlq.list" -> dlq(manifest,scope,call,eqp,window(step,context,scope),resolver);
+            case "tc.commLogs.search" -> commLogs(manifest,scope,call,eqp,window(step,context,scope),resolver);
             default -> ToolResults.result(manifest,scope,ResultStatus.FAILED,List.of(),clock.instant(),List.of(),Set.of(),List.of(),null);
         };
     }
@@ -48,5 +49,25 @@ public final class BusinessToolExecutor implements ToolExecutor {
         }
         ResultStatus status=available==0?ResultStatus.SOURCE_UNAVAILABLE:!missing.isEmpty()?ResultStatus.PARTIAL:items.isEmpty()?ResultStatus.EMPTY:ResultStatus.SUCCESS;
         return ToolResults.result(manifest,scope,status,items,results.stream().map(TcBusinessReadPort.TcReadResult::observedAt).max(Comparator.naturalOrder()).orElseThrow(),missing,warnings,List.of(),null);
+    }
+    private ToolResultEnvelope commLogs(CapabilityManifest manifest,VerifiedSystemScope scope,TcSourceAuthorizationPort.DelegatedCall call,String eqp,TimeWindow window,WorkflowResourceResolver resolver) {
+        var results=new ArrayList<TcBusinessReadPort.TcReadResult<TcBusinessReadPort.CommLogData>>();
+        for(String source:List.of("gateway","business")){resolver.beforeRead();results.add(Objects.requireNonNull(business.getCommLogs(call,eqp,source,window)));}
+        var rows=new ArrayList<Map<String,Object>>();var evaluations=new ArrayList<com.nori.ai.gateway.core.retention.TrimCompletenessEvaluator.Evaluation>();
+        var missing=new ArrayList<String>();var warnings=new HashSet<Warning>();var confirmed=new ArrayList<ToolResultMetadata.MissingRange>();
+        for(int i=0;i<results.size();i++) {
+            var value=results.get(i);String source=i==0?"gateway":"business";
+            if(value.status()==ResultStatus.DENIED||value.status()==ResultStatus.FAILED) return ToolResults.result(manifest,scope,value.status(),List.of(),value.observedAt(),value.missingFields(),Set.of(),List.of(),null);
+            if(!Set.of(ResultStatus.SUCCESS,ResultStatus.EMPTY,ResultStatus.PARTIAL,ResultStatus.OUT_OF_RETENTION,ResultStatus.SOURCE_UNAVAILABLE).contains(value.status()))throw new IllegalStateException("통신 로그 상태 계약이 다릅니다");
+            if(value.status()==ResultStatus.SOURCE_UNAVAILABLE)missing.add(source);
+            missing.addAll(value.missingFields().stream().map(field->source+"."+field).toList());warnings.addAll(value.warnings());
+            var row=new LinkedHashMap<String,Object>();row.put("source",source);row.put("status",value.status().name());row.put("observedAt",value.observedAt());
+            row.put("items",value.data()==null?List.of():value.data().items());row.put("completeness",value.data()==null?null:value.data().completeness());
+            row.put("warnings",value.warnings());row.put("retentionMeta",value.retentionMeta());rows.add(row);
+            value.retentionMeta().missingRanges().forEach(range->confirmed.add(new ToolResultMetadata.MissingRange(range.startAt(),range.endAt())));
+            evaluations.add(new com.nori.ai.gateway.core.retention.TrimCompletenessEvaluator.Evaluation(value.status(),value.retentionMeta().missingRanges(),value.retentionMeta().unverifiedRanges(),value.warnings()));
+        }
+        ResultStatus status=new com.nori.ai.gateway.core.retention.TrimCompletenessEvaluator().aggregate(evaluations);
+        return ToolResults.result(manifest,scope,status,rows,results.stream().map(TcBusinessReadPort.TcReadResult::observedAt).max(Comparator.naturalOrder()).orElseThrow(),missing,warnings,confirmed,null);
     }
 }

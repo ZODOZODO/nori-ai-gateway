@@ -1,5 +1,6 @@
 [
   "manifests/tc/tc.eqp.getOperationalSnapshot.json",
+  "manifests/tc/tc.commLogs.search.json",
   "manifests/tc/tc.event.getRecent.json",
   "manifests/tc/tc.dlq.list.json",
   "manifests/tc/tc.logs.search.json",

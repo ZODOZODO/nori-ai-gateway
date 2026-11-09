@@ -22,6 +22,8 @@ public final class TestHookRegistry {
     private final Clock clock;
     private final PausePointRegistry pauses;
     private final AtomicInteger reservations=new AtomicInteger();
+    private final List<Runnable> idleResetCallbacks=new ArrayList<>();
+    public synchronized void onIdleReset(Runnable callback){idleResetCallbacks.add(Objects.requireNonNull(callback));}
     private int admitting;
     public TestHookRegistry(Clock clock,PausePointRegistry pauses){this.clock=clock;this.pauses=pauses;}
     public synchronized void arm(String actor,String requestKey,Scenario scenario){
@@ -65,6 +67,7 @@ public final class TestHookRegistry {
         // 아직 커밋되지 않은 접수의 결속도 reset으로 지우지 않습니다.
         if(admitting!=0||!noActiveJobs.getAsBoolean())return false;
         resetMock.run();
+        idleResetCallbacks.forEach(Runnable::run);
         arms.clear();bindings.clear();consumed.clear();pauses.reset();reservations.set(0);if(clock instanceof ControllableClock controlled)controlled.reset();return true;
     }
     public synchronized void freezeAt(Instant at,java.util.function.BooleanSupplier noActiveJobs){

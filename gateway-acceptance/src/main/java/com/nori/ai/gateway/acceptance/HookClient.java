@@ -28,6 +28,7 @@ public final class HookClient {
     public void registerDelegation(String sub, String dlg) { call("POST", "/__test/tcmock/delegations", Map.of("sub", sub, "dlg", dlg), 204); }
     public JsonNode clock(Map<String,Object> operation) { return call("POST", "/__test/clock", operation, 200); }
     public JsonNode post(String path, Map<String,Object> body, int expected) { return call("POST", path, body, expected); }
+    public JsonNode get(String path) { return call("GET", path, null, 200); }
 
     private JsonNode call(String method, String path, Object body, int expected) {
         try {

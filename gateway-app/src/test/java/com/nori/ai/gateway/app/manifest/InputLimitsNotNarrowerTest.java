@@ -17,11 +17,12 @@ class InputLimitsNotNarrowerTest {
     private JsonNode args(String q) { return SchemaContracts.JSON.createObjectNode().put("eqp", "설비").put("q", q); }
     @Test void allActualManifestLimitsMatchProtectedConfirmedFieldsAndSchemas() throws Exception {
         var protectedLimits=SchemaContracts.parse(Files.readString(ROOT.resolve("eval/f0/v2/arg-limits-v2.json"))).get("fields");
-        assertThat(manifests).hasSize(9);
+        assertThat(manifests).hasSize(10);
         for (var manifest:manifests) {
             assertThat(manifest.riskLevel()).isEqualTo(RiskLevel.READ);assertThat(manifest.sideEffects()).isEqualTo(SideEffects.NONE);
             for (JsonNode field:protectedLimits) {
                 String name=field.get("field").asString();if(name.equals("t"))continue;
+                if(!manifest.inputSchema().path("properties").has(name)){assertThat(manifest.inputLimits()).doesNotContainKey(name);continue;}
                 assertThat(field.get("status").asString()).isEqualTo("CONFIRMED");
                 var limit=manifest.inputLimits().get(name);assertThat(limit).isNotNull();
                 assertThat(limit.maxChars()).isEqualTo(field.get("maxChars").asInt());
@@ -32,7 +33,7 @@ class InputLimitsNotNarrowerTest {
         }
     }
     @Test void qBoundaryCountsDecodedCodepointsAndPreservesOriginalIncludingEscapes() {
-        for (var manifest:manifests) {
+        for (var manifest:manifests.stream().filter(value->value.inputSchema().path("properties").has("q")).toList()) {
             for(String q:List.of("가".repeat(256),"😀".repeat(256)," \t원문\n\"\\é ")) {
                 var input=args(q);String before=input.toString();
                 assertThat(validator.validate(manifest,input,ZoneOffset.UTC)).isNull();assertThat(input.toString()).isEqualTo(before);
@@ -52,6 +53,7 @@ class InputLimitsNotNarrowerTest {
     @Test void equipmentBoundaryCountsSupplementaryCodepoints() {
         for (var manifest:manifests) {
             var a=SchemaContracts.JSON.createObjectNode().put("eqp","😀".repeat(64));
+            if(manifest.capabilityId().equals("tc.commLogs.search"))a.put("from","2024-01-01T00:00Z").put("to","2025-01-01T00:00Z");
             assertThat(validator.validate(manifest,a,ZoneOffset.UTC)).isNull();
             a.put("eqp","😀".repeat(65));assertThat(validator.validate(manifest,a,ZoneOffset.UTC).reason()).isEqualTo(RejectReason.PLAN_INVALID);
         }
@@ -63,7 +65,7 @@ class InputLimitsNotNarrowerTest {
             "2024-02-29T12:34:60Z","2024-02-29T12:34.1Z","2024-02-29T12:34:56.1234567890Z","2024-02-29T12:34+0900",
             "2024-02-29T12:34+09","2024-02-29T12:34+09:00:01","2024-02-29T12:34+18:01","2024-02-29T12:34+19:00","2024-2-29T12:34");
         for(var manifest:manifests) {
-            for(String value:valid) {var a=SchemaContracts.JSON.createObjectNode().put("eqp","설비").put("from",value);assertThat(validator.validate(manifest,a,ZoneOffset.UTC)).as(value).isNull();}
+            for(String value:valid) {var a=SchemaContracts.JSON.createObjectNode().put("eqp","설비").put("from",value);if(manifest.capabilityId().equals("tc.commLogs.search"))a.put("to","2030-01-01T00:00Z");assertThat(validator.validate(manifest,a,ZoneOffset.UTC)).as(value).isNull();}
             for(String value:invalid) {var a=SchemaContracts.JSON.createObjectNode().put("eqp","설비").put("from",value);assertThat(validator.validate(manifest,a,ZoneOffset.UTC)).as(value).isNotNull();}
         }
         String longest=valid.get(5);assertThat(longest.codePointCount(0,longest.length())).isEqualTo(35);

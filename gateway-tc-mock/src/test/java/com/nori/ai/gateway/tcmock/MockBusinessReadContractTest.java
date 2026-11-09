@@ -144,4 +144,8 @@ class MockBusinessReadContractTest {
         assertThat(adapter.resolveResource(call, "EQP", "other").status()).isEqualTo(ResultStatus.EMPTY);
         assertThat(adapter.resolveResource(new DelegatedCall("other", call.dlg()), "EQP", "EQP-001").status()).isEqualTo(ResultStatus.DENIED);
     }
+    @Test void resultVersionFixtureKeepsResourceLookupValidAndRejectsOnlyBusinessResult() {
+        scenarios.select("contract-v2");assertThat(adapter.resolveResource(call,"EQP","EQP-001").status()).isEqualTo(ResultStatus.SUCCESS);
+        var result=adapter.getEqpSnapshot(call,"EQP-001");assertThat(result.status()).isEqualTo(ResultStatus.FAILED);assertThat(result.missingFields()).containsExactly("contractVersion");assertThat(calls.count("getEqpSnapshot")).isOne();
+    }
 }

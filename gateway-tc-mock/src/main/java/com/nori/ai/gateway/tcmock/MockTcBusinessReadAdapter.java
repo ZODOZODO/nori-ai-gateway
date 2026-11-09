@@ -133,7 +133,7 @@ public final class MockTcBusinessReadAdapter implements TcBusinessReadPort {
             TcReadResult<T> result = source.get();
             if (result.status() != ResultStatus.OUT_OF_RETENTION) calls.increment(operation);
             validateManifestOutput(operation, result.data());
-            var wire = SchemaContracts.JSON.createObjectNode().put("contractVersion", scenarios.current().contractVersion())
+            var wire = SchemaContracts.JSON.createObjectNode().put("contractVersion", "resolveResource".equals(operation) && "contract-v2".equals(scenarios.current().id()) ? "1.0" : scenarios.current().contractVersion())
                 .set("result", SchemaContracts.JSON.valueToTree(result));
             var decoded = SchemaContracts.parse(SchemaContracts.JSON.writeValueAsString(wire));
             if (!SchemaContracts.matches(RESPONSE_SCHEMA, decoded))

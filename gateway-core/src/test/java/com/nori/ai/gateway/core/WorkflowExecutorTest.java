@@ -36,7 +36,7 @@ class WorkflowExecutorTest {
                 if(kind==ToolKind.GIT){queries.add(step.arguments().path("q").asString());assertThat(context.boundInputs().orElseThrow().bindings().keySet()).containsExactly("trace");}
                 String text=kind==ToolKind.LOG?"LOG_CODE":kind==ToolKind.TRACE?"TRACE_LEAK":"BUSINESS_LEAK";
                 var raw=result(manifest);raw=changeResult(raw,"toolExecutionId",UUID.randomUUID().toString());raw=changeResult(raw,"metadata",new ToolResultMetadata(raw.metadata().sourceRef(),manifest.sourceFreshnessPolicy(),false,List.of()));
-                return changeResult(raw,"blocks",List.of(new ResultBlock("table",raw.dataRef(),SchemaContracts.JSON.createObjectNode().set("items",SchemaContracts.JSON.valueToTree(List.of(Map.of("text",text)))))));
+                return changeResult(raw,"blocks",List.of(new ResultBlock("table",raw.dataRef(),SchemaContracts.JSON.createObjectNode().set("items",SchemaContracts.JSON.valueToTree(manifest.capabilityId().equals("tc.commLogs.search")?commRows():List.of(Map.of("text",text)))))));
             }
         });
         var dispatcher=new ToolDispatcher(registry,validator,new ToolResultContractValidator(versions),new DispatchInjectionSeam.NoOp(),tools,CLOCK);var expiry=new ExpiryCheckpoint(new ConversationExpiryGuard(),CLOCK);var store=new ToolResultCacheTest.Store();var cache=new ToolResultCache(store,validator,new ResultAccessEvaluator(),(permissions,documents)->Map.of(),expiry,CLOCK);var records=new ArrayList<ToolDispatcher.InvocationRecord>();
@@ -47,7 +47,7 @@ class WorkflowExecutorTest {
         var resolver=new WorkflowAuthorizationPreparationTest.Fixture().resolver;
         for(int i=0;i<2;i++)assertThat(executor.run(job,plan,resolver).rejection()).isEmpty();
         assertThat(queries).containsExactly("LOG_CODE","LOG_CODE");assertThat(authorizations.stream().filter(required->required.contains("AI_CODE_READ"))).hasSize(2);
-        assertThat(store.calls).hasSize(6);assertThat(records).hasSize(8);
+        assertThat(store.calls).hasSize(6);assertThat(records).hasSize(10);
     }
     @Test void aGeneralQueryWithFalseFlagsAndANonexistentSelectedReferenceNeverReadsOrDispatchesAnything() {
         var fixture=new WorkflowAuthorizationPreparationTest.Fixture();var loader=new ManifestLoader();var versions=new ContractVersionPolicy();var registry=new CapabilityRegistry(loader.loadClasspath("manifests/tc/index.json"),workflows(),Set.of(ImplementationPhase.PHASE_1),versions);
@@ -59,4 +59,7 @@ class WorkflowExecutorTest {
         var outcome=executor.run(job,plan,fixture.resolver);assertThat(outcome.rejection()).isEmpty();assertThat(outcome.blocks()).singleElement().satisfies(block->assertThat(block.type()).isEqualTo("table"));assertThat(fixture.reads).hasValue(0);assertThat(fixture.legacy).hasValue(0);assertThat(fixture.authCalls).hasValue(0);assertThat(fixture.toolCalls).hasValue(0);assertThat(store.calls).isEmpty();assertThat(recorded).isEmpty();assertThat(outcome.toolExecutionRefs()).isEmpty();
     }
 
+    private static List<Map<String,Object>> commRows() {
+        var rows=new ArrayList<Map<String,Object>>();for(String source:List.of("gateway","business")) {var row=new LinkedHashMap<String,Object>();row.put("source",source);row.put("status","EMPTY");row.put("observedAt",NOW.toString());row.put("items",List.of());row.put("completeness",null);row.put("warnings",List.of());row.put("retentionMeta",Map.of("missingRanges",List.of(),"unverifiedRanges",List.of()));rows.add(row);}return rows;
+    }
 }

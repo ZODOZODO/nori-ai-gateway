@@ -69,4 +69,13 @@ class SeamRegistryTest {
         assertThat(manifest.ownerSystem()).isEqualTo(OwnerSystem.TC);assertThat(manifest.availability()).isEqualTo(Availability.IMPLEMENTED);
         assertThat(manifest.requiresApproval()).isFalse();assertThat(target.resources().getFirst().ownerSystem()).isEqualTo(OwnerSystem.TC);assertThat(target.source().ownerSystem()).isEqualTo(OwnerSystem.TC);
     }
+    @Test void dispatchOnlyOwnerOverrideKeepsPlanOriginalAndScopesToOneJob() {
+        var manifest=loader.loadClasspath("manifests/tc/index.json").stream().filter(m->m.capabilityId().equals("tc.commLogs.search")).findFirst().orElseThrow();
+        bind("dispatch","job",new SeamRegistry.Directive(SeamRegistry.Kind.DISPATCH_OWNER_OVERRIDE,manifest.capabilityId(),null,OwnerSystem.WM),TransactionSynchronization.STATUS_COMMITTED);
+        assertThat(seams.inspect(manifest,scope("job"))).isSameAs(manifest);
+        var target=new com.nori.ai.gateway.core.dispatch.DispatchTarget(manifest,List.of(),new com.nori.ai.gateway.core.plan.ResourceResolver.SourceBinding(OwnerSystem.TC,manifest.sourceAllowlistRef(),true));
+        assertThat(seams.inspect(target,scope("job")).tool().ownerSystem()).isEqualTo(OwnerSystem.WM);
+        assertThat(seams.inspect(target,scope("next"))).isSameAs(target);
+        assertThatThrownBy(()->seams.validate(new SeamRegistry.Directive(SeamRegistry.Kind.DISPATCH_OWNER_OVERRIDE,manifest.capabilityId(),null,OwnerSystem.TC))).isInstanceOf(IllegalArgumentException.class);
+    }
 }

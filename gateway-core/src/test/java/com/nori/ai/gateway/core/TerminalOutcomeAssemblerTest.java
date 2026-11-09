@@ -56,4 +56,10 @@ class TerminalOutcomeAssemblerTest {
             var spec=assembler.assemble(outcome,ComposerOutcome.NOT_INVOKED,InferenceMode.DISABLED);assertThat(spec.resultPayload()).containsOnlyKeys("clarification");assertThat(spec.errorCode()).isEqualTo(code);
         }
     }
+    @Test void unsupportedRejectionPreservesOnlyFixedValidatorTrace() {
+        var rejection=new ValidationOutcome(false,List.of(new ValidationOutcome.Trace(6,false,RejectReason.UNSUPPORTED)),RejectReason.UNSUPPORTED,ResultStatus.UNSUPPORTED,null,null);
+        var source=outcome(List.of());var rejected=new WorkflowOutcome(source.stages(),source.blocks(),source.evidence(),source.sourceDeps(),source.trace(),source.toolExecutionRefs(),Optional.of(rejection));
+        var result=assembler.assemble(rejected,ComposerOutcome.NOT_INVOKED,InferenceMode.DISABLED);
+        assertThat(result.resultPayload().get("validationTrace")).isEqualTo(rejection.trace());assertThat(result.jobStatus()).isEqualTo(JobStatus.SUCCEEDED);
+    }
 }

@@ -46,7 +46,7 @@ class ManifestDigestTest {
     }
     @Test void pathLoaderReadsAllNineActualContractsAndProtectsMutableSchema() {
         var manifests = new ManifestLoader().load(ROOT.resolve("gateway-app/src/main/resources/manifests/tc"));
-        assertThat(manifests).hasSize(9);
+        assertThat(manifests).hasSize(10);
         var m = manifests.getFirst(); String before = m.schemaDigest();
         ((ObjectNode)m.inputSchema()).put("type", "null");
         assertThat(SchemaContracts.digest(m.inputSchema(), m.outputSchema())).isEqualTo(before);

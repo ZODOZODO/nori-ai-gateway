@@ -21,13 +21,21 @@ public final class DirectSourceToolExecutor implements ToolExecutor {
     private final ToolKind kind;private final ObjectProvider<LokiLogConnector> logs;private final ObjectProvider<TempoTraceConnector> traces;
     private final ObjectProvider<GitLabCodeConnector> code;private final ObjectProvider<GitExecutionScopes> scopes;private final Clock clock;private final LokiProperties properties;
     private final DeploymentEvidenceResolver deployments;
+    private final Optional<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probe;
     public DirectSourceToolExecutor(ToolKind kind,ObjectProvider<LokiLogConnector> logs,ObjectProvider<TempoTraceConnector> traces,ObjectProvider<GitLabCodeConnector> code,ObjectProvider<GitExecutionScopes> scopes,Clock clock,LokiProperties properties,DeploymentEvidenceResolver deployments) {
+        this(kind,logs,traces,code,scopes,clock,properties,deployments,Optional.empty());
+    }
+    public DirectSourceToolExecutor(ToolKind kind,ObjectProvider<LokiLogConnector> logs,ObjectProvider<TempoTraceConnector> traces,ObjectProvider<GitLabCodeConnector> code,ObjectProvider<GitExecutionScopes> scopes,Clock clock,LokiProperties properties,DeploymentEvidenceResolver deployments,Optional<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probe) {
         if(!Set.of(ToolKind.LOG,ToolKind.TRACE,ToolKind.GIT).contains(kind))throw new IllegalArgumentException("직결 Source 종류가 잘못되었습니다");
         this.kind=kind;this.logs=logs;this.traces=traces;this.code=code;this.scopes=scopes;this.clock=clock;this.properties=properties;
         this.deployments=deployments;
+        this.probe=Objects.requireNonNull(probe);
     }
     @Override public ToolKind toolKind(){return kind;}
     @Override public ToolResultEnvelope execute(PlanStep step,CapabilityManifest manifest,VerifiedSystemScope scope,ExecutionContext context) {
+        try(var capture=probe.map(value->value.open(scope.requestId(),manifest.capabilityId())).orElse(()->{})){return executeRead(step,manifest,scope,context);}
+    }
+    private ToolResultEnvelope executeRead(PlanStep step,CapabilityManifest manifest,VerifiedSystemScope scope,ExecutionContext context) {
         if(!(context.resolver() instanceof WorkflowResourceResolver resolver))return unavailable(manifest,scope);
         resolver.beforeRead();var request=new SourceReadAccess.Request(scope,resolver.delegatedCall(),manifest.sourceAllowlistRef(),resolver::beforeRead);
         return switch(kind) {
