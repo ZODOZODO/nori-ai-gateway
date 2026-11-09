@@ -1074,7 +1074,8 @@ LEFT JOIN gw.message pm ON pm.id=p.request_message_id AND pm.conversation_id=a.c
 
 > 보정(M-3): 직전 판은 추론 Client(구 P18)가 아직 없는 예산 assert(구 P19)를 요구했고, 구 P19 는 추론 Client 를 고칠 권한이 없었다. 두 phase 의 순서를 바꿔 예산 guard 를 먼저 만들고, 추론 Client(이제 P19)가 처음부터 그것을 실제 호출 경로에 넣는다(phase 수 30 불변).
 
-- [ ] 구현  - [ ] 검증
+- [x] 구현  - [x] 검증
+- **2026-11-09 부모 검증 완료(로컬 커밋 `95c0c6f`):** 명령 ①(core 117·integration 96)·②(`*AppContextWiringIT` 15) 실패·오류·skip 0, 각 `test-evidence verify` 통과. 범위 밖 기술 수정 2건(시험 리소스 include·`CoreSeamDefaultsTest` 대역)은 부모 승인. 기록 = Dev report "P18·seq13(ⓕ)·P16 기존 결함·정본 이관".
 - 목표: Gateway 가 LLM 호출 전에 입력 토큰을 정확히 세고(Qwen3 tokenizer 내장), SPEC §14.5 축소 순서·호출 직전 assert·잘림 감지를 **추론 Client 와 무관한 순수 구성 요소**로 구현한다(실제 호출 경로 연결은 P19 가 같은 타입을 생성자 주입으로 사용).
 - 선행: F1 exit, G-F0-TARGET 승인, `T_cmp` 산정 절차·게이트 결정(SPEC §14.5 열린 항목 ⓑ — F0 는 Composer 를 호출하지 않아 F0 근거 없음, 값은 그 절차로 정함), P17(F2 시작 조건을 한곳에 둠 — 2026-11-09 대체(임차 원칙): 종전 선행 "G-INFER-NET·G-INFER-CTX·G-INFER-RUNBOOK·G-INFER-EGRESS 완료 증거(F2 착수 게이트)" 는 폐기 이력), P03 의 chat template·`token-golden.jsonl`·`usage.json`(G-USAGE 결과). **v4.1 대체(2026-11-05):** G-F0-TARGET 승인·T_cmp 절차 미결정 대기를 선행에서 제거한다. SPEC §14.5 잠정값4928/4864/5120·방법(b)와 기존 진단 template/token-golden/usage를 사용한다. F1 exit·P17·기존 G-INFER-*는 유지하고 부족한 로컬 fixture는 오프라인에서 검증한다. 실모델 재측정을 선행시키지 않는다. **2026-11-09 대체(임차 원칙):** 이 중 G-INFER-* 서버 게이트는 폐기하고 P17 만 남긴다.
 - allowed_writes: `gateway-core/src/main/java/com/nori/ai/gateway/core/budget/**`, `gateway-integration/src/main/java/com/nori/ai/gateway/integration/tokenizer/**`, `gateway-integration/src/main/resources/tokenizer/**`, 각 `src/test/**`(golden 사본 포함) + §7 공통 예외(`CoreBeansConfiguration`·`AppContextWiringIT`·`IntegrationModuleConfiguration`).
