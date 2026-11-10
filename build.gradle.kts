@@ -202,7 +202,9 @@ project(":gateway-eval") {
                     val test = rootProject.tasks.findByPath(path) as? Test ?: throw GradleException("UNKNOWN_TEST_TASK")
                     val out = rootProject.file("build/aigw-fingerprint/${path.replace(':', '_')}.json")
                     out.parentFile.mkdirs()
-                    out.writeText(json(mapOf("taskPath" to path, "inputFingerprint" to aigwInputFingerprint(test))), Charsets.UTF_8)
+                    // 제품 모듈은 settings 의 projectDir 로 modules/ 아래에 있으므로 verifier 가 증거 위치를 task 경로로 유도하지 않도록 실제 위치를 함께 기록합니다.
+                    val projectDir = rootDir.toPath().relativize(test.project.projectDir.toPath()).toString().replace('\\', '/')
+                    out.writeText(json(mapOf("taskPath" to path, "inputFingerprint" to aigwInputFingerprint(test), "projectDir" to projectDir)), Charsets.UTF_8)
                 }
             }
         }

@@ -50,6 +50,7 @@ public final class CiEvidence {
         return tasks;
     }
 
+    // 묶음 안 항목 이름(task 경로 기준 논리 이름). evidence 모드 job 에는 fingerprint 가 없으므로 실제 projectDir 이 아니라 task 경로로 정한다.
     static String summaryPath(String task) {
         int split = task.lastIndexOf(':');
         return task.substring(1, split).replace(':', '/') + "/build/aigw-evidence/" + task.substring(split + 1) + "/leaf-results.json";
@@ -68,7 +69,7 @@ public final class CiEvidence {
         var files = new TreeMap<String,String>();
         for (String task : required.keySet()) {
             String path = summaryPath(task);
-            byte[] bytes = Json.bytes(root.resolve(path));
+            byte[] bytes = Json.bytes(TestEvidenceVerifier.summaryFile(root, task));
             JsonNode evidence = Json.parse(bytes);
             requireSpec(evidence.path("summary"), binding);
             for (JsonNode record : evidence.path("records")) requireSpec(record, binding);

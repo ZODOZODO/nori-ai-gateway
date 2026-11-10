@@ -30,7 +30,7 @@ final class CiEvidenceFixture {
         output = root.resolve("sub/build/aigw-evidence/integrationTest/leaf-results.json");
         save();
         Json.write(root.resolve("sub/build/aigw-otr/integrationTest/run-binding.json"), Map.of("runId", "r", "specSha", f.binding().specSha(), "inputFingerprint", "a".repeat(64)));
-        Json.write(root.resolve("build/aigw-fingerprint/_sub_integrationTest.json"), Map.of("inputFingerprint", "a".repeat(64)));
+        Json.write(root.resolve("build/aigw-fingerprint/_sub_integrationTest.json"), Map.of("inputFingerprint", "a".repeat(64), "projectDir", "sub"));
         required = root.resolve("ci/integration-required.txt");
         Files.createDirectories(required.getParent());
         Files.writeString(required, "# 등록 모듈만 필수\n:sub probe.RealIT\n");

@@ -33,7 +33,7 @@ NORI 공용 AI Gateway(Java 21, Spring Boot 4, Gradle 멀티 모듈, 헥사고�
 
 ## 4. 모듈 책임
 
-목표 구조는 Plan §3.2 2026-11-10 대응표이며, 디렉터리 이동은 정렬 단위 U3 에서 한다(그 전까지는 왼쪽 열의 현재 디렉터리). 물리 위치는 `modules/` 아래, 논리 경로는 `settings.gradle.kts` 의 `projectDir` 매핑이다. Java 패키지는 모두 `com.nori.ai.gateway.*` 로 유지한다.
+목표 구조는 Plan §3.2 2026-11-10 대응표이며, 디렉터리 이동은 정렬 단위 U3 에서 했다(왼쪽 열은 이동 전 디렉터리이고, `gateway-integration` 의 외부 시스템별 분할은 U3 셋째 commit 이다). 물리 위치는 `modules/` 아래, 논리 경로는 `settings.gradle.kts` 의 `projectDir` 매핑이다. Java 패키지는 모두 `com.nori.ai.gateway.*` 로 유지한다.
 
 | 현재 디렉터리 | 목표 task 경로 | 책임 |
 |---|---|---|
@@ -65,7 +65,7 @@ Windows PowerShell, cwd `C:/workspace_nori/nori-ai-gateway`, 각 명령은 별�
 
 - 운영 DB 는 공유 서버 192.168.0.150(k8s 밖, PostgreSQL 18.6)의 `nori_ai_gateway`, 포트 15432 직접 연결이다. 빌려 쓰는 서버이므로 서버 설정을 바꾸지 않고 서버 변경을 게이트로 두지 않는다. 서버 쪽 선행조건은 `docs/runbooks/aigw-db-server-prerequisites.md`(U5) 에 기록한다.
 - DB 계정은 하나다. 계정 이름과 비밀번호는 코드·문서·차트·로그에 쓰지 않고 환경변수 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD`(k8s 는 Secret `ai-gateway-config`, CI 는 CI 변수)로만 주입한다. 명령행 인자로 비밀번호를 넘기지 않는다.
-- 스키마 정본은 루트 `flyway/sql/` 의 순서대로 적용된 최종 상태다(U5 이전에는 `gateway-persistence/src/main/resources/db/migration/gateway/`). 이력 schema 는 `gw_flyway` 다. 적용은 루트 Gradle Flyway 플러그인과 CI `migrate` stage 가 하며, 앱은 `spring.flyway.enabled=false` + `SchemaVersionGuard`(빌드 때 앱 리소스로 복사한 `flyway/sql` 사본과 실제 이력 비교)다.
+- 스키마 정본은 루트 `flyway/sql/` 의 순서대로 적용된 최종 상태다(U5 이전에는 `modules/adapter/ai-gateway-db-adapter/src/main/resources/db/migration/gateway/`). 이력 schema 는 `gw_flyway` 다. 적용은 루트 Gradle Flyway 플러그인과 CI `migrate` stage 가 하며, 앱은 `spring.flyway.enabled=false` + `SchemaVersionGuard`(빌드 때 앱 리소스로 복사한 `flyway/sql` 사본과 실제 이력 비교)다.
 - migration 은 forward-only 다. 적용된 V 파일을 고치거나 지우거나 번호를 바꾸지 않는다. 새 V 번호는 Plan 의 phase 별 예약(§7 L-1·§8)을 따른다.
 - 공유 서버에 대한 `flywayMigrate`, 수동 DDL/DML 은 CI `migrate` stage 또는 사용자의 명시 지시로만 한다. 로컬 확인은 격리된 시험 컨테이너에 한다.
 - 복원 리허설 대상은 리허설 동안만 쓰는 임시 k8s PostgreSQL 인스턴스다(운영 DB 아님).

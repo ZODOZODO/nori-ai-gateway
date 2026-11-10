@@ -1,5 +1,5 @@
 {
-  "source": "Plan P08 pdg 고정 벡터 표(V1~V4 기대값·음성 N1~N3) 사본 — P02 교차도구 시험 입력, 정본 파일은 P08 의 gateway-tc-mock/src/test/resources/pdg-vectors-v1.json",
+  "source": "Plan P08 pdg 고정 벡터 표(V1~V4 기대값·음성 N1~N3) 사본 — P02 교차도구 시험 입력, 정본 파일은 P08 의 modules/adapter/ai-gateway-tc-mock-adapter/src/test/resources/pdg-vectors-v1.json",
   "vectors": [
     {"id": "V1", "catalogRevision": "rev-1", "perms": [], "expectedPdg": "d2e38e7d4d6ab86e03d2d30956f086b12aef8145fb16a35d9af10b2c76056079"},
     {"id": "V2", "catalogRevision": "rev-1", "perms": ["EQP_READ"], "expectedPdg": "4839075a4b4c092e3d9f1e89f9c7f79146786f4de5f876bc35a77c26e4b049ec"},

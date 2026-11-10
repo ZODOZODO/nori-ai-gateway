@@ -3,6 +3,7 @@ package com.nori.ai.gateway.eval.ci;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nori.ai.gateway.eval.EvalException;
 import com.nori.ai.gateway.eval.io.Json;
+import com.nori.ai.gateway.eval.report.TestEvidenceVerifier;
 import java.nio.file.*;
 import java.util.*;
 
@@ -47,8 +48,7 @@ public final class BuildIdentityManifest {
     public void verifyTaskSummaries(Path root, List<String> tasks, String commitSha) {
         String expected = commitSha == null ? gitSha : commitSha;
         for (String task : tasks) {
-            int split = task.lastIndexOf(':');
-            Path file = root.resolve(task.substring(1, split).replace(':', '/')).resolve("build/aigw-evidence/" + task.substring(split + 1) + "/leaf-results.json");
+            Path file = TestEvidenceVerifier.summaryFile(root, task);
             if (!Files.isRegularFile(file)) throw new EvalException(4, "NO_TESTS_EXECUTED");
             JsonNode evidence = Json.read(file);
             requireTaskIdentity(evidence.path("summary").path("buildIdentity"), expected);

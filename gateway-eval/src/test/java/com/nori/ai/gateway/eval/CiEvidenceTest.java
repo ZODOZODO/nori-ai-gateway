@@ -98,9 +98,19 @@ class CiEvidenceTest {
         Files.writeString(x.required, ":sub probe.RealIT\n:other probe.MissingIT\n");
         error(() -> verify(bundle, CiEvidenceFixture.SHA), 4, "REQUIRED_TASK_SUMMARY_MISSING");
         Files.writeString(x.required, ":sub probe.RealIT\n");
-        x.status = " M gateway-app/src/main/java/Changed.java\n";
+        x.status = " M modules/apps/ai-gateway-app/src/main/java/Changed.java\n";
         Path dirty = x.pack();
         error(() -> verify(dirty, CiEvidenceFixture.SHA), 4, "CI_EVIDENCE_DIRTY");
+    }
+
+    // settings 의 projectDir 매핑(:sub → modules/sub)에서 runner 판정·pack 은 기록된 projectDir 의 파일을 읽고, 묶음 항목 이름은 task 경로 기준으로 둔다.
+    @Test void runnerAndPackReadTaskEvidenceThroughRecordedProjectDir() throws Exception {
+        Files.createDirectories(directory.resolve("modules")); Files.move(directory.resolve("sub"), directory.resolve("modules/sub"));
+        Json.write(directory.resolve("build/aigw-fingerprint/_sub_integrationTest.json"), Map.of("inputFingerprint", "a".repeat(64), "projectDir", "modules/sub"));
+        assertThat(x.f.cli("test-evidence", "verify", "--tasks", ":sub:integrationTest", "--require-docker", "--expect-build-identity", "build/package/build-identity.json")).isZero();
+        Path bundle = x.pack();
+        assertThat(TarGz.read(bundle).keySet()).containsExactly("bundle.json", "sub/build/aigw-evidence/integrationTest/leaf-results.json");
+        verify(bundle, CiEvidenceFixture.SHA);
     }
 
     @Test void verifyRecomputesSpecShaFromTheCiInput() throws Exception {
