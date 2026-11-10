@@ -12,7 +12,7 @@ class RuntimeClasspathFinalizerFunctionalTest {
     @Test void rootFinalizerBuildsAndHashesRuntimeFileBeforeExtractingEvidence() throws Exception {
         TestKitSupport fixture = new TestKitSupport(directory);
         fixture.passingTest();
-        fixture.write("settings.gradle.kts", "rootProject.name=\"runtime-finalizer-fixture\"\ninclude(\"gateway-eval\",\"sub\",\"gateway-app\")\n");
+        fixture.write("settings.gradle.kts", TestKitSupport.buildLogicSettings() + "rootProject.name=\"runtime-finalizer-fixture\"\ninclude(\"gateway-eval\",\"sub\",\"gateway-app\")\n");
         fixture.write("gateway-app/build.gradle.kts", """
             val runtime = layout.buildDirectory.file("aigw/runtime-classpath.txt")
             tasks.register("writeRuntimeClasspath") {

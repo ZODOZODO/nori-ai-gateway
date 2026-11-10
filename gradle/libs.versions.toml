@@ -12,6 +12,12 @@ nimbusJoseJwt = "10.5"
 awsSdk = "2.46.17"
 otelLogback = "2.33.1-alpha"
 openaiJava = "4.80.0"
+# java-module-conventions 가 compileOnly 로 붙이는 slf4j-api 는 BOM 밖에서 버전이 필요하다. Spring Boot 4.0.7 BOM 의 slf4j.version 과 같다.
+slf4j = "2.0.18"
+# 루트 외부 Flyway 도구(U5)용. Spring Boot 4.0.7 BOM 의 flyway.version 과 같다.
+flyway = "11.14.1"
+# noricloud GitLab Package Registry project 33 의 고정 release.
+noriObjectStorage = "0.0.1"
 
 [libraries]
 json-canonicalization = { module = "io.github.erdtman:java-json-canonicalization", version.ref = "jsonCanonicalization" }
@@ -25,7 +31,7 @@ json-schema-validator = { module = "com.networknt:json-schema-validator", versio
 protobuf = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
 awssdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awsSdk" }
-nori-storage-starter = { module = "com.nori:nori-object-storage-s3-starter", version = "0.0.1-SNAPSHOT" }
+nori-storage-starter = { module = "com.nori:nori-object-storage-s3-starter", version.ref = "noriObjectStorage" }
 otel-logback = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otelLogback" }
 otel-instrumentation-bom-alpha = { module = "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha", version.ref = "otelLogback" }
 openai-java-okhttp = { module = "com.openai:openai-java-client-okhttp", version.ref = "openaiJava" }
@@ -33,6 +39,10 @@ junit-bom = { module = "org.junit:junit-bom" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 assertj = { module = "org.assertj:assertj-core" }
 jackson = { module = "com.fasterxml.jackson.core:jackson-databind" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+flyway-gradle-plugin = { module = "org.flywaydb:flyway-gradle-plugin", version.ref = "flyway" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }

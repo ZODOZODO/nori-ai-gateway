@@ -4,6 +4,10 @@ workflow:
     - when: never
 
 stages: [check, package, verify, build, scan, deploy]
+variables:
+  # settings-conventions(nori-common/build-logic)는 GitLab Package Registry 를 gitlabBaseUrl|GITLAB_BASE_URL 이 있을 때만
+  # 등록한다(nori-wm-ui-backend 와 같은 CI 입력). project id 는 gradle.properties 의 gitlabPackageProjectIds, 인증은 CI_JOB_TOKEN 이다.
+  GITLAB_BASE_URL: "https://gitlab.noricloud.org"
 default:
   tags: [nori-msa]
 
@@ -11,6 +15,7 @@ default:
 # gradlew 는 레포에 실행 권한 없이(100644) 저장되어 있으므로 bash 로 실행한다(작업 트리 chmod 0 — package 의 dirty 검사 유지).
 .aigw-spec-input:
   before_script:
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.noricloud.org/norisystem/nori-tc/nori-common.git ../nori-common
     - 'test -n "$AIGW_APPROVED_SPEC_SHA"'
     - 'bash ./gradlew :gateway-eval:run --args="spec-input fetch --api-url $CI_API_V4_URL --project-id $CI_PROJECT_ID --sha $AIGW_APPROVED_SPEC_SHA --baseline docs/gates/spec-baseline.md --out-dir build/spec-input --auth-header JOB-TOKEN --token-env CI_JOB_TOKEN" --no-daemon'
     - 'export AIGW_SPEC_FILE="$CI_PROJECT_DIR/build/spec-input/$AIGW_APPROVED_SPEC_SHA/spec.md"'
@@ -39,6 +44,7 @@ package:
   stage: package
   dependencies: []
   script:
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.noricloud.org/norisystem/nori-tc/nori-common.git ../nori-common
     - bash ./gradlew aigwPackage -Paigw.gitSha=$CI_COMMIT_SHA --no-daemon
     - test -s build/package/build-identity.json
   artifacts:

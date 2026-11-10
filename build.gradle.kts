@@ -7,7 +7,17 @@ import org.gradle.api.tasks.testing.TestDescriptor
 import org.gradle.api.tasks.testing.TestResult
 import org.gradle.process.CommandLineArgumentProvider
 
-plugins { base }
+plugins {
+    base
+    id("com.nori.common.root-project-conventions")
+}
+
+// 저장소 identity 는 이 allprojects 한 곳이 명시한다. root-project-conventions 는 group/version 을 정하지 않는다.
+// Java 패키지 com.nori.ai.gateway.* 는 이 값과 무관하게 그대로다.
+allprojects {
+    group = "com.nori.ai.gateway"
+    version = "0.0.1-SNAPSHOT"
+}
 
 fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 fun fileSha(file: File): String = if (file.isFile) sha(file.readBytes()) else "MISSING"
@@ -43,27 +53,11 @@ fun aigwInputFingerprint(test: Test): String = sha(json(aigwInputComponents(test
 val requiredTests = mutableSetOf<String>()
 
 subprojects {
-    apply(plugin = "java")
-    repositories {
-        mavenCentral()
-        if (project.path != ":gateway-eval") {
-            exclusiveContent {
-                forRepository {
-                    maven {
-                        name = "NoriObjectStorage"
-                        url = uri("https://gitlab.com/api/v4/projects/83704008/packages/maven")
-                        credentials(org.gradle.api.credentials.HttpHeaderCredentials::class) {
-                            name = providers.environmentVariable("GITLAB_AUTH_HEADER").orElse("Private-Token").get()
-                            value = providers.gradleProperty("gitlabToken").orElse(providers.environmentVariable("GITLAB_TOKEN")).orNull
-                        }
-                        authentication { create<org.gradle.authentication.http.HttpHeaderAuthentication>("header") }
-                    }
-                }
-                filter { includeGroup("com.nori") }
-            }
-        }
-    }
-    extensions.configure<JavaPluginExtension> { toolchain.languageVersion = JavaLanguageVersion.of(21) }
+    // java 는 각 모듈의 plugins {} 가 적용한다. 루트가 먼저 적용하면 java-module-conventions 가 아직 등록되지 않은 모듈의
+    // libs catalog extension 을 찾다가 실패하고, 구조용 project 에도 java 가 붙는다. java 적용 시 root-project-conventions 가
+    // java-module-conventions(toolchain 21·UTF-8·-parameters·JUnit Platform·compileOnly slf4j-api)와
+    // dependency-matrix-conventions 를 붙인다. 의존 저장소는 settings 가 소유한다.
+    pluginManager.withPlugin("java") {
     dependencies {
         add("implementation", platform(rootProject.libs.spring.boot.bom))
         add("testRuntimeOnly", "org.junit.platform:junit-platform-reporting")
@@ -86,10 +80,6 @@ subprojects {
             classpath = integration.runtimeClasspath
             systemProperty("aigw.requireDocker", providers.gradleProperty("aigw.requireDocker").orElse("false").get())
         }
-    }
-    tasks.withType<JavaCompile>().configureEach {
-        options.encoding = "UTF-8"
-        options.compilerArgs.add("-parameters")
     }
     tasks.withType<JavaExec>().configureEach { workingDir = rootDir }
     afterEvaluate { tasks.withType<Test>().toList().forEach { configuredTest -> configuredTest.apply {
@@ -165,6 +155,7 @@ subprojects {
         }
         finalizedBy(extraction)
     } } }
+    }
 }
 
 gradle.taskGraph.whenReady {
