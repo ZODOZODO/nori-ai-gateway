@@ -40,6 +40,7 @@ NORI 공용 AI Gateway(Java 21, Spring Boot 4, Gradle 멀티 모듈, 헥사고�
 | `gateway-core` | `:ai-gateway-core` | 순수 도메인·use case·port. Spring·JDBC·HTTP 무의존(ArchUnit) |
 | `gateway-persistence` | `:adapter:ai-gateway-db-adapter` | JdbcClient 저장소·큐·Knowledge 저장소. 모든 일반 저장소 public 메서드 첫 인자 `VerifiedSystemScope` |
 | `gateway-integration` | `:adapter:ai-gateway-inference-adapter`(추론+tokenizer), `:adapter:ai-gateway-loki-adapter`, `:adapter:ai-gateway-tempo-adapter`, `:adapter:ai-gateway-gitlab-adapter`, P24 의 `:adapter:ai-gateway-kafka-adapter`·`:adapter:ai-gateway-object-storage-adapter` | 외부 시스템별 읽기 전용 adapter. adapter 사이 의존 0 |
+| `gateway-integration` 의 Source 공용 코드 | `:adapter:ai-gateway-source-support`(패키지 `integration.source`) | loki·tempo·gitlab adapter 가 함께 쓰는 Source HTTP·관측·접근 검사·TC 앱 목록. core 에만 의존하고, Source adapter 는 이 모듈과 core 에만 의존한다 |
 | `gateway-tc-mock` | `:adapter:ai-gateway-tc-mock-adapter` | F1~F4 의 TC 업무 API·인가 API Mock(core port 구현) |
 | `gateway-app` | `:apps:ai-gateway-app` | 단일 조립 루트(Boot 앱·web·보안·Job 워커·시험 전용 hook). web 은 분리하지 않는다 |
 | `gateway-acceptance` | `:apps:ai-gateway-acceptance-app` | 배포 환경 대상 수용 하네스(application plugin·installDist, k8s Job 이미지) |

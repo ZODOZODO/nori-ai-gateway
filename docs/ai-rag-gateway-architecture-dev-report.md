@@ -7702,3 +7702,131 @@ P16의 이번 요청 범위는 CODE/LOCAL_VALIDATED로 마무리합니다. 구�
   - ⑤ 직후 `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --tasks :gateway-app:integrationTest --require-docker"` exit 0 `TEST_EVIDENCE_VERIFIED`. `-Paigw.requireDocker=true` 를 빼면 fingerprint 의 `aigw.requireDocker` system property(`build.gradle.kts` `aigwInputComponents`)가 `false` 로 계산되어 `STALE_TEST_EVIDENCE`(exit 4)가 난다(실측). AGENTS.md §5 의 "integrationTest 는 `-Paigw.requireDocker=true` 동반" 그대로다.
   - `:gateway-app:test`·`:gateway-eval:test` 는 실행하지 않았다. 변경은 `integrationTest` source set 뿐이고 두 task 의 classpath 에 들어가지 않는다.
 - 남은 항목: Plan U2 진행 상태 줄(⑥ 미충족 `[~]`)은 Plan 개정 권한 밖이라 고치지 않았다. 남은 시험 컨테이너 0(`docker ps -a --filter label=org.testcontainers=true -q` 빈 출력), 이미지 삭제·다른 프로젝트 컨테이너 조작 0.
+
+## U3 모듈 디렉터리 이동·경로 갱신 (2026-11-10, commit 1+2 구현·로컬 검증, commit 3 결정 대기)
+
+- 범위: worktree `C:/workspace_nori/nori-ai-gateway-u3`(branch `aigw/align-u3`, 기준 `37e3852`). 로컬 commit 2개, push 0. commit 3(integration 분할)은 아래 "결정 대기" 때문에 하지 않았다. 이 절은 커밋하지 않았다.
+- commit:
+  - commit 1 `2676ca4d63a791e174db6d648057d1bb840df001` `refactor: move gateway modules under modules/ without content changes (U3 commit 1)` — `git mv` 만. `git show --stat -M` 마지막 줄 `557 files changed, 0 insertions(+), 0 deletions(-)`, `--name-status` 전부 `R100`(100% 이외 rename 0줄).
+  - commit 2 `2911c3c54bee8aaea244a9792b4a83e7e617d229` `build: map moved modules with projectDir and update module paths (U3 commit 2)` — 24개 파일, `104 insertions(+), 63 deletions(-)`.
+
+### 옛 경로 → 새 경로
+
+| 옛 디렉터리 · task 경로 | 새 디렉터리 · task 경로 |
+|---|---|
+| `gateway-core/` · `:gateway-core` | `modules/ai-gateway-core/` · `:ai-gateway-core` |
+| `gateway-persistence/` · `:gateway-persistence` | `modules/adapter/ai-gateway-db-adapter/` · `:adapter:ai-gateway-db-adapter` |
+| `gateway-integration/` · `:gateway-integration` | (commit 1+2 임시) `modules/adapter/ai-gateway-inference-adapter/` · `:adapter:ai-gateway-inference-adapter` — loki·tempo·gitlab 분리는 commit 3 |
+| `gateway-tc-mock/` · `:gateway-tc-mock` | `modules/adapter/ai-gateway-tc-mock-adapter/` · `:adapter:ai-gateway-tc-mock-adapter` |
+| `gateway-app/` · `:gateway-app` | `modules/apps/ai-gateway-app/` · `:apps:ai-gateway-app` |
+| `gateway-acceptance/` · `:gateway-acceptance` | `modules/apps/ai-gateway-acceptance-app/` · `:apps:ai-gateway-acceptance-app` |
+| `gateway-eval/` · `:gateway-eval` | 변경 없음 |
+| (없음) | 구조용 `:adapter` → `modules/adapter`, `:apps` → `modules/apps`(java 미적용, lockfile 없음 — nori-wm 과 같음) |
+
+### 결정과 근거
+
+- `settings.gradle.kts`: nori-wm `settings.gradle.kts` 의 블록 구성(`include` 다음 `project(":…").projectDir = file("modules/…")`, 구조용 `:adapter`·`:apps` projectDir 지정)을 그대로 따랐다. `:gateway-eval` 은 루트에 둔다(Plan §3.2 표 예외).
+- `gateway-integration` 의 commit 1 이동 대상: Plan 표는 분할 뒤 위치만 정한다. commit 2 뒤 ⑥ 이 `gateway-integration/` 0줄을 요구하므로 commit 1 에서 옮겨야 하고, 표에 있는 이름 중 모듈 전체를 담을 수 있는 것은 분할 뒤에도 같은 자리에 남는 추론+tokenizer 쪽 `modules/adapter/ai-gateway-inference-adapter/` 뿐이다(새 이름 0). commit 3 은 여기서 loki·tempo·gitlab 을 `git mv` 로 꺼내는 형태가 된다.
+- 루트 `build.gradle.kts`: integrationTest source set 대상 `project.name` 집합을 새 이름으로, `:gateway-app` 참조 3곳·`:gateway-acceptance` 1곳을 새 task 경로로 바꿨다.
+- `leaf-catalog-v2.json`: `task` 값 5개와 같은 값을 key 로 쓰는 `producerIndex` 의 key 1개(`LeafCatalogTest` 가 `producerIndex.path(task)` 를 대조)를 `:apps:ai-gateway-app:integrationTest` 로 바꿨다. leaf·원자 ID 변경 0.
+- 수용 배포본 시작 스크립트: application plugin 은 project 이름으로 `bin/<이름>` 을 만든다. `applicationName` 으로 옛 이름을 고정하지 않고 새 이름 `bin/ai-gateway-acceptance-app` 을 따르도록 `.gitlab-ci.yml`(package 검사 줄)과 `deploy/docker/Dockerfile-acceptance`(`test -x`·`ENTRYPOINT`)의 모듈 경로 문자열을 바꿨다. exec 의 ai-gateway 차트 템플릿에는 command override 가 없다(이미지 ENTRYPOINT 사용).
+- 범위 안 근본 수정(실행 순서 의존): 둘째 build 에서 `RepositorySignatureArchTest.nineRepositoriesRequireScopeAndMaintenanceCallersAreRestricted` 가 실패했다(기대 `upsert=[app.ops.SourceRetentionProbeScheduler]` 가 관측에 없음). 이 시험은 app 의 `build/classes/java/main` 이 있으면 읽고 없으면 건너뛴다. 옛 평면 경로에서는 실행 순서상 app compileJava 가 persistence test 보다 먼저 돌아 우연히 있었고, `:adapter:*` 가 `:apps:*` 보다 앞서는 지금은 없다. app `test` 의 `dependsOn(":gateway-eval:classes")` 와 같은 방식으로 db-adapter `test` 에 `dependsOn(":apps:ai-gateway-app:classes")` 를 넣었다(시험 classpath·fingerprint 불변).
+- TestKit fixture: `RuntimeClasspathFinalizerFunctionalTest` 의 fixture settings 도 `:apps:ai-gateway-app` + `:apps`·`:apps:ai-gateway-app` projectDir(`modules/apps/…`)로 바꿨다. 첫 실행은 `:apps` projectDir 를 지정하지 않아 `Configuring project ':apps' without an existing directory is not allowed` 로 실패했고, 실제 settings 와 같이 지정해 해소했다.
+- testFixtures 소유(Plan §3.2 "U3 에서 기록"): commit 1+2 에서는 `DockerRequiredExtension`(`com.nori.ai.gateway.integration.testing`)이 `:adapter:ai-gateway-inference-adapter` testFixtures 에 있다. 최종 소유는 commit 3 결정과 함께 기록한다.
+- lockfile: 모듈 `gradle.lockfile` 은 디렉터리와 함께 이동했고 build·integrationTest 뒤 `git status` 변경 0. `--write-locks` 는 실행하지 않았다(새 모듈 없음). nori-common 작업 트리 clean.
+
+### 명령 결과 (commit 1+2 검증 단위, 각 별도 실행, `--offline --no-daemon`, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값)
+
+- ① spec-guard exit 0 — `{"specInputOrigin":"LOCAL_FILE","specSha":"9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19","specShaSource":"FILE_HASHED"}`(이동 전 기준과 편집 뒤 각각).
+- ② `build`:
+  - 1회차 exit 1 — `RuntimeClasspathFinalizerFunctionalTest` 1건 실패(위 TestKit fixture), `BUILD FAILED in 11m 59s`. 수정 뒤 그 클래스만 실행 exit 0(`BUILD SUCCESSFUL in 2m`).
+  - 2회차 exit 1 — `RepositorySignatureArchTest` 1건 실패(위 실행 순서 의존), `BUILD FAILED in 8m 30s`.
+  - 3회차(`build --continue`) exit 0 — `BUILD SUCCESSFUL in 4m 21s`, `84 actionable tasks: 51 executed, 33 up-to-date`. JUnit(XML 집계, 실패·오류·skip 0): eval 280, core 117, db-adapter 12, inference-adapter 114, tc-mock-adapter 48, app 70(`ArchitectureRulesTest`·`ModuleConfigurationCompletenessTest` 포함), acceptance-app 41 — 합 682, U2 와 같은 건수.
+- ③ `integrationTest -Paigw.requireDocker=true --continue` exit 0 — `BUILD SUCCESSFUL in 1h 2m 12s`(05:37:03Z~06:39:17Z). JUnit: db-adapter 85, inference-adapter 1(`TokenizerNativeSmokeIT`), app 167, 실패·오류·skip 0. core·tc-mock-adapter·acceptance-app 은 `NO-SOURCE`(미등록 모듈).
+- `test-evidence verify`(Gradle 경로): test 7개 task·IT 3개 task(`-Paigw.requireDocker=true --require-docker`) 모두 exit 1 `NO_TESTS_EXECUTED`(`:gateway-eval:test` 단독은 exit 0 `TEST_EVIDENCE_VERIFIED`). 원인은 아래 결정 대기 1.
+  - 진단(레포 변경 0): scratchpad 에 `build`→루트 `build`, `ai-gateway-core`→`modules/ai-gateway-core`, `adapter`→`modules/adapter`, `apps`→`modules/apps`, `gateway-eval`→`gateway-eval` junction 을 둔 디렉터리에서 `gateway-eval` installDist 의 `EvalCli test-evidence verify --baseline <절대경로>` 를 실행하니 test 7개 task exit 0, IT 3개 task(`--require-docker`) exit 0, `--selector integrationTest --required ci/integration-required.txt --require-docker`(등록 클래스 검사 포함) exit 0, 모두 `TEST_EVIDENCE_VERIFIED`. 즉 증거·fingerprint 는 일치하고 verifier 의 디렉터리 해석만 맞지 않는다. junction 은 진단 뒤 링크만 지웠다.
+- ④ `aigwPackage -Paigw.gitSha=<HEAD>`(clean tree) exit 0 — `build-identity.json` = `{"appJarSha256":"b50dc7056cdfc379b391f7a2a80e80a7739bccf0e7a766c774388e0c8d5bba5a","gitSha":"2911c3c54bee8aaea244a9792b4a83e7e617d229","runtimeClasspathSha256":"965e90f240dd0002e8722ec1962d6c18907e0c642b1b4f1b32d86222b0f6e02b"}`, `acceptance/bin/ai-gateway-acceptance-app`(+`.bat`) 생성. gitSha 없는 `aigwPackage` 는 P15 설계대로 `BUILD_IDENTITY_GIT_SHA_MISSING` 이므로 양성 형식으로 실행했다.
+- ⑤ 경로 문자열을 바꾼 도구는 `ops/deploy/aigw-helm.sh`(fixture corpus 허용 디렉터리·기본 catalog 경로) 하나다. 기존 도구 이미지 `aigw-p06-tools:local`(`--network none`, 이 worktree·`nori-tc-exec` readonly mount, `AIGW_SELFTEST_EXEC_DIR=/nori-tc-exec`)로 실행, 모두 exit 0 `"status": "PASS"`: runconfig-selftest 25, stage-gate 29, runtime-credentials 81 명령, verify-credentials 42, rollback-rehearsal 92(`actualNetworkCalls: 0`), backup-alert-injection 9.
+- ⑥ 0줄 아님 — 4줄, 모두 allowed_writes 밖이거나 그 짝이라 바꾸지 않았다(결정 대기 2): `AGENTS.md:68`, `eval/py/tests/fixtures/pdg-vectors-plan-p08.json:2`, `gateway-eval/src/test/java/com/nori/ai/gateway/eval/CiEvidenceTest.java:101`, `modules/adapter/ai-gateway-tc-mock-adapter/src/test/resources/pdg-vectors-v1.json:2`.
+- 경로 길이: 이 worktree 안 최장 경로(`C:/workspace_nori/nori-ai-gateway-u3/` 포함)는 `modules/` 쪽 207자(`modules/adapter/ai-gateway-inference-adapter/build/classes/java/main/.../InferenceModelConfiguration$SingleAttemptHttpClient$1.class`), 추적 파일 181자. 240자 초과 249개는 모두 이동하지 않은 `gateway-eval/build/tmp/test/work/.gradle-test-kit/caches/…`(TestKit Gradle 캐시, 최장 321자)이다.
+- 증거·환경: `evidence/**`·SPEC·Plan 변경 0. 남은 시험 컨테이너 0(`docker ps -a --filter label=org.testcontainers=true -q` 빈 출력), Docker 이미지 목록은 시작 전과 같다(새로 만든 이미지 0, 삭제 0).
+
+### 결정 대기 (root)
+
+1. **eval verifier 의 task 경로 → 디렉터리 해석(차단):** `gateway-eval/src/main/java/com/nori/ai/gateway/eval/report/TestEvidenceVerifier.java:14-18`, `ci/BuildIdentityManifest.java:51`, `ci/CiEvidence.java:53-55` 가 `:a:b:task` 를 `<root>/a/b/build/…` 로 읽는다. projectDir 가 `modules/…` 인 지금은 `test-evidence verify`·`ci-evidence pack`·`--expect-build-identity` 가 `NO_TESTS_EXECUTED` 다. 세 파일은 U3 allowed_writes 밖이다(HarnessDigest ROOTS 의 `gateway-eval/src/main/java/com/nori/ai/gateway/eval/f0` 밖이므로 F0 digest 영향 0).
+2. **⑥ 잔존 4줄(allowed_writes 밖):** `AGENTS.md:68` 의 U5 이전 migration 경로, `eval/py/tests/fixtures/pdg-vectors-plan-p08.json:2` 의 정본 경로 설명(tc-mock `pdg-vectors-v1.json` 과 바이트 동일 사본이라 tc-mock 쪽도 함께 보류), `CiEvidenceTest.java:101` 의 가짜 `git status` 경로 문자열.
+3. **commit 3 분할의 공유 클래스 배치:** `integration.loki` 의 `SourceHttpClient`·`SourceReadAccess`(`SourceObservability`·`AllowlistClientRequestObservationConvention` 포함)를 tempo·gitlab 이 쓰고(`TempoTraceConnector` 는 `LokiSourcePolicy.APPS`·`LokiLogConnector.nanos` 도 사용), `loki.TcSourceAllowlist` 는 `gitlab.GitLabSourcePolicy` 를 쓴다. 패키지 단위로 나누면 loki ↔ gitlab 순환과 tempo·gitlab → loki 의존이 생겨 Plan §3.2 "integration 계열 adapter 사이 의존 0, adapter → core 만" 과 충돌한다. 시험도 `SourceAttemptGuardTest`(gitlab·loki·tempo 동시)·`ConnectorTestSupport`(공유)·`GitLabPipelineLineageTest`(→ `LokiQueryNotRecordedTest.Capture`)가 경계를 넘는다. 공유 클래스의 위치·이름은 Plan 표에 없다.
+
+### U3 결정 대기 1·2 처리 — fix commit (2026-11-10, root 승인)
+
+- commit `2c7b41744ec2e2fcbeaf925cbcf0655afacf96e5` `fix: resolve test evidence through the recorded projectDir and update residual module paths (U3)` — 11개 파일, `87 insertions(+), 19 deletions(-)`. commit 1·2 는 amend 하지 않았다.
+- 1(경로 해석): 루트 `build.gradle.kts` 의 `:gateway-eval:run` doFirst 가 `build/aigw-fingerprint/<task>.json` 에 `projectDir`(루트 기준 상대 경로, `/` 구분)를 함께 기록한다. `TestEvidenceVerifier` 는 그 값으로 정제 요약·run-binding 위치를 찾고, 값이 없거나 절대 경로이거나 루트 밖이면 `TEST_PROJECT_DIR_INVALID`(exit 4)다. 디렉터리 탐색·task 경로 유도는 하지 않는다. `BuildIdentityManifest.verifyTaskSummaries` 와 `CiEvidence.pack` 은 공용 `TestEvidenceVerifier.summaryFile(root, task)` 로 같은 위치를 읽는다. 묶음 항목 이름(`CiEvidence.summaryPath`)은 task 경로 기준 논리 이름 그대로다 — evidence 모드 job 에는 fingerprint 가 없으므로 `ci-evidence verify` 가 실제 projectDir 을 알 수 없다.
+- 실패 시험 먼저: `TestEvidenceVerifyTest.findsEvidenceOnlyThroughRecordedProjectDir`(`:sub` → `modules/sub`, projectDir 누락·루트 밖 거부), `CiEvidenceTest.runnerAndPackReadTaskEvidenceThroughRecordedProjectDir`(runner `--expect-build-identity`·pack·verify), `ProjectDirMappingFunctionalTest.verifyFindsEvidenceOfModuleMappedUnderModulesDirectory`(실제 루트 build TestKit, `:apps:sub` → `modules/apps/sub`). 수정 전 3건 모두 `NO_TESTS_EXECUTED` 로 실패(exit 1, `12 tests completed, 3 failed`), 수정 뒤 3 클래스 exit 0. 기존 fixture 의 fingerprint 에 `"projectDir":"sub"` 를 더했다(`TestEvidenceVerifyTest`·`CiEvidenceFixture`). 루트 `:sub` 를 쓰는 기존 TestKit 시험은 그대로 통과했다.
+- 2(⑥ 잔존 4줄): `AGENTS.md:68` 경로, `AGENTS.md:36` "U3 전까지는 왼쪽 열" 문구(→ "U3 에서 했다(왼쪽 열은 이동 전 디렉터리이고, `gateway-integration` 의 외부 시스템별 분할은 U3 셋째 commit 이다)"), pdg 벡터 사본 두 파일의 `source` 설명(바꾼 뒤 `cmp` 동일), `CiEvidenceTest.java:101` 가짜 status 경로. 다른 내용 변경 0. `AGENTS.md:42` 표 행에는 source-support 가 없다(이번 승인 범위 밖이라 그대로 둠).
+- 결과(각 별도, `--offline --no-daemon`):
+  - `:gateway-eval:test` exit 0 — `BUILD SUCCESSFUL in 8m 18s`, XML 57개 tests 283(종전 280 + 새 시험 3)·failures 0·errors 0·skipped 0. 직후 `test-evidence verify --tasks :gateway-eval:test` exit 0 `TEST_EVIDENCE_VERIFIED`.
+  - 재실행 없는 verify: test 6개(core·db-adapter·inference-adapter·app·acceptance-app + eval) exit 0 `TEST_EVIDENCE_VERIFIED`. `:adapter:ai-gateway-tc-mock-adapter:test` 는 exit 1 `STALE_TEST_EVIDENCE` — pdg 벡터 `src/test/resources/pdg-vectors-v1.json` 은 그 Test task classpath 이므로 fingerprint 가 정확히 바뀌었다. 그 task 만 재실행(exit 0, XML 7개 tests 48·실패 0) 뒤 verify exit 0. IT 3개 `--tasks …:integrationTest --require-docker -Paigw.requireDocker=true` exit 0, `--selector integrationTest --required ci/integration-required.txt --require-docker` exit 0, 모두 `TEST_EVIDENCE_VERIFIED`(commit 2 단계 IT 실행 결과).
+  - integrationTest 재실행이 불필요한 근거: `aigwInputFingerprint`(`build.gradle.kts` `aigwInputComponents`)의 입력은 Test task classpath 파일 내용·specSha·baselineSha256·catalogSha256·includeTags·testFilters·`aigw.*` system property 다. fix commit 이 바꾼 것은 `gateway-eval` main·test(IT classpath 밖), 루트 build 의 fingerprint 기록 형식(fingerprint 계산식 불변), AGENTS.md·eval/py(입력 아님), tc-mock 의 test resource(tc-mock `test` classpath 만 — app IT 는 tc-mock `testFixtures` 만 씀)다. 실제로 IT verify 가 재실행 없이 통과했다.
+  - ⑥ 0줄.
+
+## U3 commit 3 — integration 의 외부 시스템별 분할 + Source 공용 기반 (2026-11-10, 구현·로컬 검증)
+
+- commit `7cba8d45f8bb80f9f828defcddb8d07462980712` `refactor: split gateway-integration per external system with a shared source-support module (U3 commit 3)` — 70개 파일, `556 insertions(+), 175 deletions(-)`. rename 30개(R053~R100, `git mv` 로 이동 후 패키지·import 만 수정), 새 파일 12개(4개 모듈 build·lockfile, `TcSourcePolicy`, adapter 별 SourceAttemptGuardTest 3개). Plan §3.2 표 integration 행의 2026-11-10 사용자 결정(Source 공용 기반)을 계약으로 따랐다. Plan 파일은 root 미커밋 수정이라 stage·수정하지 않았다.
+
+### 대응표 (종전 `gateway-integration` → commit 3)
+
+| 종전(패키지·클래스) | commit 3 모듈 · 패키지 |
+|---|---|
+| `integration.inference.*`, `integration.tokenizer.*`, testFixtures `integration.testing.DockerRequiredExtension`, `TokenizerNativeSmokeIT` | `:adapter:ai-gateway-inference-adapter` · 그대로 |
+| `integration.IntegrationModuleConfiguration` | inference-adapter · `integration.InferenceAdapterModuleConfiguration`(이름 변경, `@Import` 항목 불변) |
+| `integration.loki.{SourceHttpClient,SourceReadAccess,SourceObservability,AllowlistClientRequestObservationConvention}` | `:adapter:ai-gateway-source-support` · `integration.source.*` |
+| `integration.loki.LokiSourcePolicy.APPS` | source-support · `integration.source.TcSourcePolicy.APPS` |
+| `integration.loki.LokiLogConnector.nanos(Instant)` | source-support · `integration.source.SourceHttpClient.nanos(Instant)` |
+| `integration.loki.{LokiLogConnector,LokiProperties,LokiRetentionProbe,LokiSourcePolicy(SOURCE_REF·selector·retentionSourceId)}` | `:adapter:ai-gateway-loki-adapter` · `integration.loki` |
+| `integration.tempo.TempoTraceConnector` | `:adapter:ai-gateway-tempo-adapter` · `integration.tempo` |
+| `integration.gitlab.*`, `integration.loki.TcSourceAllowlist` | `:adapter:ai-gateway-gitlab-adapter` · `integration.gitlab`(TcSourceAllowlist 는 패키지 이동) |
+| test `integration.ConnectorTestSupport`, `loki.LokiQueryNotRecordedTest.Capture` | source-support testFixtures · `integration.ConnectorTestSupport`(+ 중첩 `Capture`) |
+| test `loki.SourceHttpClientTest`, `loki.SourceHttpTerminationTest` | source-support test · `integration.source` |
+| test `loki.TcSourceAllowlistTest` | gitlab-adapter test · `integration.gitlab` |
+| app 시험 자원 `config/sources/**` 포함 | inference → gitlab-adapter test 자원(TcSourceAllowlistTest 만 사용) |
+
+### 결정과 근거
+
+- 새 이름(root 지시: 기존 이름·용어에서 선택):
+  - 앱 목록 → `TcSourcePolicy.APPS`. `<시스템>SourcePolicy` 는 기존 `LokiSourcePolicy`·`GitLabSourcePolicy` 의 이름 형식이고, `TcSource` 접두는 기존 `TcSourceAllowlist`·core `TcSourceAuthorizationPort` 와 같다. 필드 이름 `APPS` 는 그대로다.
+  - nanos → 새 클래스 없이 기존 `SourceHttpClient` 의 static 메서드. Loki(`start`/`end`)·Tempo(조회 창) 조회 파라미터를 만드는 Source HTTP 요청 형식이며 `SourceHttpClient.uri(…, query)` 와 같은 책임이다.
+  - `Capture` → 이름을 바꾸지 않고 testFixtures `ConnectorTestSupport` 의 중첩 클래스로 옮겼다(GitLab 시험이 loki 시험 클래스를 참조하던 경계 위반 해소).
+  - inference 의 module configuration → `InferenceAdapterModuleConfiguration`(nori-wm `UiKafkaAdapterModuleConfiguration` 등 `<…>AdapterModuleConfiguration` 형식). Plan §3.2 공통 예외 파일 목록의 "integration 계열 각 adapter 의 `*ModuleConfiguration.java`(클래스 이름은 U3 셋째 commit 에서 확정·기록)" 에 해당한다.
+- ModuleConfiguration: source-support·loki·tempo·gitlab 에는 두지 않았다. 네 모듈에 `@Component`·`@Configuration` 계열 클래스가 0개이고(`LokiProperties` 는 app `SourceConnectorConfiguration` 의 `@EnableConfigurationProperties`), 객체는 모두 app `SourceConnectorConfiguration` 의 `@Bean` 이 만든다. 종전 `IntegrationModuleConfiguration` 의 `@Import` 항목은 전부 inference·tokenizer 라 나눠 줄 항목이 없다. 빈 `@Import({})` 설정 클래스는 만들지 않았다. `ModuleConfigurationCompletenessTest` 는 `ArchitectureRulesTest.mainClasses()` 의 모든 main 산출물(새 4개 모듈 디렉터리 추가)에서 `@Component` 계열이 app 진입점에서 `@Import` 로 도달하는지 검사하며 통과했다.
+- 의존: `source-support` = `api(core, spring-web, micrometer-observation, micrometer-core, jackson-databind)`(공개 시그니처에 나오는 타입), loki = core + source-support + `spring-boot`(`@ConfigurationProperties`), tempo·gitlab = core + source-support. adapter 사이 의존을 막는 기존 ArchUnit 규칙은 없어(`ArchitectureRulesTest` 의 금지 방향은 persistence↔integration·tcmock→… 패키지 단위) Gradle 의존 그래프로 확인했다(`:adapter:ai-gateway-<m>:dependencies --configuration runtimeClasspath`, 각 exit 0, `project :` 줄 인용):
+  - source-support: `+--- project :ai-gateway-core`
+  - loki·tempo·gitlab 각각: `+--- project :ai-gateway-core` / `+--- project :adapter:ai-gateway-source-support` / `|    +--- project :ai-gateway-core (*)`
+  - inference: `+--- project :ai-gateway-core`
+- app 은 네 모듈을 모두 `implementation` 한다. acceptance 는 loki·source-support 를 더하고 inference 의존은 유지했다 — acceptance 코드는 inference 를 쓰지 않지만, 빼면 실행 classpath 에서 logback·spring-ai·djl·kafka·S3·object-storage 등이 빠지고 micrometer 런타임 버전이 1.17.2 → 1.16.6 으로 바뀐다(첫 `--write-locks` 의 acceptance lockfile diff 로 확인). 동작 변경 0 을 지키려고 유지했고 정리는 별도 결정으로 남긴다.
+- kafka starter·object-storage starter·AWS S3(P24 용): main·test 코드에서 쓰는 곳 0(`kafka`·`software.amazon`·`com.nori.storage` 참조 0). 지금은 inference-adapter 에 그대로 두었다(임의 결정 안 함). 판단 재료: inference main 의 `@ConditionalOnProperty`(spring-boot-autoconfigure)와 inference·acceptance 의 logback 은 `spring-boot-starter-kafka` 경유로만 들어온다(`:adapter:ai-gateway-inference-adapter:dependencyInsight --dependency spring-boot-autoconfigure|logback-classic --configuration compileClasspath`: `requested org.springframework.boot:spring-boot-starter-kafka` → `spring-boot-starter:4.0.7` → `spring-boot-starter-logging:4.0.7`). 제거하면 inference 에 `spring-boot-autoconfigure` 명시가 필요하고 acceptance 실행 classpath 가 바뀐다.
+- 시험 분할(단언 약화 0, JUnit 건수 integration 114 → 5개 모듈 합 123 = 114 − 5 + 13 + 1):
+
+| 종전 `SourceAttemptGuardTest` 메서드(kind 반복) | commit 3 위치 |
+|---|---|
+| `firstCheckAndRetryPreserveTheExactLifecycleExceptionEvenWhenScopeExpired`(logs·trace·code·lineage × retry) | `LokiSourceAttemptGuardTest`(logs), `TempoSourceAttemptGuardTest`(trace), `GitLabSourceAttemptGuardTest`(code·lineage) 같은 이름·같은 단언 |
+| `denialEmptyPermissionsAndUnavailableStopThePhysicalRetryWithoutChangingFailureClass` | 위 세 클래스 같은 이름·같은 단언 |
+| `anAllowedRetryReallyPerformsTwoHttpRequestsAndErrorsEscapeUnchanged`(logs 5건·그 외 2건 + logs `AssertionError` 블록) | Loki(5건 + `AssertionError` 블록), Tempo(2건), GitLab(code·lineage 각 2건) |
+| `lifecycleChangeDuringAuthorizationStopsTheVeryFirstHttpBeforeTransport` | 위 세 클래스 같은 이름·같은 단언 |
+| `timeSpentInTheGuardConsumesTheSameDeadlineBeforeTransportStarts`(전송기 전용) | source-support `integration.source.SourceAttemptGuardTest` |
+| `SourceHttpClientTest.transportDefaultsMatchApprovedConnectAndReadTimeouts` 의 `LokiProperties` 기본값 4개 단언 | `LokiPropertiesTest.lokiDefaultsMatchApprovedSplitLimitAndDeadline`(같은 4개 단언). 전송 timeout 단언은 원래 메서드에 남음 |
+
+- 관측 sourceId 허용 집합(`loki`·`tempo`·`gitlab`, `AllowlistClientRequestObservationConvention`)은 바꾸지 않았다(SPEC 허용 목록).
+- `ci/integration-required.txt`: 통합 IT 는 inference 의 `TokenizerNativeSmokeIT` 하나라 등록 줄은 그대로(`:adapter:ai-gateway-inference-adapter …`), 2행 주석의 IT 없는 모듈 목록에 새 4개 모듈을 더했다. 등록 IT FQCN 변경 0.
+- 루트 `build.gradle.kts` 의 integrationTest source set 대상 이름 집합, `ArchitectureRulesTest.mainClasses()`·`RepositorySignatureArchTest` 의 모듈 디렉터리 목록에 새 4개 모듈을 더했다.
+- lockfile: `resolveAndLockAll --write-locks` exit 0. 새 lockfile 4개, 내용이 바뀐 기존 lockfile 은 acceptance 하나(compileClasspath 에 source-support `api` 의존 추가 — runtimeClasspath 줄 변경 0). 나머지는 CRLF 만 달라 commit 때 정규화되어 변경 0. `../nori-common/build-logic/gradle.lockfile` 은 `git checkout` 으로 되돌려 nori-common clean.
+
+### 명령 결과 (commit 3 검증 단위, 각 별도, `--offline --no-daemon`)
+
+- ① spec-guard exit 0 — specSha `9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19`.
+- ② `build` exit 0 — `BUILD SUCCESSFUL in 10m 13s`. JUnit(XML 집계, 실패·오류·skip 0): eval 283, core 117, db-adapter 12, inference-adapter 43, source-support 8, loki-adapter 38, tempo-adapter 10, gitlab-adapter 24, tc-mock-adapter 48, app 70(`ArchitectureRulesTest`·`ModuleConfigurationCompletenessTest` 포함), acceptance-app 41 — 합 694. 직후 test 11개 `test-evidence verify --tasks …` exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ③ `integrationTest -Paigw.requireDocker=true`(비한정) exit 0 — `BUILD SUCCESSFUL in 1h 23s`(07:49:28Z~08:49:52Z). JUnit: db-adapter 85, inference-adapter 1, app 167, 실패·오류·skip 0. 나머지 8개 모듈 `NO-SOURCE`(미등록). 직후 `--tasks <IT 3개> --require-docker -Paigw.requireDocker=true` exit 0, `--selector integrationTest --required ci/integration-required.txt --require-docker` exit 0, 모두 `TEST_EVIDENCE_VERIFIED`.
+- ④ `aigwPackage -Paigw.gitSha=<HEAD 7cba8d4>` exit 1 `BUILD_IDENTITY_DIRTY_TREE` — 작업 트리에 root 소유 미커밋 Plan 수정과 이 Dev report 수정이 있어 설계대로 신원 기록을 거부했다. 같은 실행에서 `build/package/{app.jar,runtime-classpath.txt,acceptance/}` 는 만들어졌다(acceptance `bin/ai-gateway-acceptance-app`, lib 에 loki·source-support·inference jar, runtime-classpath 에 새 4개 모듈 좌표). clean tree 양성은 Plan·Dev report 커밋 뒤에 실행해야 한다.
+- ⑤ selftest 6종(`aigw-p06-tools:local`, `--network none`) 모두 exit 0 PASS: runconfig 25, stage-gate 29, runtime-credentials 81 명령, verify-credentials 42, rollback-rehearsal 92, backup-alert-injection 9. commit 3 은 셸·Python 도구를 바꾸지 않았다.
+- ⑥ `git grep …` 0줄(exit 1). 옛 FQCN(`integration.loki.SourceHttpClient` 등)·`LokiSourcePolicy.APPS`·`LokiLogConnector.nanos` 잔존 0(`docs`·`evidence` 제외).
+- 경로 길이: 추적 파일 최장 180자(`modules/adapter/ai-gateway-source-support/src/main/java/com/nori/ai/gateway/integration/source/AllowlistClientRequestObservationConvention.java`), build 산출물 포함 `modules/` 쪽 최장 207자. 240자 초과는 모두 `gateway-eval/build/tmp/test/work/.gradle-test-kit/caches/…`(이동 안 한 TestKit 캐시)뿐이다.
+- 환경: 남은 시험 컨테이너 0, Docker 이미지 목록 시작 전과 같음, nori-common clean, `evidence/**`·SPEC 변경 0.
