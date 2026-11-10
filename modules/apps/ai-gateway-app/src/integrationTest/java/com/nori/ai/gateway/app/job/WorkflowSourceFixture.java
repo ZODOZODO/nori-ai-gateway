@@ -1,5 +1,6 @@
 package com.nori.ai.gateway.app.job;
 
+import com.nori.ai.gateway.integration.source.*;
 import com.nori.ai.gateway.core.authz.SourceAuthorizationStep;
 import com.nori.ai.gateway.core.port.SourceRetentionReader;
 import com.nori.ai.gateway.integration.loki.*;
@@ -48,7 +49,7 @@ public class WorkflowSourceFixture {
                 String body;
                 if(exchange.getRequestURI().getPath().startsWith("/loki/")) {
                     logs.incrementAndGet();var query=query(exchange.getRequestURI());String selector=query.get("query");
-                    String app=LokiSourcePolicy.APPS.stream().filter(value->selector.contains("app=\""+value+"\"")).findFirst().orElseThrow();
+                    String app=TcSourcePolicy.APPS.stream().filter(value->selector.contains("app=\""+value+"\"")).findFirst().orElseThrow();
                     try{requestDigests.add(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest((app+"\n"+"tc"+"\n"+query.get("start")+"\n"+query.get("end")).getBytes(java.nio.charset.StandardCharsets.UTF_8))));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
                     // 실제 전달된 나노초 창의 첫 instant만 응답하므로 서버 fixture가 창을 축소하지 않습니다.
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("status","success","data",Map.of("resultType","streams","result",List.of(Map.of("stream",Map.of("app",app,"namespace","tc"),"values",List.of(List.of(query.get("start"),logText)))))));
@@ -58,7 +59,7 @@ public class WorkflowSourceFixture {
                 } else if(exchange.getRequestURI().getPath().startsWith("/api/traces/")) {
                     String id=exchange.getRequestURI().getPath().substring("/api/traces/".length());int index=Integer.parseInt(id.substring(28),16)-1;
                     var attributes=List.of(Map.of("key","service.name","value",Map.of("stringValue","tc-gateway")),Map.of("key","service.version","value",Map.of("stringValue",traceVersions.get(index))));
-                    var spans=List.of(Map.of("spanId",spanIds.isEmpty()?"span-"+index:spanIds.get(index),"name","equipment","startTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",LokiLogConnector.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
+                    var spans=List.of(Map.of("spanId",spanIds.isEmpty()?"span-"+index:spanIds.get(index),"name","equipment","startTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("batches",List.of(Map.of("resource",Map.of("attributes",attributes),"scopeSpans",List.of(Map.of("spans",spans))))));
                 } else if(exchange.getRequestURI().getPath().contains("/pipelines/")) {
                     String version=exchange.getRequestURI().getPath().split("/")[6];pipelines.add(version);body="[{\"id\":"+(Long.parseLong(version)*10+3)+",\"name\":\"package\",\"status\":\"success\"}]";

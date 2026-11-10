@@ -8,7 +8,7 @@ import com.nori.ai.gateway.core.result.ResultStatus;
 import com.nori.ai.gateway.core.scope.ActorRef;
 import com.nori.ai.gateway.core.scope.OwnerSystem;
 import com.nori.ai.gateway.core.scope.VerifiedSystemScope;
-import com.nori.ai.gateway.integration.loki.SourceHttpClient;
+import com.nori.ai.gateway.integration.source.SourceHttpClient;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.registry.otlp.OtlpMeterRegistry;

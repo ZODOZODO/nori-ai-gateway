@@ -79,7 +79,7 @@ class OracleQueriesTest {
             });
             default -> null;
         });
-        for (String app : com.nori.ai.gateway.integration.loki.LokiSourcePolicy.APPS) assertThat(new OracleQueries(capturing).retentionProbe(app)).isEmpty();
+        for (String app : com.nori.ai.gateway.integration.source.TcSourcePolicy.APPS) assertThat(new OracleQueries(capturing).retentionProbe(app)).isEmpty();
         assertThat(bound).containsExactly("sources://TC/logs/tc-gateway", "sources://TC/logs/tc-business", "sources://TC/logs/tc-ui-backend", "sources://TC/logs/tc-ui-front");
     }
 }

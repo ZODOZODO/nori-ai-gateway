@@ -1,6 +1,6 @@
 package com.nori.ai.gateway.app.hooks;
 
-import com.nori.ai.gateway.integration.loki.LokiSourcePolicy;
+import com.nori.ai.gateway.integration.source.TcSourcePolicy;
 import com.nori.ai.gateway.persistence.queue.TerminalCommitObserver;
 import io.micrometer.observation.*;
 import org.springframework.http.client.observation.ClientRequestObservationContext;
@@ -67,7 +67,7 @@ public final class SourceRequestProbe implements ObservationHandler<ClientReques
                 var matcher=SELECTOR.matcher(values.getOrDefault("query",""));String state="INVALID",digest="";
                 if(matcher.lookingAt()&&literalFilters(values.get("query").substring(matcher.end()))){
                     String app=matcher.group(1),namespace=matcher.group(2);var from=new BigInteger(values.get("start"));var to=new BigInteger(values.get("end"));if(from.compareTo(to)>=0)throw new IllegalArgumentException();
-                    state=LokiSourcePolicy.APPS.contains(app)&&namespace.equals("tc")?"ALLOWLIST":"OUTSIDE_ALLOWLIST";
+                    state=TcSourcePolicy.APPS.contains(app)&&namespace.equals("tc")?"ALLOWLIST":"OUTSIDE_ALLOWLIST";
                     digest=digest(app,namespace,from.toString(),to.toString());
                 }else if(values.getOrDefault("query","").startsWith("{namespace="))state="NAMESPACE_ONLY";
                 int index=data.attempts.size();data.attempts.add(new Attempt(digest,state,"STARTED"));context.put(Pending.class,new Pending(data,index));if(!state.equals("ALLOWLIST"))data.status="INVALID";

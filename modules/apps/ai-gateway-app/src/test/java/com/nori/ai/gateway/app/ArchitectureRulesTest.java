@@ -1,6 +1,6 @@
 package com.nori.ai.gateway.app;
 
-import com.nori.ai.gateway.integration.IntegrationModuleConfiguration;
+import com.nori.ai.gateway.integration.InferenceAdapterModuleConfiguration;
 import com.nori.ai.gateway.persistence.PersistenceModuleConfiguration;
 import com.nori.ai.gateway.tcmock.TcMockModuleConfiguration;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -110,7 +110,7 @@ class ArchitectureRulesTest {
     static JavaClasses mainClasses() throws Exception {
         Set<Path> locations = new HashSet<>();
         // 참조된 타입의 자동 해석에 기대지 않고 모든 제품 main 산출물을 직접 수집합니다.
-        for (String module : List.of("modules/apps/ai-gateway-app","modules/adapter/ai-gateway-db-adapter","modules/ai-gateway-core","modules/adapter/ai-gateway-inference-adapter","modules/adapter/ai-gateway-tc-mock-adapter","gateway-eval")) {
+        for (String module : List.of("modules/apps/ai-gateway-app","modules/adapter/ai-gateway-db-adapter","modules/ai-gateway-core","modules/adapter/ai-gateway-inference-adapter","modules/adapter/ai-gateway-source-support","modules/adapter/ai-gateway-loki-adapter","modules/adapter/ai-gateway-tempo-adapter","modules/adapter/ai-gateway-gitlab-adapter","modules/adapter/ai-gateway-tc-mock-adapter","gateway-eval")) {
             Path output = Path.of(System.getProperty("aigw.rootDir"),module,"build/classes/java/main");
             assertThat(output).isDirectory(); locations.add(output);
         }

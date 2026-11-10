@@ -1,5 +1,6 @@
 package com.nori.ai.gateway.app.ops;
 
+import com.nori.ai.gateway.integration.source.TcSourcePolicy;
 import com.nori.ai.gateway.app.config.SourceConnectorConfiguration.LokiProbeFactory;
 import com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput;
 import com.nori.ai.gateway.app.job.recovery.ReadinessGate;
@@ -61,7 +62,7 @@ public final class SourceRetentionProbeScheduler implements AutoCloseable {
         LokiProbeFactory factory = factories.getIfAvailable();
         ProbeWindowInput input = windows.getIfAvailable();
         if (factory == null || input == null) return;
-        for (String app : LokiSourcePolicy.APPS) {
+        for (String app : TcSourcePolicy.APPS) {
             String sourceId = LokiSourcePolicy.retentionSourceId(app);
             var window = input.window(sourceId, now);
             if (window.isEmpty()) continue;

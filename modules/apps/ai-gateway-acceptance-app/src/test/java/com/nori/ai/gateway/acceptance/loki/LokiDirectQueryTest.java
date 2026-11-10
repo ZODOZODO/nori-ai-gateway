@@ -1,8 +1,8 @@
 package com.nori.ai.gateway.acceptance.loki;
 
 import com.nori.ai.gateway.core.retention.TimeWindow;
-import com.nori.ai.gateway.integration.loki.SourceHttpClient;
-import com.nori.ai.gateway.integration.loki.SourceObservability;
+import com.nori.ai.gateway.integration.source.SourceHttpClient;
+import com.nori.ai.gateway.integration.source.SourceObservability;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;

@@ -68,7 +68,7 @@ subprojects {
             add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
         }
     }
-    if (project.name in setOf("ai-gateway-core", "ai-gateway-db-adapter", "ai-gateway-inference-adapter", "ai-gateway-tc-mock-adapter", "ai-gateway-app", "ai-gateway-acceptance-app")) {
+    if (project.name in setOf("ai-gateway-core", "ai-gateway-db-adapter", "ai-gateway-inference-adapter", "ai-gateway-source-support", "ai-gateway-loki-adapter", "ai-gateway-tempo-adapter", "ai-gateway-gitlab-adapter", "ai-gateway-tc-mock-adapter", "ai-gateway-app", "ai-gateway-acceptance-app")) {
         val integration = extensions.getByType<SourceSetContainer>().create("integrationTest")
         val main = extensions.getByType<SourceSetContainer>()["main"]
         integration.compileClasspath += main.output

@@ -2,7 +2,6 @@ plugins { `java-library`; `java-test-fixtures` }
 dependencies {
     implementation(project(":ai-gateway-core"))
     implementation("org.springframework:spring-web")
-    implementation("io.micrometer:micrometer-observation")
     implementation("io.micrometer:micrometer-core")
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation(platform(libs.spring.ai.bom))
@@ -19,14 +18,13 @@ dependencies {
     testImplementation(testFixtures(project(":adapter:ai-gateway-inference-adapter")))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation(libs.djl.tokenizers)
-    testImplementation("ch.qos.logback:logback-classic")
     testImplementation("io.micrometer:micrometer-core")
 }
 
-// 실제 Source 선언도 Connector 시험의 입력 지문에 포함합니다.
+// 앱이 쓰는 tokenizer 자료도 시험 입력 지문에 포함합니다(Source 선언은 gitlab adapter 시험으로 옮김).
 sourceSets.test {
     resources.srcDir(rootProject.file("modules/apps/ai-gateway-app/src/main/resources"))
-    resources.include("config/sources/**", "tokenizer/**")
+    resources.include("tokenizer/**")
 }
 
 tasks.named<Test>("integrationTest") {

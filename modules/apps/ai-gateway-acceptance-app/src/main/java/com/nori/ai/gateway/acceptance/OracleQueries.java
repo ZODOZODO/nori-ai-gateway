@@ -1,5 +1,6 @@
 package com.nori.ai.gateway.acceptance;
 
+import com.nori.ai.gateway.integration.source.TcSourcePolicy;
 import com.nori.ai.gateway.tcmock.verify.ResidueScanner;
 import com.nori.ai.gateway.integration.loki.LokiSourcePolicy;
 import java.sql.*;
@@ -124,7 +125,7 @@ public final class OracleQueries {
     }
     /** P14 저장 키 그대로: {@code SourceRetentionProbeScheduler} 가 쓰는 {@link LokiSourcePolicy#retentionSourceId} (허용 앱 목록 포함)를 재사용한다. */
     public Optional<RetentionProbe> retentionProbe(String lokiApp) {
-        if (!LokiSourcePolicy.APPS.contains(lokiApp)) throw new IllegalArgumentException("SOURCE_ID_INVALID");
+        if (!TcSourcePolicy.APPS.contains(lokiApp)) throw new IllegalArgumentException("SOURCE_ID_INVALID");
         String sourceId = LokiSourcePolicy.retentionSourceId(lokiApp);
         return query(Query.RETENTION_PROBE, rows -> rows.next() ? Optional.of(new RetentionProbe(instant(rows, 1), instant(rows, 2), instant(rows, 3).orElseThrow())) : Optional.<RetentionProbe>empty(), sourceId);
     }

@@ -65,7 +65,7 @@ final class WorkflowContent {
                     {target.put("startTimeUnixNano",start);target.put("endTimeUnixNano",end);}
                 // 기존 DeploymentEvidenceResolver 조회 조건(승인 앱·양의 long pipeline 번호)입니다.
                 String service=string(span,"service"),version=string(span,"serviceVersion");
-                if(service!=null&&com.nori.ai.gateway.integration.loki.LokiSourcePolicy.APPS.contains(service)&&version!=null&&version.matches("[1-9][0-9]*")&&fitsLong(version))target.put("serviceVersion",version);
+                if(service!=null&&com.nori.ai.gateway.integration.source.TcSourcePolicy.APPS.contains(service)&&version!=null&&version.matches("[1-9][0-9]*")&&fitsLong(version))target.put("serviceVersion",version);
             }
         }
         return new ResultBlock(masked.type(),masked.dataRef(),content);

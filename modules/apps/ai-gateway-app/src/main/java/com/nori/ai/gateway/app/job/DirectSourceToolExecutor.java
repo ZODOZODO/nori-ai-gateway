@@ -1,5 +1,6 @@
 package com.nori.ai.gateway.app.job;
 
+import com.nori.ai.gateway.integration.source.*;
 import com.nori.ai.gateway.core.dispatch.*;
 import com.nori.ai.gateway.core.plan.*;
 import com.nori.ai.gateway.core.registry.*;
@@ -57,7 +58,7 @@ public final class DirectSourceToolExecutor implements ToolExecutor {
     private ToolResultEnvelope traces(PlanStep step,CapabilityManifest manifest,VerifiedSystemScope scope,WorkflowResourceResolver resolver,SourceReadAccess.Request request) {
         var connector=traces.getIfAvailable();if(connector==null)return unavailable(manifest,scope);
         List<TempoTraceConnector.Trace> values=new ArrayList<>();Set<String> ids=new HashSet<>();List<String> missing=new ArrayList<>();Set<Warning> warnings=new HashSet<>();int observed=0;
-        for(String service:LokiSourcePolicy.APPS) {
+        for(String service:TcSourcePolicy.APPS) {
             resolver.beforeRead();var result=connector.search(request,service,window(step,resolver,scope));
             if(result.status()==ResultStatus.DENIED)return ToolResults.result(manifest,scope,ResultStatus.DENIED,List.of(),clock.instant(),List.of(),Set.of(),List.of(),null);
             if(result.status()==ResultStatus.SOURCE_UNAVAILABLE){missing.add(service);continue;}
@@ -81,7 +82,7 @@ public final class DirectSourceToolExecutor implements ToolExecutor {
         Map<String,DeploymentEvidenceResolver.Resolution> resolved=new HashMap<>();
         for(var origin:provenance) {
             DeploymentEvidenceResolver.Resolution resolution;
-            if(origin.isPresent()&&origin.get().service()!=null&&LokiSourcePolicy.APPS.contains(origin.get().service())) {
+            if(origin.isPresent()&&origin.get().service()!=null&&TcSourcePolicy.APPS.contains(origin.get().service())) {
                 var value=origin.get();String key=value.service()+"\u0000"+value.serviceVersion();
                 resolver.beforeRead();resolution=resolved.computeIfAbsent(key,ignored->deployments.resolve(request,value.service(),value.serviceVersion(),approved.deployLineage()));
             } else resolution=new DeploymentEvidenceResolver.Resolution(Optional.empty(),"UNKNOWN",List.of("deployed source commit","plugin JAR digest","effectiveConfig"),"CURRENT_APPROVED_REF");

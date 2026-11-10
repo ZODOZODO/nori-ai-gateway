@@ -35,7 +35,7 @@ class RepositorySignatureArchTest {
         }
         // 실제 제품 클래스 전체에서 유지보수 저장소의 실행 호출만 검사합니다. 빈 등록 의존은 호출이 아닙니다.
         var paths = new ArrayList<Path>();
-        for (String module : List.of("modules/adapter/ai-gateway-db-adapter", "modules/apps/ai-gateway-app", "modules/ai-gateway-core", "modules/adapter/ai-gateway-inference-adapter", "modules/adapter/ai-gateway-tc-mock-adapter")) {
+        for (String module : List.of("modules/adapter/ai-gateway-db-adapter", "modules/apps/ai-gateway-app", "modules/ai-gateway-core", "modules/adapter/ai-gateway-inference-adapter", "modules/adapter/ai-gateway-source-support", "modules/adapter/ai-gateway-loki-adapter", "modules/adapter/ai-gateway-tempo-adapter", "modules/adapter/ai-gateway-gitlab-adapter", "modules/adapter/ai-gateway-tc-mock-adapter")) {
             var path = root.resolve(module + "/build/classes/java/main"); if (Files.isDirectory(path)) paths.add(path);
         }
         var probeCallers = new HashMap<String,Set<String>>();

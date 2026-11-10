@@ -1,8 +1,8 @@
 package com.nori.ai.gateway.acceptance.loki;
 
+import com.nori.ai.gateway.integration.source.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nori.ai.gateway.core.retention.TimeWindow;
-import com.nori.ai.gateway.integration.loki.*;
 import java.time.*;
 import java.util.*;
 import java.math.BigInteger;
@@ -18,7 +18,7 @@ public final class LokiDirectQuery {
     public Observation measure(String app, TimeWindow window) {
         if (!CONTROL_APPS.contains(app)) throw new IllegalArgumentException("허용되지 않은 양성 제어 앱입니다");
         JsonNode root = http.json(http.uri(List.of("loki", "api", "v1", "query_range"), Map.of("query", "{app=\"" + app + "\", namespace=\"tc\"}",
-            "start", LokiLogConnector.nanos(window.startAt()), "end", LokiLogConnector.nanos(window.endAt()), "limit", 500, "direction", "backward")), null, http.deadline(Duration.ofSeconds(30))).body();
+            "start", SourceHttpClient.nanos(window.startAt()), "end", SourceHttpClient.nanos(window.endAt()), "limit", 500, "direction", "backward")), null, http.deadline(Duration.ofSeconds(30))).body();
         if (!"success".equals(root.path("status").asText()) || !"streams".equals(root.path("data").path("resultType").asText())
                 || !root.path("data").path("result").isArray()) throw new SourceHttpClient.Failure(false, false);
         int count = 0; Set<String> apps = new HashSet<>(), namespaces = new HashSet<>(); Instant oldest = null, newest = null;

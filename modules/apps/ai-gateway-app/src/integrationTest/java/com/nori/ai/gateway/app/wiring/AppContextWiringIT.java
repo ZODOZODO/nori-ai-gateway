@@ -2,7 +2,7 @@ package com.nori.ai.gateway.app.wiring;
 
 import com.nori.ai.gateway.app.StackContextSupport;
 import com.nori.ai.gateway.app.config.CoreBeansConfiguration;
-import com.nori.ai.gateway.integration.IntegrationModuleConfiguration;
+import com.nori.ai.gateway.integration.InferenceAdapterModuleConfiguration;
 import com.nori.ai.gateway.persistence.PersistenceModuleConfiguration;
 import com.nori.ai.gateway.tcmock.TcMockModuleConfiguration;
 import com.nori.ai.gateway.core.registry.*;
@@ -92,7 +92,7 @@ class AppContextWiringIT extends StackContextSupport {
     @Test void applicationImportsAllModulesAndRealP05CoreBeans() {
         start();
         assertThat(context.getEnvironment().getActiveProfiles()).contains("verify");
-        for (Class<?> type : new Class<?>[]{CoreBeansConfiguration.class, IntegrationModuleConfiguration.class,
+        for (Class<?> type : new Class<?>[]{CoreBeansConfiguration.class, InferenceAdapterModuleConfiguration.class,
                 PersistenceModuleConfiguration.class, TcMockModuleConfiguration.class, ManifestLoader.class,
                 CapabilityRegistry.class, ContractVersionPolicy.class, PlanValidator.class, ToolDispatcher.class,
                 ToolResultContractValidator.class, PlanInjectionSeam.class, DispatchInjectionSeam.class,
@@ -272,7 +272,7 @@ class AppContextWiringIT extends StackContextSupport {
     }
     private static final List<Class<?>> SOURCE_BEANS = List.of(com.nori.ai.gateway.integration.loki.LokiLogConnector.class, com.nori.ai.gateway.integration.tempo.TempoTraceConnector.class,
         com.nori.ai.gateway.integration.gitlab.GitLabCodeConnector.class, com.nori.ai.gateway.integration.gitlab.GitLabPipelineLineageReader.class,
-        com.nori.ai.gateway.integration.loki.SourceHttpClient.class, com.nori.ai.gateway.integration.loki.SourceReadAccess.class, com.nori.ai.gateway.integration.loki.SourceObservability.class,
+        com.nori.ai.gateway.integration.source.SourceHttpClient.class, com.nori.ai.gateway.integration.source.SourceReadAccess.class, com.nori.ai.gateway.integration.source.SourceObservability.class,
         com.nori.ai.gateway.app.config.SourceConnectorConfiguration.LokiProbeFactory.class, com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class,
         com.nori.ai.gateway.app.job.DirectSourceToolExecutor.GitExecutionScopes.class);
 
@@ -319,11 +319,11 @@ class AppContextWiringIT extends StackContextSupport {
             String tokenJson = ",\"readTokenFile\":\"" + token.toString().replace("\\", "\\\\") + "\"";
             try (var child = sourceChild(sourceDeclaration(target(true, base), target(true, base), target(true, base) + tokenJson))) {
                 for (Class<?> type : SOURCE_BEANS) if (type != com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class)
-                    assertThat(child.getBeansOfType(type)).as(type.getName()).hasSize(type == com.nori.ai.gateway.integration.loki.SourceHttpClient.class ? 3 : 1);
+                    assertThat(child.getBeansOfType(type)).as(type.getName()).hasSize(type == com.nori.ai.gateway.integration.source.SourceHttpClient.class ? 3 : 1);
                 assertThat(child.getBeansOfType(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class)).isEmpty();
                 var loki = child.getBean(com.nori.ai.gateway.integration.loki.LokiLogConnector.class);
                 assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "http")).isSameAs(child.getBean("lokiSourceHttpClient"));
-                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "access")).isSameAs(child.getBean(com.nori.ai.gateway.integration.loki.SourceReadAccess.class));
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "access")).isSameAs(child.getBean(com.nori.ai.gateway.integration.source.SourceReadAccess.class));
                 assertThat(org.springframework.test.util.ReflectionTestUtils.getField(loki, "retention")).isSameAs(context.getBean(com.nori.ai.gateway.core.port.SourceRetentionReader.class));
                 var scopes = child.getBean(com.nori.ai.gateway.app.job.DirectSourceToolExecutor.GitExecutionScopes.class);
                 assertThat(scopes.repositories()).singleElement().satisfies(repo -> assertThat(repo.sourceRepo()).isEqualTo("nori-tc-gateway"));
@@ -372,7 +372,7 @@ class AppContextWiringIT extends StackContextSupport {
             try (var child = sourceChild(sourceDeclaration(target(true, base) + probe + "{\"startAt\":\"" + startAt + "\",\"approvalRef\":\"local-gate-approval\"}", "", ""))) {
                 var input = child.getBean(com.nori.ai.gateway.app.config.SourceConnectorConfiguration.ProbeWindowInput.class);
                 assertThat(hits).as("기동 중 Source I/O 0").hasValue(afterPositive);
-                for (String app : com.nori.ai.gateway.integration.loki.LokiSourcePolicy.APPS) {
+                for (String app : com.nori.ai.gateway.integration.source.TcSourcePolicy.APPS) {
                     String sourceId = com.nori.ai.gateway.integration.loki.LokiSourcePolicy.retentionSourceId(app);
                     assertThat(input.window(sourceId, now)).contains(new com.nori.ai.gateway.core.retention.TimeWindow(startAt, now));
                     assertThat(input.window(sourceId, now.plus(java.time.Duration.ofHours(24)))).contains(new com.nori.ai.gateway.core.retention.TimeWindow(startAt, now.plus(java.time.Duration.ofHours(24))));

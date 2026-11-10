@@ -1,7 +1,7 @@
 package com.nori.ai.gateway.app.job;
 
 import com.nori.ai.gateway.integration.gitlab.*;
-import com.nori.ai.gateway.integration.loki.SourceReadAccess;
+import com.nori.ai.gateway.integration.source.SourceReadAccess;
 import org.springframework.beans.factory.ObjectProvider;
 import java.util.*;
 

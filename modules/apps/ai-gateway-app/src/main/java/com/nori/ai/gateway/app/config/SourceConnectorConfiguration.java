@@ -1,5 +1,6 @@
 package com.nori.ai.gateway.app.config;
 
+import com.nori.ai.gateway.integration.source.*;
 import com.nori.ai.gateway.app.job.DirectSourceToolExecutor;
 import com.nori.ai.gateway.core.authz.SourceAuthorizationStep;
 import com.nori.ai.gateway.core.port.SourceRetentionReader;
@@ -261,7 +262,7 @@ public class SourceConnectorConfiguration {
         }
         /** 네 앱의 보존 SourceId에 대해 startAt < now인 주기만 새 [startAt, now) 창을 만든다. 이전 창은 보관하지 않는다. */
         static ProbeWindowInput probeWindows(Instant startAt) {
-            Set<String> sourceIds = Set.copyOf(LokiSourcePolicy.APPS.stream().map(LokiSourcePolicy::retentionSourceId).toList());
+            Set<String> sourceIds = Set.copyOf(TcSourcePolicy.APPS.stream().map(LokiSourcePolicy::retentionSourceId).toList());
             return new ProbeWindowInput((sourceId, now) -> sourceIds.contains(sourceId) && startAt.isBefore(now) ? Optional.of(new TimeWindow(startAt, now)) : Optional.empty());
         }
         private String readDeclared() {
