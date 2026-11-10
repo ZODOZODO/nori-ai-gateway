@@ -7681,3 +7681,24 @@ P16의 이번 요청 범위는 CODE/LOCAL_VALIDATED로 마무리합니다. 구�
 - 부수 효과: `--write-locks` 는 composite 의 included build 에도 적용되어 `../nori-common/build-logic/gradle.lockfile` 을 CRLF 로 다시 쓴다(내용 차이 0, `git diff --ignore-cr-at-eol` 0줄). ②·⑦ 뒤 각각 `git checkout` 으로 되돌려 nori-common 은 clean 이다. 이 레포 lockfile 은 `.gitattributes` `eol=lf` 로 커밋 때 정규화된다.
 - 증거·환경: `evidence/**` 변경 0(빌드가 쓰는 시험 증거는 각 모듈 `build/aigw-otr`·`build/aigw-evidence` 와 루트 `build/aigw-fingerprint` 뿐). 남은 시험 컨테이너 0, 오늘 만든 Docker 이미지 0. 고정 이미지(pgvector·ryuk)는 병행 검증이 쓰는 중이라 남겼다.
 - 참고: `verifyDependencyMatrix` 금지 목록은 consumer 가 채운 것만 검사하며 이 레포는 채우지 않았다(U2 allowed_writes 에 없음).
+
+## gateway-app 통합 시험 기존 실패 2건 해소 (2026-11-10, 시험 기대값 정정·로컬 검증)
+
+- 범위: worktree `C:/workspace_nori/nori-ai-gateway-fix-it`(branch `aigw/fix-app-it`, 기준 `c8e6f40`). 커밋 없음. U2 ⑥ 에서 기록한 실패 2건(기준 `f2e50c1`·`c8e6f40` 모두 재현)을 다룬다. production 코드 변경 0.
+- `AdmissionMaskingIT.actualPostStoresOnlySanitizedUserMessageAndFailureRollsBackAllRows`(종전 `AdmissionMaskingIT.java:32`, 기대 `"[마스킹] …"`, 실제 `"service:TC"`):
+  - 원인: 시험 spy 는 `ContentSanitizer.sanitize` 의 **마지막** 호출 결과를 관측한다. P14(`7c810d2`)가 추가한 `AuditFieldAllowlist.requireService`(`gateway-core/.../audit/AuditFieldAllowlist.java:64`)는 인입 serviceRef 를 같은 sanitizer 로 검사하며, 같은 접수 tx 에서 질문 sanitize(`JobAdmissionService.java:88`) 직후 `audit.write(AuditEvent.jobAccepted(…))`(같은 파일 93줄)가 이 검사를 부른다. 그래서 마지막 호출이 `sanitize("service:TC")` 가 됐다. U2 절의 "P16 에서 기대값이 낡았다" 는 설명은 이 시험에는 맞지 않는다 — 이 시험은 P14 에서 깨졌다. P14 의 필터 명령(Plan §P14 명령 ①)에 이 클래스가 없었고 이후 P15~P19 도 필터 실행만 해서 드러나지 않았다.
+  - 판정: production 동작은 정본과 맞다. Plan P14 "`AuditFieldAllowlist`는 event별 필드 집합·기존 enum·CapabilityRegistry 소속을 검사한다(CoreBeans의 같은 sanitizer/registry 재사용)", SPEC §12.3 "허용값 검증과 호출자 제한은 실제 저장·실행 경계에서 강제해야 한다". 시험의 "마지막 호출" 관측이 낡았다.
+  - 수정: 질문 원문을 상수 `MASKED_QUESTION` 으로 두고 spy 가 그 입력의 호출 결과만 `observed` 에 담는다. 기존 단언(`observed.text()` = 저장된 `content_masked`, `ruleSetVersion` = `mask-v1`, `applied` = true)은 그대로다.
+- `WorkflowExpiryRaceIT.toolCallAuditFailureOnTheThrewPathIsCountedAndLoggedWhileThePrimaryCancellationWins`(종전 `WorkflowExpiryRaceIT.java:112`, TOOL_CALL `["tc.eqp.getOperationalSnapshot","tc.commLogs.search"]` vs 기대 `["tc.eqp.getOperationalSnapshot"]`):
+  - 원인: P16(`4397bbc`)이 `workflows/tc/INCIDENT_ANALYSIS.json` 에 `commLogs` 단계(`tc.commLogs.search`, `dependsOn: snapshot`)를 넣고 `logs` 를 그 뒤(`dependsOn: commLogs`)로 옮겼다. 같은 커밋은 `WorkflowMockIT` 기대값은 고쳤지만 이 시험(P14 작성)은 고치지 않았다.
+  - 판정: SPEC §6.3 순서 `tc.eqp.getOperationalSnapshot → tc.commLogs.search → tc.logs.search …` 와 같은 절 "TC 통신로그 READ 연결(2026-11-09 사용자 승인)" 이 정본이다. 시험 기대값이 낡았다.
+  - 수정: 조회에 `ORDER BY id` 를 붙이고 `containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search")` 로 바꿨다(trigger 가 `tc.logs.search` 감사만 거부하므로 앞선 두 Tool 감사가 단계 순서대로 저장된다). trigger 설명 주석도 snapshot·commLogs 로 맞췄다.
+- 변경 파일: `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/AdmissionMaskingIT.java`, `gateway-app/src/integrationTest/java/com/nori/ai/gateway/app/job/WorkflowExpiryRaceIT.java`, 이 Dev report. `evidence/**`·SPEC·Plan 변경 0.
+- 명령 결과(각 별도 실행, `--offline --no-daemon`, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값):
+  - ① spec-guard exit 0 — specSha `9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19`.
+  - ② 두 클래스 `--tests '*AdmissionMaskingIT' --tests '*WorkflowExpiryRaceIT'` exit 0 — `BUILD SUCCESSFUL in 5m 34s`. XML: AdmissionMaskingIT 2·WorkflowExpiryRaceIT 5, 실패·오류·skip 0.
+  - ③ 비한정 `:gateway-app:integrationTest -Paigw.requireDocker=true` 1회차 exit 1 — `BUILD FAILED in 1h 6m 17s`, 167건 중 실패 1(오류·skip 0): `IdempotentAdmissionIT.duplicateConflictExpiredAndCrossIdentityAreDistinct` 가 `PgTestDatabase.java:65` "격리 PostgreSQL 준비에 실패했습니다"(pgvector 컨테이너 `exited with code 255`, `database system is ready to accept connections` 대기 timeout). 수정 대상과 무관한 컨테이너 기동 실패다. 그 시험 구간(02:55:26Z 시작, 187s) 안에 다른 프로젝트의 Docker 스택이 기동했다(컨테이너 StartedAt 02:57:19Z~02:58:04Z, Docker VM 메모리 약 4GB). 경합이 원인이라는 것은 추정이다 — Docker 이벤트 버퍼에 그 구간이 남아 있지 않아 확정하지 못했다.
+  - ④ 비한정 재실행 exit 0 — `BUILD SUCCESSFUL in 52m 56s`. `gateway-app/build/test-results/integrationTest/*.xml` 44개 집계 tests 167·failures 0·errors 0·skipped 0(IdempotentAdmissionIT 3건 통과).
+  - ⑤ 직후 `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --tasks :gateway-app:integrationTest --require-docker"` exit 0 `TEST_EVIDENCE_VERIFIED`. `-Paigw.requireDocker=true` 를 빼면 fingerprint 의 `aigw.requireDocker` system property(`build.gradle.kts` `aigwInputComponents`)가 `false` 로 계산되어 `STALE_TEST_EVIDENCE`(exit 4)가 난다(실측). AGENTS.md §5 의 "integrationTest 는 `-Paigw.requireDocker=true` 동반" 그대로다.
+  - `:gateway-app:test`·`:gateway-eval:test` 는 실행하지 않았다. 변경은 `integrationTest` source set 뿐이고 두 task 의 classpath 에 들어가지 않는다.
+- 남은 항목: Plan U2 진행 상태 줄(⑥ 미충족 `[~]`)은 Plan 개정 권한 밖이라 고치지 않았다. 남은 시험 컨테이너 0(`docker ps -a --filter label=org.testcontainers=true -q` 빈 출력), 이미지 삭제·다른 프로젝트 컨테이너 조작 0.

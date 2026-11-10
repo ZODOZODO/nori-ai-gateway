@@ -1168,7 +1168,7 @@ LEFT JOIN gw.message pm ON pm.id=p.request_message_id AND pm.conversation_id=a.c
 
 ### U2 nori-common build-logic 채택 (모듈 이동 없음)
 
-- [x] 구현  - [~] 검증 — 부분: ①②③④⑤⑦ 충족 / 미충족 ⑥ `:gateway-app:integrationTest` 167건 중 실패 2(`AdmissionMaskingIT`·`WorkflowExpiryRaceIT`). 두 실패는 기준 `f2e50c1` 에서도 같은 메서드·같은 메시지로 재현되는 기존 결함이며 U2 회귀가 아니다. 결함 수정 단위 통과 뒤 ⑥ 재실행으로 검증을 채운다.
+- [x] 구현  - [x] 검증 — ⑥ 의 `:gateway-app:integrationTest` 실패 2(`AdmissionMaskingIT`·`WorkflowExpiryRaceIT`)는 기준 `f2e50c1` 에서도 재현되는 기존 결함이었고(P14 `7c810d2`·P16 `4397bbc` 이후 낡은 시험 기대값), 시험 수정 뒤 비한정 `:gateway-app:integrationTest -Paigw.requireDocker=true` 가 167건 실패·오류·skip 0, `test-evidence verify --require-docker` `TEST_EVIDENCE_VERIFIED` 다(Dev report "gateway-app 통합 시험 기존 실패 2건 해소" 절). persistence IT 85·integration IT 1 은 U2 실행에서 실패 0.
 - **2026-11-10 root 검증:** XML 독립 집계가 Dev report U2 절과 일치(test 7 task 682건 실패 0, persistence IT 85·integration IT 1 실패 0). root 가 main 작업 트리(`f2e50c1`)에서 두 클래스만 실행해 같은 2건 실패(7건 중 2, `BUILD FAILED in 8m 33s`)를 재현했다. `:gateway-app` `integrationTestRuntimeClasspath` 해석 결과를 main 과 비교하면 차이는 `com.nori:nori-object-storage-{api,s3-starter}` `0.0.1-SNAPSHOT` → `0.0.1` 뿐이다. settings marker `0.0.6` 은 `../nori-common/build-logic/build.gradle.kts:19` 의 source version 과 같다. nori-common 작업 트리 clean, 남은 시험 컨테이너 0.
 - 목표: 디렉터리를 옮기지 않고 빌드 기반만 nori-wm 방식으로 바꾼다(§3.1 2026-11-10 빌드). 빌드 실패 원인을 모듈 이동과 분리한다.
 - 선행: U1 검증. 외부: `../nori-common` 로컬 checkout, `nori-object-storage` 의 noricloud 고정 release 발행(버전·registry project id 를 이 단위에서 기록 — 미발행이면 U2 차단), 운영 GitLab `nori-ai-gateway` 프로젝트와 `nori-common` job-token allowlist 등록(CI clone 용 — 로컬 검증은 비차단, 첫 파이프라인 전 필수).

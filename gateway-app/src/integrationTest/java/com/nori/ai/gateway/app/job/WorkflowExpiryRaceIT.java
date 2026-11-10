@@ -87,7 +87,7 @@ class WorkflowExpiryRaceIT extends P09QueueSupport {
     @Test void toolCallAuditFailureOnTheThrewPathIsCountedAndLoggedWhileThePrimaryCancellationWins() throws Exception {
         try(var connection=database.connection("aigw_migrator");var statement=connection.createStatement()) {
             statement.execute("CREATE FUNCTION gw.reject_tool_call_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 Tool 감사 거부'; END $$");
-            // incident의 앞선 snapshot Tool 감사는 정상 저장되고, 차단 대상인 logs Tool 감사만 거부합니다.
+            // incident의 앞선 snapshot·commLogs Tool 감사는 정상 저장되고, 차단 대상인 logs Tool 감사만 거부합니다.
             statement.execute("CREATE TRIGGER reject_tool_call_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'TOOL_CALL' AND NEW.tool_id = 'tc.logs.search') EXECUTE FUNCTION gw.reject_tool_call_audit()");
         }
         var failures=context.getBean(io.micrometer.core.instrument.MeterRegistry.class).get(com.nori.ai.gateway.app.observability.MetricsCatalog.AUDIT_WRITE_FAILURES).counter();
@@ -108,8 +108,8 @@ class WorkflowExpiryRaceIT extends P09QueueSupport {
                 .containsExactly("AUDIT_WRITE_FAILED");
             assertThat(captured.list.stream().filter(event->"AUDIT_WRITE_FAILED".equals(event.getMessage()))).allSatisfy(event->{assertThat(event.getArgumentArray()).isNullOrEmpty();assertThat(event.getThrowableProxy()).isNull();});
             assertThat(assertJobAuditLineage(accepted.jobId(),true)).contains("TOOL_CALL");
-            assertThat(jdbc().sql("SELECT tool_id FROM gw.audit_event WHERE job_id=:id AND event_type='TOOL_CALL'").param("id",accepted.jobId()).query(String.class).list())
-                .containsExactly("tc.eqp.getOperationalSnapshot");
+            assertThat(jdbc().sql("SELECT tool_id FROM gw.audit_event WHERE job_id=:id AND event_type='TOOL_CALL' ORDER BY id").param("id",accepted.jobId()).query(String.class).list())
+                .containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search");
             assertThat(jdbc().sql("SELECT decision FROM gw.audit_event WHERE job_id=:id AND event_type='JOB_TERMINAL'").param("id",accepted.jobId()).query(String.class).single()).isEqualTo("CANCELLED");
         } finally { root.detachAppender(captured); captured.stop(); }
     }
