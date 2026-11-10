@@ -8,7 +8,11 @@
  * - composite 일 때만 ../nori-common/build-logic 을 이름 nori-common-build-logic 으로 include 하고 published 는 build-logic include 0개다.
  * - noriCatalog 는 두지 않는다. 이 레포는 com.nori.common 좌표를 소비하지 않고 settings-conventions 도 catalog 를 요구하지 않는다.
  * - 의존 저장소는 settings-conventions 가 settings 단위로 소유한다(FAIL_ON_PROJECT_REPOS, gradle.properties 의 gitlabPackageProjectIds).
- * - 모듈 디렉터리 이동과 projectDir 매핑은 U3 에서 한다(현재는 평면 include).
+ *
+ * 디렉터리 규약(nori-wm-ui-backend 와 같음, Plan §3.2 2026-11-10 모듈 경로 정렬·U3)
+ * - 제품 Gradle 모듈의 물리 위치는 modules/ 아래이고 논리 경로(:ai-gateway-core, :adapter:*, :apps:*)는 projectDir 로 매핑한다.
+ * - 모듈 간 내부 의존은 project(":...") 논리 경로로 참조한다.
+ * - :gateway-eval 은 예외로 루트 gateway-eval/ 에 그대로 둔다(F0 사전등록 문서·HarnessDigest 입력 경로).
  */
 
 pluginManagement {
@@ -79,4 +83,37 @@ plugins {
 }
 
 rootProject.name = "nori-ai-gateway"
-include("gateway-eval", "gateway-core", "gateway-persistence", "gateway-integration", "gateway-tc-mock", "gateway-app", "gateway-acceptance")
+/* ===================================================
+ * 1. F0 하네스·Eval CLI (이동 예외)
+ * =================================================== */
+
+include(":gateway-eval")
+
+/* ===================================================
+ * 2. Core Module
+ * =================================================== */
+
+include(":ai-gateway-core")
+project(":ai-gateway-core").projectDir = file("modules/ai-gateway-core")
+
+/* ===================================================
+ * 3. Adapter Modules
+ * =================================================== */
+
+include(":adapter:ai-gateway-db-adapter")
+project(":adapter").projectDir = file("modules/adapter")
+project(":adapter:ai-gateway-db-adapter").projectDir = file("modules/adapter/ai-gateway-db-adapter")
+include(":adapter:ai-gateway-inference-adapter")
+project(":adapter:ai-gateway-inference-adapter").projectDir = file("modules/adapter/ai-gateway-inference-adapter")
+include(":adapter:ai-gateway-tc-mock-adapter")
+project(":adapter:ai-gateway-tc-mock-adapter").projectDir = file("modules/adapter/ai-gateway-tc-mock-adapter")
+
+/* ===================================================
+ * 4. Application Modules (단일 조립 루트 앱 + 배포 수용 하네스)
+ * =================================================== */
+
+include(":apps:ai-gateway-app")
+project(":apps").projectDir = file("modules/apps")
+project(":apps:ai-gateway-app").projectDir = file("modules/apps/ai-gateway-app")
+include(":apps:ai-gateway-acceptance-app")
+project(":apps:ai-gateway-acceptance-app").projectDir = file("modules/apps/ai-gateway-acceptance-app")

@@ -59,7 +59,7 @@ class EvidenceIngestGuardTest {
     }
     @Test void itReferencePreservesOriginalBytesAndRejectsDifferentGitIdentity() throws Exception {
         EvidenceRepositoryFs repository=new EvidenceRepositoryFs(directory);repository.store(f.parent("F4","p"));
-        ObjectNode summary=f.record(Map.of("kind","RUN","status","COMPLETED","stage","F4","producer","JUNIT_OTR","runId","it1","taskPath",":gateway-app:integrationTest","otrSha256","a".repeat(64),"buildIdentity",f.identity("F4")));
+        ObjectNode summary=f.record(Map.of("kind","RUN","status","COMPLETED","stage","F4","producer","JUNIT_OTR","runId","it1","taskPath",":apps:ai-gateway-app:integrationTest","otrSha256","a".repeat(64),"buildIdentity",f.identity("F4")));
         ObjectNode leaf=f.leaf("F4","raw-parent","it1","AC-18-WORKER-RUN",0,"PASS","2026-10-29T00:00:01Z");Path input=directory.resolve("it/leaf-results.json");Json.write(input,Map.of("summary",summary,"records",List.of(leaf)));byte[] before=Files.readAllBytes(input);
         EvidenceIngestor ingestor=new EvidenceIngestor(repository,f.catalog);assertThat(ingestor.ingest(input,"junit-otr","F4","p",f.binding())).isEqualTo(1);assertThat(Files.readAllBytes(input)).isEqualTo(before);
         var report=new GateEvaluator().evaluate("F4","p",repository.readAll("F4"),f.catalog,SpecBaseline.parseChain(f.baseline));assertThat(report.leaves().stream().filter(l->l.leafId().equals("AC-18-WORKER-RUN")).findFirst().orElseThrow().result()).isEqualTo("PASS");

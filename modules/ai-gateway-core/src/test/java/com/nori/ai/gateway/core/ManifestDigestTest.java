@@ -45,7 +45,7 @@ class ManifestDigestTest {
         assertThatThrownBy(() -> loader.decode(bad)).isInstanceOf(IllegalArgumentException.class);
     }
     @Test void pathLoaderReadsAllNineActualContractsAndProtectsMutableSchema() {
-        var manifests = new ManifestLoader().load(ROOT.resolve("gateway-app/src/main/resources/manifests/tc"));
+        var manifests = new ManifestLoader().load(ROOT.resolve("modules/apps/ai-gateway-app/src/main/resources/manifests/tc"));
         assertThat(manifests).hasSize(10);
         var m = manifests.getFirst(); String before = m.schemaDigest();
         ((ObjectNode)m.inputSchema()).put("type", "null");

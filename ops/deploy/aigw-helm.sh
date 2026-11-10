@@ -55,7 +55,7 @@ if [[ $app == 1 ]]; then
   if [[ -n $fixture_catalog ]]; then
     # 허용 디렉터리(P23 corpus 목록) 밖 경로·심볼릭 링크는 거부한다.
     resolved=$(realpath -e -- "$fixture_catalog" 2>/dev/null) || error FIXTURE_CATALOG_INVALID
-    allowed=$(realpath -m -- gateway-app/src/main/resources/config/fixtures/corpus)
+    allowed=$(realpath -m -- modules/apps/ai-gateway-app/src/main/resources/config/fixtures/corpus)
     [[ $resolved == "$allowed"/* && ! -L $fixture_catalog && -f $resolved ]] || error FIXTURE_CATALOG_INVALID
   fi
   if [[ -z $baseline ]]; then baseline=docs/gates/spec-baseline.md; fi
@@ -164,7 +164,7 @@ if [[ $app == 1 ]]; then
   }
   # 쉼표가 든 JSON 은 --set 으로 넘기면 값이 쪼개지므로 파일로 넘긴다.
   printf '%s' "$(digest buildIdentityJson)" > "$tmp/build-identity.json"
-  catalog=${fixture_catalog:-gateway-app/src/main/resources/config/fixtures/corpus/tc-fixture-corpus-v1.yaml}
+  catalog=${fixture_catalog:-modules/apps/ai-gateway-app/src/main/resources/config/fixtures/corpus/tc-fixture-corpus-v1.yaml}
   if [[ $mode == lint ]]; then
     # lint 는 비밀 아닌 lint 전용 입력만 쓴다(승인값 아님).
     catalog=ops/runconfig/fixtures/lint-fixture-catalog.yaml

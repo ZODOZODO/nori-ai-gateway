@@ -1278,7 +1278,7 @@
           {
             "componentId": "IT",
             "producer": "JUNIT_OTR",
-            "task": ":gateway-app:integrationTest"
+            "task": ":apps:ai-gateway-app:integrationTest"
           }
         ]
       }
@@ -1302,7 +1302,7 @@
           {
             "componentId": "IT",
             "producer": "JUNIT_OTR",
-            "task": ":gateway-app:integrationTest"
+            "task": ":apps:ai-gateway-app:integrationTest"
           }
         ]
       }
@@ -1326,7 +1326,7 @@
           {
             "componentId": "IT",
             "producer": "JUNIT_OTR",
-            "task": ":gateway-app:integrationTest"
+            "task": ":apps:ai-gateway-app:integrationTest"
           }
         ]
       }
@@ -1350,7 +1350,7 @@
           {
             "componentId": "IT",
             "producer": "JUNIT_OTR",
-            "task": ":gateway-app:integrationTest"
+            "task": ":apps:ai-gateway-app:integrationTest"
           }
         ]
       }
@@ -1374,7 +1374,7 @@
           {
             "componentId": "IT",
             "producer": "JUNIT_OTR",
-            "task": ":gateway-app:integrationTest"
+            "task": ":apps:ai-gateway-app:integrationTest"
           }
         ]
       }
@@ -7029,7 +7029,7 @@
       "AC-33-LOADING",
       "AC-44"
     ],
-    ":gateway-app:integrationTest": [
+    ":apps:ai-gateway-app:integrationTest": [
       "AC-18-WORKER-RUN",
       "AC-18-WORKER-QUEUED-VALID",
       "AC-18-WORKER-QUEUED-EXPIRED",

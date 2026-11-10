@@ -1,6 +1,6 @@
 plugins { `java-library`; `java-test-fixtures` }
 dependencies {
-    implementation(project(":gateway-core"))
+    implementation(project(":ai-gateway-core"))
     implementation("org.springframework:spring-web")
     implementation("io.micrometer:micrometer-observation")
     implementation("io.micrometer:micrometer-core")
@@ -16,7 +16,7 @@ dependencies {
     testFixturesImplementation(platform(libs.spring.boot.bom))
     testFixturesImplementation("org.testcontainers:testcontainers")
     testFixturesImplementation(libs.junit.jupiter)
-    testImplementation(testFixtures(project(":gateway-integration")))
+    testImplementation(testFixtures(project(":adapter:ai-gateway-inference-adapter")))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation(libs.djl.tokenizers)
     testImplementation("ch.qos.logback:logback-classic")
@@ -25,7 +25,7 @@ dependencies {
 
 // 실제 Source 선언도 Connector 시험의 입력 지문에 포함합니다.
 sourceSets.test {
-    resources.srcDir(rootProject.file("gateway-app/src/main/resources"))
+    resources.srcDir(rootProject.file("modules/apps/ai-gateway-app/src/main/resources"))
     resources.include("config/sources/**", "tokenizer/**")
 }
 

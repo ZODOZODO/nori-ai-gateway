@@ -3,10 +3,10 @@ USER root
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 2000 aigw && useradd --uid 3000 --gid 2000 --no-create-home aigw
 COPY build/package/acceptance/ /opt/aigw-acceptance/
-RUN test -x /opt/aigw-acceptance/bin/gateway-acceptance \
+RUN test -x /opt/aigw-acceptance/bin/ai-gateway-acceptance-app \
     && test -d /opt/aigw-acceptance/lib \
     && chown -R root:root /opt/aigw-acceptance \
     && chmod -R go-w /opt/aigw-acceptance
 USER 3000:2000
 WORKDIR /tmp
-ENTRYPOINT ["/opt/aigw-acceptance/bin/gateway-acceptance"]
+ENTRYPOINT ["/opt/aigw-acceptance/bin/ai-gateway-acceptance-app"]

@@ -47,7 +47,7 @@ class WorkflowOptionalStepContractTest {
         assertThatThrownBy(() -> loader.decodeWorkflow(binding)).isInstanceOf(IllegalArgumentException.class);
     }
     private String readIncident() {
-        try{return java.nio.file.Files.readString(ROOT.resolve("gateway-app/src/main/resources/workflows/tc/INCIDENT_ANALYSIS.json"));}
+        try{return java.nio.file.Files.readString(ROOT.resolve("modules/apps/ai-gateway-app/src/main/resources/workflows/tc/INCIDENT_ANALYSIS.json"));}
         catch(java.io.IOException e){throw new IllegalStateException(e);}
     }
 }

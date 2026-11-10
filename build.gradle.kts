@@ -68,7 +68,7 @@ subprojects {
             add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
         }
     }
-    if (project.name in setOf("gateway-core", "gateway-persistence", "gateway-integration", "gateway-tc-mock", "gateway-app", "gateway-acceptance")) {
+    if (project.name in setOf("ai-gateway-core", "ai-gateway-db-adapter", "ai-gateway-inference-adapter", "ai-gateway-tc-mock-adapter", "ai-gateway-app", "ai-gateway-acceptance-app")) {
         val integration = extensions.getByType<SourceSetContainer>().create("integrationTest")
         val main = extensions.getByType<SourceSetContainer>()["main"]
         integration.compileClasspath += main.output
@@ -123,8 +123,8 @@ subprojects {
         val extraction = tasks.register<JavaExec>("${name}LeafEvidence") {
             workingDir = rootDir
             mainClass = "com.nori.ai.gateway.eval.EvalCli"
-            val app = rootProject.findProject(":gateway-app")
-            if (app != null) dependsOn(":gateway-app:writeRuntimeClasspath")
+            val app = rootProject.findProject(":apps:ai-gateway-app")
+            if (app != null) dependsOn(":apps:ai-gateway-app:writeRuntimeClasspath")
             val eval = rootProject.findProject(":gateway-eval")
             if (eval != null) {
                 classpath = eval.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
@@ -213,12 +213,12 @@ project(":gateway-eval") {
 // 패키징 정본: 한 번의 Gradle 호출에서 bootJar·수용 배포본·runtime classpath를 함께 만들어 신원이 갈라지지 않게 합니다.
 val aigwPackageDir = layout.buildDirectory.dir("package")
 val aigwPackage by tasks.registering(Sync::class) {
-    val app = project(":gateway-app")
+    val app = project(":apps:ai-gateway-app")
     into(aigwPackageDir)
     // bootJar 출력만 사용합니다. plain jar·installDist·Boot 배포 task 산출은 이미지에 들어가지 않습니다.
     from(app.tasks.named<Jar>("bootJar").flatMap { it.archiveFile }) { rename { "app.jar" } }
     from(app.tasks.named("writeRuntimeClasspath")) { rename { "runtime-classpath.txt" } }
-    from(project(":gateway-acceptance").tasks.named("installDist")) { into("acceptance") }
+    from(project(":apps:ai-gateway-acceptance-app").tasks.named("installDist")) { into("acceptance") }
 }
 val aigwBuildIdentity by tasks.registering {
     val gitSha = providers.gradleProperty("aigw.gitSha")

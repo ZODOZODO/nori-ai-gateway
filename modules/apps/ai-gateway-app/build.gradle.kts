@@ -8,10 +8,10 @@ plugins {
 }
 application { mainClass = "com.nori.ai.gateway.app.AiGatewayApplication" }
 dependencies {
-    implementation(project(":gateway-core"))
-    implementation(project(":gateway-persistence"))
-    implementation(project(":gateway-integration"))
-    implementation(project(":gateway-tc-mock"))
+    implementation(project(":ai-gateway-core"))
+    implementation(project(":adapter:ai-gateway-db-adapter"))
+    implementation(project(":adapter:ai-gateway-inference-adapter"))
+    implementation(project(":adapter:ai-gateway-tc-mock-adapter"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -27,9 +27,9 @@ dependencies {
     add("integrationTestImplementation", libs.json.schema.validator)
     testImplementation(libs.archunit)
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation(testFixtures(project(":gateway-integration")))
-    testImplementation(testFixtures(project(":gateway-persistence")))
-    testImplementation(testFixtures(project(":gateway-tc-mock")))
+    testImplementation(testFixtures(project(":adapter:ai-gateway-inference-adapter")))
+    testImplementation(testFixtures(project(":adapter:ai-gateway-db-adapter")))
+    testImplementation(testFixtures(project(":adapter:ai-gateway-tc-mock-adapter")))
     testImplementation(platform(libs.spring.ai.bom))
     testImplementation(libs.spring.ai.openai)
     testImplementation(libs.openai.java.okhttp)

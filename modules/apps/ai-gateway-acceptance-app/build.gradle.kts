@@ -2,11 +2,11 @@ plugins { application }
 // 배포 수용 하네스는 installDist 배포본으로만 실행합니다(Boot·fat-jar 0). Gateway 앱은 이 모듈에 의존하지 않습니다.
 application { mainClass = "com.nori.ai.gateway.acceptance.AcceptanceMain" }
 dependencies {
-    implementation(project(":gateway-core"))
-    implementation(project(":gateway-tc-mock"))
-    implementation(project(":gateway-integration"))
+    implementation(project(":ai-gateway-core"))
+    implementation(project(":adapter:ai-gateway-tc-mock-adapter"))
+    implementation(project(":adapter:ai-gateway-inference-adapter"))
     implementation("com.fasterxml.jackson.core:jackson-databind")
-    implementation(testFixtures(project(":gateway-tc-mock")))
+    implementation(testFixtures(project(":adapter:ai-gateway-tc-mock-adapter")))
     implementation("org.junit.jupiter:junit-jupiter-api")
     implementation("org.junit.platform:junit-platform-launcher")
     implementation("org.postgresql:postgresql")

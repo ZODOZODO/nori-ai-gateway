@@ -12,8 +12,8 @@ class RuntimeClasspathFinalizerFunctionalTest {
     @Test void rootFinalizerBuildsAndHashesRuntimeFileBeforeExtractingEvidence() throws Exception {
         TestKitSupport fixture = new TestKitSupport(directory);
         fixture.passingTest();
-        fixture.write("settings.gradle.kts", TestKitSupport.buildLogicSettings() + "rootProject.name=\"runtime-finalizer-fixture\"\ninclude(\"gateway-eval\",\"sub\",\"gateway-app\")\n");
-        fixture.write("gateway-app/build.gradle.kts", """
+        fixture.write("settings.gradle.kts", TestKitSupport.buildLogicSettings() + "rootProject.name=\"runtime-finalizer-fixture\"\ninclude(\"gateway-eval\",\"sub\",\":apps:ai-gateway-app\")\nproject(\":apps\").projectDir = file(\"modules/apps\")\nproject(\":apps:ai-gateway-app\").projectDir = file(\"modules/apps/ai-gateway-app\")\n");
+        fixture.write("modules/apps/ai-gateway-app/build.gradle.kts", """
             val runtime = layout.buildDirectory.file("aigw/runtime-classpath.txt")
             tasks.register("writeRuntimeClasspath") {
                 outputs.file(runtime)
@@ -27,16 +27,16 @@ class RuntimeClasspathFinalizerFunctionalTest {
         fixture.write(".git/HEAD", head + "\n");
         fixture.env.put("AIGW_GIT_SHA", "0".repeat(40));
         var build = fixture.run(false, ":sub:test");
-        assertThat(build.task(":gateway-app:writeRuntimeClasspath")).isNotNull();
-        assertThat(build.getOutput().indexOf(":gateway-app:writeRuntimeClasspath"))
+        assertThat(build.task(":apps:ai-gateway-app:writeRuntimeClasspath")).isNotNull();
+        assertThat(build.getOutput().indexOf(":apps:ai-gateway-app:writeRuntimeClasspath"))
             .isLessThan(build.getOutput().indexOf(":sub:testLeafEvidence"));
-        Path runtime = directory.resolve("gateway-app/build/aigw/runtime-classpath.txt");
+        Path runtime = directory.resolve("modules/apps/ai-gateway-app/build/aigw/runtime-classpath.txt");
         var evidence = Json.read(directory.resolve("sub/build/aigw-evidence/test/leaf-results.json"));
         assertThat(evidence.path("summary").path("buildIdentity").path("gitSha").asText()).isEqualTo(head);
         assertThat(evidence.path("summary").path("buildIdentity").path("runtimeClasspathSha256").asText()).isEqualTo(Json.sha(Json.bytes(runtime)));
         fixture.run(false, ":gateway-eval:run", fixture.verifyArgs(":sub:test"));
         Files.delete(runtime);
-        fixture.write("gateway-app/build.gradle.kts", "tasks.register(\"writeRuntimeClasspath\")\n");
+        fixture.write("modules/apps/ai-gateway-app/build.gradle.kts", "tasks.register(\"writeRuntimeClasspath\")\n");
         assertThat(fixture.run(true, ":sub:testLeafEvidence").getOutput()).contains("INPUT_MISSING");
         assertThat(directory.resolve("sub/build/aigw-evidence/test/leaf-results.json")).doesNotExist();
     }

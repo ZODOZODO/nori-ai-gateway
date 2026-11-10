@@ -12,7 +12,7 @@ class RuntimeClasspathCleanTest {
         assertThat(input).isNotBlank();
         Path file = Path.of(input);
         assertThat(file).isRegularFile();
-        assertThat(file.toString().replace('\\', '/')).endsWith("gateway-app/build/aigw/runtime-classpath.txt");
+        assertThat(file.toString().replace('\\', '/')).endsWith("modules/apps/ai-gateway-app/build/aigw/runtime-classpath.txt");
         String runtime = Files.readString(file);
         assertThat(runtime).isNotBlank().contains("org.springframework.boot:spring-boot:", "ai.djl.huggingface:tokenizers:",
             "native/lib/linux-x86_64/cpu/libtokenizers.so", "native/lib/win-x86_64/cpu/tokenizers.dll",

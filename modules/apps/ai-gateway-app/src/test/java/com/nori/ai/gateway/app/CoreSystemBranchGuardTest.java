@@ -15,7 +15,7 @@ class CoreSystemBranchGuardTest {
     private static final Set<String> SYSTEMS = Set.of("TC", "WM", "HRM");
 
     @Test void coreConditionsDoNotBranchByOwnerSystem() throws Exception {
-        Path source = Path.of(System.getProperty("aigw.rootDir"), "gateway-core/src/main/java");
+        Path source = Path.of(System.getProperty("aigw.rootDir"), "modules/ai-gateway-core/src/main/java");
         assertThat(source).isDirectory();
         try (var paths = Files.walk(source)) {
             List<Path> files = paths.filter(p -> p.toString().endsWith(".java") && !p.getFileName().toString().equals("OwnerSystem.java")).toList();

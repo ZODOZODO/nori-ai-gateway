@@ -38,6 +38,6 @@ POST `/v1/query`, `/v1/conversations/{id}/messages`, `/v1/analyses`는 dlg `[A-Z
 
 StubAssertionSigner는 tc-mock testFixtures에만 있습니다. `ephemeral(test-eph-...)`, `fromPrivateJwkFile(path)` 두 factory와 `sign(claims, providedInstant)`를 사용하며 iat는 제공 시각, exp는 정확히 +60초입니다. secret-file 오류는 ephemeral로 fallback하지 않습니다. 실제 배포 수용 suite는 승인된 secret-file만 사용해야 하며 P08은 배포 suite를 구현하지 않습니다. Gateway runtime에는 서명기·시험 인프라·개인키를 넣지 않습니다.
 
-pdg 정본은 비어 있지 않고 CR/LF 없는 catalogRevision, 비어 있지 않고 공백 없는 permCode 목록을 중복 제거·Unicode 코드포인트 정렬한 뒤 `revision + "\n" + join(perms,"\n")`의 UTF-8 SHA-256입니다. 끝 개행을 추가하지 않습니다. 고정 벡터는 `gateway-tc-mock/src/test/resources/pdg-vectors-v1.json`의 V1~V4/N1~N3이며 Java와 기존 Python 도구가 기대값과 비교합니다.
+pdg 정본은 비어 있지 않고 CR/LF 없는 catalogRevision, 비어 있지 않고 공백 없는 permCode 목록을 중복 제거·Unicode 코드포인트 정렬한 뒤 `revision + "\n" + join(perms,"\n")`의 UTF-8 SHA-256입니다. 끝 개행을 추가하지 않습니다. 고정 벡터는 `modules/adapter/ai-gateway-tc-mock-adapter/src/test/resources/pdg-vectors-v1.json`의 V1~V4/N1~N3이며 Java와 기존 Python 도구가 기대값과 비교합니다.
 
 V3.1을 먼저 migrator로 적용하고 최신 SchemaVersionGuard·자격·감사 실패 응답을 검증한 뒤 인입을 활성화합니다. rollback도 같은 schema와 승인 A 계약에 호환되는 앱만 허용합니다. 호환 앱이 없으면 인입 중단 후 forward-only 보정하며 기존 V 수정·미확인 감사 삭제·가짜 신원 채우기는 하지 않습니다.

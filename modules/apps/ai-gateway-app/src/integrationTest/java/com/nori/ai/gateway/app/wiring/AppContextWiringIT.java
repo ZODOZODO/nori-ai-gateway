@@ -277,7 +277,7 @@ class AppContextWiringIT extends StackContextSupport {
         com.nori.ai.gateway.app.job.DirectSourceToolExecutor.GitExecutionScopes.class);
 
     @Test void productionSourceDeclarationRegistersNoSourceBeanAndOnlyTheActualRetentionReader() throws Exception {
-        var declared = java.nio.file.Path.of(System.getProperty("aigw.rootDir"), "gateway-app/src/main/resources/config/sources/tc-sources-v1.json");
+        var declared = java.nio.file.Path.of(System.getProperty("aigw.rootDir"), "modules/apps/ai-gateway-app/src/main/resources/config/sources/tc-sources-v1.json");
         byte[] before = java.nio.file.Files.readAllBytes(declared);
         start();
         for (Class<?> type : SOURCE_BEANS) assertThat(context.getBeansOfType(type)).as(type.getName()).isEmpty();

@@ -85,7 +85,7 @@ class ArchitectureRulesTest {
         // 동명 타입·알려지지 않은 메서드·목록 밖 호출자를 허용하는 포괄 예외가 없습니다.
         assertThat(rules).doesNotContainKey("queue.UnrelatedReader.forWorker(java.lang.String)");
         assertThat(rules.get("queue.JobDelegationReader.forWorker(java.lang.String)")).doesNotContain("app.job.JobAdmissionService");
-        Path sources=Path.of(System.getProperty("aigw.rootDir"),"gateway-persistence/src/main/java/com/nori/ai/gateway/persistence");
+        Path sources=Path.of(System.getProperty("aigw.rootDir"),"modules/adapter/ai-gateway-db-adapter/src/main/java/com/nori/ai/gateway/persistence");
         var permitted=Set.of("repository/JobRepository.java","queue/JobDelegationReader.java","queue/JobTerminalCommitter.java");
         try(var paths=Files.walk(sources)){for(var file:paths.filter(p->p.toString().endsWith(".java")).toList())if(Files.readString(file).contains("delegation_id"))assertThat(permitted).contains(sources.relativize(file).toString().replace('\\','/'));}
     }
@@ -110,7 +110,7 @@ class ArchitectureRulesTest {
     static JavaClasses mainClasses() throws Exception {
         Set<Path> locations = new HashSet<>();
         // 참조된 타입의 자동 해석에 기대지 않고 모든 제품 main 산출물을 직접 수집합니다.
-        for (String module : List.of("gateway-app","gateway-persistence","gateway-core","gateway-integration","gateway-tc-mock","gateway-eval")) {
+        for (String module : List.of("modules/apps/ai-gateway-app","modules/adapter/ai-gateway-db-adapter","modules/ai-gateway-core","modules/adapter/ai-gateway-inference-adapter","modules/adapter/ai-gateway-tc-mock-adapter","gateway-eval")) {
             Path output = Path.of(System.getProperty("aigw.rootDir"),module,"build/classes/java/main");
             assertThat(output).isDirectory(); locations.add(output);
         }

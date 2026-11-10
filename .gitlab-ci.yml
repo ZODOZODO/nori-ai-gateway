@@ -105,7 +105,7 @@ build-image:
       test "$git_sha" = "$CI_COMMIT_SHA"
       printf '%s  build/package/app.jar\n' "$app_sha" | sha256sum --check --status
       printf '%s  build/package/runtime-classpath.txt\n' "$runtime_sha" | sha256sum --check --status
-      migrations_sha=$(find gateway-persistence/src/main/resources/db/migration/gateway -type f -print | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -d ' ' -f 1)
+      migrations_sha=$(find modules/adapter/ai-gateway-db-adapter/src/main/resources/db/migration/gateway -type f -print | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -d ' ' -f 1)
       mkdir -p build/image-digest
       /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile --destination "harbor.nori.local/nori-tc/ai-gateway:$CI_PIPELINE_ID" --build-arg "GIT_SHA=$git_sha" --build-arg "APP_JAR_SHA256=$app_sha" --build-arg "RUNTIME_CLASSPATH_SHA256=$runtime_sha" --build-arg "MIGRATIONS_SHA256=$migrations_sha" --digest-file build/image-digest/app.digest
   artifacts:
@@ -138,7 +138,7 @@ build-acceptance-image:
     entrypoint: ['']
   dependencies: [package]
   script:
-    - test -x build/package/acceptance/bin/gateway-acceptance
+    - test -x build/package/acceptance/bin/ai-gateway-acceptance-app
     - mkdir -p build/image-digest
     - '/kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile deploy/docker/Dockerfile-acceptance --destination "harbor.nori.local/nori-tc/ai-gateway-acceptance:$CI_PIPELINE_ID" --digest-file build/image-digest/acceptance.digest'
   artifacts:

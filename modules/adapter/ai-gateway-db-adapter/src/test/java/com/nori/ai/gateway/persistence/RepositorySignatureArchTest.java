@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 class RepositorySignatureArchTest {
     @Test void nineRepositoriesRequireScopeAndMaintenanceCallersAreRestricted() throws Exception {
         var root = Path.of(System.getProperty("aigw.rootDir"));
-        var classes = new ClassFileImporter().importPath(root.resolve("gateway-persistence/build/classes/java/main"));
+        var classes = new ClassFileImporter().importPath(root.resolve("modules/adapter/ai-gateway-db-adapter/build/classes/java/main"));
         var allRepositories = classes.stream().filter(type -> type.getSimpleName().endsWith("Repository")).toList();
         var expected = new HashSet<String>();
         for (String name : List.of("Conversation", "Message", "Job", "JobEvent", "Result", "Evidence", "ToolExecution", "Cache", "Audit"))
@@ -35,7 +35,7 @@ class RepositorySignatureArchTest {
         }
         // 실제 제품 클래스 전체에서 유지보수 저장소의 실행 호출만 검사합니다. 빈 등록 의존은 호출이 아닙니다.
         var paths = new ArrayList<Path>();
-        for (String module : List.of("gateway-persistence", "gateway-app", "gateway-core", "gateway-integration", "gateway-tc-mock")) {
+        for (String module : List.of("modules/adapter/ai-gateway-db-adapter", "modules/apps/ai-gateway-app", "modules/ai-gateway-core", "modules/adapter/ai-gateway-inference-adapter", "modules/adapter/ai-gateway-tc-mock-adapter")) {
             var path = root.resolve(module + "/build/classes/java/main"); if (Files.isDirectory(path)) paths.add(path);
         }
         var probeCallers = new HashMap<String,Set<String>>();
@@ -67,13 +67,13 @@ class RepositorySignatureArchTest {
         assertThat(methods.getFirst().getParameterTypes()).containsExactly(com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppend.class);
         assertThat(Arrays.stream(com.nori.ai.gateway.persistence.audit.auth.AuthRejectionAppend.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
             .containsExactly("requestId", "ownerSystem", "actorRef", "reason");
-        var source = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "gateway-persistence/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionAppendRepository.java"));
+        var source = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "modules/adapter/ai-gateway-db-adapter/src/main/java/com/nori/ai/gateway/persistence/audit/auth/AuthRejectionAppendRepository.java"));
         assertThat(source.split("INSERT INTO", -1)).hasSize(2);
         assertThat(source).doesNotContain("SELECT ", "DELETE ", "UPDATE ", "catch (", "Logger", "new VerifiedSystemScope");
     }
 
     @Test void jobQueriesNeverSelectWildcardOrReadDelegationOutsideDedicatedReader() throws Exception {
-        Path source = Path.of(System.getProperty("aigw.rootDir"), "gateway-persistence/src/main/java");
+        Path source = Path.of(System.getProperty("aigw.rootDir"), "modules/adapter/ai-gateway-db-adapter/src/main/java");
         try (var files = Files.walk(source)) {
             for (var file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
                 String content = Files.readString(file);
