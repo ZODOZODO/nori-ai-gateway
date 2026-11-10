@@ -15,10 +15,10 @@ class BackupColumnCoverageIT {
         Path root = Path.of(System.getProperty("aigw.rootDir"));
         List<String> listed = Files.readAllLines(root.resolve("ops/backup/job-columns-v1.txt")).stream().filter(line -> !line.isBlank()).toList();
         try (var database = new PgTestDatabase(System.getProperty("aigw.pgTestImage"), root).start()) {
-            database.bootstrap(false);
+            database.bootstrap();
             database.migrate();
             var actual = new ArrayList<String>();
-            try (var connection = database.connection("aigw_backup"); var statement = connection.prepareStatement(
+            try (var connection = database.connection(database.user()); var statement = connection.prepareStatement(
                     "SELECT column_name FROM information_schema.columns WHERE table_schema = 'gw' AND table_name = 'job' ORDER BY ordinal_position");
                  var rows = statement.executeQuery()) {
                 while (rows.next()) actual.add(rows.getString(1));

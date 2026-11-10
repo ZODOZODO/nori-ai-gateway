@@ -397,7 +397,7 @@ class IngressAuthIT extends StackContextSupport {
             assertThat(isolated.authenticated().statusCode()).isEqualTo(202);
             try (var connection = isolated.ownedDatabase().connection("postgres"); var statement = connection.createStatement()) { statement.execute("TRUNCATE gw.conversation, gw.audit_event CASCADE"); }
             isolated.application().getBean(IngressTerminalFixture.Counters.class).reset();
-            try (var connection = isolated.ownedDatabase().connection("aigw_migrator"); var statement = connection.createStatement()) {
+            try (var connection = isolated.ownedDatabase().connection(isolated.ownedDatabase().user()); var statement = connection.createStatement()) {
                 statement.execute("CREATE FUNCTION gw.reject_api_request_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 요청 감사 거부'; END $$");
                 statement.execute("CREATE TRIGGER reject_api_request_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'API_REQUEST') EXECUTE FUNCTION gw.reject_api_request_audit()");
             }
@@ -423,14 +423,14 @@ class IngressAuthIT extends StackContextSupport {
     @Test void realInsertPermissionFailureConverts401And403To503() throws Exception {
         try (var isolated = new IsolatedApplication(Map.of())) {
             isolated.open();
-            try (var connection = isolated.ownedDatabase().connection("postgres"); var statement = connection.createStatement()) { statement.execute("REVOKE INSERT ON gw.audit_event FROM aigw_app"); }
+            try (var connection = isolated.ownedDatabase().connection("postgres"); var statement = connection.createStatement()) { statement.execute("REVOKE INSERT ON gw.audit_event FROM " + isolated.ownedDatabase().user()); }
             isolated.assertUnavailable(false,true); isolated.assertUnavailable(true,true);
         }
     }
     @Test void realDeferredCommitFailureConverts401And403To503() throws Exception {
         try (var isolated = new IsolatedApplication(Map.of())) {
             isolated.open();
-            try (var connection = isolated.ownedDatabase().connection("aigw_migrator"); var statement = connection.createStatement()) {
+            try (var connection = isolated.ownedDatabase().connection(isolated.ownedDatabase().user()); var statement = connection.createStatement()) {
                 statement.execute("CREATE FUNCTION gw.reject_auth_commit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 감사 커밋 실패'; END $$");
                 statement.execute("CREATE CONSTRAINT TRIGGER reject_auth_commit AFTER INSERT ON gw.audit_event DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION gw.reject_auth_commit()");
             }

@@ -10,7 +10,7 @@ import static org.mockito.Mockito.*;
 class AdmissionMaskingIT extends P09QueueSupport {
     @Test void eventFailureRollsBackMessageJobSnapshotAndConversationInTheSameAdmission() throws Exception {
         pauses().hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");
-        try(var connection=database.connection("aigw_migrator");var sql=connection.createStatement()) {
+        try(var connection=database.connection(database.user());var sql=connection.createStatement()) {
             sql.execute("CREATE FUNCTION gw.p10_reject_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '접수 원자성 시험 실패'; END $$");
             sql.execute("CREATE TRIGGER p10_reject_event BEFORE INSERT ON gw.job_event FOR EACH ROW EXECUTE FUNCTION gw.p10_reject_event()");
         }

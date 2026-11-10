@@ -20,8 +20,8 @@ abstract class PgIntegrationSupport {
     }
     protected ConfigurableApplicationContext application(PgTestDatabase database, Class<?>... sources) {
         return new SpringApplicationBuilder(PersistenceApplication.class).sources(sources).web(WebApplicationType.NONE)
-            .properties(Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", "aigw_app",
-                "spring.datasource.password", database.passwordFor("aigw_app"), "spring.flyway.enabled", "false"))
+            .properties(Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", database.user(),
+                "spring.datasource.password", database.passwordFor(database.user()), "spring.flyway.enabled", "false"))
             .run();
     }
     @EnableAutoConfiguration @Import(PersistenceModuleConfiguration.class)

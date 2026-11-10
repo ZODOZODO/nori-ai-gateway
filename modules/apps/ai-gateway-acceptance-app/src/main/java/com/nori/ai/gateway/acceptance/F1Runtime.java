@@ -26,7 +26,7 @@ public final class F1Runtime {
             Path key=Path.of(required(config,"AIGW_SIGNER_PRIVATE_JWK_FILE"));var signer=StubAssertionSigner.fromPrivateJwkFile(key);
             var gateway=new GatewayClient(http,base,token,signer,hooks);var assertions=new F1Assertions((ECKey)JWK.parse(Files.readString(key)));
             OracleQueries oracle=null;
-            if(database){oracle=new OracleQueries(OracleQueries.postgres(required(config,"AIGW_DB_HOST"),config.secret("AIGW_DB_PASSWORD_FILE")));oracle.verifyDatabaseBoundary();}
+            if(database){oracle=new OracleQueries(OracleQueries.postgres(required(config,"AIGW_DB_HOST"),required(config,"AI_GATEWAY_DB_USER"),config.secret("AIGW_DB_PASSWORD_FILE")));oracle.verifyDatabaseBoundary();}
             return new Clients(gateway,hooks,oracle,assertions,token);
         }catch(OracleQueries.BoundaryViolation e){throw new AssertionError("F1_DATABASE_BOUNDARY");}
         catch(Exception e){throw new TestAbortedException("VERIFY_CREDENTIALS_MISSING");}

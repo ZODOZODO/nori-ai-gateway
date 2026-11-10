@@ -1,83 +1,55 @@
 package com.nori.ai.gateway.persistence;
 
 import org.junit.jupiter.api.Test;
-import java.sql.*;
 import java.nio.file.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
+/**
+ * 운영 순서 재현(Plan §8 2026-11-10): 서버 담당자 선행조건(DB·vector 0.8.7·DB 를 소유하는 단일 계정) → 외부 Flyway migrate
+ * (filesystem flyway/sql, 이력 gw_flyway) → 같은 계정으로 persistence 컨텍스트·SchemaVersionGuard 기동.
+ */
 class DbBootstrapOrderIT extends PgIntegrationSupport {
-    @Test void canonicalBootstrapMigrationAppAndRestrictedBackupAcceptanceRoles() throws Exception {
+    @Test void serverPrerequisitesThenExternalMigrationThenSameAccountPersistenceContext() throws Exception {
         try (var database = rawDatabase()) {
-            database.bootstrap(true); database.bootstrap(true);
-            try (var connection = database.connection("postgres"); var statement = connection.createStatement();
-                    var rows = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN ('gw','kn')")) {
-                assertThat(rows.next()).isTrue(); assertThat(rows.getInt(1)).isZero();
+            database.bootstrap(); database.bootstrap();
+            try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
+                try (var rows = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getInt(1)).isZero();
+                }
+                try (var rows = statement.executeQuery("SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getString(1)).isEqualTo(database.user());
+                }
+            }
+            try (var connection = database.connection(database.user()); var statement = connection.createStatement()) {
+                try (var rows = statement.executeQuery("SELECT rolsuper, has_database_privilege(current_user, current_database(), 'CREATE') FROM pg_roles WHERE rolname = current_user")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getBoolean(1)).isFalse(); assertThat(rows.getBoolean(2)).isTrue();
+                }
+                try (var rows = statement.executeQuery("SELECT extversion FROM pg_extension WHERE extname = 'vector'")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getString(1)).isEqualTo("0.8.7");
+                }
+                // DbSystemIdentifierReader 가 쓰는 함수는 서버에서 PUBLIC 실행이 가능하다(GRANT 불필요, 2026-11-10 확인).
+                try (var rows = statement.executeQuery("SELECT system_identifier FROM pg_control_system()")) { assertThat(rows.next()).isTrue(); }
             }
             database.migrate();
-            try (var context = application(database); var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
+            try (var context = application(database); var connection = database.connection(database.user()); var statement = connection.createStatement()) {
                 assertThat(context.getBean(com.nori.ai.gateway.persistence.schema.SchemaVersionGuard.class)).isNotNull();
+                assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT current_user").query(String.class).single()).isEqualTo(database.user());
                 statement.execute("INSERT INTO gw.conversation VALUES ('c','TC','actor',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '1 day','ACTIVE')");
                 assertThat(statement.executeUpdate("UPDATE gw.conversation SET status = 'ACTIVE' WHERE id = 'c'")).isEqualTo(1);
                 statement.execute("INSERT INTO gw.context VALUES ('c','TC','{}',CURRENT_TIMESTAMP)");
                 assertThat(statement.executeUpdate("DELETE FROM gw.context WHERE conversation_id = 'c'")).isEqualTo(1);
-                for (String sql : List.of("CREATE TABLE gw.forbidden(id integer)", "CREATE TABLE kn.forbidden(id integer)",
-                        "ALTER TABLE gw.conversation ADD COLUMN forbidden integer", "DROP TABLE gw.conversation",
-                        "TRUNCATE gw.conversation CASCADE", "CREATE TEMP TABLE forbidden(id integer)")) denied(statement, sql);
-            }
-            var tables = new ArrayList<String>();
-            try (var connection = database.connection("postgres"); var statement = connection.createStatement();
-                    var rows = statement.executeQuery("SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway') ORDER BY 1")) {
-                while (rows.next()) tables.add(rows.getString(1));
-            }
-            assertThat(tables).hasSize(16);
-            try (var connection = database.connection("aigw_backup"); var statement = connection.createStatement()) {
-                for (String table : tables) {
-                    try (var result = statement.executeQuery("SELECT count(*) FROM " + table)) { assertThat(result.next()).isTrue(); }
-                    if (!table.equals("gw.backup_run")) denied(statement, "INSERT INTO " + table + " DEFAULT VALUES");
-                    denied(statement, "DELETE FROM " + table);
-                    denied(statement, "TRUNCATE " + table + " CASCADE");
+                try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
+                    var versions = new ArrayList<String>(); while (rows.next()) versions.add(rows.getString(1));
+                    assertThat(versions).containsExactly("1", "2", "3", "3.1", "4", "5", "7");
                 }
-                statement.execute("INSERT INTO gw.backup_run(started_at,outcome) VALUES (CURRENT_TIMESTAMP,'STARTED')");
-                denied(statement, "UPDATE gw.backup_run SET outcome = 'CHANGED'");
-                denied(statement, "CREATE TABLE gw.forbidden(id integer)");
-            }
-            try (var connection = database.connection("aigw_acceptance_ro"); var statement = connection.createStatement()) {
-                statement.execute("SET default_transaction_read_only = off");
-                for (String table : tables) {
-                    try (var result = statement.executeQuery("SELECT count(*) FROM " + table)) { assertThat(result.next()).isTrue(); }
-                    denied(statement, "INSERT INTO " + table + " DEFAULT VALUES");
-                    denied(statement, "DELETE FROM " + table);
+                try (var rows = statement.executeQuery("SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway')")) {
+                    var owners = new ArrayList<String>(); while (rows.next()) owners.add(rows.getString(1));
+                    assertThat(owners).containsExactly(database.user());
                 }
-                for (String sql : List.of("UPDATE gw.conversation SET status = 'CHANGED'", "TRUNCATE gw.conversation CASCADE",
-                        "CREATE TABLE gw.forbidden(id integer)", "ALTER TABLE gw.conversation ADD COLUMN forbidden integer",
-                        "DROP TABLE gw.conversation", "CREATE TEMP TABLE forbidden(id integer)")) denied(statement, sql);
-                try (var result = statement.executeQuery("SELECT pg_has_role(current_user,'pg_read_all_data','MEMBER')")) {
-                    assertThat(result.next()).isTrue(); assertThat(result.getBoolean(1)).isTrue();
-                }
-            }
-            try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
-                statement.execute("CREATE DATABASE p07_outside");
-                for (String role : List.of("aigw_app", "aigw_backup")) for (String table : tables) {
-                    try (var result = statement.executeQuery("SELECT has_table_privilege('" + role + "','" + table + "','TRUNCATE,REFERENCES,TRIGGER')")) {
-                        assertThat(result.next()).isTrue(); assertThat(result.getBoolean(1)).isFalse();
-                    }
-                }
-            }
-            assertThat(database.acceptsViaUnix()).isTrue();
-            for (String name : List.of("postgres", "template1", "p07_outside")) for (boolean unix : List.of(false, true))
-                assertThat(database.rejectsOtherDatabase(name, unix)).as("HBA %s unix=%s", name, unix).isTrue();
-            database.bootstrap(false); database.bootstrap(false);
-            try (var connection = database.connection("postgres"); var statement = connection.createStatement();
-                    var result = statement.executeQuery("SELECT count(*) FROM pg_roles WHERE rolname = 'aigw_acceptance_ro'")) {
-                assertThat(result.next()).isTrue(); assertThat(result.getInt(1)).isZero();
             }
             String bootstrap = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "ops/postgres/bootstrap.sql"));
             assertThat(bootstrap).doesNotContainPattern("(?i)\\b(?:gw|kn|gw_flyway)\\.");
         }
-    }
-    private void denied(Statement statement, String sql) {
-        assertThatThrownBy(() -> statement.execute(sql)).as(sql).isInstanceOfSatisfying(SQLException.class,
-            failure -> assertThat(failure.getSQLState()).isEqualTo("42501"));
     }
 }

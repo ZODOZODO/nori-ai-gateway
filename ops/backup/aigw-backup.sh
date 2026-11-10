@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 검증 환경 일일 백업(Plan P15 M-6). 백업 이미지 안에서 db-chart CronJob 명령으로만 실행한다.
-# 입력(env): PGHOST·PGUSER(aigw_backup)·PGPASSWORD(Secret)·PGDATABASE(ai_gateway)·PGPORT,
+# 입력(env): PGHOST·PGUSER(단일 계정 — 이름은 env 로만)·PGPASSWORD(Secret)·PGDATABASE(nori_ai_gateway)·PGPORT,
 #   AIGW_BACKUP_DESTINATION, AIGW_BACKUP_AGE_RECIPIENT, AIGW_BACKUP_RETENTION_DAYS, AIGW_BACKUP_DEST_TYPE(이미지 고정),
 #   AIGW_BACKUP_CREDENTIALS_DIR(목적지 Secret 마운트), 선택 AIGW_BACKUP_DEST_OVERRIDE=unreachable-probe(경보 주입 전용).
 # 평문 덤프·Job 데이터는 파일로 쓰지 않고 파이프로만 age 에 넘긴다. 결과는 gw.backup_run 1행(SUCCESS|FAILED+단계 코드)이다.
@@ -14,7 +14,7 @@ die_input() { printf 'BACKUP_INPUT_INVALID:%s\n' "$1" >&2; exit 2; }
 [[ ${AIGW_BACKUP_DEST_TYPE:-} == s3 || ${AIGW_BACKUP_DEST_TYPE:-} == sftp ]] || die_input dest_type
 [[ ${AIGW_BACKUP_AGE_RECIPIENT:-} =~ ^age1[02-9ac-hj-np-z]{58}$ ]] || die_input age_recipient
 [[ ${AIGW_BACKUP_RETENTION_DAYS:-} =~ ^[1-9][0-9]{0,2}$ ]] || die_input retention_days
-[[ -n ${PGHOST:-} && ${PGUSER:-} == aigw_backup && ${PGDATABASE:-} == ai_gateway && -n ${PGPASSWORD:-} ]] || die_input pg_connection
+[[ -n ${PGHOST:-} && -n ${PGUSER:-} && ${PGDATABASE:-} == nori_ai_gateway && -n ${PGPASSWORD:-} ]] || die_input pg_connection
 [[ -d ${AIGW_BACKUP_CREDENTIALS_DIR:-} ]] || die_input credentials_dir
 [[ -d $PLAIN && -d $ENC && -z $(ls -A "$PLAIN") && -z $(ls -A "$ENC") ]] || die_input work_dirs
 destination=${AIGW_BACKUP_DESTINATION:-}
@@ -40,7 +40,7 @@ column_list=${column_list//,/, }
 utc() { date -u +%Y-%m-%dT%H:%M:%S.%6NZ; }
 started_at=$(utc)
 record() {
-  # aigw_backup 의 유일한 쓰기 권한(V3). 값은 스크립트가 만든 시각·고정 코드뿐이다.
+  # 백업이 쓰는 유일한 행(gw.backup_run). 값은 스크립트가 만든 시각·고정 코드뿐이다.
   local outcome=$1 detail=$2 point=$3
   psql -X -q -w -v ON_ERROR_STOP=1 -v started="$started_at" -v finished="$(utc)" -v outcome="$outcome" -v point="$point" -v detail="$detail" >/dev/null 2>&1 <<'SQL'
 INSERT INTO gw.backup_run(started_at, finished_at, outcome, backup_point_at, detail_code)

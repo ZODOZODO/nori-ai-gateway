@@ -85,7 +85,7 @@ class WorkflowExpiryRaceIT extends P09QueueSupport {
         assertThat(assertJobAuditLineage(accepted.jobId(),true)).contains("JOB_CLASSIFIED","TOOL_CALL");
     }
     @Test void toolCallAuditFailureOnTheThrewPathIsCountedAndLoggedWhileThePrimaryCancellationWins() throws Exception {
-        try(var connection=database.connection("aigw_migrator");var statement=connection.createStatement()) {
+        try(var connection=database.connection(database.user());var statement=connection.createStatement()) {
             statement.execute("CREATE FUNCTION gw.reject_tool_call_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 Tool 감사 거부'; END $$");
             // incident의 앞선 snapshot·commLogs Tool 감사는 정상 저장되고, 차단 대상인 logs Tool 감사만 거부합니다.
             statement.execute("CREATE TRIGGER reject_tool_call_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'TOOL_CALL' AND NEW.tool_id = 'tc.logs.search') EXECUTE FUNCTION gw.reject_tool_call_audit()");

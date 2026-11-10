@@ -56,7 +56,9 @@ class BackupScriptIT {
 
     final Path root = Path.of(System.getProperty("aigw.rootDir"));
     final String pgImage = System.getProperty("aigw.pgTestImage");
-    final Map<String,String> passwords = Map.of("postgres", secret(), "aigw_migrator", secret(), "aigw_app", secret(), "aigw_backup", secret());
+    /** 단일 계정(앱·migration·백업·복원이 함께 쓴다). 이름은 실행마다 무작위이고 원본·복원 대상 bootstrap 에 env 로만 전달한다. */
+    final String account = "acct_" + secret().substring(0, 12);
+    final Map<String,String> passwords = Map.of("postgres", secret(), account, secret());
     final String s3Key = "it-" + secret().substring(0, 12), s3Secret = secret();
     Network network;
     GenericContainer<?> source, seaweed, runner;
@@ -90,17 +92,17 @@ class BackupScriptIT {
             System.out.println("P15_BACKUP_IMAGE source=deploy/docker/Dockerfile-backup local-build pg=" + pgImage + " pins=" + new TreeMap<>(TOOL_PINS));
         }
         source = postgres("ai-gateway-db", 5432);
-        org.flywaydb.core.Flyway.configure().dataSource(jdbc(source, 5432), "aigw_migrator", passwords.get("aigw_migrator"))
-            .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").load().migrate();
+        org.flywaydb.core.Flyway.configure().dataSource(jdbc(source, 5432), account, passwords.get(account)).defaultSchema("gw_flyway").createSchemas(true)
+            .locations("filesystem:" + root.resolve(System.getProperty("aigw.flyway.sql.dir"))).load().migrate();
         seaweed = new GenericContainer<>(SEAWEED_IMAGE).withNetwork(network).withNetworkAliases("aigw-backup-s3")
             .withCommand("server", "-s3", "-s3.port=8333", "-dir=/data").withExposedPorts(8333)
             .waitingFor(Wait.forListeningPorts(8333).withStartupTimeout(Duration.ofMinutes(2)));
         seaweed.start();
         keys();
         runner = new GenericContainer<>(backupImage).withNetwork(network).withCommand("sleep", "infinity")
-            .withEnv(Map.of("PGHOST", "ai-gateway-db", "PGPORT", "5432", "PGUSER", "aigw_backup", "PGDATABASE", "ai_gateway", "PGPASSWORD", passwords.get("aigw_backup"),
+            .withEnv(Map.of("PGHOST", "ai-gateway-db", "PGPORT", "5432", "PGUSER", account, "PGDATABASE", "nori_ai_gateway", "PGPASSWORD", passwords.get(account),
                 "AIGW_BACKUP_DESTINATION", DESTINATION, "AIGW_BACKUP_AGE_RECIPIENT", recipient, "AIGW_BACKUP_RETENTION_DAYS", "7",
-                "AIGW_BACKUP_CREDENTIALS_DIR", "/run/aigw/backup-destination", "AIGW_RESTORE_PGPASSWORD", passwords.get("aigw_migrator")))
+                "AIGW_BACKUP_CREDENTIALS_DIR", "/run/aigw/backup-destination", "AIGW_RESTORE_PGPASSWORD", passwords.get(account)))
             .withTmpFs(Map.of("/work/plain", "rw,mode=0700,uid=999,gid=999,size=64m", "/work/enc", "rw,mode=0700,uid=999,gid=999"))
             .withCopyToContainer(Transferable.of(s3Key.getBytes(StandardCharsets.UTF_8), 0444), "/run/aigw/backup-destination/access-key")
             .withCopyToContainer(Transferable.of(s3Secret.getBytes(StandardCharsets.UTF_8), 0444), "/run/aigw/backup-destination/secret-key")
@@ -119,15 +121,15 @@ class BackupScriptIT {
     }
 
     @Test @Order(1) void backupUnderConcurrentWritesRestoresIntoIsolatedTarget() throws Exception {
-        long sequenceBefore = scalar(source, "aigw_app", "SELECT last_value FROM gw.job_seq_seq");
-        long jobsBefore = scalar(source, "aigw_app", "SELECT count(*) FROM gw.job");
+        long sequenceBefore = scalar(source, account, "SELECT last_value FROM gw.job_seq_seq");
+        long jobsBefore = scalar(source, account, "SELECT count(*) FROM gw.job");
         // 원본의 독립 기대값: 표별 행 내용 지문(job 은 delegation_id 제외)·행 수. audit_event 는 동시 쓰기 대상이라 아래에서 따로 본다.
         Map<String,String> sourceDigests = tableDigests(source, 5432);
         Map<String,Long> sourceCounts = tableCounts(source, 5432);
         long auditBefore = sourceCounts.get("gw.audit_event");
         var writing = new AtomicBoolean(true); var committed = new AtomicInteger(); var failure = new AtomicReference<Throwable>();
         var writer = new Thread(() -> {
-            try (var connection = DriverManager.getConnection(jdbc(source, 5432), "aigw_app", passwords.get("aigw_app"))) {
+            try (var connection = DriverManager.getConnection(jdbc(source, 5432), account, passwords.get(account))) {
                 while (writing.get()) {
                     try (var statement = connection.prepareStatement("INSERT INTO gw.audit_event(recorded_at, owner_system, actor_ref, request_id, event_type) VALUES (now(), 'TC', 'writer', ?, 'P15_BACKUP_PROBE')")) {
                         statement.setString(1, "req-" + (committed.get() + 1));
@@ -169,7 +171,7 @@ class BackupScriptIT {
         assertThat(decrypted.getStdout()).contains("\"delegationExcluded\":true", "CREATE TABLE gw.job");
         assertThat(ResidueScanner.scan(Map.of("bundle", decrypted.getStdout()), Set.of(DLG_SENTINEL)).matchCount()).isZero();
 
-        // N15: bootstrap 만 된 빈 대상에 aigw_migrator 로 복원.
+        // N15: bootstrap 만 된 빈 대상에 단일 계정으로 복원.
         var target = postgres("ai-gateway-db-restore", 15432);
         var restore = restore("/tmp/restore/" + bundle, "/tmp/receipt-1");
         assertThat(restore.getExitCode()).as("restore stderr=%s", restore.getStderr()).isZero();
@@ -196,16 +198,16 @@ class BackupScriptIT {
             assertThat(restoredCounts.get(table)).as(table).isEqualTo(sourceCounts.get(table));
             assertThat(receipt.path("tableRowCounts").path(table).asLong(-1)).as("receipt " + table).isEqualTo(sourceCounts.get(table));
         }
-        long probes = scalar(target, 15432, "aigw_migrator", "SELECT count(*) FROM gw.audit_event WHERE event_type = 'P15_BACKUP_PROBE'");
+        long probes = scalar(target, 15432, account, "SELECT count(*) FROM gw.audit_event WHERE event_type = 'P15_BACKUP_PROBE'");
         assertThat(restoredCounts.get("gw.audit_event")).isEqualTo(auditBefore + probes);
         assertThat(probes).isBetween((long) committedAtStart, (long) committedAtEnd);
-        assertThat(scalar(target, 15432, "aigw_migrator", "SELECT count(*) FROM gw.audit_event WHERE event_type = 'P15_BACKUP_PROBE' AND request_id NOT IN"
+        assertThat(scalar(target, 15432, account, "SELECT count(*) FROM gw.audit_event WHERE event_type = 'P15_BACKUP_PROBE' AND request_id NOT IN"
             + " (SELECT 'req-' || g FROM generate_series(1, " + probes + ") g)")).as("snapshot 은 commit 순서의 접두사").isZero();
-        assertThat(scalar(target, 15432, "aigw_migrator", "SELECT count(*) FROM gw.job WHERE delegation_id IS NOT NULL")).isZero();
-        assertThat(scalar(target, 15432, "aigw_migrator", "SELECT count(*) FROM gw.job j LEFT JOIN gw.message m ON m.id = j.request_message_id AND m.conversation_id = j.conversation_id"
+        assertThat(scalar(target, 15432, account, "SELECT count(*) FROM gw.job WHERE delegation_id IS NOT NULL")).isZero();
+        assertThat(scalar(target, 15432, account, "SELECT count(*) FROM gw.job j LEFT JOIN gw.message m ON m.id = j.request_message_id AND m.conversation_id = j.conversation_id"
             + " WHERE m.id IS NULL")).as("Job → 요청 Message 연관").isZero();
         // 덤프의 SEQUENCE SET 이 원래 counter 를 복원한다(setval 보정 0).
-        assertThat(scalar(target, 15432, "aigw_migrator", "SELECT last_value FROM gw.job_seq_seq")).isEqualTo(sequenceBefore);
+        assertThat(scalar(target, 15432, account, "SELECT last_value FROM gw.job_seq_seq")).isEqualTo(sequenceBefore);
         // P10 요청 입력은 실제 reader(JobRepository.findRequestInput, owner/actor scope)로 읽어 원본과 같아야 한다.
         for (String job : List.of("job-done", "job-running", "job-queued")) {
             var original = requestInput(source, 5432, job);
@@ -215,12 +217,12 @@ class BackupScriptIT {
             assertThat(restored.requestFields()).isEqualTo(original.requestFields()).isEqualTo(REQUEST_FIELDS);
             assertThat(restored.selectedResourceRefs()).hasSize(1);
         }
-        try (var connection = DriverManager.getConnection(jdbc(target, 15432), "aigw_app", passwords.get("aigw_app"))) {
+        try (var connection = DriverManager.getConnection(jdbc(target, 15432), account, passwords.get(account))) {
             connection.setAutoCommit(false);
             insertJob(connection, "job-after-restore", "SUCCEEDED", null);
             connection.commit();
         }
-        assertThat(scalar(target, 15432, "aigw_migrator", "SELECT seq FROM gw.job WHERE id = 'job-after-restore'")).isGreaterThan(sequenceBefore);
+        assertThat(scalar(target, 15432, account, "SELECT seq FROM gw.job WHERE id = 'job-after-restore'")).isGreaterThan(sequenceBefore);
 
         // 비어 있지 않은 DB 에는 쓰지 않는다.
         Map<String,String> beforeReject = tableDigests(target, 15432);
@@ -232,19 +234,19 @@ class BackupScriptIT {
     }
 
     @Test @Order(2) void failedDestinationRecordsFailedAndUnknownOverrideIsRejected() throws Exception {
-        var metrics = new BackupStatusMetrics(JdbcClient.create(new DriverManagerDataSource(jdbc(source, 5432), "aigw_app", passwords.get("aigw_app"))), new SimpleMeterRegistry());
-        long rows = scalar(source, "aigw_backup", "SELECT count(*) FROM gw.backup_run");
+        var metrics = new BackupStatusMetrics(JdbcClient.create(new DriverManagerDataSource(jdbc(source, 5432), account, passwords.get(account))), new SimpleMeterRegistry());
+        long rows = scalar(source, account, "SELECT count(*) FROM gw.backup_run");
         var probe = exec(runner, "sh", "-c", "AIGW_BACKUP_DEST_OVERRIDE=unreachable-probe exec /opt/aigw/aigw-backup.sh");
         assertThat(probe.getExitCode()).isNotZero();
         assertThat(probe.getStderr()).contains("BACKUP_FAILED:UPLOAD");
         assertThat(latestOutcome()).isEqualTo("FAILED");
-        assertThat(scalar(source, "aigw_backup", "SELECT count(*) FROM gw.backup_run")).isEqualTo(rows + 1);
+        assertThat(scalar(source, account, "SELECT count(*) FROM gw.backup_run")).isEqualTo(rows + 1);
         assertThat(exec(runner, "find", "/work", "-mindepth", "2").getStdout()).isBlank();
         assertThat(metrics.lastRunFailed()).isEqualTo(1.0);
         assertThat(metrics.lastSuccessEpochSeconds()).isPositive();
         var invalid = exec(runner, "sh", "-c", "AIGW_BACKUP_DEST_OVERRIDE=s3://elsewhere exec /opt/aigw/aigw-backup.sh");
         assertThat(invalid.getExitCode()).isEqualTo(2);
-        assertThat(scalar(source, "aigw_backup", "SELECT count(*) FROM gw.backup_run")).isEqualTo(rows + 1);
+        assertThat(scalar(source, account, "SELECT count(*) FROM gw.backup_run")).isEqualTo(rows + 1);
         var recovered = exec(runner, "/opt/aigw/aigw-backup.sh");
         assertThat(recovered.getExitCode()).isZero();
         assertThat(metrics.lastRunFailed()).isZero();
@@ -252,15 +254,15 @@ class BackupScriptIT {
 
     @Test @Order(3) void corruptedTocEntryStopsRestoreAtThatStep() throws Exception {
         // 대상에 없는 역할의 ACL 을 가진 항목 1개를 넣은 묶음은 그 TOC 항목에서 즉시 중단해야 한다.
-        exec(source, "psql", "-X", "-w", "-U", "postgres", "-d", "ai_gateway", "-v", "ON_ERROR_STOP=1", "-c",
-            "CREATE ROLE p15_toc_probe_absent NOLOGIN; CREATE TABLE gw.p15_toc_probe(id int); GRANT SELECT ON gw.p15_toc_probe TO aigw_backup, p15_toc_probe_absent;");
+        exec(source, "psql", "-X", "-w", "-U", "postgres", "-d", "nori_ai_gateway", "-v", "ON_ERROR_STOP=1", "-c",
+            "CREATE ROLE p15_toc_probe_absent NOLOGIN; CREATE TABLE gw.p15_toc_probe(id int); GRANT SELECT ON gw.p15_toc_probe TO " + account + ", p15_toc_probe_absent;");
         var backup = exec(runner, "/opt/aigw/aigw-backup.sh");
         assertThat(backup.getExitCode()).as("backup stderr=%s", backup.getStderr()).isZero();
         String bundle = backup.getStdout().strip().replaceFirst("^BACKUP_SUCCESS bundle=", "");
         assertThat(s3("copyto", "aigwdest:aigw-backup/verify/" + bundle, "/tmp/restore/" + bundle).getExitCode()).isZero();
         var target = postgres("ai-gateway-db-restore-2", 15432);
         exec(runner, "mkdir", "-p", "/tmp/receipt-3");
-        var restore = exec(runner, "/opt/aigw/aigw-restore.sh", "--bundle", "/tmp/restore/" + bundle, "--target-db-url", "postgresql://aigw_migrator@ai-gateway-db-restore-2:15432/ai_gateway",
+        var restore = exec(runner, "/opt/aigw/aigw-restore.sh", "--bundle", "/tmp/restore/" + bundle, "--target-db-url", "postgresql://" + account + "@ai-gateway-db-restore-2:15432/nori_ai_gateway",
             "--expect-db-release", "ai-gateway-db-restore", "--age-identity-file", "/run/age/identity", "--receipt-dir", "/tmp/receipt-3");
         assertThat(restore.getExitCode()).as("restore stderr=%s", restore.getStderr()).isEqualTo(8);
         assertThat(restore.getStderr()).startsWith("RESTORE_STEP_FAILED:");
@@ -268,7 +270,7 @@ class BackupScriptIT {
         System.out.println("P15_TOC_PROBE failedStep=" + failedStep);
         assertThat(exec(runner, "test", "-e", "/tmp/receipt-3/restore-receipt.json").getExitCode()).isNotZero();
         // 실패 단계 이후 단계는 실행하지 않는다: pre-data 에서 멈췄다면 Job 데이터 적재도 없다.
-        if (failedStep.equals("pre-data")) assertThat(scalar(target, 15432, "aigw_migrator", "SELECT count(*) FROM gw.job")).isZero();
+        if (failedStep.equals("pre-data")) assertThat(scalar(target, 15432, account, "SELECT count(*) FROM gw.job")).isZero();
     }
 
     @Test @Order(4) void malformedBundlesAreRejectedBeforeTargetAccess() throws Exception {
@@ -303,27 +305,25 @@ class BackupScriptIT {
 
     private Container.ExecResult restore(String bundle, String receiptDirectory) throws Exception {
         exec(runner, "mkdir", "-p", receiptDirectory);
-        return exec(runner, "/opt/aigw/aigw-restore.sh", "--bundle", bundle, "--target-db-url", "postgresql://aigw_migrator@ai-gateway-db-restore:15432/ai_gateway",
+        return exec(runner, "/opt/aigw/aigw-restore.sh", "--bundle", bundle, "--target-db-url", "postgresql://" + account + "@ai-gateway-db-restore:15432/nori_ai_gateway",
             "--expect-db-release", "ai-gateway-db-restore", "--age-identity-file", "/run/age/identity", "--receipt-dir", receiptDirectory);
     }
 
     private GenericContainer<?> postgres(String alias, int port) throws Exception {
         var container = new GenericContainer<>(pgImage).withNetwork(network).withNetworkAliases(alias)
-            .withEnv(Map.of("POSTGRES_DB", "ai_gateway", "POSTGRES_USER", "postgres", "POSTGRES_PASSWORD", passwords.get("postgres"), "PGPORT", String.valueOf(port),
-                "PGDATA", "/var/lib/postgresql/18/docker", "AIGW_MIGRATOR_PASSWORD", passwords.get("aigw_migrator"), "AIGW_APP_PASSWORD", passwords.get("aigw_app"),
-                "AIGW_BACKUP_PASSWORD", passwords.get("aigw_backup")))
-            .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/acceptance-pg_hba.conf")), "/etc/aigw/postgres/pg_hba.conf")
+            .withEnv(Map.of("POSTGRES_DB", "nori_ai_gateway", "POSTGRES_USER", "postgres", "POSTGRES_PASSWORD", passwords.get("postgres"), "PGPORT", String.valueOf(port),
+                "PGDATA", "/var/lib/postgresql/18/docker", "AI_GATEWAY_DB_USER", account, "AI_GATEWAY_DB_PASSWORD", passwords.get(account)))
             .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/bootstrap.sql")), "/tmp/p15-bootstrap.sql")
-            .withCommand("postgres", "-c", "hba_file=/etc/aigw/postgres/pg_hba.conf", "-c", "port=" + port).withExposedPorts(port)
+            .withCommand("postgres", "-c", "port=" + port).withExposedPorts(port)
             .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*\\s", 2).withStartupTimeout(Duration.ofMinutes(3)));
         container.start();
         if (!alias.equals("ai-gateway-db")) targets.add(container);
-        var bootstrap = exec(container, "psql", "-X", "-w", "-U", "postgres", "-d", "ai_gateway", "-v", "ON_ERROR_STOP=1", "-v", "acceptance_role_enabled=false", "-f", "/tmp/p15-bootstrap.sql");
+        var bootstrap = exec(container, "psql", "-X", "-w", "-U", "postgres", "-d", "nori_ai_gateway", "-v", "ON_ERROR_STOP=1", "-f", "/tmp/p15-bootstrap.sql");
         assertThat(bootstrap.getExitCode()).as("bootstrap").isZero();
         return container;
     }
     private void seed() throws Exception {
-        try (var connection = DriverManager.getConnection(jdbc(source, 5432), "aigw_app", passwords.get("aigw_app"))) {
+        try (var connection = DriverManager.getConnection(jdbc(source, 5432), account, passwords.get(account))) {
             connection.setAutoCommit(false);
             try (var statement = connection.createStatement()) {
                 statement.executeUpdate("INSERT INTO gw.conversation(id, owner_system, owner_actor_ref, created_at, updated_at, expires_at, status) VALUES ('conv-1','TC','actor-1',now(),now(),now() + interval '30 days','ACTIVE')");
@@ -362,7 +362,7 @@ class BackupScriptIT {
     }
     private Map<String,String> tableQuery(GenericContainer<?> container, int port, String template) throws SQLException {
         var result = new TreeMap<String,String>();
-        try (var connection = DriverManager.getConnection(jdbc(container, port), "aigw_migrator", passwords.get("aigw_migrator"))) {
+        try (var connection = DriverManager.getConnection(jdbc(container, port), account, passwords.get(account))) {
             var tables = new ArrayList<String>();
             try (var statement = connection.createStatement(); var rows = statement.executeQuery(
                     "SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('gw','kn','gw_flyway') ORDER BY 1, 2")) {
@@ -379,7 +379,7 @@ class BackupScriptIT {
     }
     /** 실제 reader 경로: 저장된 Job scope(ScopeAssembler.forWorker) + JobRepository.findRequestInput. */
     private com.nori.ai.gateway.core.job.JobRequestInput requestInput(GenericContainer<?> container, int port, String job) {
-        var data = new DriverManagerDataSource(jdbc(container, port), "aigw_app", passwords.get("aigw_app"));
+        var data = new DriverManagerDataSource(jdbc(container, port), account, passwords.get(account));
         var client = JdbcClient.create(data);
         var persisted = client.sql("SELECT j.owner_system,j.actor_ref,j.request_perm,j.request_pdg,j.id,j.created_at,j.conversation_id,c.expires_at,j.status FROM gw.job j"
                 + " JOIN gw.conversation c ON c.id=j.conversation_id AND c.owner_system=j.owner_system WHERE j.id=:id").param("id", job)
@@ -393,7 +393,7 @@ class BackupScriptIT {
     }
     private static String sha256(byte[] bytes) throws NoSuchAlgorithmException { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
     private String latestOutcome() throws SQLException {
-        try (var connection = DriverManager.getConnection(jdbc(source, 5432), "aigw_app", passwords.get("aigw_app"));
+        try (var connection = DriverManager.getConnection(jdbc(source, 5432), account, passwords.get(account));
              var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT outcome FROM gw.backup_run ORDER BY id DESC LIMIT 1")) {
             return rows.next() ? rows.getString(1) : null;
         }
@@ -404,7 +404,7 @@ class BackupScriptIT {
             assertThat(rows.next()).isTrue(); return rows.getLong(1);
         }
     }
-    private String jdbc(GenericContainer<?> container, int port) { return "jdbc:postgresql://" + container.getHost() + ":" + container.getMappedPort(port) + "/ai_gateway"; }
+    private String jdbc(GenericContainer<?> container, int port) { return "jdbc:postgresql://" + container.getHost() + ":" + container.getMappedPort(port) + "/nori_ai_gateway"; }
     private Container.ExecResult s3(String... arguments) throws Exception {
         var command = new StringBuilder("export RCLONE_CONFIG_AIGWDEST_TYPE=s3 RCLONE_CONFIG_AIGWDEST_PROVIDER=Other RCLONE_CONFIG_AIGWDEST_ENDPOINT=http://aigw-backup-s3:8333"
             + " RCLONE_CONFIG_AIGWDEST_FORCE_PATH_STYLE=true RCLONE_CONFIG_AIGWDEST_ACCESS_KEY_ID=$(cat /run/aigw/backup-destination/access-key)"

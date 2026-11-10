@@ -8,16 +8,15 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * {@code aigw_acceptance_ro} 의 이름 붙은 고정 SELECT 만 실행한다(H-2). 임의 SQL 입력 경로가 없고 결과는 건수·ID·상태값·시각·digest 만 돌려준다.
+ * 단일 DB 계정(앱과 같은 자격, 이름은 env 로만)으로 이름 붙은 고정 SELECT 만 실행한다(H-2 — 하네스 코드 규약이며 DB 권한으로 강제되지 않는다). 임의 SQL 입력 경로가 없고 결과는 건수·ID·상태값·시각·digest 만 돌려준다.
  * 행 본문은 {@link #residueScan(Set)} 안에서 메모리로만 {@link ResidueScanner} 에 넘긴다.
  */
 public final class OracleQueries {
-    /** 연결 경계. 데이터베이스 이름은 {@link #DATABASES} 의 고정 값만 들어온다. */
+    /** 연결 경계. 데이터베이스 이름은 {@link #DATABASE} 고정 값만 들어온다. */
     @FunctionalInterface public interface Connector { Connection open(String database) throws SQLException; }
     public static final class BoundaryViolation extends Exception { BoundaryViolation(String code) { super(code); } }
 
-    public static final String DATABASE = "ai_gateway";
-    static final Set<String> DATABASES = Set.of(DATABASE, "postgres", "template1");
+    public static final String DATABASE = "nori_ai_gateway";
     static final Set<String> JOB_STATUSES = Set.of("QUEUED", "RUNNING", "SUCCEEDED", "PARTIAL", "FAILED", "CANCELLED", "TIMED_OUT");
     static final List<String> RESIDUE_TABLES = List.of("conversation", "message", "job", "job_event", "result", "audit_event", "tool_execution", "evidence", "cache_entry");
 
@@ -58,28 +57,24 @@ public final class OracleQueries {
     private final Connector connector;
     public OracleQueries(Connector connector) { this.connector = connector; }
 
-    /** 운영 연결: 고정 사용자·포트, 비밀번호는 Secret 파일 값(출력 0). */
-    public static Connector postgres(String host, String password) {
+    /** 운영 연결: 공유 서버 직접 연결 포트 15432, 사용자는 env 의 단일 계정 이름, 비밀번호는 Secret 파일 값(출력 0). */
+    public static Connector postgres(String host, String user, String password) {
         return database -> {
-            if (!DATABASES.contains(database)) throw new SQLException("DATABASE_NOT_ALLOWED");
-            var properties = new Properties(); properties.setProperty("user", "aigw_acceptance_ro"); properties.setProperty("password", password);
+            if (!DATABASE.equals(database)) throw new SQLException("DATABASE_NOT_ALLOWED");
+            var properties = new Properties(); properties.setProperty("user", user); properties.setProperty("password", password);
             properties.setProperty("connectTimeout", "10"); properties.setProperty("readOnly", "true");
-            return DriverManager.getConnection("jdbc:postgresql://" + host + ":5432/" + database, properties);
+            return DriverManager.getConnection("jdbc:postgresql://" + host + ":15432/" + database, properties);
         };
     }
 
     /**
-     * suite 시작 전 DB 경계: {@code ai_gateway} 고정 SELECT 는 성공하고 {@code postgres}·{@code template1} TCP 접속은 HBA 거부(SQLSTATE 28000)여야 한다.
-     * 다른 DB 접속이 허용되거나 HBA 거부가 아닌 인증·통신 오류면 수용을 중단한다. 오류 메시지·자격 값은 담지 않는다.
+     * suite 시작 전 DB 경계: {@code nori_ai_gateway} 고정 SELECT 가 성공해야 한다. 실패하면 수용을 중단하며 오류 메시지·자격 값은 담지 않는다.
+     * 다른 DB 의 HBA 거부 판정은 수용 전용 역할이 없어(단일 계정, Plan §11.7 2026-11-10) 하지 않는다.
      */
     public void verifyDatabaseBoundary() throws BoundaryViolation {
         try (Connection connection = connector.open(DATABASE); var statement = connection.prepareStatement("SELECT 1"); var rows = statement.executeQuery()) {
             if (!rows.next() || rows.getInt(1) != 1) throw new BoundaryViolation("ACCEPTANCE_DB_SELECT_FAILED");
         } catch (SQLException e) { throw new BoundaryViolation("ACCEPTANCE_DB_SELECT_FAILED"); }
-        for (String other : List.of("postgres", "template1")) {
-            try (Connection ignored = connector.open(other)) { throw new BoundaryViolation("ACCEPTANCE_DB_OTHER_DATABASE_ALLOWED"); }
-            catch (SQLException e) { if (!"28000".equals(e.getSQLState())) throw new BoundaryViolation("ACCEPTANCE_DB_OTHER_DATABASE_NOT_HBA_REJECTED"); }
-        }
     }
 
     public long jobCountByStatus(String status) {

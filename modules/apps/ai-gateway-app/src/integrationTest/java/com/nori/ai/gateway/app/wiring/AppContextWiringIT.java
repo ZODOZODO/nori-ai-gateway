@@ -79,7 +79,7 @@ class AppContextWiringIT extends StackContextSupport {
     @Test @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
     void actualApplicationStartupRejectsMissingMalformedEmptyAndNestedPrivateCredentials(org.springframework.boot.test.system.CapturedOutput output) {
         database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(true); database.migrate();
+        database.bootstrap(); database.migrate();
         for (String mode : List.of("missing","malformed","empty","private")) {
             credentialFailure = mode; LaterRunner.invocations = 0;
             assertThatThrownBy(() -> startApplication(LaterRunner.class)).hasStackTraceContaining("인입 인증 자격 파일이 잘못되었습니다");
@@ -178,7 +178,7 @@ class AppContextWiringIT extends StackContextSupport {
     @Test void actualApplicationRejectsMissingHistoryBeforeLaterRunner() throws Exception {
         database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),
             java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(true);
+        database.bootstrap();
         LaterRunner.invocations = 0;
         assertThatThrownBy(() -> startApplication(LaterRunner.class)).isInstanceOf(RuntimeException.class);
         assertThat(LaterRunner.invocations).isZero();
@@ -186,7 +186,7 @@ class AppContextWiringIT extends StackContextSupport {
         startApplication(LaterRunner.class);
         assertThat(LaterRunner.invocations).isEqualTo(1);
         context.close(); context = null;
-        try (var connection = database.connection("aigw_migrator"); var statement = connection.createStatement()) {
+        try (var connection = database.connection(database.user()); var statement = connection.createStatement()) {
             String latest;
             try (var rows = statement.executeQuery("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")) {
                 assertThat(rows.next()).isTrue(); latest = rows.getString(1); assertThat(latest).isEqualTo("7");
@@ -204,52 +204,33 @@ class AppContextWiringIT extends StackContextSupport {
         @Override public void run(org.springframework.boot.ApplicationArguments arguments) { invocations++; }
     }
 
-    @Test void migrationOnlyMainAppliesOnceAndPropagatesWrongRoleProfileAndMigrationFailure() throws Exception {
+    /** 앱 안 마이그레이션 0: migrate 프로필·spring.flyway.enabled=true 는 기동 전 거부되고, 외부 Flyway 적용 뒤에만 같은 계정으로 기동한다. */
+    @Test void normalApplicationNeverMigratesAndStartsOnlyAfterExternalMigration() throws Exception {
         database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"),
             java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(false);
+        database.bootstrap();
         prepareSecurityCredentials();
+        var credentials = Map.<String,Object>of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username",database.user(),
+            "spring.datasource.password",database.passwordFor(database.user()));
         assertThatThrownBy(() -> new org.springframework.boot.builder.SpringApplicationBuilder(com.nori.ai.gateway.app.AiGatewayApplication.class)
             .web(org.springframework.boot.WebApplicationType.NONE).profiles("migrate")
-            .properties(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_migrator",
-                "spring.datasource.password",database.passwordFor("aigw_migrator"))).properties(securityProperties()).run())
+            .properties(credentials).properties(securityProperties()).run())
+            .hasMessage("일반 애플리케이션에서는 자동 마이그레이션을 사용할 수 없습니다");
+        assertThatThrownBy(() -> new org.springframework.boot.builder.SpringApplicationBuilder(com.nori.ai.gateway.app.AiGatewayApplication.class)
+            .web(org.springframework.boot.WebApplicationType.NONE).properties(credentials).properties(Map.of("spring.flyway.enabled", true))
+            .properties(securityProperties()).run())
             .hasMessage("일반 애플리케이션에서는 자동 마이그레이션을 사용할 수 없습니다");
         try (var connection = database.connection("postgres"); var statement = connection.createStatement();
-                var result = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN ('gw','gw_flyway')")) {
+                var result = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN (gw,gw_flyway)")) {
             assertThat(result.next()).isTrue(); assertThat(result.getInt(1)).isZero();
         }
-        withMigrationProperties("aigw_app", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
-            new String[]{"--spring.profiles.active=migrate"})).hasRootCauseMessage("마이그레이션 전용 역할이 필요합니다"));
-        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
-            new String[0])).hasMessageContaining("마이그레이션 프로필이 필요합니다"));
-        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
-            new String[]{"--spring.profiles.active=migrate", "--spring.flyway.enabled=false"})).isInstanceOf(RuntimeException.class));
-        try (var connection = database.connection("postgres"); var statement = connection.createStatement()) {
-            statement.execute("DROP EXTENSION vector");
-        }
-        withMigrationProperties("aigw_migrator", () -> assertThatThrownBy(() -> com.nori.ai.gateway.app.config.MigrateApplication.main(
-            new String[]{"--spring.profiles.active=migrate"})).isInstanceOf(RuntimeException.class));
-        database.bootstrap(false);
-        withMigrationProperties("aigw_migrator", () -> {
-            com.nori.ai.gateway.app.config.MigrateApplication.main(new String[]{"--spring.profiles.active=migrate"});
-            com.nori.ai.gateway.app.config.MigrateApplication.main(new String[]{"--spring.profiles.active=migrate"});
-        });
+        // Spring Flyway 자동 설정은 앱 classpath 에 없다(spring-boot-flyway 제거).
+        assertThatThrownBy(() -> Class.forName("org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration")).isInstanceOf(ClassNotFoundException.class);
+        database.migrate();
         startApplication();
-        assertThat(context.getBeansOfType(com.nori.ai.gateway.app.config.MigrateCommand.class)).isEmpty();
-        assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class)
-            .sql("SELECT count(*) FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
-            .query(Integer.class).single()).isEqualTo(7);
+        assertThat(context.getBeansOfType(org.flywaydb.core.Flyway.class)).isEmpty();
         assertThat(context.getBean(org.springframework.jdbc.core.simple.JdbcClient.class).sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")
             .query(String.class).list()).containsExactly("1","2","3","3.1","4","5","7");
-    }
-
-    private void withMigrationProperties(String role, Runnable action) {
-        var properties = Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", role,
-            "spring.datasource.password", database.passwordFor(role));
-        var previous = new HashMap<String, String>();
-        properties.forEach((key, value) -> { previous.put(key, System.getProperty(key)); System.setProperty(key, value); });
-        try { action.run(); }
-        finally { previous.forEach((key, value) -> { if (value == null) System.clearProperty(key); else System.setProperty(key, value); }); }
     }
 
     // ---- P14 Source 생산 조립: 같은 Registrar·factory에 명시 snapshot을 공급한다(운영 classpath 파일·전역 cache·env override 없음) ----
@@ -409,7 +390,7 @@ class AppContextWiringIT extends StackContextSupport {
     @Test void inferenceDisabledRegistersNoInferenceBeanNeedsNoBaseUrlAndNeverContactsTheEndpoint() throws Exception {
         try (var stub = new com.nori.ai.gateway.app.inference.OllamaEndpointStub()) {
             database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"), java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-            database.bootstrap(true); database.migrate();
+            database.bootstrap(); database.migrate();
             var hooks = hookProperties();
             inferenceProperties = hooks;
             startApplication();
@@ -433,7 +414,7 @@ class AppContextWiringIT extends StackContextSupport {
     @Test void inferenceEnabledRegistersTheSevenInferenceBeansWiresTheRealClientPathAndHasNoDisabledReadiness() throws Exception {
         try (var stub = new com.nori.ai.gateway.app.inference.OllamaEndpointStub()) {
             database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"), java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-            database.bootstrap(true); database.migrate();
+            database.bootstrap(); database.migrate();
             var properties = new HashMap<String,Object>(hookProperties());
             properties.putAll(Map.of("ai.gateway.inference.mode", "enabled", "ai.gateway.inference.baseUrl", stub.baseUrl(),
                 "ai.gateway.inference.generationModelDigest", com.nori.ai.gateway.app.inference.OllamaEndpointStub.EXPECTED_DIGEST));

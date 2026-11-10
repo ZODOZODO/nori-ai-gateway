@@ -76,7 +76,7 @@ class ApiInputIT extends ApiWebSupport {
             .header("Authorization","Bearer "+serviceToken).header("X-Actor-Assertion",signer.sign(claims("actor",null),clock().instant())).GET().build(),java.net.http.HttpResponse.BodyHandlers.ofInputStream());
         assertThat(stream.statusCode()).isEqualTo(200);stream.body().close();
         assertThat(apiRequests()).isEqualTo(3);
-        try(var connection=database.connection("aigw_migrator");var statement=connection.createStatement()) {
+        try(var connection=database.connection(database.user());var statement=connection.createStatement()) {
             statement.execute("CREATE FUNCTION gw.reject_job_accepted_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '시험 접수 감사 거부'; END $$");
             statement.execute("CREATE TRIGGER reject_job_accepted_audit BEFORE INSERT ON gw.audit_event FOR EACH ROW WHEN (NEW.event_type = 'JOB_ACCEPTED') EXECUTE FUNCTION gw.reject_job_accepted_audit()");
         }

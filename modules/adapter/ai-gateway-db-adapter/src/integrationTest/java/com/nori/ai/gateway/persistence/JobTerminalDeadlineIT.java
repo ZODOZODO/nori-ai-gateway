@@ -61,7 +61,7 @@ class JobTerminalDeadlineIT extends PgIntegrationSupport {
 
     @Test void rawClockRetainsExactAndSuccessorJobDeadlineBeforeTimestampStorage(){
         try(var database=rawDatabase()){
-            database.bootstrap(false);database.migrate();
+            database.bootstrap();database.migrate();
             try(var context=application(database,AdmissionClock.class)){
                 var jdbc=context.getBean(JdbcClient.class);
                 var manager=context.getBean(PlatformTransactionManager.class);
@@ -97,7 +97,7 @@ class JobTerminalDeadlineIT extends PgIntegrationSupport {
 
     @Test void expiredQueuedCommitWritesOnlyForAStillQueuedExpiredJobAndMissingOriginRollsBack(){
         try(var database=rawDatabase()){
-            database.bootstrap(false);database.migrate();
+            database.bootstrap();database.migrate();
             try(var context=application(database,AdmissionClock.class)){
                 var jdbc=context.getBean(JdbcClient.class);
                 var manager=context.getBean(PlatformTransactionManager.class);
@@ -139,7 +139,7 @@ class JobTerminalDeadlineIT extends PgIntegrationSupport {
 
     @Test void duplicateAcceptedOriginsStoreNoJobAuditAndRollBackTheTerminalWhileExactlyOneOriginStores(){
         try(var database=rawDatabase()){
-            database.bootstrap(false);database.migrate();
+            database.bootstrap();database.migrate();
             try(var context=application(database,AdmissionClock.class)){
                 var jdbc=context.getBean(JdbcClient.class);
                 var scope=scope();

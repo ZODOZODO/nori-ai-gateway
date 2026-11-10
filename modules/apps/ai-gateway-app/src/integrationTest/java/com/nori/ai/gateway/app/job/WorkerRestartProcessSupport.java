@@ -22,15 +22,15 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
     protected final JsonMapper json=JsonMapper.builder().build();
     protected Path state;
     @BeforeEach void prepareProcess()throws Exception{
-        database=new PgTestDatabase(System.getProperty("aigw.pgTestImage"),Path.of(System.getProperty("aigw.rootDir"))).start();database.bootstrap(true);database.migrate();prepareSecurityCredentials();
+        database=new PgTestDatabase(System.getProperty("aigw.pgTestImage"),Path.of(System.getProperty("aigw.rootDir"))).start();database.bootstrap();database.migrate();prepareSecurityCredentials();
         Files.writeString(securityDirectory.resolve("hook.sha256"),HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(hookToken.getBytes(java.nio.charset.StandardCharsets.UTF_8)))+"\n");
-        jdbc=JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(),"aigw_app",database.passwordFor("aigw_app")));
+        jdbc=JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(),database.user(),database.passwordFor(database.user())));
         state=securityDirectory.resolve("state");harness=new AppProcessHarness(hookToken);launch(NOW);
     }
     protected Map<String,String> properties(Instant at){
-        harness.watch(serviceToken);harness.watch(database.passwordFor("aigw_app"));
+        harness.watch(serviceToken);harness.watch(database.passwordFor(database.user()));
         var p=new LinkedHashMap<String,String>();securityProperties().forEach((k,v)->p.put(k,v.toString()));
-        p.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app"),"server.address","127.0.0.1","server.port","0","spring.flyway.enabled","false"));
+        p.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username",database.user(),"spring.datasource.password",database.passwordFor(database.user()),"server.address","127.0.0.1","server.port","0","spring.flyway.enabled","false"));
         p.putAll(Map.of("ai.gateway.capacity.max-running-jobs","1","ai.gateway.capacity.generation-concurrency","1","ai.gateway.capacity.queued-depth","4","ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s","ai.gateway.inference.mode","disabled"));
         p.putAll(Map.of("ai.gateway.test-hooks.enabled","true","ai.gateway.test-hooks.token-sha256-file",securityDirectory.resolve("hook.sha256").toString(),"ai.gateway.test-hooks.clock.mode","FROZEN","ai.gateway.test-hooks.clock.initial",at.toString(),"ai.gateway.tcmock.state-dir",state.toString()));
         p.putAll(Map.of("spring.kafka.bootstrap-servers","127.0.0.1:1","spring.kafka.listener.auto-startup","false","nori.storage.s3.enabled","true","nori.storage.s3.endpoint","http://127.0.0.1:1","nori.storage.s3.bucket","p09-fixture","nori.storage.s3.access-key","p09-dummy","nori.storage.s3.secret-key","p09-dummy","nori.storage.s3.region","us-east-1"));return p;
@@ -69,7 +69,7 @@ abstract class WorkerRestartProcessSupport extends StackContextSupport {
     }
     protected com.nori.ai.gateway.core.job.JobRequestInput requestInput(String job) {
         var scope=restoredScope(job);
-        var source=new DriverManagerDataSource(database.jdbcUrl(),"aigw_app",database.passwordFor("aigw_app"));var tx=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.support.JdbcTransactionManager(source));
+        var source=new DriverManagerDataSource(database.jdbcUrl(),database.user(),database.passwordFor(database.user()));var tx=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.support.JdbcTransactionManager(source));
         return new com.nori.ai.gateway.persistence.repository.JobRepository(JdbcClient.create(source),tx,Clock.fixed(NOW.plusSeconds(1),ZoneOffset.UTC)).findRequestInput(scope,job).orElseThrow();
     }
     protected com.nori.ai.gateway.core.scope.VerifiedSystemScope restoredScope(String job) {

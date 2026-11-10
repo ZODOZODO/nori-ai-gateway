@@ -170,7 +170,7 @@ class InferenceRequestContractIT extends StackContextSupport {
 
     @Test void startupRejectsBaseUrlPathV1TrailingSlashOrMissingAndMissingDigestWithoutContactingTheEndpoint() throws Exception {
         database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"), java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(true); database.migrate();
+        database.bootstrap(); database.migrate();
         String stubUrl = stub.baseUrl();
         for (String invalid : Arrays.asList(stubUrl + "/v1", stubUrl + "/", stubUrl + "/api", "http://127.0.0.1", null)) {
             baseUrl = invalid;

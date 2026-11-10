@@ -44,6 +44,11 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
 }
 
+// 스키마 정본은 루트 flyway/sql 이다. SchemaVersionGuard 가 읽는 classpath 위치(db/migration/gateway)에 빌드 때 사본을 둔다.
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("flyway/sql")) { into("db/migration/gateway") }
+}
+
 tasks.named<Test>("integrationTest") {
     val harnessArguments = objects.newInstance<HarnessJvmArguments>()
     harnessArguments.runtimeClasspath.from(sourceSets["integrationTest"].runtimeClasspath)
@@ -57,7 +62,10 @@ tasks.named<Test>("integrationTest") {
     val backupImage = providers.gradleProperty("aigw.backupImage").orElse("").get()
     inputs.property("aigw.backupImage", backupImage)
     systemProperty("aigw.backupImage", backupImage)
-    for ((key, path) in mapOf("pgBootstrapSha256" to "ops/postgres/bootstrap.sql", "pgHbaSha256" to "ops/postgres/acceptance-pg_hba.conf",
+    // 시험 Flyway 는 루트 flyway/sql 을 filesystem 위치로 읽는다. 값은 aigw.rootDir 기준 상대 경로다.
+    inputs.dir(rootProject.file("flyway/sql"))
+    systemProperty("aigw.flyway.sql.dir", "flyway/sql")
+    for ((key, path) in mapOf("pgBootstrapSha256" to "ops/postgres/bootstrap.sql",
             "backupDockerfileSha256" to "deploy/docker/Dockerfile-backup", "backupScriptSha256" to "ops/backup/aigw-backup.sh",
             "restoreScriptSha256" to "ops/backup/aigw-restore.sh", "backupJobColumnsSha256" to "ops/backup/job-columns-v1.txt")) {
         val source = rootProject.file(path)

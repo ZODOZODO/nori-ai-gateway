@@ -31,7 +31,7 @@ class AuthRejectionAuditIT extends PgIntegrationSupport {
     }
     @Test void actualConstraintsAndTypedAppendPreserveOptionalIdentityAndClosedPayload() throws Exception {
         try (var database = rawDatabase()) {
-            database.bootstrap(false); database.migrate();
+            database.bootstrap(); database.migrate();
             try (var context = application(database, ClockConfiguration.class)) {
                 var jdbc = context.getBean(JdbcClient.class);
                 assertThat(jdbc.sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1").query(String.class).single()).isEqualTo("7");
@@ -53,7 +53,7 @@ class AuthRejectionAuditIT extends PgIntegrationSupport {
                     assertThat(((java.sql.Timestamp)row.get("recorded_at")).toInstant()).isEqualTo(BASE.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
                     for (String column : List.of("conversation_id", "job_id", "trace_id", "tool_id", "source_ref", "error_code", "timings", "token_usage", "versions", "reduction", "service_ref", "task_type", "result_status")) assertThat(row.get(column)).isNull();
                 }
-                try (var connection = database.connection("aigw_app")) {
+                try (var connection = database.connection(database.user())) {
                     for (String[] values : List.of(new String[]{null,null,"TEST"}, new String[]{"TC",null,"TEST"}, new String[]{null,"a","TEST"}, new String[]{null,"a","AUTH_REJECTED"}, new String[]{"OTHER","a","AUTH_REJECTED"})) {
                         try (var statement = connection.prepareStatement("INSERT INTO gw.audit_event(recorded_at,owner_system,actor_ref,request_id,event_type) VALUES (now(),?,?,?,?)")) {
                             statement.setString(1,values[0]); statement.setString(2,values[1]); statement.setString(3,id.toString()); statement.setString(4,values[2]);
@@ -81,7 +81,7 @@ class AuthRejectionAuditIT extends PgIntegrationSupport {
     }
     @Test void normalScopedIsolationAndExactNinetyDayPurgeIncludeNullRows() throws Exception {
         try (var database = rawDatabase()) {
-            database.bootstrap(false); database.migrate();
+            database.bootstrap(); database.migrate();
             try (var context = application(database, ClockConfiguration.class)) {
                 var clock = context.getBean(MutableClock.class);
                 var append = context.getBean(AuthRejectionAppendRepository.class);
@@ -111,7 +111,7 @@ class AuthRejectionAuditIT extends PgIntegrationSupport {
     }
     @Test void generalWriterRejectsAuthRejectedBeforeStorageAndNullIdentityRowsArePurgedInBatches() throws Exception {
         try (var database = rawDatabase()) {
-            database.bootstrap(false); database.migrate();
+            database.bootstrap(); database.migrate();
             try (var context = application(database, ClockConfiguration.class)) {
                 var clock = context.getBean(MutableClock.class);
                 var jdbc = context.getBean(JdbcClient.class);

@@ -12,19 +12,24 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.testcontainers.containers.BindMode;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
-/** 정본 bootstrap/HBA를 공유하며 자격과 격리 컨테이너의 수명을 소유합니다. */
+/**
+ * 공유 운영 서버의 서버 담당자 선행조건(DB nori_ai_gateway·vector 0.8.7·DB 를 소유하는 단일 계정)을 격리 컨테이너에 재현하고
+ * 자격과 컨테이너 수명을 소유합니다. superuser 는 컨테이너 준비({@link #bootstrap()})와 시험의 결함 주입에만 씁니다.
+ * 계정 이름은 실행마다 무작위로 만들어 코드가 특정 계정 이름에 기대지 않게 합니다.
+ */
 public final class PgTestDatabase implements AutoCloseable {
+    public static final String DATABASE = "nori_ai_gateway";
     private static final String OWNER_LABEL = "aigw.p07.owner";
     private final String owner = UUID.randomUUID().toString();
     private final Path root;
     private final String image;
-    private final Map<String, String> passwords = Map.of("postgres", password(), "aigw_migrator", password(),
-        "aigw_app", password(), "aigw_backup", password(), "aigw_acceptance_ro", password());
+    private final String account = "acct_" + HexFormat.of().formatHex(randomBytes(6));
+    private final Map<String, String> passwords = Map.of("postgres", password(), account, password());
     private PostgreSQLContainer container;
 
     public PgTestDatabase(String image, Path root) {
@@ -32,7 +37,6 @@ public final class PgTestDatabase implements AutoCloseable {
             throw new IllegalArgumentException("고정된 PostgreSQL 시험 이미지가 필요합니다");
         this.image = image; this.root = root.toAbsolutePath().normalize();
         verifySource("ops/postgres/bootstrap.sql", "aigw.pgBootstrapSha256");
-        verifySource("ops/postgres/acceptance-pg_hba.conf", "aigw.pgHbaSha256");
     }
     private void verifySource(String file, String property) {
         try {
@@ -45,16 +49,11 @@ public final class PgTestDatabase implements AutoCloseable {
     public PgTestDatabase start() {
         try {
             container = new PostgreSQLContainer(DockerImageName.parse(image).asCompatibleSubstituteFor("postgres"))
-                .withDatabaseName("ai_gateway").withUsername("postgres").withPassword(passwords.get("postgres"))
+                .withDatabaseName(DATABASE).withUsername("postgres").withPassword(passwords.get("postgres"))
                 .withLabel(OWNER_LABEL, owner).withStartupTimeout(java.time.Duration.ofMinutes(3)).withEnv("PGDATA", "/var/lib/postgresql/18/docker")
-                .withEnv("AIGW_MIGRATOR_PASSWORD", passwords.get("aigw_migrator"))
-                .withEnv("AIGW_APP_PASSWORD", passwords.get("aigw_app"))
-                .withEnv("AIGW_BACKUP_PASSWORD", passwords.get("aigw_backup"))
-                .withEnv("AIGW_ACCEPTANCE_PASSWORD", passwords.get("aigw_acceptance_ro"))
-                .withFileSystemBind(root.resolve("ops/postgres/acceptance-pg_hba.conf").toString(),
-                    "/etc/aigw/postgres/pg_hba.conf", BindMode.READ_ONLY)
-                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/bootstrap.sql")), "/tmp/p07-bootstrap.sql")
-                .withCommand("postgres", "-c", "hba_file=/etc/aigw/postgres/pg_hba.conf");
+                .withEnv("AI_GATEWAY_DB_USER", account)
+                .withEnv("AI_GATEWAY_DB_PASSWORD", passwords.get(account))
+                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/bootstrap.sql")), "/tmp/p07-bootstrap.sql");
             container.start();
             try (var connection = connection("postgres"); var statement = connection.createStatement();
                     var result = statement.executeQuery("SHOW server_version")) {
@@ -64,10 +63,11 @@ public final class PgTestDatabase implements AutoCloseable {
             return this;
         } catch (Exception failure) { close(); throw new IllegalStateException("격리 PostgreSQL 준비에 실패했습니다", failure); }
     }
-    public void bootstrap(boolean acceptanceRoleEnabled) {
+    /** 서버 담당자 선행조건 재현: superuser 의 psql 로 정본 bootstrap 을 실행한다(멱등). */
+    public void bootstrap() {
         try {
-            var result = container.execInContainer("psql", "-X", "-w", "-U", "postgres", "-d", "ai_gateway", "-v", "ON_ERROR_STOP=1",
-                "-v", "acceptance_role_enabled=" + acceptanceRoleEnabled, "-f", "/tmp/p07-bootstrap.sql");
+            var result = container.execInContainer("psql", "-X", "-w", "-U", "postgres", "-d", DATABASE, "-v", "ON_ERROR_STOP=1",
+                "-f", "/tmp/p07-bootstrap.sql");
             if (result.getExitCode() != 0) throw new IllegalStateException("정본 PostgreSQL bootstrap이 실패했습니다");
             try (var connection = connection("postgres"); var statement = connection.createStatement();
                     var version = statement.executeQuery("SELECT extversion FROM pg_extension WHERE extname = 'vector'")) {
@@ -79,37 +79,22 @@ public final class PgTestDatabase implements AutoCloseable {
             throw new IllegalStateException("정본 PostgreSQL bootstrap을 실행할 수 없습니다", failure);
         }
     }
-    public void migrate() {
-        Flyway.configure().dataSource(jdbcUrl(), "aigw_migrator", passwordFor("aigw_migrator"))
-            .defaultSchema("gw_flyway").createSchemas(true).locations("classpath:db/migration/gateway").load().migrate();
+    /** 루트 build.gradle.kts 의 Flyway 설정과 같은 값(filesystem flyway/sql, 이력 gw_flyway, 단일 계정)이다. */
+    public FluentConfiguration flywayConfiguration() {
+        String directory = System.getProperty("aigw.flyway.sql.dir");
+        if (directory == null || directory.isBlank()) throw new IllegalStateException("aigw.flyway.sql.dir 시험 속성이 필요합니다");
+        return Flyway.configure().dataSource(jdbcUrl(), account, passwordFor(account))
+            .defaultSchema("gw_flyway").createSchemas(true).locations("filesystem:" + root.resolve(directory));
     }
+    public void migrate() { flywayConfiguration().load().migrate(); }
+    /** 단일 계정 이름(앱·migration·백업·수용 oracle 이 함께 쓴다). */
+    public String user() { return account; }
     public Connection connection(String role) throws SQLException { return DriverManager.getConnection(jdbcUrl(), role, passwordFor(role)); }
     public String jdbcUrl() { return container.getJdbcUrl(); }
     public String passwordFor(String role) {
         String value = passwords.get(role);
         if (value == null) throw new IllegalArgumentException("시험 역할이 잘못되었습니다");
         return value;
-    }
-    public boolean rejectsOtherDatabase(String database, boolean unix) {
-        if (!java.util.Set.of("postgres", "template1", "p07_outside").contains(database)) throw new IllegalArgumentException("시험 DB가 잘못되었습니다");
-        try {
-            String script = "PGPASSWORD=\"$AIGW_ACCEPTANCE_PASSWORD\" exec psql -X -w " + (unix ? "" : "-h 127.0.0.1 ")
-                + "-U aigw_acceptance_ro -d " + database + " -c 'SELECT 1'";
-            var result = container.execInContainer("sh", "-c", script);
-            return result.getExitCode() != 0 && result.getStderr().contains("pg_hba.conf rejects connection");
-        } catch (java.io.IOException | InterruptedException failure) {
-            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new IllegalStateException("격리 HBA 거부를 확인할 수 없습니다", failure);
-        }
-    }
-    public boolean acceptsViaUnix() {
-        try {
-            var result = container.execInContainer("sh", "-c", "PGPASSWORD=\"$AIGW_ACCEPTANCE_PASSWORD\" exec psql -X -w -U aigw_acceptance_ro -d ai_gateway -Atc 'SELECT count(*) FROM gw.conversation'");
-            return result.getExitCode() == 0 && result.getStdout().trim().equals("1");
-        } catch (java.io.IOException | InterruptedException failure) {
-            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new IllegalStateException("격리 HBA 허용을 확인할 수 없습니다", failure);
-        }
     }
     @Override public void close() {
         if (container != null && container.getContainerId() != null) {
@@ -118,8 +103,6 @@ public final class PgTestDatabase implements AutoCloseable {
             container.stop();
         }
     }
-    private static String password() {
-        byte[] bytes = new byte[32]; new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
+    private static byte[] randomBytes(int size) { byte[] bytes = new byte[size]; new SecureRandom().nextBytes(bytes); return bytes; }
+    private static String password() { return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes(32)); }
 }

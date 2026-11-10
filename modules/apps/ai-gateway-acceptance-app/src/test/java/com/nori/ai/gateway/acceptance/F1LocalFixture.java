@@ -54,7 +54,7 @@ final class F1LocalFixture implements AutoCloseable {
     }
     private Object response(String job){var payload=new LinkedHashMap<String,Object>();payload.put("status",seam.isEmpty()?"SUCCESS":"UNSUPPORTED");payload.put("blocks",List.of());if(!seam.isEmpty())payload.put("validationTrace",List.of(Map.of("step",6,"passed",false,"reason",seam)));return Map.of("jobId",returnedJob==null?job:returnedJob,"jobStatus","SUCCEEDED","result",Map.of("status",payload.get("status"),"payload",payload));}
     private Connection connect(String database)throws SQLException {
-        if(!database.equals("ai_gateway"))throw new SQLException("hba","28000");
+        if(!database.equals(OracleQueries.DATABASE))throw new SQLException("database","3D000");
         return (Connection)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
             if(m.getName().equals("prepareStatement")){String sql=(String)a[0];selectedSql.add(sql);var args=new ArrayList<Object>();return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{PreparedStatement.class},(sp,sm,sa)->{
                 if(sm.getName().equals("setObject")){args.add(sa[1]);return null;}

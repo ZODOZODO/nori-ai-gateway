@@ -25,18 +25,18 @@ class InferenceProcessEnvironmentIT extends StackContextSupport {
 
     @Test void childProcessWithOpenAiEnvironmentConnectsOnlyToTheConfiguredEndpointAndNeverAdoptsOrPrintsIt() throws Exception {
         database = new PgTestDatabase(System.getProperty("aigw.pgTestImage"), Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(true); database.migrate(); prepareSecurityCredentials();
+        database.bootstrap(); database.migrate(); prepareSecurityCredentials();
         Files.writeString(securityDirectory.resolve("hook.sha256"), HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(hookToken.getBytes(StandardCharsets.UTF_8))) + "\n");
         Path state = securityDirectory.resolve("state");
         var harness = new AppProcessHarness(apiKeySentinel);
         try (var stub = new OllamaEndpointStub(); var decoy = new OllamaEndpointStub()) {
             try {
-                harness.watch(hookToken); harness.watch(serviceToken); harness.watch(database.passwordFor("aigw_app"));
+                harness.watch(hookToken); harness.watch(serviceToken); harness.watch(database.passwordFor(database.user()));
                 // SDK 가 요청 본문을 기록하면 나타나는 키다. OPENAI_LOG=debug 를 채택하지 않았다면 출력에 없다.
                 harness.watch("encoding_format");
                 var p = new LinkedHashMap<String,String>();
                 securityProperties().forEach((key, value) -> p.put(key, value.toString()));
-                p.putAll(Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", "aigw_app", "spring.datasource.password", database.passwordFor("aigw_app"),
+                p.putAll(Map.of("spring.datasource.url", database.jdbcUrl(), "spring.datasource.username", database.user(), "spring.datasource.password", database.passwordFor(database.user()),
                     "server.address", "127.0.0.1", "server.port", "0", "spring.flyway.enabled", "false"));
                 p.putAll(Map.of("ai.gateway.capacity.max-running-jobs", "1", "ai.gateway.capacity.generation-concurrency", "1", "ai.gateway.capacity.queued-depth", "4",
                     "ai.gateway.capacity.queue-wait-limit", "60s", "ai.gateway.capacity.job-lifetime-limit", "180s"));

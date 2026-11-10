@@ -19,6 +19,9 @@ class RuntimeClasspathCleanTest {
             "io.micrometer:micrometer-registry-otlp:1.16.6 ", "io.opentelemetry.proto:opentelemetry-proto:1.8.0-alpha ");
         assertThat(runtime).doesNotContain("junit-platform-reporting", "junit-platform-launcher", ":gateway-eval:", "test-fixtures", "testFixtures", "org.testcontainers:");
         assertThat(runtime).doesNotContain("\r");
+        // migration 은 앱 밖(루트 Gradle Flyway)이다. 앱 런타임에는 Spring Flyway 자동 설정·DB 방언 모듈이 없고 guard 용 flyway-core 만 남는다.
+        assertThat(runtime).doesNotContain("org.springframework.boot:spring-boot-flyway:", "org.springframework.boot:spring-boot-starter-flyway:",
+            "org.flywaydb:flyway-database-postgresql:").contains("org.flywaydb:flyway-core:");
         assertThat(runtime.lines()).allMatch(line -> line.matches("\\S+ sha256=[0-9a-f]{64} nativeResources=.*"));
         Path mockLocation = Path.of(TcMockModuleConfiguration.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         // Mock의 운영 구성과 시험 보조 패키지가 같은 모듈 이름에 가려지지 않도록 실제 산출물도 검사합니다.

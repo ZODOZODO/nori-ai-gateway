@@ -29,13 +29,14 @@ class OracleQueriesTest {
             if (!query.name().startsWith("RESIDUE_")&&!query.name().equals("TOOL_PROJECTION")) assertThat(sql).doesNotContain("row_to_json", "content_masked", "payload");
             if(query.name().equals("TOOL_PROJECTION"))assertThat(sql).isEqualTo("select payload::text from gw.tool_execution where job_id = ? and capability_id = ? order by created_at, id");
         }
-        assertThat(OracleQueries.DATABASES).containsExactlyInAnyOrder("ai_gateway", "postgres", "template1");
+        assertThat(OracleQueries.DATABASE).isEqualTo("nori_ai_gateway");
         var queries = new OracleQueries(database -> { throw new SQLException("unused", "08001"); });
         assertThatThrownBy(() -> queries.jobCountByStatus("QUEUED' OR '1'='1")).hasMessage("JOB_STATUS_INVALID");
         assertThatThrownBy(() -> queries.resultRowCount("x; DROP TABLE gw.job")).hasMessage("ID_INVALID");
         for (String invalid : List.of("prometheus", "loki", "tempo", "gitlab"))
             assertThatThrownBy(() -> queries.retentionProbe(invalid)).hasMessage("SOURCE_ID_INVALID");
-        assertThatThrownBy(() -> OracleQueries.postgres("db", "pw-value").open("other_db")).hasMessage("DATABASE_NOT_ALLOWED");
+        for (String other : List.of("other_db", "postgres", "template1"))
+            assertThatThrownBy(() -> OracleQueries.postgres("db", "user-value", "pw-value").open(other)).hasMessage("DATABASE_NOT_ALLOWED");
     }
 
     private static Connection working() {
@@ -50,22 +51,14 @@ class OracleQueriesTest {
             default -> null;
         });
     }
-    private static OracleQueries.Connector connector(String otherSqlState, boolean otherAllowed) {
-        return database -> {
-            if (database.equals("ai_gateway") || otherAllowed) return working();
-            throw new SQLException("no pg_hba.conf entry for host secret-host user aigw_acceptance_ro", otherSqlState);
-        };
-    }
-
-    @Test void databaseBoundaryRequiresHbaRejectionOfOtherDatabases() throws Exception {
-        new OracleQueries(connector("28000", false)).verifyDatabaseBoundary();
-        assertThatThrownBy(() -> new OracleQueries(connector("28000", true)).verifyDatabaseBoundary()).hasMessage("ACCEPTANCE_DB_OTHER_DATABASE_ALLOWED");
-        // 비밀번호 실패(28P01)·통신 오류(08001)는 HBA 거부가 아니므로 수용을 중단한다. 메시지에 호스트·사용자·자격 값이 없다.
+    /** 단일 계정이라 다른 DB 의 HBA 거부 판정은 없다. 경계 검사는 고정 DB 의 SELECT 하나만 열고, 실패 메시지에 자격 값이 없다. */
+    @Test void databaseBoundaryOpensOnlyTheFixedDatabaseAndHidesCredentialsOnFailure() throws Exception {
+        var opened = new ArrayList<String>();
+        new OracleQueries(database -> { opened.add(database); return working(); }).verifyDatabaseBoundary();
+        assertThat(opened).containsExactly("nori_ai_gateway");
         for (String state : List.of("28P01", "08001"))
-            assertThatThrownBy(() -> new OracleQueries(connector(state, false)).verifyDatabaseBoundary())
-                .hasMessage("ACCEPTANCE_DB_OTHER_DATABASE_NOT_HBA_REJECTED").hasMessageNotContaining("secret-host").hasMessageNotContaining("aigw_acceptance_ro");
-        assertThatThrownBy(() -> new OracleQueries(database -> { throw new SQLException("password pw-value rejected", "28P01"); }).verifyDatabaseBoundary())
-            .hasMessage("ACCEPTANCE_DB_SELECT_FAILED").hasMessageNotContaining("pw-value");
+            assertThatThrownBy(() -> new OracleQueries(database -> { throw new SQLException("password pw-value rejected for user-value at secret-host", state); }).verifyDatabaseBoundary())
+                .hasMessage("ACCEPTANCE_DB_SELECT_FAILED").hasMessageNotContaining("pw-value").hasMessageNotContaining("user-value").hasMessageNotContaining("secret-host");
     }
 
     /** 조회 키는 P14 producer(SourceRetentionProbeScheduler)가 저장하는 {@code sources://TC/logs/<app>} 와 같아야 한다. */

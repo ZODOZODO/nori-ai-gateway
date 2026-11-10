@@ -1,9 +1,11 @@
 spring:
+  # 단일 계정 자격은 env 로만 받는다(기본값 0 — 없으면 기동 실패). migration 은 앱 밖(루트 Gradle Flyway·CI migrate)이다.
+  datasource:
+    url: ${AI_GATEWAY_DB_URL}
+    username: ${AI_GATEWAY_DB_USER}
+    password: ${AI_GATEWAY_DB_PASSWORD}
   flyway:
     enabled: false
-    locations: classpath:db/migration/gateway
-    default-schema: gw_flyway
-    create-schemas: true
 management:
   endpoint:
     health:

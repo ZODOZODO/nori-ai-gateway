@@ -50,7 +50,7 @@ public abstract class StackContextSupport {
 
     protected void start(Class<?>... additionalSources) {
         database = new PgTestDatabase(System.getProperty("aigw.pgTestImage"), Path.of(System.getProperty("aigw.rootDir"))).start();
-        database.bootstrap(true);
+        database.bootstrap();
         database.migrate();
         startApplication(additionalSources);
     }
@@ -61,7 +61,7 @@ public abstract class StackContextSupport {
         properties.putAll(Map.of("ai.gateway.capacity.max-running-jobs",1,"ai.gateway.capacity.generation-concurrency",1,
             "ai.gateway.capacity.queued-depth",4,"ai.gateway.capacity.queue-wait-limit","60s","ai.gateway.capacity.job-lifetime-limit","180s",
             "ai.gateway.inference.mode","disabled"));
-        properties.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username","aigw_app","spring.datasource.password",database.passwordFor("aigw_app")));
+        properties.putAll(Map.of("spring.datasource.url",database.jdbcUrl(),"spring.datasource.username",database.user(),"spring.datasource.password",database.passwordFor(database.user())));
         properties.putAll(extraApplicationProperties());
         if (applicationType() == WebApplicationType.SERVLET) { properties.put("server.address","127.0.0.1"); properties.put("server.port",0); }
         var arguments = new java.util.ArrayList<>(List.of(

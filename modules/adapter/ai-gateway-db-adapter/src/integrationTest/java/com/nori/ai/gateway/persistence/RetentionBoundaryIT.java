@@ -35,11 +35,11 @@ class RetentionBoundaryIT extends PgIntegrationSupport {
 
     @BeforeAll void prepare() {
         database = rawDatabase();
-        database.bootstrap(false);
+        database.bootstrap();
         database.migrate();
         context = application(database, TestClock.class);
         clock = bean(MutableClock.class);
-        assertThat(bean(JdbcClient.class).sql("SELECT current_user").query(String.class).single()).isEqualTo("aigw_app");
+        assertThat(bean(JdbcClient.class).sql("SELECT current_user").query(String.class).single()).isEqualTo(database.user());
     }
     @AfterAll void release() {
         try { if (context != null) context.close(); }

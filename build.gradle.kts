@@ -7,6 +7,23 @@ import org.gradle.api.tasks.testing.TestDescriptor
 import org.gradle.api.tasks.testing.TestResult
 import org.gradle.process.CommandLineArgumentProvider
 
+// ----------------------------------------------------------------------------
+// Flyway (DB 스키마 마이그레이션) — 레포 단일 owner 외부 도구(nori-wm-ui-backend build.gradle.kts 와 같은 형태)
+// ----------------------------------------------------------------------------
+// Flyway gradle 플러그인은 JDBC 드라이버·DB 방언 모듈을 buildscript classpath 로 받는다(플러그인과 같은 classloader).
+// postgresql 버전은 catalog 에 항목이 없어 Spring Boot 4.0.7 BOM 의 postgresql.version 과 같은 값을 쓴다.
+buildscript {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+    dependencies {
+        classpath(libs.flyway.gradle.plugin)
+        classpath(libs.flyway.database.postgresql)
+        classpath("org.postgresql:postgresql:42.7.11")
+    }
+}
+
 plugins {
     base
     id("com.nori.common.root-project-conventions")
@@ -17,6 +34,23 @@ plugins {
 allprojects {
     group = "com.nori.ai.gateway"
     version = "0.0.1-SNAPSHOT"
+}
+
+// 앱 임베드 아님 — 앱은 spring.flyway.enabled=false + SchemaVersionGuard, 스키마 owner 는 이 외부 Flyway task 다.
+apply(plugin = "org.flywaydb.flyway")
+
+// 대상 DB 는 공유 서버의 nori_ai_gateway 이고 계정은 하나다(AGENTS.md §6). 자격은 -P 또는 env 로만 주입하며 비밀번호는
+// 명령행 -Pflyway.password 대신 env AI_GATEWAY_DB_PASSWORD 로 준다. 공유 서버 적용은 CI migrate stage 가 하고,
+// 로컬 확인은 격리 시험 컨테이너에만 한다(파이프라인 밖에서 돌리면 그 DB 가 그대로 바뀐다).
+//   AI_GATEWAY_DB_URL=... AI_GATEWAY_DB_USER=... AI_GATEWAY_DB_PASSWORD=... ./gradlew flywayInfo
+// 빈 DB 에서 시작하므로 baselineOnMigrate 는 쓰지 않는다. 이력 schema 는 gw_flyway 다.
+configure<org.flywaydb.gradle.FlywayExtension> {
+    url = (project.findProperty("flyway.url") as String?) ?: System.getenv("AI_GATEWAY_DB_URL")
+    user = (project.findProperty("flyway.user") as String?) ?: System.getenv("AI_GATEWAY_DB_USER")
+    password = (project.findProperty("flyway.password") as String?) ?: System.getenv("AI_GATEWAY_DB_PASSWORD")
+    locations = arrayOf("filesystem:${rootDir.resolve("flyway/sql")}")
+    defaultSchema = "gw_flyway"
+    createSchemas = true
 }
 
 fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

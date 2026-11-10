@@ -25,7 +25,7 @@ class WorkerRestartEpochIT extends P09QueueSupport {
     }
     @Test void allEightEpochModesUseRealIdentifierAndFailClosedBeforeAnyLaterWrites()throws Exception{
         String identifier=jdbc().sql("SELECT system_identifier::text FROM pg_control_system()").query(String.class).single();
-        var parent=JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(),"aigw_migrator",database.passwordFor("aigw_migrator")));
+        var parent=JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(),database.user(),database.passwordFor(database.user())));
         for(String which:List.of("a","b","c","d","e","f","g","h")){
             context.close();context=null;
             parent.sql("TRUNCATE gw.conversation,gw.audit_event,gw.instance_epoch CASCADE").update();

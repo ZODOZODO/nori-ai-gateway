@@ -41,10 +41,25 @@ class StackSmokeIT extends StackContextSupport {
         assertThat(context.getBean(JdbcClient.class).sql("select 1").query(Integer.class).single()).isEqualTo(1);
         assertThat(context.getBeansOfType(Flyway.class)).isEmpty();
         var jdbc = context.getBean(JdbcClient.class);
-        assertThat(jdbc.sql("SELECT current_user").query(String.class).single()).isEqualTo("aigw_app");
+        assertThat(jdbc.sql("SELECT current_user").query(String.class).single()).isEqualTo(database.user());
         var versions = jdbc.sql("SELECT version FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL")
             .query(String.class).list();
         assertThat(versions.stream().map(org.flywaydb.core.api.MigrationVersion::fromVersion)
+            .max(org.flywaydb.core.api.MigrationVersion::compareTo).orElseThrow())
+            .isEqualTo(com.nori.ai.gateway.persistence.schema.SchemaVersionGuard.latestClasspathVersion());
+        // 앱 리소스 사본(db/migration/gateway)은 루트 flyway/sql 과 파일 집합·바이트가 같고 최신 V 도 같다.
+        var source = java.nio.file.Path.of(System.getProperty("aigw.rootDir")).resolve(System.getProperty("aigw.flyway.sql.dir"));
+        var copies = new java.util.TreeMap<String, byte[]>();
+        for (var resource : new org.springframework.core.io.support.PathMatchingResourcePatternResolver().getResources("classpath*:db/migration/gateway/V*__*.sql"))
+            try (var in = resource.getInputStream()) { copies.put(resource.getFilename(), in.readAllBytes()); }
+        var originals = new java.util.TreeMap<String, byte[]>();
+        try (var files = java.nio.file.Files.list(source)) {
+            for (var file : files.filter(path -> path.getFileName().toString().matches("V.+__.+\\.sql")).toList())
+                originals.put(file.getFileName().toString(), java.nio.file.Files.readAllBytes(file));
+        }
+        assertThat(copies.keySet()).isEqualTo(originals.keySet()).hasSize(7);
+        originals.forEach((name, bytes) -> assertThat(copies.get(name)).as(name).isEqualTo(bytes));
+        assertThat(originals.keySet().stream().map(name -> org.flywaydb.core.api.MigrationVersion.fromVersion(name.substring(1, name.indexOf("__")).replace('_', '.')))
             .max(org.flywaydb.core.api.MigrationVersion::compareTo).orElseThrow())
             .isEqualTo(com.nori.ai.gateway.persistence.schema.SchemaVersionGuard.latestClasspathVersion());
         assertThat(jdbc.sql("SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('gw','kn','gw_flyway')")

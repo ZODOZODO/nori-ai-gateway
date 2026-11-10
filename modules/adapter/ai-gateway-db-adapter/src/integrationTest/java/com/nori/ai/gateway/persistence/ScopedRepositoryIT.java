@@ -65,7 +65,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
     private VerifiedSystemScope requestScope(String job){var original=scope(OwnerSystem.TC,"a");return new VerifiedSystemScope(original.boundSystem(),original.authenticatedServiceRef(),original.actorRef(),original.sub(),original.perm(),original.pdg(),original.issuedAt(),original.expiresAt(),job);}
     private void request(String job,String message){var scope=requestScope(job);assertThat(bean(MessageRepository.class).insert(scope,"tc",message(message))).isTrue();assertThat(bean(JobRepository.class).insert(scope,new JobRepository.NewJob(job,"tc",null,"digest","B",message,Map.of()),null)).isTrue();}
     @Test void requestInputForeignKeyAndObjectConstraintRejectCrossConversationAndNonObjectSnapshots() throws Exception {
-        try(var connection=database.connection("aigw_app");var sql=connection.createStatement()) {
+        try(var connection=database.connection(database.user());var sql=connection.createStatement()) {
             String prefix="INSERT INTO gw.job(id,conversation_id,owner_system,actor_ref,status,created_at,request_digest,expected_path,request_perm,request_pdg,request_message_id,request_input) VALUES ";
             assertThatThrownBy(()->sql.execute(prefix+"('bad-fk','tc','TC','a','QUEUED',CURRENT_TIMESTAMP,'digest','/v1/query',ARRAY[]::text[],'pdg','m-wm','{}')"))
                 .isInstanceOfSatisfying(java.sql.SQLException.class,failure->assertThat(failure.getSQLState()).isEqualTo("23503"));
@@ -84,7 +84,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
     private ConfigurableApplicationContext context;
     static class TestClock { @Bean Clock testClock() { return Clock.fixed(NOW, ZoneOffset.UTC); } }
     @BeforeAll void prepare() {
-        database = rawDatabase(); database.bootstrap(false); database.migrate(); context = application(database, TestClock.class);
+        database = rawDatabase(); database.bootstrap(); database.migrate(); context = application(database, TestClock.class);
         assertThat(context.getBeansOfType(Clock.class)).hasSize(1);
     }
     @AfterAll void release() { try { if (context != null) context.close(); } finally { if (database != null) database.close(); } }
@@ -207,7 +207,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
     }
     @Test void auditNinetyDayAndCacheOwnExpiryBoundariesAreIndependentOfLiveConversation() throws Exception {
         var scope = scope(OwnerSystem.TC,"a");
-        try (var connection = database.connection("aigw_app");
+        try (var connection = database.connection(database.user());
                 var audit = connection.prepareStatement("UPDATE gw.audit_event SET recorded_at = ? WHERE request_id = 'audit-tc'");
                 var cache = connection.prepareStatement("UPDATE gw.cache_entry SET expires_at = ? WHERE conversation_id = 'tc'")) {
             audit.setTimestamp(1, Timestamp.from(NOW.minus(Duration.ofDays(90)))); audit.executeUpdate();
@@ -223,7 +223,7 @@ class ScopedRepositoryIT extends PgIntegrationSupport {
         assertThatThrownBy(queue::lockControl).isInstanceOf(IllegalStateException.class);
         bean(org.springframework.transaction.support.TransactionTemplate.class).executeWithoutResult(status -> queue.lockControl());
         assertThat(bean(com.nori.ai.gateway.persistence.maintenance.RetentionMaintenanceRepository.class).purgeExpiredConversations()).isZero();
-        try (var connection = database.connection("aigw_app"); var statement = connection.createStatement()) {
+        try (var connection = database.connection(database.user()); var statement = connection.createStatement()) {
             statement.executeUpdate("UPDATE gw.job SET status = 'CANCELLED' WHERE conversation_id IN ('expired','edge')");
         }
         assertThat(bean(com.nori.ai.gateway.persistence.maintenance.RetentionMaintenanceRepository.class).purgeExpiredConversations()).isEqualTo(2);

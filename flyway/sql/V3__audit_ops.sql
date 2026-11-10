@@ -16,5 +16,3 @@ CREATE TABLE gw.instance_epoch (
     id integer PRIMARY KEY CHECK (id = 1), db_system_identifier text NOT NULL, recorded_at timestamptz NOT NULL,
     restore_completed_at timestamptz, restored_backup_point_at timestamptz
 );
-GRANT INSERT ON gw.backup_run TO aigw_backup;
-GRANT USAGE ON SEQUENCE gw.backup_run_id_seq TO aigw_backup;

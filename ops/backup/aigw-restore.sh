@@ -2,10 +2,11 @@
 # 격리 복원(Plan P15 M-2·M-6, §11.8). 백업 이미지 안에서만 실행한다:
 #   docker run --rm --network host -v <bundle 디렉터리>:/in:ro -v <identity>:/run/age/identity:ro -v <출력 디렉터리>:/out \
 #     -e AIGW_RESTORE_PGPASSWORD <backup image@digest> /opt/aigw/aigw-restore.sh --bundle /in/<bundle> \
-#     --target-db-url postgresql://aigw_migrator@127.0.0.1:15432/ai_gateway --expect-db-release ai-gateway-db-restore \
+#     --target-db-url postgresql://<단일 계정>@127.0.0.1:15432/nori_ai_gateway --expect-db-release ai-gateway-db-restore \
 #     --age-identity-file /run/age/identity --receipt-dir /out
 # 종료 코드: 2 입력 오류, 7 RESTORE_TARGET_REJECTED(쓰기 0), 8 RESTORE_STEP_FAILED(오류 1건이면 즉시 중단).
 # 평문 덤프는 디스크에 쓰지 않고 복호 스트림을 pg_restore 에 파이프로만 넘긴다. 주 DB·주 앱 release 는 바꾸지 않는다.
+# 대상은 리허설 전용 임시 인스턴스이고, 접속 계정은 bootstrap 이 env 로 받은 이름으로 만든 단일 계정(그 DB 의 소유자)이다.
 set -euo pipefail
 set +x
 umask 077
@@ -22,8 +23,8 @@ while (($#)); do
   shift 2
 done
 [[ -f $bundle && -f $identity && -d $receipt_dir && -n ${AIGW_RESTORE_PGPASSWORD:-} ]] || die ARGUMENT_MISSING 2
-[[ $target =~ ^postgresql://aigw_migrator@([A-Za-z0-9.-]+):([0-9]+)/ai_gateway$ ]] || die TARGET_URL_INVALID 2
-export PGHOST=${BASH_REMATCH[1]} PGPORT=${BASH_REMATCH[2]} PGUSER=aigw_migrator PGDATABASE=ai_gateway PGPASSWORD=$AIGW_RESTORE_PGPASSWORD
+[[ $target =~ ^postgresql://([A-Za-z_][A-Za-z0-9_.-]{0,62})@([A-Za-z0-9.-]+):([0-9]+)/nori_ai_gateway$ ]] || die TARGET_URL_INVALID 2
+export PGUSER=${BASH_REMATCH[1]} PGHOST=${BASH_REMATCH[2]} PGPORT=${BASH_REMATCH[3]} PGDATABASE=nori_ai_gateway PGPASSWORD=$AIGW_RESTORE_PGPASSWORD
 unset AIGW_RESTORE_PGPASSWORD
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
@@ -58,9 +59,10 @@ reject() { printf 'RESTORE_TARGET_REJECTED:%s\n' "$1" >&2; exit 7; }
 [[ $PGPORT == "$FORWARD_PORT" ]] || reject port
 schemas=$(q "SELECT count(*) FROM pg_namespace WHERE nspname IN ('gw','kn','gw_flyway')" 2>/dev/null) || reject connect
 tables=$(q "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','p','v','m','S') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%'") || reject connect
-roles=$(q "SELECT count(*) FROM pg_roles WHERE rolname IN ('aigw_migrator','aigw_app','aigw_backup')") || reject connect
+# bootstrap 된 대상 = 접속 계정이 그 DB 의 소유자(서버 선행조건과 같은 형태 — 스키마를 만들 수 있다).
+roles=$(q "SELECT count(*) FROM pg_database WHERE datname = current_database() AND pg_get_userbyid(datdba) = current_user") || reject connect
 [[ $schemas == 0 && $tables == 0 ]] || reject not_empty
-[[ $roles == 3 ]] || reject bootstrap_roles
+[[ $roles == 1 ]] || reject bootstrap_roles
 
 # TOC 필터(N15): bootstrap(superuser)이 소유한 항목만 뺀다. 그 밖(gw·kn·gw_flyway·SEQUENCE SET 포함)은 그대로 복원한다.
 step=TOC
@@ -73,7 +75,7 @@ grep -E "$excluded_pattern" "$work/toc.full" > "$work/toc.excluded" || true
 grep -vE "$excluded_pattern" "$work/toc.full" > "$work/restore.list"
 restore_section() {
   step=$1
-  decrypt | pg_restore --section="$1" --no-owner --role=aigw_migrator --exit-on-error -L "$work/restore.list" -d "$PGDATABASE" >/dev/null 2>"$work/restore.err" || fail_step
+  decrypt | pg_restore --section="$1" --no-owner --role="$PGUSER" --exit-on-error -L "$work/restore.list" -d "$PGDATABASE" >/dev/null 2>"$work/restore.err" || fail_step
 }
 restore_section pre-data
 step=JOB_DATA

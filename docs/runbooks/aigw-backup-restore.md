@@ -6,7 +6,7 @@
 
 - runconfig(main) `backup.{enabled,type,schedule,destination,ageRecipient,retentionDays}` — 승인 문서 참조 필수. `aigw-helm.sh --release ai-gateway-db --image-digests <image-digests.json>` 가 `backup` digest 와 함께 차트에 넘기며 하나라도 없으면 렌더 실패.
 - `backup.destination` 형식: `s3` = `https://<endpoint host[:port]>/<bucket>[/<prefix>]`(경로 방식 S3 호환), `sftp` = `sftp://<user>@<host>[:port]/<path>`. 유형은 이미지 빌드 인자 `BACKUP_DEST_TYPE` 와 같아야 한다.
-- Secret: `ai-gateway-db-backup`(`password`, 역할 `aigw_backup`), `ai-gateway-backup-destination`(s3 = `access-key`·`secret-key`, sftp = `ssh-private-key`·`known-hosts`). age 수신자 공개키는 runconfig 값(비밀 아님). 개인키는 복원 실행자만 보유하며 클러스터·이미지·레포에 두지 않는다.
+- Secret: `ai-gateway-db-backup`(`password`, 단일 DB 계정 — 이름은 env 로만), `ai-gateway-backup-destination`(s3 = `access-key`·`secret-key`, sftp = `ssh-private-key`·`known-hosts`). age 수신자 공개키는 runconfig 값(비밀 아님). 개인키는 복원 실행자만 보유하며 클러스터·이미지·레포에 두지 않는다.
 
 ## 백업 확인
 
@@ -34,10 +34,10 @@ kubectl -n tc create job --from=cronjob/ai-gateway-db-backup ai-gateway-db-backu
 3. bundle 을 목적지에서 내려받아 읽기 전용 디렉터리에 두고, 같은 backup 이미지 digest 로 실행한다. 비밀번호는 env 로만 넣는다(명령행·출력 0).
 
 ```bash
-read -rs AIGW_RESTORE_PGPASSWORD; export AIGW_RESTORE_PGPASSWORD   # aigw_migrator (복원 release)
+read -rs AIGW_RESTORE_PGPASSWORD; export AIGW_RESTORE_PGPASSWORD   # 단일 계정(복원 release bootstrap 이 env 이름으로 만든 역할)
 docker run --rm --network host -v "$BUNDLE_DIR:/in:ro" -v "$AGE_IDENTITY_FILE:/run/age/identity:ro" -v "$OUT_DIR:/out" \
   -e AIGW_RESTORE_PGPASSWORD "harbor.nori.local/nori-tc/ai-gateway-backup@$BACKUP_DIGEST" /opt/aigw/aigw-restore.sh \
-  --bundle "/in/$BUNDLE_NAME" --target-db-url postgresql://aigw_migrator@127.0.0.1:15432/ai_gateway \
+  --bundle "/in/$BUNDLE_NAME" --target-db-url "postgresql://$AI_GATEWAY_DB_USER@127.0.0.1:15432/nori_ai_gateway" \
   --expect-db-release ai-gateway-db-restore --age-identity-file /run/age/identity --receipt-dir /out
 ```
 

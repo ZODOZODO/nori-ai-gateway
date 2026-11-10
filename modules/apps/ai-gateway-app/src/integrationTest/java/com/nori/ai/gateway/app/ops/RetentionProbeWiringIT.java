@@ -127,7 +127,7 @@ class RetentionProbeWiringIT extends P09QueueSupport {
     @Test void pendingRecoveryNeverStartsTheProbeOrWritesRows() throws Exception {
         await(() -> rows().size() == 4);
         context.close(); context = null;
-        var migrator = JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(), "aigw_migrator", database.passwordFor("aigw_migrator")));
+        var migrator = JdbcClient.create(new DriverManagerDataSource(database.jdbcUrl(), database.user(), database.passwordFor(database.user())));
         migrator.sql("TRUNCATE gw.source_retention_probe").update();
         // 다른 DB 식별자 기록 = 복원 경로 필요(복구 완료 신호 없음)입니다.
         migrator.sql("UPDATE gw.instance_epoch SET db_system_identifier = 'p14-other-instance'").update();
