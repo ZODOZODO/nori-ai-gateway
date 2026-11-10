@@ -7830,3 +7830,12 @@ P16의 이번 요청 범위는 CODE/LOCAL_VALIDATED로 마무리합니다. 구�
 - ⑥ `git grep …` 0줄(exit 1). 옛 FQCN(`integration.loki.SourceHttpClient` 등)·`LokiSourcePolicy.APPS`·`LokiLogConnector.nanos` 잔존 0(`docs`·`evidence` 제외).
 - 경로 길이: 추적 파일 최장 180자(`modules/adapter/ai-gateway-source-support/src/main/java/com/nori/ai/gateway/integration/source/AllowlistClientRequestObservationConvention.java`), build 산출물 포함 `modules/` 쪽 최장 207자. 240자 초과는 모두 `gateway-eval/build/tmp/test/work/.gradle-test-kit/caches/…`(이동 안 한 TestKit 캐시)뿐이다.
 - 환경: 남은 시험 컨테이너 0, Docker 이미지 목록 시작 전과 같음, nori-common clean, `evidence/**`·SPEC 변경 0.
+
+### root 독립 검증과 ④ 재실행 (2026-11-10)
+
+- JUnit XML 직접 집계: test 11개 task 합 694건, integrationTest db-adapter 85·inference 1·app 167, 모두 실패·오류·skip 0. 분할된 5개 모듈 test 합 123건.
+- `test-evidence verify --tasks <test 11개 쉼표 목록>` exit 0, `-Paigw.requireDocker=true … --selector integrationTest --required ci/integration-required.txt --require-docker` exit 0, 둘 다 `TEST_EVIDENCE_VERIFIED`.
+- ⑥ 을 commit `7cba8d4` 대상으로 다시 돌려 0줄, 옛 모듈 디렉터리 추적 파일 0.
+- `SourceAttemptGuardTest` 분할: 종전 시험 5개 → 공용 4개 × adapter 3개 + 전송기 전용 1개 = 13개. 종전 단언 4종은 `kind` 분기가 adapter 별 `SOURCE_REF`·건수(logs 5, 그 외 2)로 바뀐 형태로 모두 남았다(약화 0).
+- 결정 대기 1·2(kafka·object-storage·S3 의존, acceptance-app 의 inference adapter 의존): 둘 다 P04 `8e51ea9` 부터 있던 구성이고 U3 는 동작 변경 0 이 원칙이므로 유지한다. 정리는 그 의존을 받을 새 모듈을 만드는 P24 의 2026-11-10 대체 문단에 넘겼다. 결정 대기 3(AGENTS.md §4 source-support 행)은 같은 문서 commit 에서 추가했다.
+- ④ 문서 commit `cd116d4` 뒤 깨끗한 트리에서 `aigwPackage -Paigw.gitSha=cd116d4b9df2700151d3…` exit 0 `BUILD SUCCESSFUL in 25s`, `build/package/build-identity.json` 의 `gitSha` 가 HEAD 와 같다.
