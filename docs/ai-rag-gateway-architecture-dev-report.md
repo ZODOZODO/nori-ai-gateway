@@ -8013,3 +8013,13 @@ Schema version: 7
 
 - Plan 변경 필요: ① U6 ① "`ai-gateway-db.properties`(실제 계정 값)" → 계정 값은 같은 Secret 의 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 키, 파일 키는 placeholder(위 결정). ② U6 allowed_writes 의 `spring.config.import: optional:file:config/ai-gateway*.properties` → 파일별 줄(Spring wildcard 제약), `ai-gateway.properties`·`ai-gateway-messaging.properties` 는 내용이 생길 때. ③ U6 allowed_writes 에 모듈 시험의 `ops/`·`deploy/docker/` 경로 문자열(5개 파일) 추가. ④ ⑦ 의 grep 이 증거 디렉터리 `evidence/<stage>/ops/` 를 잡는다 — 제외 조건(예: `:!gateway-eval/src/test` 와 `evidence/[^ ]*ops/` 표기 제외) 또는 판정 문구 조정. ⑤ rollback 리허설: A 는 A 의 commit checkout 에서 먼저 배포(`FROM_NOT_DEPLOYED`). ⑥ 운영자 호스트 도구에 `psql` 추가(rollback 리허설·백업 경보 주입). ⑦ `pvc-capacity`·`pvc-protection` 승인 문서를 배포 필수 목록에 남길지. ⑧ 백업 CronJob egress NetworkPolicy(§11.3)는 목적지 egress 대상 입력이 없어 미구현.
 - 사용자 결정 필요: 복원 리허설 인스턴스 superuser 비밀번호를 단일 계정 비밀번호와 같게 둔 것(위 결정).
+
+### root 독립 검증과 보완 (2026-11-11)
+
+- commit 1 `94fb7b3`: 53개 모두 R100(내용 변경 0). commit 3 `22a0053`: 29개 파일 blob 이 exec `c34518d` 와 같다(앱 차트 17 → `operations/deploy/helm/ai-gateway/`, `db-chart/` 12 → `operations/deploy/helm/ai-gateway-db-restore/`).
+- JUnit XML 직접 집계: test 11개 task 합 694건, integrationTest db-adapter 85·inference 1·app 167, 모두 실패·오류·skip 0. `test-evidence verify --tasks <test 11개>` exit 0, `-Paigw.requireDocker=true … --selector integrationTest --required ci/integration-required.txt --require-docker` exit 0, 둘 다 `TEST_EVIDENCE_VERIFIED`.
+- `aigw-p06-tools:local`(`--network none`, readonly mount)로 3 release lint exit 0(`LOCAL_CHART_OK`, chartDigest 앱 `f661627e…`·복원 DB `aa26b935…`), selftest 5종 exit 0 `PASS`(31·64·31·94·9), runconfig selftest exit 0 `PASS` 24.
+- Spring Boot 4.0.7 jar 의 `LocationResourceLoader.class` 에 "Location '%s' must end with '*/'" 가 있음을 확인했다(파일 이름 wildcard 거부).
+- ⑦ 원래 식 5줄은 모두 `evidence/<stage>/ops/` 표기다. 판정식을 Plan U6 2026-11-11 ④ 로 바꿨고 결과 0줄(U6 전 `65ba263` 에서는 229줄). U5 ⑧ 0줄.
+- 보완: `operations/deploy/runconfig.py` 배포 게이트 목록에서 `pvc-capacity`·`pvc-protection` 을 뺐다(P07 2026-11-10 ⑥). 두 selftest 의 승인 fixture 목록과 `operations/runconfig/README.md` 문구를 같이 고쳤다. 수정 뒤 runconfig selftest 24·runtime-credentials 64 를 포함한 6종 PASS, lint 3 release exit 0. 이 파일들을 읽는 Gradle 시험은 0건이라 시험 증거에 영향이 없다.
+- 백업 목적지 egress 미생성은 G-BACKUP-DEST `BLOCKED` 때문이며 Plan U6 2026-11-11 ⑧ 에 순서를 기록했다.

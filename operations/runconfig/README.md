@@ -33,7 +33,7 @@ python3 -B operations/deploy/runconfig-selftest.py
 
 ## 배포
 
-승인 운영자만 `--mode deploy --runconfig "$AIGW_RUNCONFIG"`(복원은 `$AIGW_RESTORE_RUNCONFIG`)를 실행합니다. 부작용 전에 차트 checkout 을 확인합니다: `operations/` 의 미커밋·미추적 변경이 있으면 `CHART_CHECKOUT_DIRTY`, 앱 release 에서 HEAD 가 `image-digests.json` 의 `buildIdentity.gitSha`(앱 이미지 `GIT_SHA` label 과 같은 값)와 다르면 `CHART_CHECKOUT_SHA_MISMATCH`, git checkout 이 아니면 `CHART_CHECKOUT_UNREADABLE` 로 exit 2 입니다. 이어서 postgres-image·corpus-inventory·pvc-capacity·pvc-protection·backup-destination(앱 release 는 netpol-targets 추가)의 실제 승인과 런타임 자격 check 를 요구합니다. `--wait --timeout 600s` 후 rollout(복원 DB 는 bootstrap Job 완료까지), status=deployed와 양의 revision을 모두 확인해야 성공 증거(`chartRepoSha`·`chartDigest`·helm revision·digest)를 기록합니다. restore는 RESTORE 자격 단계로 검사합니다.
+승인 운영자만 `--mode deploy --runconfig "$AIGW_RUNCONFIG"`(복원은 `$AIGW_RESTORE_RUNCONFIG`)를 실행합니다. 부작용 전에 차트 checkout 을 확인합니다: `operations/` 의 미커밋·미추적 변경이 있으면 `CHART_CHECKOUT_DIRTY`, 앱 release 에서 HEAD 가 `image-digests.json` 의 `buildIdentity.gitSha`(앱 이미지 `GIT_SHA` label 과 같은 값)와 다르면 `CHART_CHECKOUT_SHA_MISMATCH`, git checkout 이 아니면 `CHART_CHECKOUT_UNREADABLE` 로 exit 2 입니다. 이어서 postgres-image·corpus-inventory·backup-destination(앱 release 는 netpol-targets 추가)의 실제 승인과 런타임 자격 check 를 요구합니다. `--wait --timeout 600s` 후 rollout(복원 DB 는 bootstrap Job 완료까지), status=deployed와 양의 revision을 모두 확인해야 성공 증거(`chartRepoSha`·`chartDigest`·helm revision·digest)를 기록합니다. restore는 RESTORE 자격 단계로 검사합니다.
 
 ## P15 앱 release 입력
 

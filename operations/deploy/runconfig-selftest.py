@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
                     refs(value)
     refs(data)
     run(data, 2, 'RUNCONFIG_MISSING:postgres-image', mode='deploy', release='ai-gateway')
-    for name in ['postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']:
+    for name in ['postgres-image', 'corpus-inventory', 'backup-destination']:
         (gate / (name + '.md')).write_text('Status: APPROVED\n')
     run(data, 2, 'RUNCONFIG_MISSING:netpol-targets', mode='deploy', release='ai-gateway')
     (gate / 'netpol-targets.md').write_text('Status: APPROVED\n')

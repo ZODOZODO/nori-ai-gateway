@@ -112,7 +112,7 @@ sys.exit(subprocess.call([os.environ['REAL_HELM'],*args]))
     (work/'deploy-input.json').write_text(json.dumps(deploy_data))
     restore_data=dict(purpose='deploy',profile='restore',pgImage=deploy_data['pgImage'],restore=deploy_data['restore'])
     (work/'restore-input.json').write_text(json.dumps(restore_data))
-    for name in ['postgres-image','corpus-inventory','pvc-capacity','pvc-protection','backup-destination','netpol-targets']:
+    for name in ['postgres-image','corpus-inventory','backup-destination','netpol-targets']:
         (gate/(name+'.md')).write_text('Status: APPROVED\n')
     git=lambda *a: subprocess.run(['git','-c','user.name=selftest','-c','user.email=selftest@invalid',*a],cwd=work,check=True,capture_output=True,text=True).stdout.strip()
     db=['operations/deploy/aigw-helm.sh','--release','ai-gateway-db-restore','--mode','deploy','--runconfig','restore-input.json']

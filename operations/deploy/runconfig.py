@@ -108,7 +108,8 @@ def validate(data, release, mode):
     if errors:
         fail('RUNCONFIG_INVALID:' + '.'.join(map(str, errors[0].path)))
     if deploy:
-        gates = ['postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']
+        # pvc-capacity·pvc-protection 은 배포 게이트가 아니다(Plan P07 2026-11-10 ⑥ — 운영 DB PVC 범위는 이력).
+        gates = ['postgres-image', 'corpus-inventory', 'backup-destination']
         if release in APP_RELEASES:
             gates.append('netpol-targets')
         for name in gates:
