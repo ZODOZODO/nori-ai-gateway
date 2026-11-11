@@ -18,6 +18,7 @@
 - 포트 15432 직접 연결이다(pgbouncer 16432 아님 — 백업의 `pg_dump` snapshot·Flyway 가 세션 연결을 쓴다).
 - 계정 이름과 비밀번호는 이 문서·코드·차트·로그에 쓰지 않는다. 환경변수 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 로만 주입한다(URL 은 `AI_GATEWAY_DB_URL`). 명령행 인자로 비밀번호를 넘기지 않는다.
 - migration 은 루트 Gradle Flyway(`flywayInfo`·`flywayMigrate`, 위치 `flyway/sql`, 이력 schema `gw_flyway`)가 CI `migrate` stage 에서 적용한다. 앱은 `spring.flyway.enabled=false` 이고 `SchemaVersionGuard` 로 버전만 확인한다.
+- CI `migrate` job 이 읽는 GitLab CI 변수는 `AI_GATEWAY_DB_USER`(masked)·`AI_GATEWAY_DB_PASSWORD`(protected·masked) 두 개다(사용자·운영자가 첫 파이프라인 전에 등록, 값은 채팅·레포·로그에 쓰지 않음). `AI_GATEWAY_DB_URL` 은 `.gitlab-ci.yml` 에 적힌 일반 값이다. 둘 중 하나라도 비면 job 이 Gradle 호출 전에 실패한다.
 
 ## 읽기 전용 확인(같은 계정, 첫 배포 때)
 

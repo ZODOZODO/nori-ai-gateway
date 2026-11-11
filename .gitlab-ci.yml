@@ -3,7 +3,7 @@ workflow:
     - if: '$CI_SERVER_HOST == "gitlab.noricloud.org"'
     - when: never
 
-stages: [check, package, verify, build, scan, deploy]
+stages: [check, package, verify, build, scan, migrate, deploy]
 variables:
   # settings-conventions(nori-common/build-logic)는 GitLab Package Registry 를 gitlabBaseUrl|GITLAB_BASE_URL 이 있을 때만
   # 등록한다(nori-wm-ui-backend 와 같은 CI 입력). project id 는 gradle.properties 의 gitlabPackageProjectIds, 인증은 CI_JOB_TOKEN 이다.
@@ -162,6 +162,36 @@ scan-image:
       jq -n --arg app "$(cat build/image-digest/app.digest)" --arg backup "$(cat build/image-digest/backup.digest)" --arg acceptance "$(cat build/image-digest/acceptance.digest)" --slurpfile identity build/package/build-identity.json '{app:$app,backup:$backup,acceptance:$acceptance,buildIdentity:$identity[0]}' > image-digests.json
   artifacts:
     paths: [image-digests.json]
+
+# 공유 서버 DB nori_ai_gateway 에 루트 Gradle Flyway(flyway/sql, 이력 schema gw_flyway)를 적용한다(nori-wm-ui-backend migrate job 형태).
+# 순서는 needs 없이 stage 로만 강제한다 — 이 job 이 실패하면 뒤 stage 의 deploy-verify 는 시작되지 않는다.
+# 계정 이름·비밀번호는 CI 변수 AI_GATEWAY_DB_USER(masked)·AI_GATEWAY_DB_PASSWORD(protected·masked)로만 받는다.
+# -Pflyway.* 를 쓰지 않는 이유: CI trace 에 명령줄이 찍힌다. build.gradle.kts 가 env AI_GATEWAY_DB_URL/USER/PASSWORD 를 읽는다.
+# 둘 중 하나라도 비면 Gradle 호출 전에 실패한다(protected 변수는 protected 가 아닌 ref 에서 비어 있다).
+# migrate 의 종료 코드만 믿지 않고 적용 뒤 flywayInfo 로 Pending 잔존을 다시 본다.
+# flywayInfo -q 의 stdout 은 "Schema version" 줄과 Category/Version/Description/Type/Installed On/State/Undoable 표뿐이라
+# (Flyway 11.14.1 FlywayInfoTask·MigrationInfoDumper) 계정 이름·URL 이 artifact 에 들어가지 않는다.
+migrate:
+  stage: migrate
+  tags: [nori-msa]
+  dependencies: []
+  allow_failure: false
+  variables:
+    AI_GATEWAY_DB_URL: "jdbc:postgresql://192.168.0.150:15432/nori_ai_gateway"
+  script:
+    - 'if [ -z "$AI_GATEWAY_DB_USER" ] || [ -z "$AI_GATEWAY_DB_PASSWORD" ]; then echo "AI_GATEWAY_DB_USER or AI_GATEWAY_DB_PASSWORD is empty - register both as CI variables (protected ref required)" >&2; exit 1; fi'
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.noricloud.org/norisystem/nori-tc/nori-common.git ../nori-common
+    - bash ./gradlew flywayInfo -q --no-daemon
+    - bash ./gradlew flywayMigrate --no-daemon
+    - bash ./gradlew flywayInfo -q --no-daemon > flyway-info-after.txt
+    - 'if grep -q "Pending" flyway-info-after.txt; then echo "Pending migrations remain after flywayMigrate" >&2; exit 1; fi'
+  artifacts:
+    when: always
+    paths: [flyway-info-after.txt]
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
 
 deploy-verify:
   stage: deploy
