@@ -8023,3 +8023,4 @@ Schema version: 7
 - ⑦ 원래 식 5줄은 모두 `evidence/<stage>/ops/` 표기다. 판정식을 Plan U6 2026-11-11 ④ 로 바꿨고 결과 0줄(U6 전 `65ba263` 에서는 229줄). U5 ⑧ 0줄.
 - 보완: `operations/deploy/runconfig.py` 배포 게이트 목록에서 `pvc-capacity`·`pvc-protection` 을 뺐다(P07 2026-11-10 ⑥). 두 selftest 의 승인 fixture 목록과 `operations/runconfig/README.md` 문구를 같이 고쳤다. 수정 뒤 runconfig selftest 24·runtime-credentials 64 를 포함한 6종 PASS, lint 3 release exit 0. 이 파일들을 읽는 Gradle 시험은 0건이라 시험 증거에 영향이 없다.
 - 백업 목적지 egress 미생성은 G-BACKUP-DEST `BLOCKED` 때문이며 Plan U6 2026-11-11 ⑧ 에 순서를 기록했다.
+- exec 삭제 commit(root, 2026-11-11): `nori-tc-exec` `f1d5e0a` `chore(deploy): remove AI Gateway helm charts moved to nori-ai-gateway operations/deploy/helm` — `deploy/helm/ai-gateway` 29개 파일 삭제(1948줄), exec 안 다른 참조 0(`git grep "helm/ai-gateway"`). push 전이며 그 레포의 미push commit 은 이 commit 포함 7개(`cd15491`, `6d744aa`…`c34518d` 5개, `f1d5e0a`).
