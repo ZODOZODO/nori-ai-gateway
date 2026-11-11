@@ -8090,3 +8090,9 @@ both set, no pending         exit=0 gradleCalls=3 ['flywayInfo', 'flywayMigrate'
 - `AI_GATEWAY_DB_PASSWORD` 가 protected 라 tag 파이프라인에서는 tag 가 protected 여야 값이 들어온다. 아니면 1단계에서 실패한다(fail-closed, 적용 0).
 - GitLab masked 변수는 값 길이·문자 조건이 있어 계정 이름이 그 조건을 만족하지 않으면 masked 로 등록되지 않는다(등록 시 확인).
 - `deploy-verify` 에는 rules 가 없어 main/tag 가 아닌 파이프라인에서는 `migrate` 없이 수동 배포가 가능하다. 이 경우 앱 `SchemaVersionGuard` 가 스키마 버전 불일치로 기동을 막는다. Plan U7 범위 밖이라 바꾸지 않았다.
+
+### root 독립 확인과 보완 (2026-11-11)
+
+- `af61a1f` 의 `.gitlab-ci.yml` diff 를 직접 읽었다: stages 에 `migrate` 1개 추가, `migrate` job 1개 추가, 기존 job 변경 0.
+- 보완: `deploy-verify` 의 job 수준 `when: manual` 을 nori-wm-ui-backend `.gitlab-ci.yml:266-270` 과 같은 rules(main·tag 각각 `when: manual`)로 바꿨다. migrate 가 main·tag 에서만 돌므로 다른 branch 파이프라인에서 migrate 없이 배포하는 경로를 막는다. `allow_failure: false` 는 유지한다.
+- `aigw-p06-tools:local`(`--network none`, readonly mount) PyYAML 단언 exit 0: stages 7개, `deploy-verify` 에 job 수준 `when` 없음·`allow_failure` false, `deploy-verify` rules 의 `if` 2개 = `migrate` rules 의 `if` 2개, 두 rule 모두 `when: manual` — 출력 `deploy-verify rules == migrate rules, manual, no job-level when: PASS`. `.gitlab-ci.yml` 을 읽는 시험·도구는 0건이다.

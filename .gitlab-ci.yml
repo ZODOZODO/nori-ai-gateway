@@ -193,11 +193,17 @@ migrate:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_TAG'
 
+# migrate 가 도는 ref(main·tag)에서만 수동 배포할 수 있다 — 다른 branch 파이프라인에서 migrate 없이 배포하는 경로를 막는다
+# (nori-wm-ui-backend deploy job 의 rules 와 같은 형태).
 deploy-verify:
   stage: deploy
   dependencies: [scan-image]
-  when: manual
   allow_failure: false
   script:
     - test -f operations/deploy/aigw-helm.sh
     - 'bash operations/deploy/aigw-helm.sh --release ai-gateway --mode deploy --runconfig "$AIGW_RUNCONFIG" --image-digests image-digests.json --suite none'
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_COMMIT_TAG'
+      when: manual

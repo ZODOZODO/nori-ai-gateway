@@ -1218,7 +1218,8 @@ LEFT JOIN gw.message pm ON pm.id=p.request_message_id AND pm.conversation_id=a.c
 
 ### U7 CI 단계 정렬 (migrate stage)
 
-- [ ] 구현  - [ ] 검증
+- [~] 구현·로컬 검증 완료 / 미충족 ③(첫 파이프라인 — F4 뒤, 외부 선행 필요) — ① spec-guard exit 0, ② 로컬 YAML 파싱 단언 PASS(stages 7개·migrate 필드·기존 job 불변·`deploy-verify` rules), stub `gradlew` 로 fail-closed 분기(계정 이름만·비밀번호만·둘 다 빈 경우 exit 1·Gradle 호출 0, Pending 잔존 exit 1) 확인. 상세는 Dev report U7 절.
+- **2026-11-11 U7 결과 반영(root):** ①`migrate` job 은 nori-wm 과 같이 `dependencies: []`, artifacts `when: always`(실패해도 `flyway-info-after.txt` 보존), rules main·tag 다. ②`deploy-verify` 의 job 수준 `when: manual` 을 nori-wm `.gitlab-ci.yml:266-270` 형태의 rules(main·tag 각각 `when: manual`)로 바꿨다 — migrate 는 main·tag 에서만 돌므로, rules 가 없으면 다른 branch 파이프라인에서 migrate 없이 수동 배포할 수 있었다(앱은 `SchemaVersionGuard` 로 기동을 막지만 배포 단계가 아니라 Pod 기동 실패로 드러난다). `allow_failure: false` 는 그대로다. allowed_writes 의 `.gitlab-ci.yml` 범위 안이다. ③GitLab 근거: `stages` 절 "If any job fails, the pipeline is marked as failed and jobs in later stages do not start"(migrate `allow_failure: false`). ④CI 변수 등록 시 주의: `AI_GATEWAY_DB_PASSWORD` 는 protected 라 tag 도 protected 여야 tag 파이프라인에서 값이 들어온다(아니면 첫 줄에서 실패, DB 적용 0). masked 변수는 값 길이·문자 조건이 있다.
 - 목표: `.gitlab-ci.yml` 에 nori-wm 방식 `migrate` stage 를 넣는다(nori-wm `.gitlab-ci.yml:217-245`).
 - 선행: U6 부모 확인·local commit. 외부(첫 파이프라인 전): 운영 GitLab 프로젝트·`nori-common` job-token allowlist, CI 변수 `AI_GATEWAY_DB_USER`(masked)·`AI_GATEWAY_DB_PASSWORD`(protected·masked) 등록(사용자·운영자 실행 — 값은 채팅·레포·로그 0), 서버 담당자 pg_hba 의 k8s 노드 IP 허용(러너가 클러스터 안).
 - allowed_writes: `.gitlab-ci.yml`, `docs/runbooks/aigw-db-server-prerequisites.md`(CI 변수 이름 기록만), `docs/ai-rag-gateway-architecture-dev-report.md`(U7 절).
