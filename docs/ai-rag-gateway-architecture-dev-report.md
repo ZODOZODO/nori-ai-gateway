@@ -8096,3 +8096,124 @@ both set, no pending         exit=0 gradleCalls=3 ['flywayInfo', 'flywayMigrate'
 - `af61a1f` 의 `.gitlab-ci.yml` diff 를 직접 읽었다: stages 에 `migrate` 1개 추가, `migrate` job 1개 추가, 기존 job 변경 0.
 - 보완: `deploy-verify` 의 job 수준 `when: manual` 을 nori-wm-ui-backend `.gitlab-ci.yml:266-270` 과 같은 rules(main·tag 각각 `when: manual`)로 바꿨다. migrate 가 main·tag 에서만 돌므로 다른 branch 파이프라인에서 migrate 없이 배포하는 경로를 막는다. `allow_failure: false` 는 유지한다.
 - `aigw-p06-tools:local`(`--network none`, readonly mount) PyYAML 단언 exit 0: stages 7개, `deploy-verify` 에 job 수준 `when` 없음·`allow_failure` false, `deploy-verify` rules 의 `if` 2개 = `migrate` rules 의 `if` 2개, 두 rule 모두 `when: manual` — 출력 `deploy-verify rules == migrate rules, manual, no job-level when: PASS`. `.gitlab-ci.yml` 을 읽는 시험·도구는 0건이다.
+
+## U8 전체 재검증·증거 추가 (2026-11-11, 로컬 재검증)
+
+- worktree `nori-ai-gateway-u8`, 브랜치 `aigw/align-u8`, 기준 `d045f05`(main — U2·U3·U5·U6·U7 반영, U4 는 실행 단위 없음). 제품 코드·Plan·SPEC·`docs/gates/**`·기존 `evidence/**` 변경 0. 클러스터·공유 서버·GitLab 접속 0, push 0. 이 절만 추가한다.
+- 환경: Git Bash, `JAVA_HOME`=Temurin 21.0.10, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값(`pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895…4bcd2`), Gradle 은 모두 `--offline --no-daemon`, 각 명령 별도 실행. 실행 순서는 ①⑨⑥⑧②③④⑤⑦ 이고, 각 `test-evidence verify` 는 자신이 인증하는 실행 직후에 돌렸다(사이에 한정 시험 실행 0).
+
+### 결과 요약
+
+| # | 명령 | exit | 결과 |
+|---|---|---|---|
+| ① | `:gateway-eval:run --args="spec-guard --spec <worktree SPEC> --baseline docs/gates/spec-baseline.md"` | 0 | specSha `9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19`(`FILE_HASHED`, `LOCAL_FILE`) |
+| ② | `build` | 0 | `BUILD SUCCESSFUL in 15m 9s`(04:18:02Z~04:33:12Z), test 11개 task 694건 실패·오류·skip 0, verify `TEST_EVIDENCE_VERIFIED` |
+| ③ | `check` | 0 | `BUILD SUCCESSFUL in 45s`, test 11개 task 모두 `UP-TO-DATE`(재실행 0), `verifyDependencyMatrix` 11개 실행, 재 verify `TEST_EVIDENCE_VERIFIED` |
+| ④ | `integrationTest -Paigw.requireDocker=true`(비한정) | 0 | `BUILD SUCCESSFUL in 46m 34s`(04:36:04Z~05:22:39Z), 등록 3개 task 253건 실패·오류·skip 0, verify 2종 `TEST_EVIDENCE_VERIFIED` |
+| ⑤ | `aigwPackage -Paigw.gitSha=d045f058b4f74f495e0cfd7970b483e78e21abe0`(깨끗한 트리) | 0 | `BUILD SUCCESSFUL in 35s`, build-identity `gitSha` = HEAD |
+| ⑥ | `verifyBuildLogicResolutionMode` | 0 | `NORI_BUILD_LOGIC_MODE=composite; INCLUDED_BUILD_LOGIC=1; INCLUDED_PRODUCT_BUILD=0` |
+| ⑦ | `resolveAndLockAll --write-locks` | 0 | 이 레포 lockfile 내용 diff 0(12개), nori-common 내용 diff 0, 둘 다 복원 뒤 clean |
+| ⑧ | U6 ⑤⑥(3 release lint·음성 render 3·selftest 5종·runconfig) | 모두 0 | lint `LOCAL_CHART_OK` 3, `EXPECTED_FAILURE` 3, selftest PASS 31·64·31·94·9, runconfig PASS 24 |
+| ⑨ | U3 ⑥·U5 ⑧·U6 ⑦(2026-11-11 ④ 개정식) | 각 1(일치 없음) | 각 0줄 |
+
+### 명령별 상세
+
+- ② `build` 마지막 줄:
+
+```
+BUILD SUCCESSFUL in 15m 9s
+114 actionable tasks: 108 executed, 6 up-to-date
+```
+
+  JUnit XML 집계(`build/test-results/test/*.xml` 의 `testsuite` 속성 합):
+
+| Test task | XML | tests | failures | errors | skipped |
+|---|---|---|---|---|---|
+| `:gateway-eval:test` | 57 | 283 | 0 | 0 | 0 |
+| `:ai-gateway-core:test` | 37 | 117 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-db-adapter:test` | 3 | 12 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-inference-adapter:test` | 11 | 43 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-source-support:test` | 3 | 8 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-loki-adapter:test` | 7 | 38 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-tempo-adapter:test` | 2 | 10 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-gitlab-adapter:test` | 4 | 24 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-tc-mock-adapter:test` | 7 | 48 | 0 | 0 | 0 |
+| `:apps:ai-gateway-app:test` | 21 | 70 | 0 | 0 | 0 |
+| `:apps:ai-gateway-acceptance-app:test` | 12 | 41 | 0 | 0 | 0 |
+| 합 | 164 | 694 | 0 | 0 | 0 |
+
+  직후 `-q :gateway-eval:run --args="test-evidence verify --tasks <위 11개 쉼표 목록>"` exit 0 `TEST_EVIDENCE_VERIFIED`. U3 commit 3·U5·U6 과 같은 건수다.
+- ③ `check` 는 test 11개를 모두 `UP-TO-DATE` 로 두어 XML 이 ② 와 같다. 같은 verify 를 다시 실행해 exit 0 `TEST_EVIDENCE_VERIFIED`. 마지막 줄 `BUILD SUCCESSFUL in 45s` / `97 actionable tasks: 33 executed, 64 up-to-date`.
+- ④ `integrationTest -Paigw.requireDocker=true` 마지막 줄:
+
+```
+BUILD SUCCESSFUL in 46m 34s
+54 actionable tasks: 17 executed, 37 up-to-date
+```
+
+| IT task | XML | tests | failures | errors | skipped |
+|---|---|---|---|---|---|
+| `:adapter:ai-gateway-db-adapter:integrationTest` | 8 | 85 | 0 | 0 | 0 |
+| `:adapter:ai-gateway-inference-adapter:integrationTest` | 1 | 1 | 0 | 0 | 0 |
+| `:apps:ai-gateway-app:integrationTest` | 44 | 167 | 0 | 0 | 0 |
+| 합 | 53 | 253 | 0 | 0 | 0 |
+
+  `NO-SOURCE` 7개(`:ai-gateway-core`·source-support·loki·tempo·gitlab·tc-mock·acceptance-app)는 모두 `ci/integration-required.txt` 2행 주석의 "IT 가 없는 모듈" 이다. 등록 모듈 3개는 모두 실행됐다(등록 모듈 NO-SOURCE 0). 직후 `-q -Paigw.requireDocker=true :gateway-eval:run --args="test-evidence verify --selector integrationTest --required ci/integration-required.txt --require-docker"` exit 0, `--tasks <IT 3개> --require-docker` exit 0, 둘 다 `TEST_EVIDENCE_VERIFIED`. `IdempotentAdmissionIT` 의 "격리 PostgreSQL 준비에 실패했습니다" 일시 실패는 없었다(로그 일치 0).
+- ⑤ `build/package/build-identity.json`:
+
+```
+{"appJarSha256":"8129a93ff2fb9469ae774fad4cfa7f7468f12199b8ce3a272098b6869e3c409c","gitSha":"d045f058b4f74f495e0cfd7970b483e78e21abe0","runtimeClasspathSha256":"9ff034e683c75cb61819dc239b52883d2b8d1472c79e50fd1d427bfd463a27fb"}
+```
+
+  산출물 `app.jar`·`runtime-classpath.txt`·`acceptance/bin/ai-gateway-acceptance-app`(+`.bat`). `appJarSha256`·`runtimeClasspathSha256` 은 U6 ④(`20a0d23`)와 같다 — U7 은 `.gitlab-ci.yml`·runbook 만 바꿨다.
+- ⑥ 마지막 줄 `NORI_BUILD_LOGIC_MODE=composite; INCLUDED_BUILD_LOGIC=1; INCLUDED_PRODUCT_BUILD=0` / `BUILD SUCCESSFUL in 17s`.
+- ⑦ `resolveAndLockAll --write-locks` exit 0(`Persisted dependency lock state for project ':nori-common-build-logic'`, `BUILD SUCCESSFUL in 46s`). 이 레포: lockfile 12개(`settings-gradle.lockfile`·모듈 11개)가 CRLF 로 다시 쓰여 `git status` 에 `M` 으로 보였지만 `git diff` 0줄, `git diff --ignore-cr-at-eol` 0줄이고, 12개 모두 CR 제거 뒤 HEAD blob 과 바이트 동일했다(`.gitattributes` `* text=auto eol=lf` 가 정규화). nori-common: `build-logic/gradle.lockfile` 이 같은 방식으로 `M`, `git diff --ignore-cr-at-eol --stat` 빈 출력, CR 제거 뒤 HEAD 와 동일. 둘 다 `git checkout --` 로 되돌려 `git status --porcelain` 빈 출력(실행 전 nori-common 도 clean).
+- ⑧ `aigw-p06-tools:local`(Helm v4.2.2, Python 3.12.10), `--network none`, worktree readonly mount, 작업 디렉터리 레포 루트, 각 명령 별도:
+  - `--release ai-gateway --mode lint --runconfig operations/runconfig/fixtures/lint-verify.json --image-digests operations/runconfig/fixtures/lint-image-digests.json --suite none` exit 0 `LOCAL_CHART_OK release=ai-gateway suite=none chartRepoSha=UNCHECKED chartDigest=4c35ba135a83bb8bf1224bbf0d150ec392d1f5591d46c1476afc03b9594bb30e`
+  - 같은 형식 `--release ai-gateway-restore` exit 0 `LOCAL_CHART_OK release=ai-gateway-restore suite=none chartRepoSha=UNCHECKED chartDigest=4c35ba13…b30e`
+  - 같은 형식 `--release ai-gateway-db-restore` exit 0 `LOCAL_CHART_OK release=ai-gateway-db-restore chartRepoSha=UNCHECKED chartDigest=e92f810ea130a790dadf0b6538f88b3895dd754472f78fb334bcb73c25c2c7ec`
+  - 음성 render(`operations/runconfig/README.md` 의 세 명령): `ai-gateway-db-restore` + `negative-missing-pvc.json` exit 0 `EXPECTED_FAILURE:RENDER_REQUIRED_persistence.size`, `ai-gateway` + `negative-missing-backup.json` exit 0 `EXPECTED_FAILURE:RENDER_REQUIRED_backup.destination`, `ai-gateway-restore` + `fixtures/negative-restore-ingest.json` exit 0 `EXPECTED_FAILURE:RUNCONFIG_KEY_CONFLICT:ingest.enabled`. 대조: 정상 fixture 에 `--expect-fail` exit 1 `EXPECTED_FAILURE_ABSENT`, 옛 release `ai-gateway-db` exit 2 `RENDER_INVALID_RELEASE`.
+  - selftest: stage-gate exit 0 `PASS` 31, runtime-credentials exit 0 `PASS` 64, verify-credentials exit 0 `PASS` 31, rollback-rehearsal exit 0 `PASS` 94(`actualNetworkCalls: 0`), backup-alert-injection exit 0 `PASS` 9, `python3 -B operations/deploy/runconfig-selftest.py` exit 0 `PASS` 24. 건수는 U6 root 확인과 같다.
+  - chartDigest 가 U6 기록(`f661627e…`·`aa26b935…`)과 다른 이유: `20a0d23..d045f05` 의 `operations/deploy/helm` 변경은 0이다. 같은 이미지에서 차트 사본의 mtime 만 바꿔 `helm package` 를 하면 내용이 같아도 SHA-256 이 달라졌고(같은 mtime 2회는 같음), 이 worktree 는 새로 checkout 해 mtime 이 U6 worktree 와 다르다. 즉 차트 내용 변경이 아니라 checkout 시각 차이다(아래 관찰).
+- ⑨ 세 판정식은 Plan 원문 그대로(U6 ⑦ 은 2026-11-11 ④ 개정식, 제외 6개 포함) 실행했고 모두 0줄(exit 1). 식이 비어 있지 않음을 보려고 정렬 전 commit 에 같은 식을 돌린 결과: U3 ⑥ @`37e3852` 57줄, U5 ⑧ @`832822b` 192줄, U6 ⑦ @`65ba263` 229줄(Plan 기록과 같음).
+
+### `evidence/**` 추가 — 없음(근거)
+
+이번 실행으로 기존 도구가 `evidence/**` 에 만들 수 있는 레코드는 없어 아무것도 추가하지 않았다.
+
+- 레코드를 쓰는 eval CLI(`ingest`·`gate`·`record`·`perf report`)는 `--stage F[0-4]` 와 `--parent-run-id` 가 필수다(`gateway-eval/src/main/java/com/nori/ai/gateway/eval/EvalCli.java:82-85`, 없으면 `PARENT_RUN_ID_MISSING`). JUnit 결과 ingest(`--source junit-otr`)는 같은 stage 에 `RUN`/`PARENT` manifest 가 있어야 하고 그 buildIdentity 와 일치해야 한다(`gateway-eval/src/main/java/com/nori/ai/gateway/eval/report/EvidenceIngestor.java:46-47`, 없으면 `PARENT_MANIFEST_MISSING`). PARENT manifest 는 stage gate 가 배포 뒤 실제 Pod digest 로 발급한다(`operations/gates/stage_gate.py:197-199`). 지금은 클러스터 실행이 아니어서 만들 수 없다.
+- `test-evidence verify` 는 판정만 출력하고 쓰지 않는다(`EvalCli.java:62-80`). Test task 의 leaf 결과는 `build/aigw-evidence/<task>/leaf-results.json`(`build.gradle.kts:129`)이라 레포 증거가 아니다.
+- 배포 도구는 `--mode deploy` 성공·실패 때만 `evidence/F1/gates/deploy-*.json` 을 쓴다(`operations/deploy/aigw-helm.sh:63-79,95-104,265,304`). ⑧ 의 lint·render·selftest 는 쓰지 않는다(selftest 는 임시 작업 디렉터리, worktree 는 readonly mount).
+- 따라서 U8 완료 증거는 이 절의 JUnit 건수·verify 출력·lockfile 비교·lint/selftest·grep 결과다. 실행 직후 `git status --porcelain` 빈 출력(`evidence/**` 변경 0).
+
+### 옛 경로 → 새 경로 대응표 (U3·U5·U6)
+
+| 단위 | 옛 경로 | 새 경로 |
+|---|---|---|
+| U3 | `gateway-core/` · `:gateway-core` | `modules/ai-gateway-core/` · `:ai-gateway-core` |
+| U3 | `gateway-persistence/` · `:gateway-persistence` | `modules/adapter/ai-gateway-db-adapter/` · `:adapter:ai-gateway-db-adapter` |
+| U3 | `gateway-integration/` · `:gateway-integration`(추론·tokenizer) | `modules/adapter/ai-gateway-inference-adapter/` · `:adapter:ai-gateway-inference-adapter` |
+| U3 | `gateway-integration/` 의 Source 공용 코드(`integration.loki.SourceHttpClient` 등) | `modules/adapter/ai-gateway-source-support/` · `:adapter:ai-gateway-source-support`(패키지 `integration.source`) |
+| U3 | `gateway-integration/` 의 `integration.loki` | `modules/adapter/ai-gateway-loki-adapter/` · `:adapter:ai-gateway-loki-adapter` |
+| U3 | `gateway-integration/` 의 `integration.tempo` | `modules/adapter/ai-gateway-tempo-adapter/` · `:adapter:ai-gateway-tempo-adapter` |
+| U3 | `gateway-integration/` 의 `integration.gitlab`(+`loki.TcSourceAllowlist`) | `modules/adapter/ai-gateway-gitlab-adapter/` · `:adapter:ai-gateway-gitlab-adapter` |
+| U3 | `gateway-tc-mock/` · `:gateway-tc-mock` | `modules/adapter/ai-gateway-tc-mock-adapter/` · `:adapter:ai-gateway-tc-mock-adapter` |
+| U3 | `gateway-app/` · `:gateway-app` | `modules/apps/ai-gateway-app/` · `:apps:ai-gateway-app` |
+| U3 | `gateway-acceptance/` · `:gateway-acceptance` | `modules/apps/ai-gateway-acceptance-app/` · `:apps:ai-gateway-acceptance-app`(시작 스크립트 `bin/ai-gateway-acceptance-app`) |
+| U3 | `gateway-eval/` · `:gateway-eval` | 변경 없음 |
+| U5 | `modules/adapter/ai-gateway-db-adapter/src/main/resources/db/migration/gateway/V{1,2,3,3_1,4,5,7}__*.sql`(U3 이전 `gateway-persistence/src/main/resources/db/migration/gateway/`) | 루트 `flyway/sql/` 같은 이름(앱 리소스 `db/migration/gateway/` 는 `processResources` 사본) |
+| U5 | 앱 `MigrateCommand`·`MigrateApplication`·`application-migrate.yaml` | 삭제 → 루트 Gradle `flywayInfo`·`flywayMigrate`, CI `migrate` stage(U7) |
+| U6 | `ops/{backup,deploy,gates,inference-server,monitoring,runconfig,seaweedfs}/**` | `operations/<같은 이름>/**` |
+| U6 | `deploy/docker/Dockerfile{,-acceptance,-backup}` | `operations/deploy/docker/` 같은 이름 |
+| U6 | `ops/postgres/bootstrap.sql` | `operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql` |
+| U6 | `ops/postgres/acceptance-pg_hba.conf`, `ops/deploy/hba_policy.py`, `ops/deploy/read-exec.py`(U5 에서 `ops/postgres/aigw-hba-local-test.sh`·`hba_local_test.py`) | 삭제 |
+| U6 | `nori-tc-exec:deploy/helm/ai-gateway/**`(db-chart 제외, `templates/migrate-job.yaml` 은 삭제) | `operations/deploy/helm/ai-gateway/**` |
+| U6 | `nori-tc-exec:deploy/helm/ai-gateway/db-chart/**`(release `ai-gateway-db-restore` 경로만, `hba-configmap.yaml`·`values-{restore,verify}.yaml` 삭제, `backup-cronjob.yaml` 은 앱 차트로) | `operations/deploy/helm/ai-gateway-db-restore/**` |
+| U6 | (없음) | `config/ai-gateway-db.properties` |
+
+exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
+
+### 관찰(수정 안 함)
+
+- `chartDigest`(U6 도입, `operations/deploy/aigw-helm.sh:115,277` = `helm package` 산출물 `sha256sum`)는 차트 파일 mtime 에 따라 달라진다(⑧ 재현). 배포 증거의 `chartDigest` 는 그 배포를 실행한 checkout 의 값이며, 같은 commit 이라도 다른 checkout 에서 다시 계산하면 같지 않을 수 있다. 차트 내용 동일성은 `chartRepoSha`(HEAD) 로 판정해야 한다. 이 값을 다른 checkout 에서 재계산해 대조하는 절차가 생기면 그때 문제가 된다.
+- 환경: `docker ps -a --filter label=org.testcontainers=true -q` 빈 출력. 실행 전후 `docker images`·`docker ps -a` 목록이 같다(새 이미지·컨테이너 0, 삭제 0). pgvector·ryuk·`aigw-p06-tools:local`·다른 프로젝트 자원은 건드리지 않았다. nori-common clean.
