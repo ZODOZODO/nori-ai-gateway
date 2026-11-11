@@ -1,4 +1,4 @@
-"""P06 실행 입력 검증. 출력은 검증된 비밀 아닌 차트 값 파일뿐입니다."""
+"""배포 실행 입력(runconfig) 검증. 출력은 검증된 비밀 아닌 차트 값 파일뿐입니다. DB 접속 값은 runconfig 가 아니라 Secret ai-gateway-config 다(Plan §4.1 2026-11-10)."""
 import json
 import re
 import sys
@@ -12,7 +12,7 @@ class InputError(Exception):
 
 
 APP_RELEASES = ('ai-gateway', 'ai-gateway-restore')
-RESTORE_KEYS = ('purpose', 'profile', 'execChartSha', 'pgImage', 'restore', 'seaweed', 'netpol', 'egressProbe')
+RESTORE_KEYS = ('purpose', 'profile', 'pgImage', 'restore', 'seaweed', 'netpol', 'egressProbe')
 
 
 def fail(code):
@@ -70,7 +70,7 @@ def leaves(data, prefix=''):
             yield path, value
 
 
-def validate(data, release, mode, exec_sha=None):
+def validate(data, release, mode):
     if not isinstance(data, dict):
         fail('RUNCONFIG_INVALID')
     for key in ('purpose', 'profile'):
@@ -93,14 +93,12 @@ def validate(data, release, mode, exec_sha=None):
         for key in data.get('seaweed', {}) if isinstance(data.get('seaweed'), dict) else ():
             if key != 's3Endpoint':
                 fail('RUNCONFIG_KEY_CONFLICT:seaweed.' + key)
-    required = ['execChartSha', 'pgImage.tag', 'pgImage.digest']
-    size_key = 'restore.pvcSizeGi' if profile == 'restore' else 'pvcSizeGi'
-    required += [size_key]
+    # PVC 는 복원 리허설 임시 인스턴스에만 있다(주 profile 의 pvcSizeGi 없음 — 운영 DB 는 공유 서버).
+    size_key = 'restore.pvcSizeGi' if profile == 'restore' else None
     # 음성 렌더 fixture만 누락 PVC를 차트 required까지 전달합니다.
-    missing_size = data.get('purpose') == 'lint' and size_key not in dict(leaves(data))
-    for key in required:
-        if key != size_key or not missing_size:
-            item(data, key, deploy)
+    missing_size = size_key is not None and data.get('purpose') == 'lint' and size_key not in dict(leaves(data))
+    for key in ['pgImage.tag', 'pgImage.digest'] + ([size_key] if size_key and not missing_size else []):
+        item(data, key, deploy)
     for key, value in leaves(data):
         if not isinstance(value, dict) or 'value' not in value or 'approvalRef' not in value:
             fail('RUNCONFIG_MISSING:' + key)
@@ -109,23 +107,20 @@ def validate(data, release, mode, exec_sha=None):
     errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(data), key=lambda e: str(list(e.path)))
     if errors:
         fail('RUNCONFIG_INVALID:' + '.'.join(map(str, errors[0].path)))
-    if exec_sha and data['purpose'] != 'lint' and item(data, 'execChartSha', deploy) != exec_sha:
-        fail('EXEC_SHA_MISMATCH')
     if deploy:
-        gates = ['exec-chart-ref', 'postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']
+        gates = ['postgres-image', 'corpus-inventory', 'pvc-capacity', 'pvc-protection', 'backup-destination']
         if release in APP_RELEASES:
             gates.append('netpol-targets')
         for name in gates:
             approval('docs/gates/f1/' + name + '.md', name, True)
+    if release == 'ai-gateway':
+        return dict(app_values(data), backup=backup_values(data, deploy))
     if release in APP_RELEASES:
         return app_values(data)
-    values = {
+    return {
         'pgImage': {'tag': item(data, 'pgImage.tag', deploy), 'digest': item(data, 'pgImage.digest', deploy)},
         'persistence': {'size': '' if missing_size else str(int(item(data, size_key, deploy))) + 'Gi'},
     }
-    if release == 'ai-gateway-db':
-        values['backup'] = backup_values(data, deploy)
-    return values
 
 
 def value(data, key):
@@ -138,7 +133,7 @@ def value(data, key):
 
 
 def backup_values(data, deploy):
-    """주 DB release 의 백업 CronJob 값. lint 누락 키는 차트 required 로 넘겨 RENDER_REQUIRED_backup.<key> 로 실패시킨다."""
+    """주 앱 release 의 백업 CronJob 값(공유 서버 백업). lint 누락 키는 차트 required 로 넘겨 RENDER_REQUIRED_backup.<key> 로 실패시킨다."""
     enabled = value(data, 'backup.enabled')
     out = {'enabled': enabled is not None and enabled['value'] is True}
     for key in ('type', 'schedule', 'destination', 'ageRecipient', 'retentionDays'):
@@ -182,7 +177,7 @@ def app_values(data):
 def main():
     try:
         data = load(sys.argv[1])
-        values = validate(data, sys.argv[2], sys.argv[3], sys.argv[5] or None)
+        values = validate(data, sys.argv[2], sys.argv[3])
         Path(sys.argv[4]).write_text(json.dumps(values), encoding='utf-8')
     except InputError as error:
         print(str(error), file=sys.stderr)

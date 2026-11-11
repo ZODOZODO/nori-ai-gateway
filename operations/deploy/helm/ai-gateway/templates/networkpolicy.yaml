@@ -31,13 +31,7 @@ spec:
   ingress: []
   {{- end }}
   egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: ai-gateway-db
-              aigw.nori/db-instance: {{ .Values.db.release }}
-      ports:
-        - {protocol: TCP, port: 5432}
+    {{- include "aigw.dbEgress" . | nindent 4 }}
     {{- $targets := list "dns" "loki" "tempo" "alloy" "gitlab" -}}
     {{- if .Values.inference.enabled }}{{- $targets = append $targets "inference" -}}{{ end -}}
     {{- if .Values.knowledgeSource.read.enabled }}{{- $targets = append $targets "seaweed" -}}{{ end -}}

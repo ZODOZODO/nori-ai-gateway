@@ -1,10 +1,6 @@
 {
   "purpose": "lint",
   "profile": "main",
-  "execChartSha": {
-    "value": "0000000000000000000000000000000000000000",
-    "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-  },
   "pgImage": {
     "tag": {
       "value": "lint-pg18",
@@ -14,10 +10,6 @@
       "value": "0000000000000000000000000000000000000000000000000000000000000000",
       "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
     }
-  },
-  "pvcSizeGi": {
-    "value": 1,
-    "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
   },
   "restore": {
     "pvcSizeGi": {
@@ -137,8 +129,8 @@
       "value": [
         {
           "id": "db-main",
-          "host": "ai-gateway-db",
-          "port": 5432,
+          "host": "192.168.0.150",
+          "port": 15432,
           "expect": "ALLOWED"
         },
         {

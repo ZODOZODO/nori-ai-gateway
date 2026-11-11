@@ -16,7 +16,9 @@ spec:
       labels:
         app: ai-gateway-acceptance
         app.kubernetes.io/instance: {{ .Release.Name }}
-        aigw.nori/db-target: {{ .Values.db.release }}
+        {{- if .Values.restoreMode }}
+        aigw.nori/db-target: ai-gateway-db-restore
+        {{- end }}
       annotations:
         checksum/spec-verify: {{ .Values.specVerify.sha256 | quote }}
     spec:
@@ -44,8 +46,13 @@ spec:
               value: {{ printf "-Daigw.acceptance.suite=%s -Daigw.acceptance.signer=secret-file" .Values.acceptance.suite | quote }}
             - {name: AIGW_GATEWAY_BASE_URL, value: {{ printf "http://%s:8080" .Release.Name | quote }}}
             - {name: AIGW_PARENT_RUN_ID, value: {{ .Values.acceptance.parentRunId | quote }}}
-            - {name: AIGW_DB_HOST, value: {{ .Values.db.release | quote }}}
-            - {name: AIGW_DB_USERNAME, value: aigw_acceptance_ro}
+            - {name: AIGW_DB_HOST, value: {{ include "aigw.dbHost" . | quote }}}
+            # 수용 oracle 의 DB 자격 = 앱과 같은 단일 계정(Plan §11.7 2026-11-10). 이름은 env, 비밀번호는 파일로 같은 Secret 의 두 키에서 받는다.
+            - name: AI_GATEWAY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.configSecret.name }}
+                  key: AI_GATEWAY_DB_USER
             - {name: AIGW_DB_PASSWORD_FILE, value: /run/aigw/db/password}
             - {name: AIGW_SIGNER_PRIVATE_JWK_FILE, value: /run/aigw/signer/signer-private.jwk}
             - {name: AIGW_SERVICE_TOKEN_FILE, value: /run/aigw/client/service-token}
@@ -89,7 +96,7 @@ spec:
             name: {{ .Release.Name }}-spec-verify
             optional: true
             defaultMode: 0444
-        {{- $secrets := dict "signer" (list .Values.credentialsRef.acceptanceSigner (list "signer-private.jwk")) "client" (list .Values.credentialsRef.acceptanceClient (list "service-token" "hook-token")) "db" (list .Values.credentialsRef.acceptanceDbRead (list "password")) -}}
+        {{- $secrets := dict "signer" (list .Values.credentialsRef.acceptanceSigner (list "signer-private.jwk")) "client" (list .Values.credentialsRef.acceptanceClient (list "service-token" "hook-token")) -}}
         {{- if eq (include "aigw.fixtureWriter" .) "true" }}{{- $_ := set $secrets "fixture-writer" (list .Values.credentialsRef.acceptanceFixtureWriter (list "access-key" "secret-key")) -}}{{ end -}}
         {{- range $name, $secret := $secrets }}
         - name: {{ $name }}
@@ -101,4 +108,10 @@ spec:
               - {key: {{ . }}, path: {{ . }}}
               {{- end }}
         {{- end }}
+        - name: db
+          secret:
+            secretName: {{ .Values.configSecret.name }}
+            defaultMode: 0440
+            items:
+              - {key: AI_GATEWAY_DB_PASSWORD, path: password}
 {{- end }}

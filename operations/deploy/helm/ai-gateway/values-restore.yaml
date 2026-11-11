@@ -1,7 +1,5 @@
 profile: verify
 restoreMode: true
-db:
-  release: ai-gateway-db-restore
 inference:
   enabled: false
 knowledgeSource:

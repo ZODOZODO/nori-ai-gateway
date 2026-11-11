@@ -10,8 +10,6 @@ capacity:
   queuedDepth: 4
   queueWaitLimit: 60s
   jobLifetimeLimit: 180s
-db:
-  release: ai-gateway-db
 restoreMode: false
 recovery:
   backupPointAt: ""
@@ -44,17 +42,23 @@ testHooks:
     mode: ""
     initial: ""
 credentialsRef:
-  serviceTokens: ""
-  actorJwks: ""
-  dbApp: ""
-  dbMigrator: ""
-  gitlabRead: ""
-  seaweedRead: ""
-  testHooks: ""
   acceptanceSigner: ""
   acceptanceClient: ""
-  acceptanceDbRead: ""
   acceptanceFixtureWriter: ""
+# 앱 자격·DB 설정 파일 Secret. 운영자가 만들고 차트는 참조만 한다(Plan U6 ①).
+configSecret:
+  create: false
+  name: ai-gateway-config
+# runconfig backup.* 승인값으로만 채운다(aigw-helm.sh, 주 release 만). 비어 있으면 렌더 실패.
+backup:
+  enabled: false
+  type: ""
+  schedule: ""
+  destination: ""
+  ageRecipient: ""
+  retentionDays: ""
+  image:
+    digest: ""
 netpol:
   targets: {}
 egressProbe:

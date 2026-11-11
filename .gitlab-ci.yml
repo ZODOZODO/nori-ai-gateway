@@ -34,8 +34,8 @@ helm-validate:
   script:
     - test -f operations/deploy/aigw-helm.sh
     - |
-      for release in ai-gateway ai-gateway-restore ai-gateway-db ai-gateway-db-restore; do
-        bash operations/deploy/aigw-helm.sh --release "$release" --mode lint --exec-sha "$AIGW_EXEC_CHART_SHA" --runconfig operations/runconfig/fixtures/lint-verify.json --image-digests operations/runconfig/fixtures/lint-image-digests.json --suite none || exit "$?"
+      for release in ai-gateway ai-gateway-restore ai-gateway-db-restore; do
+        bash operations/deploy/aigw-helm.sh --release "$release" --mode lint --runconfig operations/runconfig/fixtures/lint-verify.json --image-digests operations/runconfig/fixtures/lint-image-digests.json --suite none || exit "$?"
       done
   artifacts:
     paths: [build/helm-validation/]
@@ -170,4 +170,4 @@ deploy-verify:
   allow_failure: false
   script:
     - test -f operations/deploy/aigw-helm.sh
-    - 'bash operations/deploy/aigw-helm.sh --release ai-gateway --mode deploy --exec-sha "$AIGW_EXEC_CHART_SHA" --runconfig "$AIGW_RUNCONFIG" --image-digests image-digests.json --suite none'
+    - 'bash operations/deploy/aigw-helm.sh --release ai-gateway --mode deploy --runconfig "$AIGW_RUNCONFIG" --image-digests image-digests.json --suite none'

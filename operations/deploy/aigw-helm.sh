@@ -2,18 +2,16 @@
 set -euo pipefail
 set +x
 export PYTHONDONTWRITEBYTECODE=1
-release= mode= runconfig= exec_sha= exec_dir= profile= expect= acceptance_role= image_digests= suite= spec_file= baseline=
+# 차트는 이 checkout 의 operations/deploy/helm/** 에서 읽는다(Plan §4.1 2026-11-10). deploy·suite-only 는 operations/ 미커밋 변경 0 과
+# HEAD = 앱 이미지 GIT_SHA(image-digests.json buildIdentity.gitSha)를 부작용 전에 확인하고, 증거에는 chartRepoSha·chartDigest 를 남긴다.
+release= mode= runconfig= profile= expect= image_digests= suite= spec_file= baseline=
 fixture_catalog= clock_initial= backup_point= prep_manifest= parent_run_id= outage_phase= set_extra= rubric_targets=
 error() { printf '%s\n' "$1" >&2; exit "${2:-2}"; }
 while (($#)); do
   (($# >= 2)) || error ARGUMENT_MISSING
   case "$1" in
     --release) release=$2;; --mode) mode=$2;; --runconfig) runconfig=$2;;
-    --exec-sha) exec_sha=$2;; --exec-dir) exec_dir=$2;;
     --values-profile) profile=$2;; --expect-fail) expect=$2;;
-    --acceptance-role)
-      [[ $2 == enabled || $2 == disabled ]] || error ACCEPTANCE_ROLE_INVALID
-      acceptance_role=$2;;
     --image-digests) image_digests=$2;; --suite) suite=$2;; --spec-file) spec_file=$2;; --baseline) baseline=$2;;
     --fixture-catalog) fixture_catalog=$2;; --clock-initial) clock_initial=$2;; --backup-point) backup_point=$2;;
     --prep-manifest) prep_manifest=$2;; --parent-run-id) parent_run_id=$2;; --outage-phase) outage_phase=$2;; --set-extra) set_extra=$2;; --rubric-targets) rubric_targets=$2;;
@@ -21,26 +19,24 @@ while (($#)); do
   esac
   shift 2
 done
-[[ -f operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql && -f operations/runconfig/verify.schema.json ]] || error AI_ROOT_REQUIRED
+[[ -f operations/runconfig/verify.schema.json && -f operations/deploy/helm/ai-gateway/Chart.yaml ]] || error AI_ROOT_REQUIRED
 app=0
 case $release in
-  ai-gateway-db|ai-gateway-db-restore) ;;
+  ai-gateway-db-restore) ;;
   ai-gateway|ai-gateway-restore) app=1;;
   *) error RENDER_INVALID_RELEASE;;
 esac
 [[ $mode == lint || $mode == render || $mode == deploy || ($app == 1 && $mode == suite-only) ]] || error MODE_INVALID
 [[ -n $runconfig ]] || error ARGUMENT_MISSING
-# 앱 release 는 image-digests.json 이 필수다. DB release 는 백업 CronJob digest(backup)가 필요할 때만 쓴다.
+# 앱 release 는 image-digests.json 이 필수다(앱·수용·백업 digest·빌드 신원).
 [[ $app == 0 || -n $image_digests ]] || error ARGUMENT_MISSING
 [[ -z $expect || $mode == render ]] || error EXPECT_FAIL_RENDER_ONLY
-[[ -z $acceptance_role || $acceptance_role == enabled || $acceptance_role == disabled ]] || error ACCEPTANCE_ROLE_INVALID
 desired=verify
 [[ $release != *-restore ]] || desired=restore
 [[ -z $profile || $profile == "$desired" ]] || error RUNCONFIG_PROFILE_MISMATCH
 profile=$desired
 if [[ $app == 1 ]]; then
   [[ -n $suite ]] || error ARGUMENT_MISSING
-  [[ -z $acceptance_role ]] || error ARGUMENT_INVALID
   if [[ $mode == suite-only ]]; then
     case $suite in F1-RUBRIC|F2-OUTAGE|F2-RUBRIC|F4-RUBRIC|F4-OUTAGE|F4-CLOCK|F4-RESTORE-PREP|F4-RESTORE-MUTATE) ;; *) error SUITE_UNSUPPORTED;; esac
   elif [[ $release == ai-gateway-restore ]]; then
@@ -62,24 +58,23 @@ if [[ $app == 1 ]]; then
   [[ $mode != deploy || $baseline == docs/gates/spec-baseline.md ]] || error BASELINE_DEPLOY_FIXED
   [[ -n $spec_file ]] || spec_file=${AIGW_SPEC_FILE:-}
 fi
-if [[ -n $exec_dir ]]; then
-  [[ $mode != deploy && $mode != suite-only && -z $exec_sha ]] || error EXEC_DIR_LOCAL_ONLY
-else
-  [[ $exec_sha =~ ^[a-f0-9]{40}$ ]] || error EXEC_SHA_REQUIRED
-fi
 for tool in python3 helm git sha256sum mktemp realpath; do command -v "$tool" >/dev/null || error "TOOL_MISSING:$tool"; done
-python3 -B operations/deploy/hba_policy.py source || error HBA_POLICY_INVALID
+chart_repo_sha=
+if [[ $mode == deploy || $mode == suite-only ]]; then
+  # 부작용 전 checkout 검사(exit 2): operations/ 미커밋·미추적 변경 0, 앱 release 는 HEAD = 이미지 GIT_SHA.
+  chart_repo_sha=$(python3 -B operations/deploy/app_render.py checkout "${image_digests:--}") || exit 2
+fi
 tmp=$(mktemp -d)
 deployment_started=0
 cleanup() {
   code=$?
   if [[ $deployment_started == 1 && $code != 0 ]]; then
-    python3 -B - "$release" "$actual_sha" "$chart_digest" <<'PY'
+    python3 -B - "$release" "$chart_repo_sha" "$chart_digest" <<'PY'
 import datetime,json,pathlib,sys,uuid
 release,sha,digest=sys.argv[1:]
 out=pathlib.Path('evidence/F1/gates'); out.mkdir(parents=True,exist_ok=True)
 stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+uuid.uuid4().hex[:8]
-(out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(dict(release=release,execSha=sha,chartDigest=digest,status='FAIL',reason='DEPLOYMENT_FAILED',operationalGate='BLOCKED'))+'\n')
+(out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(dict(release=release,chartRepoSha=sha,chartDigest=digest,status='FAIL',reason='DEPLOYMENT_FAILED',operationalGate='BLOCKED'))+'\n')
 PY
   fi
   chmod -R u+w "$tmp" 2>/dev/null || true
@@ -88,55 +83,43 @@ PY
 trap cleanup EXIT
 [[ -z $image_digests ]] || python3 -B operations/deploy/app_render.py digests "$image_digests" "$tmp/digests.json" || exit 2
 digest() { python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$tmp/digests.json" "$1"; }
-if ! python3 -B operations/deploy/runconfig.py "$runconfig" "$release" "$([[ $mode == suite-only ]] && echo deploy || echo "$mode")" "$tmp/values.json" "$exec_sha" 2>"$tmp/runconfig.err"; then
+if ! python3 -B operations/deploy/runconfig.py "$runconfig" "$release" "$([[ $mode == suite-only ]] && echo deploy || echo "$mode")" "$tmp/values.json" 2>"$tmp/runconfig.err"; then
   reason=$(head -c 200 "$tmp/runconfig.err")
-  # 앱 render 의 --expect-fail 은 입력 검증 사유(예: 복원 runconfig 의 RUNCONFIG_KEY_CONFLICT:<leaf>)도 정확히 같을 때만 성공으로 본다.
-  if [[ $app == 1 && -n $expect ]]; then
+  # render 의 --expect-fail 은 입력 검증 사유(예: 복원 runconfig 의 RUNCONFIG_KEY_CONFLICT:<leaf>)도 정확히 같을 때만 성공으로 본다.
+  if [[ -n $expect ]]; then
     [[ $reason == "$expect" ]] || error EXPECTED_FAILURE_MISMATCH 1
     printf 'EXPECTED_FAILURE:%s\n' "$expect"; exit 0
   fi
   printf '%s\n' "$reason" >&2; exit 2
 fi
-if [[ -z $exec_dir ]]; then
-  if [[ ${CI:-} == true ]]; then
-    [[ -n ${CI_JOB_TOKEN:-} ]] || error EXEC_READ_CREDENTIAL_MISSING
-    export AIGW_ASK_USER=gitlab-ci-token AIGW_ASK_TOKEN="$CI_JOB_TOKEN"
-  else
-    [[ -n ${AIGW_EXEC_READ_USER:-} && -n ${AIGW_EXEC_READ_TOKEN:-} ]] || error EXEC_READ_CREDENTIAL_MISSING
-    export AIGW_ASK_USER="$AIGW_EXEC_READ_USER" AIGW_ASK_TOKEN="$AIGW_EXEC_READ_TOKEN"
-  fi
-  printf '%s\n' '#!/usr/bin/env bash' 'case "$1" in *[Uu]sername*) printf "%s\n" "$AIGW_ASK_USER";; *) printf "%s\n" "$AIGW_ASK_TOKEN";; esac' > "$tmp/askpass"
-  chmod 700 "$tmp/askpass"
-  export GIT_ASKPASS="$tmp/askpass" GIT_TERMINAL_PROMPT=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-  unset GIT_TRACE GIT_TRACE_CURL GIT_TRACE_PACKET GIT_TRACE_SETUP GIT_TRACE_PERFORMANCE GIT_CURL_VERBOSE GIT_TRACE2 GIT_TRACE2_EVENT GIT_TRACE2_PERF GIT_CONFIG_PARAMETERS
-  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=''
-  # 원시 오류를 파일에도 쓰지 않고 메모리에서 고정 오류 코드로 바꿉니다.
-  python3 -B operations/deploy/read-exec.py "$tmp/exec" "$exec_sha" || exit 2
-  actual_sha=$exec_sha
-  rm -f "$tmp/askpass"
-  unset AIGW_ASK_USER AIGW_ASK_TOKEN GIT_ASKPASS
-  chmod -R a-w "$tmp/exec"
-  exec_dir=$tmp/exec
-else
-  actual_sha=$(git -C "$exec_dir" rev-parse HEAD) || error EXEC_CHECKOUT_FAILED
-fi
+record_deploy() {  # $1 = 추가 필드 JSON. 성공 배포 증거(값 없는 신원·digest·revision 만).
+  helm status "$release" -n tc -o json >"$tmp/status.json" 2>"$tmp/error" || error HELM_STATUS_FAILED 1
+  python3 -B - "$release" "$chart_repo_sha" "$chart_digest" "$tmp/status.json" "$1" <<'PY'
+import datetime,json,pathlib,sys,uuid
+release,sha,digest,status,extra=sys.argv[1:]
+data=json.loads(pathlib.Path(status).read_text())
+if data.get('info',{}).get('status')!='deployed' or not isinstance(data.get('version'),int) or data['version']<1:
+    sys.exit('HELM_NOT_DEPLOYED')
+out=pathlib.Path('evidence/F1/gates'); out.mkdir(parents=True,exist_ok=True)
+stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+uuid.uuid4().hex[:8]
+record=dict(release=release,chartRepoSha=sha,chartDigest=digest,helmRevision=data['version'],**json.loads(extra))
+(out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(record,indent=2)+'\n')
+PY
+}
 
 # ── 앱 release(ai-gateway·ai-gateway-restore) ──────────────────────────────────────────────
 if [[ $app == 1 ]]; then
-  chart=$exec_dir/deploy/helm/ai-gateway
-  [[ -f $chart/Chart.yaml ]] || error EXEC_CHART_MISSING
+  chart=operations/deploy/helm/ai-gateway
   helm package "$chart" -d "$tmp" >"$tmp/package.log" 2>&1 || error HELM_PACKAGE_FAILED
   package=$tmp/ai-gateway-0.1.0.tgz
   chart_digest=$(sha256sum "$package"); chart_digest=${chart_digest%% *}
-  # §11.9 공통·행별 Secret 이름은 고정 정본이다(runconfig 로 바꾸지 않는다).
+  # 앱 자격·DB 설정은 Secret ai-gateway-config(차트 values 고정), 수용 하네스 Secret 이름은 §11.9 고정 정본이다(runconfig 로 바꾸지 않는다).
   common=(-n tc -f "$chart/values.yaml" -f "$chart/values-$profile.yaml" -f "$tmp/values.json"
     --set-string "image.digest=$(digest app)" --set-string "acceptance.image.digest=$(digest acceptance)"
-    --set-string credentialsRef.serviceTokens=ai-gateway-service-tokens --set-string credentialsRef.actorJwks=ai-gateway-actor-jwks
-    --set-string credentialsRef.dbApp=ai-gateway-db-app --set-string credentialsRef.dbMigrator=ai-gateway-db-migrator
-    --set-string credentialsRef.gitlabRead=ai-gateway-gitlab-read --set-string credentialsRef.testHooks=ai-gateway-test-hooks
-    --set-string credentialsRef.seaweedRead=ai-gateway-seaweedfs-read
     --set-string credentialsRef.acceptanceSigner=ai-gateway-acceptance-signer --set-string credentialsRef.acceptanceClient=ai-gateway-acceptance-client
-    --set-string credentialsRef.acceptanceDbRead=ai-gateway-db-acceptance-ro --set-string credentialsRef.acceptanceFixtureWriter=ai-gateway-acceptance-fixture-writer)
+    --set-string credentialsRef.acceptanceFixtureWriter=ai-gateway-acceptance-fixture-writer)
+  # 백업 CronJob 이미지 = image-digests.json 의 backup(주 release 만 렌더).
+  [[ $release != ai-gateway ]] || common+=(--set-string "backup.image.digest=$(digest backup)")
   # suite → 추론·Source 읽기·ingest·fixture catalog 플래그(§11.9). 복원 release 는 values-restore 가 정한다.
   flags() {
     case $1 in
@@ -197,15 +180,16 @@ if [[ $app == 1 ]]; then
       rubric_args=(--set-file "acceptance.rubricTargets=$rubric_targets")
     fi
     deployment_started=1
-    helm upgrade "$release" "$package" -n tc --reuse-values --set acceptance.enabled=true --set-string "acceptance.suite=$suite"       --set-string "acceptance.parentRunId=$parent_run_id" --set-string "acceptance.outagePhase=$outage_phase"       --set-file "acceptance.buildIdentityJson=$tmp/build-identity.json" "${rubric_args[@]}" -f "$spec_values" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
+    helm upgrade "$release" "$package" -n tc --reuse-values --set acceptance.enabled=true --set-string "acceptance.suite=$suite" \
+      --set-string "acceptance.parentRunId=$parent_run_id" --set-string "acceptance.outagePhase=$outage_phase" \
+      --set-file "acceptance.buildIdentityJson=$tmp/build-identity.json" "${rubric_args[@]}" -f "$spec_values" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
     deployment_started=0
-    printf 'SUITE_ONLY_OK release=%s suite=%s chartDigest=%s
-' "$release" "$suite" "$chart_digest" >&2
+    printf 'SUITE_ONLY_OK release=%s suite=%s chartRepoSha=%s chartDigest=%s\n' "$release" "$suite" "$chart_repo_sha" "$chart_digest" >&2
     exit 0
   fi
   suite_args "$suite" extra "$spec_values" "$catalog"
   if [[ -n $expect ]]; then
-    case $expect in INGEST_REQUIRES_SOURCE_READ|RESTORE_FLAGS_CONFLICT|RESTORE_BACKUP_POINT_REQUIRED|SPEC_VERIFY_SHA_MISMATCH) ;; *) error EXPECT_FAIL_CODE_INVALID;; esac
+    case $expect in INGEST_REQUIRES_SOURCE_READ|RESTORE_FLAGS_CONFLICT|RESTORE_BACKUP_POINT_REQUIRED|SPEC_VERIFY_SHA_MISMATCH|RENDER_REQUIRED_backup.type|RENDER_REQUIRED_backup.schedule|RENDER_REQUIRED_backup.destination|RENDER_REQUIRED_backup.ageRecipient|RENDER_REQUIRED_backup.retentionDays) ;; *) error EXPECT_FAIL_CODE_INVALID;; esac
     if helm template "$release" "$package" "${common[@]}" "${extra[@]}" >"$tmp/render.yaml" 2>"$tmp/error"; then error EXPECTED_FAILURE_ABSENT 1; fi
     grep -Fq -- "$expect" "$tmp/error" || error EXPECTED_FAILURE_MISMATCH 1
     printf 'EXPECTED_FAILURE:%s\n' "$expect"; exit 0
@@ -220,17 +204,18 @@ if [[ $app == 1 ]]; then
       if helm template "$release" "$package" "${common[@]}" "${extra[@]}" "$@" >"$tmp/negative" 2>"$tmp/error"; then error "RENDER_GUARD_MISSING:$want" 1; fi
       grep -Fq -- "$want" "$tmp/error" || error "RENDER_GUARD_MISMATCH:$want" 1
     }
-    # 용량 확장 값은 차트 schema(const 1)가 먼저 거부한다.
+    # 용량 확장 값·Secret 생성은 차트 schema(const)가 먼저 거부한다.
     negative "at '/replicaCount': value must be 1" --set replicaCount=2
     negative "at '/capacity/maxRunningJobs': value must be 1" --set capacity.maxRunningJobs=2
     negative "at '/capacity/generationConcurrency': value must be 1" --set capacity.generationConcurrency=2
+    negative "at '/configSecret/create'" --set configSecret.create=true
+    negative "at '/configSecret/name'" --set-string configSecret.name=ai-gateway-db-app
     negative APP_IMAGE_DIGEST_REQUIRED --set-string image.digest=
     negative INGEST_REQUIRES_SOURCE_READ --set ingest.enabled=true --set knowledgeSource.read.enabled=false
     negative VERIFY_RULE_SET_SUITE_ONLY --set-string sanitize.verifyRuleSet=mask-v1r
     if [[ $release == ai-gateway ]]; then
       negative PRODUCTION_RENDER_BLOCKED -f "$chart/values-prod.yaml"
       negative MAIN_RELEASE_CONFLICT --set restoreMode=true
-      negative MAIN_RELEASE_CONFLICT --set-string db.release=ai-gateway-db-restore
       # 추론 endpoint 직접 호출(SPEC §26.1): baseUrl 은 scheme://host:port 만, baseUrl 포트·inference.port·netpol 추론 대상 포트가 같아야 한다.
       negative INFERENCE_BASE_URL_REQUIRED --set inference.enabled=true --set-string inference.baseUrl=
       negative INFERENCE_BASE_URL_INVALID --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1/v1
@@ -239,10 +224,15 @@ if [[ $app == 1 ]]; then
       negative INFERENCE_PORT_REQUIRED --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=0
       negative INFERENCE_PORT_CONFLICT --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=2 --set netpol.targets.inference.port=2
       negative INFERENCE_PORT_CONFLICT --set inference.enabled=true --set-string inference.baseUrl=http://lint-only-inference:1 --set inference.port=1 --set netpol.targets.inference.port=2
+      # 백업 CronJob 양성·음성(공유 서버·단일 계정): runconfig 의 backup 값으로 켰을 때 정확히 1개·backup digest·Forbid, 목적지 누락이면 그 사유로 실패.
+      helm template "$release" "$package" "${common[@]}" "${extra[@]}" --set backup.enabled=true >"$tmp/backup.yaml" 2>"$tmp/error" || error BACKUP_RENDER_FAILED 1
+      python3 -B operations/deploy/app_render.py backup "$tmp/backup.yaml" "$(digest backup)" || error BACKUP_RENDER_MISMATCH 1
+      negative RENDER_REQUIRED_backup.destination --set backup.enabled=true --set-string backup.destination=
     else
       negative RESTORE_FLAGS_CONFLICT --set inference.enabled=true
       negative RESTORE_BACKUP_POINT_REQUIRED --set-string recovery.backupPointAt=
-      negative RESTORE_RELEASE_CONFLICT --set-string db.release=ai-gateway-db
+      negative RESTORE_RELEASE_CONFLICT --set restoreMode=false
+      negative RENDER_RESTORE_BACKUP_FORBIDDEN --set backup.enabled=true
     fi
     if helm template invalid-release "$package" "${common[@]}" "${extra[@]}" >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
     grep -Fq RENDER_INVALID_RELEASE "$tmp/error" || error RENDER_GUARD_MISMATCH 1
@@ -272,39 +262,21 @@ if [[ $app == 1 ]]; then
     deployment_started=1
     helm upgrade --install "$release" "$package" "${common[@]}" "${extra[@]}" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
     kubectl -n tc rollout status "deployment/$release" --timeout=300s >"$tmp/rollout.log" 2>&1 || error APP_ROLLOUT_FAILED 1
-    helm status "$release" -n tc -o json >"$tmp/status.json" 2>"$tmp/error" || error HELM_STATUS_FAILED 1
-    python3 -B - "$release" "$actual_sha" "$chart_digest" "$tmp/status.json" "$tmp/digests.json" "$suite" <<'PY'
-import datetime,json,pathlib,sys,uuid
-release,sha,digest,status,digests,suite=sys.argv[1:]
-data=json.loads(pathlib.Path(status).read_text())
-if data.get('info',{}).get('status')!='deployed' or not isinstance(data.get('version'),int) or data['version']<1:
-    sys.exit('HELM_NOT_DEPLOYED')
-images=json.loads(pathlib.Path(digests).read_text())
-out=pathlib.Path('evidence/F1/gates'); out.mkdir(parents=True,exist_ok=True)
-stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+uuid.uuid4().hex[:8]
-record=dict(release=release,suite=suite,execSha=sha,chartDigest=digest,helmRevision=data['version'],appImageDigest=images['app'],acceptanceImageDigest=images['acceptance'])
-(out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(record,indent=2)+'\n')
-PY
+    record_deploy "$(python3 -B -c 'import json,sys; d=json.load(open(sys.argv[1])); print(json.dumps(dict(suite=sys.argv[2],appImageDigest=d["app"],acceptanceImageDigest=d["acceptance"])))' "$tmp/digests.json" "$suite")" || error HELM_NOT_DEPLOYED 1
+    deployment_started=0
   fi
-  printf 'LOCAL_CHART_OK release=%s suite=%s execSha=%s chartDigest=%s\n' "$release" "$suite" "$actual_sha" "$chart_digest" >&2
+  printf 'LOCAL_CHART_OK release=%s suite=%s chartRepoSha=%s chartDigest=%s\n' "$release" "$suite" "${chart_repo_sha:-UNCHECKED}" "$chart_digest" >&2
   exit 0
 fi
 
-# ── DB release(ai-gateway-db·ai-gateway-db-restore) ────────────────────────────────────────
-chart=$exec_dir/deploy/helm/ai-gateway/db-chart
-[[ -f $chart/Chart.yaml ]] || error EXEC_CHART_MISSING
-args=(-n tc -f "$chart/values.yaml" -f "$chart/values-$profile.yaml" -f "$tmp/values.json" --set-file bootstrap.sql=operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql --set-file hba.overlay=ops/postgres/acceptance-pg_hba.conf)
-# 백업 CronJob 이미지 = image-digests.json 의 backup(주 DB release 만 렌더).
-[[ $release != ai-gateway-db || -z $image_digests ]] || args+=(--set-string "backup.image.digest=$(digest backup)")
-if [[ -n $acceptance_role ]]; then
-  enabled=true; [[ $acceptance_role != disabled ]] || enabled=false
-  args+=(--set "bootstrap.acceptanceRole.enabled=$enabled")
-fi
+# ── 복원 리허설 DB release(ai-gateway-db-restore) ───────────────────────────────────────────
+chart=operations/deploy/helm/ai-gateway-db-restore
+args=(-n tc -f "$chart/values.yaml" -f "$tmp/values.json")
 helm package "$chart" -d "$tmp" >"$tmp/package.log" 2>&1 || error HELM_PACKAGE_FAILED
-package=$tmp/ai-gateway-db-0.1.0.tgz
+package=$tmp/ai-gateway-db-restore-0.1.0.tgz
 chart_digest=$(sha256sum "$package"); chart_digest=${chart_digest%% *}
 if [[ -n $expect ]]; then
-  case $expect in RENDER_REQUIRED_persistence.size|RENDER_REQUIRED_backup.destination|RENDER_REQUIRED_backup.schedule|RENDER_REQUIRED_backup.ageRecipient|RENDER_REQUIRED_backup.type|RENDER_REQUIRED_backup.retentionDays) ;; *) error EXPECT_FAIL_CODE_INVALID;; esac
+  case $expect in RENDER_REQUIRED_persistence.size) ;; *) error EXPECT_FAIL_CODE_INVALID;; esac
   if helm template "$release" "$package" "${args[@]}" >"$tmp/render.yaml" 2>"$tmp/error"; then
     error EXPECTED_FAILURE_ABSENT 1
   elif grep -Fq "$expect" "$tmp/error"; then
@@ -315,58 +287,21 @@ if [[ -n $expect ]]; then
 fi
 helm lint "$package" "${args[@]}" >"$tmp/lint.log" 2>&1 || error HELM_LINT_FAILED
 helm template "$release" "$package" "${args[@]}" >"$tmp/render.yaml" 2>"$tmp/error" || error HELM_RENDER_FAILED
-python3 -B operations/deploy/hba_policy.py render "$tmp/render.yaml" "$release" || error HBA_POLICY_INVALID
-# 성공 경로에서도 두 필수 guard가 실제로 작동하는지 확인합니다.
+python3 -B operations/deploy/app_render.py restore-db "$tmp/render.yaml" "$chart/bootstrap.sql" || error RESTORE_DB_RENDER_MISMATCH 1
+# 성공 경로에서도 두 필수 guard 가 실제로 작동하는지 확인한다.
 if helm template "$release" "$package" "${args[@]}" --set-string persistence.size= >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
 grep -Fq RENDER_REQUIRED_persistence.size "$tmp/error" || error RENDER_GUARD_MISMATCH 1
 if helm template invalid-release "$package" "${args[@]}" >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
 grep -Fq RENDER_INVALID_RELEASE "$tmp/error" || error RENDER_GUARD_MISMATCH 1
-# 백업 CronJob: 주 DB 에 백업이 켜져 있으면 정확히 1개, 복원 release 에는 0개.
-python3 -B - "$tmp/render.yaml" "$release" "$tmp/values.json" <<'PY' || error BACKUP_RENDER_MISMATCH 1
-import json,sys,yaml
-render,release,values=sys.argv[1:]
-jobs=[d for d in yaml.safe_load_all(open(render,encoding='utf-8')) if isinstance(d,dict) and d.get('kind')=='CronJob']
-enabled=release=='ai-gateway-db' and json.load(open(values,encoding='utf-8')).get('backup',{}).get('enabled') is True
-sys.exit(0 if len(jobs)==(1 if enabled else 0) else 1)
-PY
-if [[ $mode == lint && $release == ai-gateway-db && -n $image_digests ]]; then
-  # 백업 CronJob 양성·음성: runconfig 의 backup 값으로 켰을 때 정확히 1개·image-digests 의 backup digest, 목적지 누락이면 그 사유로 실패.
-  helm template "$release" "$package" "${args[@]}" --set backup.enabled=true >"$tmp/backup.yaml" 2>"$tmp/error" || error BACKUP_RENDER_FAILED 1
-  python3 -B -c '
-import sys,yaml
-render,digest=sys.argv[1:]
-jobs=[d for d in yaml.safe_load_all(open(render,encoding="utf-8")) if isinstance(d,dict) and d.get("kind")=="CronJob"]
-container=jobs[0]["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0] if len(jobs)==1 else {}
-sys.exit(0 if jobs and jobs[0]["spec"]["concurrencyPolicy"]=="Forbid" and container.get("image")=="harbor.nori.local/nori-tc/ai-gateway-backup@sha256:"+digest else 1)
-' "$tmp/backup.yaml" "$(digest backup)" || error BACKUP_RENDER_MISMATCH 1
-  if helm template "$release" "$package" "${args[@]}" --set backup.enabled=true --set-string backup.destination= >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
-  grep -Fq RENDER_REQUIRED_backup.destination "$tmp/error" || error RENDER_GUARD_MISMATCH 1
-fi
 if [[ $mode == render ]]; then cat "$tmp/render.yaml"; fi
 if [[ $mode == deploy ]]; then
-  # 클러스터 변경은 승인 운영자가 이 모드를 실행할 때만 발생합니다.
-  stage=F1; [[ $release != *-restore ]] || stage=RESTORE
-  AIGW_RUNCONFIG="$runconfig" bash operations/gates/aigw-runtime-credentials.sh check --stage "$stage"
-  if [[ $acceptance_role != disabled ]]; then
-    kubectl -n tc get secret ai-gateway-db-acceptance-ro -o 'go-template={{range $k,$v := .data}}{{printf "%s\n" $k}}{{end}}' 2>/dev/null | grep -qx password || error RUNTIME_CREDENTIALS_MISSING 13
-  fi
+  # 클러스터 변경은 승인 운영자가 이 모드를 실행할 때만 발생한다.
+  AIGW_RUNCONFIG="$runconfig" bash operations/gates/aigw-runtime-credentials.sh check --stage RESTORE
   deployment_started=1
   helm upgrade --install "$release" "$package" "${args[@]}" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
-  kubectl -n tc rollout status "statefulset/$release" --timeout=300s >"$tmp/rollout.log" 2>&1 || error HBA_ROLLOUT_FAILED 1
+  kubectl -n tc rollout status "statefulset/$release" --timeout=300s >"$tmp/rollout.log" 2>&1 || error DB_ROLLOUT_FAILED 1
   kubectl -n tc wait --for=condition=complete "job/$release-bootstrap" --timeout=300s >"$tmp/bootstrap.log" 2>&1 || error BOOTSTRAP_FAILED 1
-  python3 -B operations/deploy/hba_policy.py live "$release" "$tmp/hba-check.json" || error HBA_DEPLOY_CHECK_FAILED 1
-  helm status "$release" -n tc -o json >"$tmp/status.json" 2>"$tmp/error" || error HELM_STATUS_FAILED 1
-  python3 -B - "$release" "$actual_sha" "$chart_digest" "$tmp/status.json" "$tmp/values.json" "$tmp/hba-check.json" <<'PY'
-import datetime,hashlib,json,pathlib,sys,uuid
-release,sha,digest,status,values,hba=sys.argv[1:]
-data=json.loads(pathlib.Path(status).read_text())
-if data.get('info',{}).get('status')!='deployed' or not isinstance(data.get('version'),int) or data['version']<1:
-    sys.exit('HELM_NOT_DEPLOYED')
-out=pathlib.Path('evidence/F1/gates'); out.mkdir(parents=True,exist_ok=True)
-stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+uuid.uuid4().hex[:8]
-record=dict(release=release,execSha=sha,chartDigest=digest,bootstrapSqlSha256=hashlib.sha256(pathlib.Path('operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql').read_bytes()).hexdigest(),helmRevision=data['version'],imageDigest=json.loads(pathlib.Path(values).read_text())['pgImage']['digest'])
-record.update(json.loads(pathlib.Path(hba).read_text()))
-(out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(record,indent=2)+'\n')
-PY
+  record_deploy "$(python3 -B -c 'import hashlib,json,sys; print(json.dumps(dict(bootstrapSqlSha256=hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest(),imageDigest=json.load(open(sys.argv[2]))["pgImage"]["digest"])))' "$chart/bootstrap.sql" "$tmp/values.json")" || error HELM_NOT_DEPLOYED 1
+  deployment_started=0
 fi
-printf 'LOCAL_CHART_OK release=%s execSha=%s chartDigest=%s\n' "$release" "$actual_sha" "$chart_digest" >&2
+printf 'LOCAL_CHART_OK release=%s chartRepoSha=%s chartDigest=%s\n' "$release" "${chart_repo_sha:-UNCHECKED}" "$chart_digest" >&2

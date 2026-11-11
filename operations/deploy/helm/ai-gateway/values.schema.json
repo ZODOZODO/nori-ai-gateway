@@ -62,22 +62,6 @@
         "jobLifetimeLimit"
       ]
     },
-    "db": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "release": {
-          "type": "string",
-          "enum": [
-            "ai-gateway-db",
-            "ai-gateway-db-restore"
-          ]
-        }
-      },
-      "required": [
-        "release"
-      ]
-    },
     "restoreMode": {
       "type": "boolean"
     },
@@ -266,43 +250,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "serviceTokens": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "actorJwks": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "dbApp": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "dbMigrator": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "gitlabRead": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "seaweedRead": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "testHooks": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
         "acceptanceSigner": {
           "type": "string",
           "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
         },
         "acceptanceClient": {
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
-        },
-        "acceptanceDbRead": {
           "type": "string",
           "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
         },
@@ -312,17 +264,67 @@
         }
       },
       "required": [
-        "serviceTokens",
-        "actorJwks",
-        "dbApp",
-        "dbMigrator",
-        "gitlabRead",
-        "seaweedRead",
-        "testHooks",
         "acceptanceSigner",
         "acceptanceClient",
-        "acceptanceDbRead",
         "acceptanceFixtureWriter"
+      ]
+    },
+    "configSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "const": false
+        },
+        "name": {
+          "const": "ai-gateway-config"
+        }
+      },
+      "required": [
+        "create",
+        "name"
+      ]
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "ageRecipient": {
+          "type": "string"
+        },
+        "retentionDays": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "digest"
+          ]
+        }
+      },
+      "required": [
+        "enabled"
       ]
     },
     "netpol": {
@@ -841,7 +843,6 @@
     "replicaCount",
     "image",
     "capacity",
-    "db",
     "restoreMode",
     "recovery",
     "inference",
@@ -852,6 +853,8 @@
     "kafka",
     "testHooks",
     "credentialsRef",
+    "configSecret",
+    "backup",
     "netpol",
     "egressProbe",
     "specVerify",

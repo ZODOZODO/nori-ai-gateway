@@ -2,7 +2,9 @@
 app: {{ .Release.Name }}
 app.kubernetes.io/name: ai-gateway
 app.kubernetes.io/instance: {{ .Release.Name }}
-aigw.nori/db-target: {{ .Values.db.release }}
+{{- if .Values.restoreMode }}
+aigw.nori/db-target: ai-gateway-db-restore
+{{- end }}
 {{- end -}}
 
 {{- define "aigw.image" -}}
@@ -17,9 +19,9 @@ aigw.nori/db-target: {{ .Values.db.release }}
 {{- if not (regexMatch "^[a-f0-9]{64}$" $v.image.digest) }}{{ fail "APP_IMAGE_DIGEST_REQUIRED" }}{{ end -}}
 {{- if or (ne (int $v.capacity.queuedDepth) 4) (ne $v.capacity.queueWaitLimit "60s") (ne $v.capacity.jobLifetimeLimit "180s") }}{{ fail "CAPACITY_PROFILE_CONFLICT" }}{{ end -}}
 {{- if eq .Release.Name "ai-gateway-restore" -}}
-  {{- if or (ne $v.db.release "ai-gateway-db-restore") (not $v.restoreMode) }}{{ fail "RESTORE_RELEASE_CONFLICT" }}{{ end -}}
+  {{- if not $v.restoreMode }}{{ fail "RESTORE_RELEASE_CONFLICT" }}{{ end -}}
 {{- else -}}
-  {{- if or (ne $v.db.release "ai-gateway-db") $v.restoreMode }}{{ fail "MAIN_RELEASE_CONFLICT" }}{{ end -}}
+  {{- if $v.restoreMode }}{{ fail "MAIN_RELEASE_CONFLICT" }}{{ end -}}
 {{- end -}}
 {{- if and $v.ingest.enabled (not $v.knowledgeSource.read.enabled) }}{{ fail "INGEST_REQUIRES_SOURCE_READ" }}{{ end -}}
 {{- if and (eq $v.sanitize.verifyRuleSet "mask-v1r") (or (ne $v.profile "verify") (ne $v.acceptance.suite "F3-RULEVER")) }}{{ fail "VERIFY_RULE_SET_SUITE_ONLY" }}{{ end -}}
@@ -33,10 +35,15 @@ aigw.nori/db-target: {{ .Values.db.release }}
   {{- fail "PRODUCTION_RENDER_BLOCKED: tcAdapter http 구현은 F5a" -}}
 {{- else if not $v.testHooks.enabled }}{{ fail "VERIFY_HOOKS_REQUIRED" }}{{ end -}}
 {{- if and (not $v.inference.enabled) (not (and (eq $v.profile "verify") $v.testHooks.enabled)) }}{{ fail "DISABLED_INFERENCE_VERIFY_HOOKS_REQUIRED" }}{{ end -}}
-{{- range $key := list "serviceTokens" "actorJwks" "dbApp" "dbMigrator" "gitlabRead" -}}
-  {{- $_ := required (printf "CREDENTIALS_REF_REQUIRED:%s" $key) (index $v.credentialsRef $key) -}}
+{{- /* 앱 자격·DB 설정은 운영자가 만드는 파일 Secret 하나(ai-gateway-config)에서만 받는다. 차트는 만들지 않는다(Plan U6 ①). */ -}}
+{{- if or $v.configSecret.create (ne $v.configSecret.name "ai-gateway-config") }}{{ fail "CONFIG_SECRET_REFERENCE_ONLY" }}{{ end -}}
+{{- if $v.backup.enabled -}}
+  {{- if ne .Release.Name "ai-gateway" }}{{ fail "RENDER_RESTORE_BACKUP_FORBIDDEN" }}{{ end -}}
+  {{- $type := required "RENDER_REQUIRED_backup.type" $v.backup.type -}}
+  {{- if not (has $type (list "s3" "sftp")) }}{{ fail "RENDER_INVALID_backup.type" }}{{ end -}}
+  {{- range $key := list "schedule" "destination" "ageRecipient" "retentionDays" }}{{- $_ := required (printf "RENDER_REQUIRED_backup.%s" $key) (index $v.backup $key) -}}{{ end -}}
+  {{- if not (regexMatch "^[a-f0-9]{64}$" (required "RENDER_REQUIRED_backup.image.digest" $v.backup.image.digest)) }}{{ fail "RENDER_INVALID_backup.image.digest" }}{{ end -}}
 {{- end -}}
-{{- if $v.testHooks.enabled }}{{- $_ := required "TEST_HOOKS_REF_REQUIRED" $v.credentialsRef.testHooks -}}{{ end -}}
 {{- if eq $v.profile "verify" -}}
   {{- $allowed := 0 -}}{{- $blocked := 0 -}}
   {{- range $v.egressProbe.targets -}}
@@ -52,7 +59,6 @@ aigw.nori/db-target: {{ .Values.db.release }}
   {{- if ne (int (regexReplaceAll "^.*:([0-9]+)$" $v.inference.baseUrl "${1}")) (int $v.inference.port) }}{{ fail "INFERENCE_PORT_CONFLICT" }}{{ end -}}
 {{- end -}}
 {{- if $v.knowledgeSource.read.enabled -}}
-  {{- $_ := required "SEAWEED_READ_REF_REQUIRED" $v.credentialsRef.seaweedRead -}}
   {{- $_ := required "SEAWEED_ENDPOINT_REQUIRED" $v.seaweed.s3Endpoint -}}
 {{- end -}}
 {{- if $v.ingest.enabled -}}
@@ -76,7 +82,7 @@ aigw.nori/db-target: {{ .Values.db.release }}
   {{- if or (ne $v.profile "verify") (eq $v.acceptance.suite "none") }}{{ fail "ACCEPTANCE_VERIFY_SUITE_REQUIRED" }}{{ end -}}
   {{- if not (regexMatch "^[a-f0-9]{64}$" $v.acceptance.image.digest) }}{{ fail "ACCEPTANCE_IMAGE_DIGEST_REQUIRED" }}{{ end -}}
   {{- $_ := required "ACCEPTANCE_PARENT_REQUIRED" $v.acceptance.parentRunId -}}
-  {{- range $key := list "acceptanceSigner" "acceptanceClient" "acceptanceDbRead" }}{{- $_ := required (printf "ACCEPTANCE_REF_REQUIRED:%s" $key) (index $v.credentialsRef $key) -}}{{ end -}}
+  {{- range $key := list "acceptanceSigner" "acceptanceClient" }}{{- $_ := required (printf "ACCEPTANCE_REF_REQUIRED:%s" $key) (index $v.credentialsRef $key) -}}{{ end -}}
   {{- range $key := list "loki" "tempo" "metrics" "approvalRef" }}{{- $_ := required (printf "READBACK_REQUIRED:%s" $key) (index $v.acceptance.readback $key) -}}{{ end -}}
   {{- $metrics := required "NETPOL_TARGET_REQUIRED:metrics" (index $v.netpol.targets "metrics") -}}
   {{- $_ := required "NETPOL_APPROVAL_REQUIRED:metrics" $metrics.approvalRef -}}
@@ -113,5 +119,28 @@ aigw.nori/db-target: {{ .Values.db.release }}
   podSelector:
     matchLabels:
       {{- toYaml .podSelector | nindent 6 }}
+{{- end }}
+{{- end -}}
+
+{{- /* DB 대상(Plan §11.3 2026-11-10): 주 release = 공유 서버 192.168.0.150:15432(ipBlock), 복원 release = 임시 인스턴스 ai-gateway-db-restore(Service 15432 → Pod 5432). */ -}}
+{{- define "aigw.dbHost" -}}
+{{ ternary "ai-gateway-db-restore" "192.168.0.150" .Values.restoreMode }}
+{{- end -}}
+
+{{- define "aigw.dbEgress" -}}
+{{- if .Values.restoreMode }}
+- to:
+    - podSelector:
+        matchLabels:
+          app: ai-gateway-db
+          aigw.nori/db-instance: ai-gateway-db-restore
+  ports:
+    - {protocol: TCP, port: 5432}
+{{- else }}
+- to:
+    - ipBlock:
+        cidr: 192.168.0.150/32
+  ports:
+    - {protocol: TCP, port: 15432}
 {{- end }}
 {{- end -}}

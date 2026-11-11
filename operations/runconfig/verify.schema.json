@@ -15,24 +15,6 @@
         "restore"
       ]
     },
-    "execChartSha": {
-      "type": "object",
-      "required": [
-        "value",
-        "approvalRef"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{40}$"
-        },
-        "approvalRef": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
     "pgImage": {
       "type": "object",
       "additionalProperties": false,
@@ -78,24 +60,6 @@
         "tag",
         "digest"
       ]
-    },
-    "pvcSizeGi": {
-      "type": "object",
-      "required": [
-        "value",
-        "approvalRef"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "approvalRef": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
     },
     "restore": {
       "type": "object",
@@ -937,27 +901,9 @@
   "required": [
     "purpose",
     "profile",
-    "execChartSha",
     "pgImage"
   ],
   "allOf": [
-    {
-      "if": {
-        "properties": {
-          "purpose": {
-            "const": "deploy"
-          },
-          "profile": {
-            "const": "main"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "pvcSizeGi"
-        ]
-      }
-    },
     {
       "if": {
         "properties": {

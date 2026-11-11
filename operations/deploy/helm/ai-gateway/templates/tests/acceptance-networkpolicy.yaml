@@ -21,13 +21,7 @@ spec:
               app.kubernetes.io/instance: {{ .Release.Name }}
       ports:
         - {protocol: TCP, port: 8080}
-    - to:
-        - podSelector:
-            matchLabels:
-              app: ai-gateway-db
-              aigw.nori/db-instance: {{ .Values.db.release }}
-      ports:
-        - {protocol: TCP, port: 5432}
+    {{- include "aigw.dbEgress" . | nindent 4 }}
     {{- $readTargets := list "dns" "loki" "tempo" "metrics" -}}
     {{- if eq (include "aigw.fixtureWriter" .) "true" }}{{- $readTargets = append $readTargets "seaweed" -}}{{ end -}}
     {{- range $key := $readTargets }}

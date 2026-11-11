@@ -1,10 +1,6 @@
 {
   "purpose": "lint",
   "profile": "main",
-  "execChartSha": {
-    "value": "0000000000000000000000000000000000000000",
-    "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-  },
   "pgImage": {
     "tag": {
       "value": "lint-pg18",
@@ -12,12 +8,6 @@
     },
     "digest": {
       "value": "0000000000000000000000000000000000000000000000000000000000000000",
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    }
-  },
-  "restore": {
-    "pvcSizeGi": {
-      "value": 1,
       "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
     }
   },

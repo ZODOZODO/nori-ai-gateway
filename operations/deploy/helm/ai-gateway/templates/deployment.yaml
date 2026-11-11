@@ -1,4 +1,5 @@
 {{- include "aigw.guard" . -}}
+{{- $config := .Values.configSecret.name -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,15 +57,19 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: {{ .Values.profile | quote }}
-            - name: SPRING_DATASOURCE_URL
-              value: {{ printf "jdbc:postgresql://%s:5432/ai_gateway" .Values.db.release | quote }}
-            - name: SPRING_DATASOURCE_USERNAME
-              value: aigw_app
-            - name: SPRING_DATASOURCE_PASSWORD
+            # DB 계정 값은 Secret 의 두 키에만 두고, /app/config/ai-gateway-db.properties 의 placeholder 가 이 env 를 읽는다.
+            {{- range $key := list "AI_GATEWAY_DB_USER" "AI_GATEWAY_DB_PASSWORD" }}
+            - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.credentialsRef.dbApp }}
-                  key: password
+                  name: {{ $config }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- if .Values.restoreMode }}
+            # 복원 격리(§11.8): OS env 는 import 한 설정 파일보다 우선하므로 Secret 파일 내용과 무관하게 복원 인스턴스로만 붙는다.
+            - name: SPRING_DATASOURCE_URL
+              value: {{ printf "jdbc:postgresql://%s:15432/nori_ai_gateway" (include "aigw.dbHost" .) | quote }}
+            {{- end }}
             - name: AI_GATEWAY_INFERENCE_MODE
               value: {{ ternary "enabled" "disabled" .Values.inference.enabled | quote }}
             - name: AI_GATEWAY_CAPACITY_MAX_RUNNING_JOBS
@@ -90,9 +95,9 @@ spec:
             - name: AI_GATEWAY_SANITIZE_VERIFY_RULE_SET
               value: {{ .Values.sanitize.verifyRuleSet | quote }}
             - name: AI_GATEWAY_SECURITY_SERVICE_TOKENS_FILE
-              value: /run/aigw/service/service-tokens.json
+              value: /app/config/service-tokens.json
             - name: AI_GATEWAY_SECURITY_ACTOR_JWKS_FILE
-              value: /run/aigw/actor/jwks.json
+              value: /app/config/jwks.json
             - name: DJL_CACHE_DIR
               value: /tmp/djl
             {{- if .Values.inference.enabled }}
@@ -103,7 +108,7 @@ spec:
             - name: AI_GATEWAY_SEAWEED_S3_ENDPOINT
               value: {{ .Values.seaweed.s3Endpoint | quote }}
             - name: AI_GATEWAY_SEAWEED_CREDENTIALS_PATH
-              value: /run/aigw/seaweed
+              value: /app/config
             {{- end }}
             {{- if .Values.ingest.enabled }}
             - name: AI_GATEWAY_KAFKA_BOOTSTRAP_SERVERS
@@ -125,7 +130,7 @@ spec:
             {{- end }}
             {{- if .Values.testHooks.enabled }}
             - name: AI_GATEWAY_TEST_HOOKS_TOKEN_SHA256_FILE
-              value: /run/aigw/hooks/hook-token-sha256
+              value: /app/config/hook-token-sha256
             - name: AI_GATEWAY_TCMOCK_STATE_DIR
               value: /work/mock
             - name: AI_GATEWAY_TEST_HOOKS_EGRESS_TARGETS_FILE
@@ -139,36 +144,29 @@ spec:
             {{- end }}
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
-            {{- range $name := list "service" "actor" "db" "gitlab" }}
-            - {name: {{ $name }}, mountPath: /run/aigw/{{ $name }}, readOnly: true}
-            {{- end }}
-            {{- if .Values.knowledgeSource.read.enabled }}
-            - {name: seaweed, mountPath: /run/aigw/seaweed, readOnly: true}
-            {{- end }}
+            - {name: config, mountPath: /app/config, readOnly: true}
             {{- if .Values.ingest.fixtureCatalog.enabled }}
             - {name: fixture, mountPath: /run/aigw/fixture, readOnly: true}
             {{- end }}
             {{- if .Values.testHooks.enabled }}
-            - {name: hooks, mountPath: /run/aigw/hooks, readOnly: true}
             - {name: egress, mountPath: /run/aigw/egress, readOnly: true}
             - {name: mock, mountPath: /work/mock}
             {{- end }}
       volumes:
         - name: tmp
           emptyDir: {medium: Memory, sizeLimit: 64Mi}
-        {{- $secrets := dict "service" (list .Values.credentialsRef.serviceTokens (list "service-tokens.json")) "actor" (list .Values.credentialsRef.actorJwks (list "jwks.json")) "db" (list .Values.credentialsRef.dbApp (list "password")) "gitlab" (list .Values.credentialsRef.gitlabRead (list "token")) -}}
-        {{- if .Values.knowledgeSource.read.enabled }}{{- $_ := set $secrets "seaweed" (list .Values.credentialsRef.seaweedRead (list "access-key" "secret-key")) -}}{{ end -}}
-        {{- if .Values.testHooks.enabled }}{{- $_ := set $secrets "hooks" (list .Values.credentialsRef.testHooks (list "hook-token-sha256")) -}}{{ end -}}
-        {{- range $name, $secret := $secrets }}
-        - name: {{ $name }}
+        # 그 행에 필요한 키만 투영한다(키가 없으면 Pod 가 뜨지 않는다). GitLab 읽기 = token, SeaweedFS 읽기 = access-key·secret-key.
+        {{- $keys := list "ai-gateway-db.properties" "service-tokens.json" "jwks.json" "token" -}}
+        {{- if .Values.knowledgeSource.read.enabled }}{{- $keys = concat $keys (list "access-key" "secret-key") -}}{{ end -}}
+        {{- if .Values.testHooks.enabled }}{{- $keys = append $keys "hook-token-sha256" -}}{{ end }}
+        - name: config
           secret:
-            secretName: {{ index $secret 0 }}
+            secretName: {{ $config }}
             defaultMode: 0440
             items:
-              {{- range index $secret 1 }}
+              {{- range $keys }}
               - {key: {{ . }}, path: {{ . }}}
               {{- end }}
-        {{- end }}
         {{- if .Values.ingest.fixtureCatalog.enabled }}
         - name: fixture
           configMap:
