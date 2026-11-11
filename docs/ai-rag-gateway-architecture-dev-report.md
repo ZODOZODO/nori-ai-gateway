@@ -7839,3 +7839,85 @@ P16의 이번 요청 범위는 CODE/LOCAL_VALIDATED로 마무리합니다. 구�
 - `SourceAttemptGuardTest` 분할: 종전 시험 5개 → 공용 4개 × adapter 3개 + 전송기 전용 1개 = 13개. 종전 단언 4종은 `kind` 분기가 adapter 별 `SOURCE_REF`·건수(logs 5, 그 외 2)로 바뀐 형태로 모두 남았다(약화 0).
 - 결정 대기 1·2(kafka·object-storage·S3 의존, acceptance-app 의 inference adapter 의존): 둘 다 P04 `8e51ea9` 부터 있던 구성이고 U3 는 동작 변경 0 이 원칙이므로 유지한다. 정리는 그 의존을 받을 새 모듈을 만드는 P24 의 2026-11-10 대체 문단에 넘겼다. 결정 대기 3(AGENTS.md §4 source-support 행)은 같은 문서 commit 에서 추가했다.
 - ④ 문서 commit `cd116d4` 뒤 깨끗한 트리에서 `aigwPackage -Paigw.gitSha=cd116d4b9df2700151d3…` exit 0 `BUILD SUCCESSFUL in 25s`, `build/package/build-identity.json` 의 `gitSha` 가 HEAD 와 같다.
+
+## U5 DB 결정 반영 + Flyway 외부화 (2026-11-11, 구현·로컬 검증)
+
+- worktree `nori-ai-gateway-u5`, 브랜치 `aigw/align-u5`, 기준 `832822b`. commit 1 `1846b03` `refactor: move gateway migrations to root flyway/sql without content changes (U5 commit 1)`(7개 순수 rename, 0 insertions/0 deletions), commit 2 `61e6eb6` `build: externalize Flyway to the root Gradle plugin and adopt the single shared-server DB account (U5 commit 2)`(48개 파일, `342 insertions(+), 788 deletions(-)`), commit 3 `548c312` `fix: keep datasource keys out of application.yaml and fix the app-never-migrates test (U5)`(⑤ 1·2회차 실패 원인 수정, 아래), commit 4 = 이 절.
+- 공유 서버(192.168.0.150)·다른 공유 서버 접속 0. ⑦ 은 직접 띄운 격리 컨테이너에만 실행했다. 계정 이름·비밀번호를 코드·문서·출력에 쓰지 않았다(시험 계정 이름은 실행마다 무작위 `acct_<hex>`).
+
+### 옛 위치 → 새 위치
+
+| 종전 | U5 |
+|---|---|
+| `modules/adapter/ai-gateway-db-adapter/src/main/resources/db/migration/gateway/V{1,2,3,3_1,4,5,7}__*.sql` | 루트 `flyway/sql/` 같은 이름(V6 는 원래 없음). 앱 리소스 `db/migration/gateway/` 는 app `processResources` 사본이고 db-adapter IT 리소스에도 같은 사본을 둔다 |
+| 앱 `MigrateCommand`·`MigrateApplication`·`application-migrate.yaml`(Spring Flyway 자동 migrate) | 삭제. 루트 Gradle Flyway(`flywayInfo`·`flywayMigrate`, CI `migrate` stage 는 U7) |
+| db-adapter `api(spring-boot-starter-flyway)`·`runtimeOnly(flyway-database-postgresql)` | 삭제. main `implementation(libs.flyway.core)`(guard 의 `MigrationVersion` 만), `testImplementation(libs.flyway.core)`, `testFixturesApi(libs.flyway.core)` |
+| 역할 4종(migration·앱·백업·수용 읽기 전용), DB 이름(종전) | 단일 계정(env `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD`, URL `AI_GATEWAY_DB_URL`), DB `nori_ai_gateway` |
+| `ops/postgres/bootstrap.sql`(역할 3종·수용 역할·DB 권한) | 임시 인스턴스용 선행조건 재현(vector·env 이름 단일 계정을 DB 소유자로·`pg_control_system()` PUBLIC 실행). 운영 공유 서버에는 실행하지 않는다 |
+| `ops/postgres/aigw-hba-local-test.sh`·`hba_local_test.py` | 삭제 |
+| (없음) | `docs/runbooks/aigw-db-server-prerequisites.md`(서버 담당자 선행조건, 계정 이름·값 0) |
+
+### V1·V3 제자리 수정(Plan §8 일회성 예외, 계정·GRANT 문만)
+
+- V1: 두 `CREATE SCHEMA … AUTHORIZATION <migration 역할>;` → `CREATE SCHEMA gw;`·`CREATE SCHEMA kn;`. `GRANT USAGE ON SCHEMA gw, kn, gw_flyway TO <앱·백업 역할>;`, `GRANT SELECT ON gw_flyway.flyway_schema_history TO <앱·백업 역할>;`, `ALTER DEFAULT PRIVILEGES FOR ROLE <migration 역할> …` 4줄 삭제(8줄 → 2줄). vector 0.8.7 검사 `DO` 블록 불변.
+- V3: `GRANT INSERT ON gw.backup_run TO <백업 역할>;`·`GRANT USAGE ON SEQUENCE gw.backup_run_id_seq TO <백업 역할>;` 2줄 삭제. 테이블 정의 불변.
+- 다른 V(V2·V3_1·V4·V5·V7) 바이트 변경 0(commit 1 의 rename 그대로).
+
+### 결정과 근거
+
+- 루트 Flyway: nori-wm `build.gradle.kts:1-17,55-78` 형태(buildscript classpath → `apply(plugin = "org.flywaydb.flyway")` → `configure<FlywayExtension>`). url/user/password = `-Pflyway.*` 다음 env `AI_GATEWAY_DB_*`, `locations = filesystem:flyway/sql`, `defaultSchema = gw_flyway`, `createSchemas = true`, `baselineOnMigrate` 미사용(Plan U5 allowed_writes 그대로). JDBC 드라이버는 catalog 에 `postgresql` 항목이 없고 `gradle/libs.versions.toml` 이 allowed_writes 밖이라 buildscript 에 Spring Boot 4.0.7 BOM 의 `postgresql.version` 과 같은 `42.7.11` 을 직접 적었다. buildscript 에 BOM platform 을 거는 방법은 루트 플러그인 classloader 의 다른 의존(kotlin·jackson)까지 BOM 이 바꿀 수 있어 쓰지 않았다. flyway-gradle-plugin 11.14.1 은 로컬 캐시에 없어 첫 해석 1회만 `--offline` 없이 실행했다(Gradle Plugin Portal·Maven Central, 공유 서버 아님).
+- flyway-core 를 db-adapter main 에 남김: `SchemaVersionGuard.java:6` 이 `org.flywaydb.core.api.MigrationVersion` 으로 버전을 비교한다(`SchemaVersionGuardTest` 가 V10·V3_1 순서를 고정). 비교를 직접 구현하면 운영 로직이 바뀌므로 유지했다. Spring Flyway 자동 설정(`spring-boot-flyway`)·`flyway-database-postgresql` 은 앱 런타임에서 빠졌다(`RuntimeClasspathCleanTest` 에 부재 단언 추가).
+- `PgTestDatabase`: bootstrap 을 정본 `ops/postgres/bootstrap.sql` 재사용으로 축소했다. 이 파일은 Plan P06 2026-11-10 이 정한 복원 임시 인스턴스 bootstrap(vector 0.8.7 + env 이름 단일 계정)과 서버 담당자 선행조건 재현이 같은 내용이라 하나로 두었고, P07 의 "별도 SQL 사본을 내장하지 않는다" 원칙과 sha 결속(`aigw.pgBootstrapSha256`)을 유지한다. 계정을 DB 소유자로 만드는 것은 서버 상태(계정 = DB 소유자·CREATE 권한, 2026-11-10 확인)와 같다. superuser 는 컨테이너 준비와 시험의 결함 주입에만 쓴다. HBA mount·`hba_file` 인자와 `aigw.pgHbaSha256` 결속은 지웠다. 새 공개 메서드는 `user()`(단일 계정 이름)와 `flywayConfiguration()`(루트 Flyway 설정과 같은 값 — `target` 지정 시험용) 두 개이고, `bootstrap(boolean)` → `bootstrap()` 이다.
+- `aigw.flyway.sql.dir` 값은 `aigw.rootDir` 기준 상대 경로 `flyway/sql` 이다. 절대 경로면 시험 입력 지문(`aigwInputComponents` 의 `aigw.*` 속성)이 checkout 위치마다 달라진다. 내용 변경은 `inputs.dir(flyway/sql)` 와 classpath 사본으로 지문에 들어간다.
+- db-adapter IT 도 `SchemaVersionGuard` 가 classpath 사본을 읽으므로 `processIntegrationTestResources` 에서 같은 사본을 둔다(guard 의 classpath 위치 불변, Plan P07 2026-11-10).
+- 앱 `application.yaml`: 앱 안 migration 설정 `spring.flyway.{locations,default-schema,create-schemas}` 는 지우고 `enabled: false` 만 남겼다. `NormalDatabaseConfiguration`(migrate 프로필·`spring.flyway.enabled=true` 거부)은 그대로 둔다.
+- "DB 설정 키를 `AI_GATEWAY_DB_*` 로"(Plan U5 app 항목)는 이 단위에서 적용하지 않았다(결정 대기). 1차 시도로 `application.yaml` 에 `spring.datasource.{url,username,password}: ${AI_GATEWAY_DB_URL}`·`${AI_GATEWAY_DB_USER}`·`${AI_GATEWAY_DB_PASSWORD}` 를 넣자 ⑤ 1회차가 136건 중 120건 실패했다(`'url' must start with "jdbc"`). 원인: 앱 IT 는 `SpringApplicationBuilder.properties(...)`(Spring 기본 속성 — 우선순위 최하)로 datasource 를 주는데 `application.yaml` 값이 그 위에 와서 해석되지 않은 placeholder 가 남는다. 명령행 인자로 주는 child-process IT(`WorkerRestart*IT`·`InferenceProcessEnvironmentIT`)와 `BackupScriptIT` 는 통과했다. 되돌린 뒤 ⑤ 를 다시 돌렸다. nori-wm 은 이 매핑을 `config/wm-db.properties`(U6 의 `config/ai-gateway-db.properties` 와 같은 자리)에 둔다. U6 의 `spring.config.import` 도 같은 우선순위 문제를 만나므로 U6 에서 시험 주입 방식을 함께 정해야 한다.
+- `MigrateCommand`·`MigrateApplication` 은 어느 `*ModuleConfiguration` 의 `@Import` 에도 없었다(`MigrateApplication` 이 직접 `@Import(MigrateCommand.class)`). 삭제에 따른 ModuleConfiguration 변경 0, `ModuleConfigurationCompletenessTest` 통과(④).
+- 수용 oracle: `OracleQueries.postgres(host, user, password)` — 사용자는 env `AI_GATEWAY_DB_USER`(AGENTS.md §6 의 계정 이름 env), 포트 15432(공유 서버 직접 연결·복원 port-forward 와 같음), DB 는 `nori_ai_gateway` 하나만 허용. 고정 SELECT enum 불변. 다른 DB(postgres·template1) HBA 거부 판정은 수용 전용 역할이 없어 지웠다(Plan P15 2026-11-10 D-16). exec 차트 `acceptance-job.yaml:48` 의 `AIGW_DB_USERNAME`(옛 역할값)은 이 코드가 읽지 않으며 공급 경로는 U6 이 정한다.
+- 백업·복원: `aigw-backup.sh` 입력 검사 = PGUSER 비어 있지 않음·`PGDATABASE == nori_ai_gateway`. `aigw-restore.sh` 대상 URL = `postgresql://<계정>@<host>:<port>/nori_ai_gateway`(계정은 URL 에서 읽음), bootstrap 확인 = 접속 계정이 그 DB 소유자(종전 역할 3종 존재 확인 대체, 거부 코드 `bootstrap_roles` 유지), `pg_restore --role="$PGUSER"`. TOC 제외 목록은 그대로다(공유 서버의 `pg_control_system()` PUBLIC ACL 도 dump 에 실리므로 제외가 필요하다).
+- `AppContextWiringIT` 의 종전 migrate 전용 진입점 시험 → `normalApplicationNeverMigratesAndStartsOnlyAfterExternalMigration`: migrate 프로필·`spring.flyway.enabled=true` 기동 거부와 테이블 0, `FlywayAutoConfiguration` 클래스 부재, 외부 migrate 뒤 같은 계정 기동·Flyway 빈 0·이력 1,2,3,3.1,4,5,7. `DbBootstrapOrderIT` 는 Plan P07 2026-11-10 순서로 다시 썼다(역할별 거부·수용 역할·HBA 단언 제거). `StackSmokeIT` 에 "앱 리소스 사본 = `flyway/sql`(파일 집합·바이트·최신 V)" 단언을 더했다. IT 클래스 이름 변경 0 이라 `ci/integration-required.txt` 변경 0.
+- lockfile: `resolveAndLockAll --write-locks` 뒤 내용이 바뀐 것은 db-adapter·app 둘(spring-boot-flyway·starter-flyway 줄 삭제, flyway-database-postgresql 은 시험 구성만). 나머지는 CRLF 만 달라 되돌렸고, `../nori-common/build-logic/gradle.lockfile` 도 `git checkout` 으로 되돌려 nori-common clean.
+
+### HBA overlay·승인 A 도구를 U5 에서 지우지 않은 이유(결정 대기)
+
+- 원인(클래스 단위): `ops/postgres/acceptance-pg_hba.conf` 는 시험 fixture 외에 `ops/deploy/hba_policy.py`(`SOURCE`, `source`·`render`·`live`)가 읽고, `aigw-helm.sh:71` 이 app release 를 포함한 모든 호출에서 `hba_policy.py source` 를 먼저 실행하며, `aigw-helm.sh:296` 이 exec `db-chart` 에 `--set-file hba.overlay` 로 넘기고, `aigw-runtime-credentials-selftest.sh:36,214` 가 읽는다. 파일 삭제는 배포 도구 흐름 변경을 요구한다(고정 제약). Plan 은 그 흐름 변경(승인 A 수용 역할 provision/cleanup·DB 역할 Secret 4종 제거, 운영 db-chart 폐기)을 U6 ②③ 에 두었고 U5 의 `ops/deploy/**`·`ops/gates/**` 는 "역할·DB 이름 하드코딩만" 이다(배치 문제).
+- 이름만 바꾸는 경우: `verify_credentials.py:369` 의 정리 SQL 은 대상 역할에 `ALTER ROLE … NOLOGIN` 을 건다. 이것을 단일 계정 이름으로 바꾸면 공유 서버의 유일한 계정을 잠그는 도구가 된다. `aigw-backup-alert-injection.sh:46`·`hba_policy.py:106`·`verify_credentials.py:231`·`rollback_rehearsal.py:22` 는 없어지는 주 DB Pod(`ai-gateway-db-0`)에 exec 하는 경로라 DB 이름만 바꿔도 동작하지 않는다.
+- 그래서 U5 는 자기 완결인 HBA 로컬 시험 2개만 지웠고 `acceptance-pg_hba.conf`·`hba_policy.py`·승인 A gate 코드·해당 runbook 2개(`aigw-runtime-credentials.md`·`aigw-verify-credentials.md`)는 그대로 두었다. ⑧ 잔존 29줄은 모두 이 범주다(아래 ⑧).
+
+### 명령 결과 (각 별도, `--offline --no-daemon`, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값)
+
+- ① spec-guard exit 0 — `{"specInputOrigin":"LOCAL_FILE","specSha":"9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19","specShaSource":"FILE_HASHED"}`.
+- ② `:adapter:ai-gateway-db-adapter:test` exit 0 `BUILD SUCCESSFUL in 33s`. JUnit XML 3개 12건, 실패·오류·skip 0. `test-evidence verify --tasks :adapter:ai-gateway-db-adapter:test` exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ③ `:adapter:ai-gateway-db-adapter:integrationTest -Paigw.requireDocker=true` exit 0 `BUILD SUCCESSFUL in 3m 47s`. JUnit XML 8개 85건, 실패·오류·skip 0. `MigrationApplyIT`(`singleAccountAppliesExactlyV1ToV3AndOwnsAllObjects` = vector 0.8.7 빈 DB 에 V1~V3 → V7, 16개 표 소유자 = 단일 계정·checksum 불변, `missingExtensionFailsMigrationWithoutCreatingGatewayObjects` = vector 없으면 V1 실패·gw/kn 표 0, V5·V7 음성 2건), `DbBootstrapOrderIT.serverPrerequisitesThenExternalMigrationThenSameAccountPersistenceContext`, `SchemaVersionGuardIT` 포함. `-Paigw.requireDocker=true … test-evidence verify --tasks :adapter:ai-gateway-db-adapter:integrationTest --require-docker` exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ④ `:apps:ai-gateway-app:test` exit 0 `BUILD SUCCESSFUL in 1m 22s`. JUnit XML 21개 70건(`ModuleConfigurationCompletenessTest`·`RuntimeClasspathCleanTest` 포함), 실패·오류·skip 0. verify exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ⑥ `:apps:ai-gateway-acceptance-app:test` exit 0 `BUILD SUCCESSFUL in 28s`. JUnit XML 12개 41건, 실패·오류·skip 0. verify exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ②③⑥ 은 commit 2 직전 작업 트리(commit 2 와 같은 내용)에서 실행했다. commit 3 은 `application.yaml` 을 바꿔 ④ 를 다시 실행했다: exit 0 `BUILD SUCCESSFUL in 1m 20s`, 70건 실패·오류·skip 0, verify exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ⑤ `:apps:ai-gateway-app:integrationTest -Paigw.requireDocker=true`(비한정):
+  - 1회차(commit 2) exit 1 `BUILD FAILED in 38m 24s`, 136건 중 실패 120 — `application.yaml` datasource placeholder 문제(위 결정 대기 항목). `BackupScriptIT` 4건·`BackupColumnCoverageIT`·child-process IT 는 통과.
+  - 2회차(yaml 되돌림 뒤) exit 1 `BUILD FAILED in 43m 32s`, 167건 중 실패 1 — 새로 쓴 `normalApplicationNeverMigratesAndStartsOnlyAfterExternalMigration` 의 `spring.flyway.enabled=true` 를 기본 속성으로 줘 `application.yaml` 의 `false` 에 가려졌다. 명령행 인자로 바꾸고, 같은 편집에서 빠진 SQL 따옴표(`IN ('gw','gw_flyway')`)를 되돌렸다. 확인용 `--tests "*AppContextWiringIT"` 17건 통과(최종 회차 전 실행, 증거로 쓰지 않음).
+  - 최종 회차(commit 3 `548c312`) exit 0 `BUILD SUCCESSFUL in 43m 26s`(00:28:03Z~01:11:30Z). JUnit XML 44개 167건, 실패·오류·skip 0(`StackSmokeIT`·`AppContextWiringIT`·`BackupScriptIT`·`BackupColumnCoverageIT` 포함). 직후 `-Paigw.requireDocker=true … test-evidence verify --tasks :apps:ai-gateway-app:integrationTest --require-docker` exit 0 `TEST_EVIDENCE_VERIFIED`. `IdempotentAdmissionIT` 일시 실패는 이번 세 회차 모두 없었다.
+- `build`(commit 3) exit 0 `BUILD SUCCESSFUL in 15m 3s`. JUnit(XML 집계, 실패·오류·skip 0): eval 283, core 117, db-adapter 12, inference-adapter 43, source-support 8, loki-adapter 38, tempo-adapter 10, gitlab-adapter 24, tc-mock-adapter 48, app 70, acceptance-app 41 — 합 694(U3 와 같음). 직후 test 11개 `test-evidence verify --tasks …` exit 0 `TEST_EVIDENCE_VERIFIED`.
+- ⑦ 격리 컨테이너(`pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895…4bcd2`, `127.0.0.1` 임의 포트, 이름 `aigw-u5-flyway-check`)에 superuser 로 `bootstrap.sql`(exit 0)을 실행해 선행조건을 재현한 뒤, 자격을 그 셸 프로세스 env `AI_GATEWAY_DB_URL`·`AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 로만 주고(값은 셸 안에서 생성, 출력 0, `-Pflyway.password` 0) 루트 task 를 실행했다. `flywayInfo` exit 0(`Schema version: << Empty Schema >>`, V1·V2·V3·V3.1·V4·V5·V7 모두 `Pending`) → `flywayMigrate` exit 0 `BUILD SUCCESSFUL in 19s` → `flywayInfo` exit 0, `Pending` 0건:
+
+```
+Schema version: 7
+| Category  | Version | Description                  | Type   | Installed On        | State   | Undoable |
+|           |         | << Flyway Schema Creation >> | SCHEMA | 2026-11-11 07:44:34 | Success |          |
+| Versioned | 1       | schemas and extension assert | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 2       | conversation job core        | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 3       | audit ops                    | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 3.1     | auth rejection identity      | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 4       | job request authority        | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 5       | job request input            | SQL    | 2026-11-11 07:44:34 | Success | No       |
+| Versioned | 7       | audit request identity       | SQL    | 2026-11-11 07:44:35 | Success | No       |
+```
+
+  컨테이너는 직후 `docker rm -f` 로 지웠다.
+- selftest(`aigw-p06-tools:local`, `--network none`, worktree·`nori-tc-exec` readonly, `AIGW_SELFTEST_EXEC_DIR=/nori-tc-exec`): U5 가 바꾼 셸·SQL 은 `ops/backup/*.sh`(BackupScriptIT 가 실행)와 `bootstrap.sql` 이고 gate·deploy 도구는 바꾸지 않았지만 bootstrap 내용이 바뀌어 6종을 모두 실행했다. 모두 exit 0 `PASS`: stage-gate 29, runtime-credentials 81 명령, verify-credentials 42, rollback-rehearsal 92(`actualNetworkCalls=0`), backup-alert-injection 9, runconfig 25.
+- ⑧ `git grep -nwE "<Plan U5 ⑧ 패턴>" -- . ":!evidence" ":!docs/ai-rag-gateway-architecture.md" ":!docs/ai-rag-gateway-architecture-plan.md" ":!docs/ai-rag-gateway-architecture-dev-report.md" ":!docs/gates"` — **0줄 아님, 29줄**(작업 전 약 30개 파일 → 10개 파일). 남은 줄은 모두 위 "HBA overlay·승인 A 도구" 범주다: `docs/runbooks/aigw-runtime-credentials.md` 5, `docs/runbooks/aigw-verify-credentials.md` 3, `ops/deploy/hba_policy.py` 4, `ops/gates/aigw-backup-alert-injection.sh` 1, `ops/gates/aigw-runtime-credentials-selftest.sh` 1, `ops/gates/aigw-verify-credentials-selftest.sh` 1, `ops/gates/rollback_rehearsal.py` 1, `ops/gates/selftest_kubectl_stub.py` 1, `ops/gates/verify_credentials.py` 8, `ops/postgres/acceptance-pg_hba.conf` 4. `modules/**`·`flyway/sql/**`·`ops/backup/**`·`ops/postgres/bootstrap.sql`·`aigw-backup-restore.md` 는 0줄.
+- 환경: `docker ps -a --filter label=org.testcontainers=true -q` 빈 출력, ⑦ 컨테이너 없음. BackupScriptIT 가 만든 backup 이미지는 deleteOnExit 로 지워졌다(`aigw-backup-it-1c16f094:latest` 는 이 세션 전부터 있던 이미지라 두었다). pgvector·ryuk·`aigw-p06-tools:local`·seaweedfs·다른 프로젝트 자원은 건드리지 않았다. `../nori-common` clean. `evidence/**`·SPEC·Plan·`docs/gates/**`·`AGENTS.md`·`CLAUDE.md` 변경 0.
+
+### root 에 넘기는 항목
+
+- Plan 변경 필요: ① U5 ⑧ 의 0줄 조건은 승인 A·HBA·주 DB Pod exec 도구를 지우는 U6 ②③ 뒤에야 성립한다 — U5 ⑧ 범위에서 `ops/deploy/hba_policy.py`·`ops/gates/**` 승인 A 코드·`ops/postgres/acceptance-pg_hba.conf`·runbook 2개를 빼거나 U6 완료 증거로 옮긴다(U8 ⑨ 재검사는 그대로). ② "DB 설정 키를 `AI_GATEWAY_DB_*` 로"(U5 app)를 U6 `config/ai-gateway-db.properties` 쪽으로 옮기고, U6 에서 import 된 설정이 시험의 기본 속성 주입보다 우선하는 문제를 함께 다룬다. ③ `.gitlab-ci.yml:108` 의 `migrations_sha` 가 옛 migration 경로를 읽어 다음 CI 이미지 빌드가 실패한다 — U6(`.gitlab-ci.yml` allowed) 에서 `flyway/sql` 로 바꾼다. ④ exec 차트 `db-chart` bootstrap Job 은 새 `bootstrap.sql` 이 읽는 env(`AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD`)를 주지 않고, `acceptance-job.yaml:48` 은 옛 수용 역할을 `AIGW_DB_USERNAME` 으로 준다 — U6 차트 이관 때 맞춘다. ⑤ `gradle/libs.versions.toml` 에 `postgresql` 항목을 두려면(nori-wm `libs.versions.toml:60,212` 선례) allowed_writes 추가가 필요하다.
+- 관련 없는 발견(수정 안 함): `docs/gates/f1/runtime-classpath.txt` 는 `syncRuntimeClasspathEvidence` 로만 갱신되는 스냅샷이라 spring-boot-flyway 줄이 남아 있다. `docs/runbooks/aigw-runtime-credentials.md:48` 은 지운 HBA 로컬 시험 명령을 안내한다(U6 에서 승인 A 문단과 함께 정리).
