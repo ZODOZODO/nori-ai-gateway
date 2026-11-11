@@ -1231,7 +1231,7 @@ LEFT JOIN gw.message pm ON pm.id=p.request_message_id AND pm.conversation_id=a.c
 
 ### U8 전체 재검증·증거 추가
 
-- [ ] 구현  - [ ] 검증
+- [x] 구현  - [x] 검증 — ①~⑨ exit 0(build·check test 11개 694건, integrationTest 253건 실패·오류·skip 0, 두 `test-evidence verify` `TEST_EVIDENCE_VERIFIED`, aigwPackage gitSha 일치, lockfile 내용 차이 0, lint 3·음성 render 3·selftest 5종·runconfig PASS, 잔존 검사 3종 0줄 — 정렬 전 commit 에서는 57·192·229줄). `evidence/**` 추가 0: 레코드 CLI 는 `--stage`·`--parent-run-id` 필수이고 PARENT 회차는 배포 뒤 stage gate 가 만든다(`EvalCli.java:82-85`, `EvidenceIngestor.java:46-47`, `stage_gate.py:197-199`). `chartDigest` 는 `helm package` 의 파일 수정 시각에 따라 checkout 마다 달라지므로 차트 동일성은 `chartRepoSha` 로 판정한다(현재 `chartDigest` 를 대조하는 절차 0 — 기록 전용). 상세는 Dev report U8 절.
 - 목표: U2~U7 결과 위에서 기존 로컬 회귀 전체(F1·F2 P19 까지)를 다시 실행하고 새 증거만 추가한다.
 - 선행: U7 local commit(U7-Q1 은 2026-11-10 ⓐ 로 결정).
 - allowed_writes: `evidence/**`(새 레코드 추가만), `docs/ai-rag-gateway-architecture-dev-report.md`(U8 절 + 옛 경로 → 새 경로 대응표, 과거 본문 불변).
