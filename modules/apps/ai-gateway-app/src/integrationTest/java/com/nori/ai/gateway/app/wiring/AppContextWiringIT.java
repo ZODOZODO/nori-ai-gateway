@@ -217,11 +217,11 @@ class AppContextWiringIT extends StackContextSupport {
             .properties(credentials).properties(securityProperties()).run())
             .hasMessage("일반 애플리케이션에서는 자동 마이그레이션을 사용할 수 없습니다");
         assertThatThrownBy(() -> new org.springframework.boot.builder.SpringApplicationBuilder(com.nori.ai.gateway.app.AiGatewayApplication.class)
-            .web(org.springframework.boot.WebApplicationType.NONE).properties(credentials).properties(Map.of("spring.flyway.enabled", true))
-            .properties(securityProperties()).run())
+            .web(org.springframework.boot.WebApplicationType.NONE).properties(credentials).properties(securityProperties())
+            .run("--spring.flyway.enabled=true"))
             .hasMessage("일반 애플리케이션에서는 자동 마이그레이션을 사용할 수 없습니다");
         try (var connection = database.connection("postgres"); var statement = connection.createStatement();
-                var result = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN (gw,gw_flyway)")) {
+                var result = statement.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname IN ('gw','gw_flyway')")) {
             assertThat(result.next()).isTrue(); assertThat(result.getInt(1)).isZero();
         }
         // Spring Flyway 자동 설정은 앱 classpath 에 없다(spring-boot-flyway 제거).
