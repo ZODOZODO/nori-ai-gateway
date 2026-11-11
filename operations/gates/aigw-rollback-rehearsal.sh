@@ -4,5 +4,5 @@
 set -euo pipefail
 set +x
 export PYTHONDONTWRITEBYTECODE=1
-[[ -f ops/postgres/bootstrap.sql && -f ops/gates/rollback_rehearsal.py ]] || { printf '%s\n' AI_ROOT_REQUIRED >&2; exit 2; }
-exec python3 -B ops/gates/rollback_rehearsal.py "$@"
+[[ -f operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql && -f operations/gates/rollback_rehearsal.py ]] || { printf '%s\n' AI_ROOT_REQUIRED >&2; exit 2; }
+exec python3 -B operations/gates/rollback_rehearsal.py "$@"

@@ -31,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * Plan P15 ⑥ BackupScriptIT(M-6·N15). {@code deploy/docker/Dockerfile-backup} 을 그대로 빌드한 이미지 안에서
+ * Plan P15 ⑥ BackupScriptIT(M-6·N15). {@code operations/deploy/docker/Dockerfile-backup} 을 그대로 빌드한 이미지 안에서
  * {@code /opt/aigw/aigw-backup.sh}·{@code aigw-restore.sh} 를 실행한다. 목적지는 같은 유형(s3)의 SeaweedFS 4.35 S3 컨테이너다.
  * 로컬 candidate PG·로컬 시험 도구 pin 결과는 LOCAL_VALIDATED 이며 승인 digest·승인 목적지 재시험을 대체하지 않는다.
  */
@@ -68,8 +68,8 @@ class BackupScriptIT {
     @BeforeAll void start() throws Exception {
         assertThat(pgImage).matches("[^\s/@]+(?:/[^\s/@]+)*:[^\s/@:]+@sha256:[0-9a-f]{64}");
         // 이미지 context 로 읽는 바이트 = Gradle 이 시험 지문에 결속한 바이트(aigw.*Sha256).
-        for (var bound : Map.of("backupDockerfileSha256", "deploy/docker/Dockerfile-backup", "backupScriptSha256", "ops/backup/aigw-backup.sh",
-                "restoreScriptSha256", "ops/backup/aigw-restore.sh", "backupJobColumnsSha256", "ops/backup/job-columns-v1.txt").entrySet())
+        for (var bound : Map.of("backupDockerfileSha256", "operations/deploy/docker/Dockerfile-backup", "backupScriptSha256", "operations/backup/aigw-backup.sh",
+                "restoreScriptSha256", "operations/backup/aigw-restore.sh", "backupJobColumnsSha256", "operations/backup/job-columns-v1.txt").entrySet())
             assertThat(sha256(Files.readAllBytes(root.resolve(bound.getValue())))).as(bound.getValue()).isEqualTo(System.getProperty("aigw." + bound.getKey()));
         network = Network.newNetwork();
         String approved = System.getProperty("aigw.backupImage", "");
@@ -82,14 +82,14 @@ class BackupScriptIT {
         } else {
             String[] pg = pgImage.split("@sha256:");
             var image = new ImageFromDockerfile("aigw-backup-it-" + UUID.randomUUID().toString().substring(0, 8), true)
-                .withDockerfilePath("deploy/docker/Dockerfile-backup")
-                .withFileFromPath("deploy/docker/Dockerfile-backup", root.resolve("deploy/docker/Dockerfile-backup"));
+                .withDockerfilePath("operations/deploy/docker/Dockerfile-backup")
+                .withFileFromPath("operations/deploy/docker/Dockerfile-backup", root.resolve("operations/deploy/docker/Dockerfile-backup"));
             for (String file : List.of("aigw-backup.sh", "aigw-restore.sh", "job-columns-v1.txt"))
-                image.withFileFromPath("ops/backup/" + file, root.resolve("ops/backup/" + file));
+                image.withFileFromPath("operations/backup/" + file, root.resolve("operations/backup/" + file));
             image.withBuildArg("PG_IMAGE_REPOSITORY", pg[0].substring(0, pg[0].lastIndexOf(':'))).withBuildArg("PG_IMAGE_DIGEST", pg[1]);
             TOOL_PINS.forEach(image::withBuildArg);
             backupImage = image.get();
-            System.out.println("P15_BACKUP_IMAGE source=deploy/docker/Dockerfile-backup local-build pg=" + pgImage + " pins=" + new TreeMap<>(TOOL_PINS));
+            System.out.println("P15_BACKUP_IMAGE source=operations/deploy/docker/Dockerfile-backup local-build pg=" + pgImage + " pins=" + new TreeMap<>(TOOL_PINS));
         }
         source = postgres("ai-gateway-db", 5432);
         org.flywaydb.core.Flyway.configure().dataSource(jdbc(source, 5432), account, passwords.get(account)).defaultSchema("gw_flyway").createSchemas(true)
@@ -313,7 +313,7 @@ class BackupScriptIT {
         var container = new GenericContainer<>(pgImage).withNetwork(network).withNetworkAliases(alias)
             .withEnv(Map.of("POSTGRES_DB", "nori_ai_gateway", "POSTGRES_USER", "postgres", "POSTGRES_PASSWORD", passwords.get("postgres"), "PGPORT", String.valueOf(port),
                 "PGDATA", "/var/lib/postgresql/18/docker", "AI_GATEWAY_DB_USER", account, "AI_GATEWAY_DB_PASSWORD", passwords.get(account)))
-            .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/bootstrap.sql")), "/tmp/p15-bootstrap.sql")
+            .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql")), "/tmp/p15-bootstrap.sql")
             .withCommand("postgres", "-c", "port=" + port).withExposedPorts(port)
             .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*\\s", 2).withStartupTimeout(Duration.ofMinutes(3)));
         container.start();

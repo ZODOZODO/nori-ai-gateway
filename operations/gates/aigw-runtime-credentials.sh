@@ -27,7 +27,7 @@ case "$command" in
       [[ -n ${AIGW_RUNCONFIG:-} ]] || error RUNCONFIG_MISSING:backup.type
       backup_fields=$(python3 -B - "$AIGW_RUNCONFIG" <<'PY'
 import sys
-sys.path.insert(0, 'ops/deploy')
+sys.path.insert(0, 'operations/deploy')
 from runconfig import InputError, item, load
 try:
     data = load(sys.argv[1])

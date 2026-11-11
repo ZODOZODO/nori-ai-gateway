@@ -2,10 +2,10 @@
 set -euo pipefail
 set +x
 export PYTHONDONTWRITEBYTECODE=1
-[[ -f ops/deploy/runconfig.py ]] || { printf 'AI_ROOT_REQUIRED\n' >&2; exit 2; }
+[[ -f operations/deploy/runconfig.py ]] || { printf 'AI_ROOT_REQUIRED\n' >&2; exit 2; }
 python3 -B - "$@" <<'PY'
 import argparse,collections,datetime,json,os,pathlib,subprocess,sys
-sys.path.insert(0,str(pathlib.Path('ops/deploy').resolve()))
+sys.path.insert(0,str(pathlib.Path('operations/deploy').resolve()))
 from runconfig import InputError,item,load,approval
 import yaml
 parser=argparse.ArgumentParser()

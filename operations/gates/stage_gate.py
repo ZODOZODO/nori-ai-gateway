@@ -110,7 +110,7 @@ def runconfig_profile(path, release):
 def image_identity(path):
     with tempfile.TemporaryDirectory(prefix='aigw-gate-') as directory:
         out = pathlib.Path(directory) / 'digests.json'
-        if run(['python3', '-B', 'ops/deploy/app_render.py', 'digests', path, str(out)]).returncode != 0:
+        if run(['python3', '-B', 'operations/deploy/app_render.py', 'digests', path, str(out)]).returncode != 0:
             raise Stop('IMAGE_DIGESTS_INVALID', 2)
         return json.loads(json.loads(out.read_text())['buildIdentityJson'])
 
@@ -170,7 +170,7 @@ class Gate:
         path = out / f'{name}-{self.utc}-{uuid.uuid4().hex[:8]}.json'
         with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as raw:
             json.dump(dict(record, stage=self.stage, parentRunId=self.parent, suite=self.suite), raw)
-        if run(['python3', '-B', 'ops/gates/evidence_record.py', 'seal', self.spec, raw.name, str(path)]).returncode != 0:
+        if run(['python3', '-B', 'operations/gates/evidence_record.py', 'seal', self.spec, raw.name, str(path)]).returncode != 0:
             raise Stop('EVIDENCE_RECORD_INVALID', 1)
         pathlib.Path(raw.name).unlink()
         rc = gradle(f'ingest --stage {self.stage} --parent-run-id {self.parent} --input {path} --source ops --spec {self.spec}')
@@ -192,7 +192,7 @@ class Gate:
                          'buildIdentity': dict(identity, appImageDigest=app_digest or 'UNVERIFIED', acceptanceImageDigest=acceptance_digest or 'UNVERIFIED')}, 'parent-manifest')
 
     def helm_arguments(self, mode):
-        args = ['bash', 'ops/deploy/aigw-helm.sh', '--release', self.release, '--mode', mode, '--exec-sha', self.options['--exec-sha'],
+        args = ['bash', 'operations/deploy/aigw-helm.sh', '--release', self.release, '--mode', mode, '--exec-sha', self.options['--exec-sha'],
                 '--runconfig', self.options['--runconfig'], '--image-digests', self.options['--image-digests'], '--suite', self.suite,
                 '--spec-file', self.spec, '--parent-run-id', self.parent]
         for flag in ('--fixture-catalog', '--clock-initial', '--backup-point', '--outage-phase', '--set-extra', '--prep-manifest', '--rubric-targets'):
@@ -214,10 +214,10 @@ class Gate:
             manifest = parent_manifest(self.stage, self.parent).get('buildIdentity', {})
             if any(manifest.get(key) != identity.get(key) for key in ('appImageDigest', 'acceptanceImageDigest', 'buildIdentity')):
                 raise Stop('PARENT_IDENTITY_MISMATCH', 2)
-        if run(['bash', 'ops/gates/aigw-verify-credentials.sh', 'check', '--stage', self.verify_stage]).returncode != 0:
+        if run(['bash', 'operations/gates/aigw-verify-credentials.sh', 'check', '--stage', self.verify_stage]).returncode != 0:
             return self.aborted('VERIFY_CREDENTIALS_MISSING', 12)
         runtime_env = dict(os.environ, AIGW_RUNCONFIG=self.options['--runconfig'])
-        if run(['bash', 'ops/gates/aigw-runtime-credentials.sh', 'check', '--stage', self.runtime_stage], env=runtime_env).returncode != 0:
+        if run(['bash', 'operations/gates/aigw-runtime-credentials.sh', 'check', '--stage', self.runtime_stage], env=runtime_env).returncode != 0:
             return self.aborted('RUNTIME_CREDENTIALS_MISSING', 13)
         if self.mode == 'suite-only':
             # 재배포 0 suite: 앱 Pod UID·pod-template-hash·restartCount 가 전후로 같아야 한다.

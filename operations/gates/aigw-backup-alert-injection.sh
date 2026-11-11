@@ -19,7 +19,7 @@ while (($#)); do
   esac
   shift 2
 done
-[[ -f ops/postgres/bootstrap.sql ]] || error AI_ROOT_REQUIRED
+[[ -f operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql ]] || error AI_ROOT_REQUIRED
 [[ $parent =~ ^[A-Za-z0-9_.:-]{1,128}$ ]] || error PARENT_RUN_ID_MISSING
 [[ -n $spec && -f $spec ]] || error SPEC_INPUT_MISSING
 [[ $prometheus =~ ^https?://[^[:space:]]+$ ]] || error PROMETHEUS_URL_MISSING
@@ -99,6 +99,6 @@ record=dict(kind='LEAF',stage='F4',leafId='AC-24-BACKUP-ALERT',producer='OPS',co
 if observed: record['reasonCode']='ALERT_RECEIPT_PATH_UNAPPROVED'
 json.dump(record,open(out,'w',encoding='utf-8'))
 PY
-python3 -B ops/gates/evidence_record.py seal "$spec" "$tmp/records.json" "$out" || error EVIDENCE_RECORD_INVALID 1
+python3 -B operations/gates/evidence_record.py seal "$spec" "$tmp/records.json" "$out" || error EVIDENCE_RECORD_INVALID 1
 bash ./gradlew :gateway-eval:run --args="ingest --stage F4 --parent-run-id $parent --input $out --source ops --spec $spec" --no-daemon >"$tmp/ingest.log" 2>&1 || error INGEST_FAILED 1
 python3 -B -c 'import json,sys; r=json.load(open(sys.argv[1])); print("BACKUP_ALERT_INJECTION", r["result"], r.get("reasonCode", "-"), sys.argv[1]); sys.exit({"NOT_RUN": 2}.get(r["result"], 1))' "$out"

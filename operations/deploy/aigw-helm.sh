@@ -21,7 +21,7 @@ while (($#)); do
   esac
   shift 2
 done
-[[ -f ops/postgres/bootstrap.sql && -f ops/runconfig/verify.schema.json ]] || error AI_ROOT_REQUIRED
+[[ -f operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql && -f operations/runconfig/verify.schema.json ]] || error AI_ROOT_REQUIRED
 app=0
 case $release in
   ai-gateway-db|ai-gateway-db-restore) ;;
@@ -68,7 +68,7 @@ else
   [[ $exec_sha =~ ^[a-f0-9]{40}$ ]] || error EXEC_SHA_REQUIRED
 fi
 for tool in python3 helm git sha256sum mktemp realpath; do command -v "$tool" >/dev/null || error "TOOL_MISSING:$tool"; done
-python3 -B ops/deploy/hba_policy.py source || error HBA_POLICY_INVALID
+python3 -B operations/deploy/hba_policy.py source || error HBA_POLICY_INVALID
 tmp=$(mktemp -d)
 deployment_started=0
 cleanup() {
@@ -86,9 +86,9 @@ PY
   rm -rf -- "$tmp"
 }
 trap cleanup EXIT
-[[ -z $image_digests ]] || python3 -B ops/deploy/app_render.py digests "$image_digests" "$tmp/digests.json" || exit 2
+[[ -z $image_digests ]] || python3 -B operations/deploy/app_render.py digests "$image_digests" "$tmp/digests.json" || exit 2
 digest() { python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$tmp/digests.json" "$1"; }
-if ! python3 -B ops/deploy/runconfig.py "$runconfig" "$release" "$([[ $mode == suite-only ]] && echo deploy || echo "$mode")" "$tmp/values.json" "$exec_sha" 2>"$tmp/runconfig.err"; then
+if ! python3 -B operations/deploy/runconfig.py "$runconfig" "$release" "$([[ $mode == suite-only ]] && echo deploy || echo "$mode")" "$tmp/values.json" "$exec_sha" 2>"$tmp/runconfig.err"; then
   reason=$(head -c 200 "$tmp/runconfig.err")
   # 앱 render 의 --expect-fail 은 입력 검증 사유(예: 복원 runconfig 의 RUNCONFIG_KEY_CONFLICT:<leaf>)도 정확히 같을 때만 성공으로 본다.
   if [[ $app == 1 && -n $expect ]]; then
@@ -111,7 +111,7 @@ if [[ -z $exec_dir ]]; then
   unset GIT_TRACE GIT_TRACE_CURL GIT_TRACE_PACKET GIT_TRACE_SETUP GIT_TRACE_PERFORMANCE GIT_CURL_VERBOSE GIT_TRACE2 GIT_TRACE2_EVENT GIT_TRACE2_PERF GIT_CONFIG_PARAMETERS
   export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=''
   # 원시 오류를 파일에도 쓰지 않고 메모리에서 고정 오류 코드로 바꿉니다.
-  python3 -B ops/deploy/read-exec.py "$tmp/exec" "$exec_sha" || exit 2
+  python3 -B operations/deploy/read-exec.py "$tmp/exec" "$exec_sha" || exit 2
   actual_sha=$exec_sha
   rm -f "$tmp/askpass"
   unset AIGW_ASK_USER AIGW_ASK_TOKEN GIT_ASKPASS
@@ -167,9 +167,9 @@ if [[ $app == 1 ]]; then
   catalog=${fixture_catalog:-modules/apps/ai-gateway-app/src/main/resources/config/fixtures/corpus/tc-fixture-corpus-v1.yaml}
   if [[ $mode == lint ]]; then
     # lint 는 비밀 아닌 lint 전용 입력만 쓴다(승인값 아님).
-    catalog=ops/runconfig/fixtures/lint-fixture-catalog.yaml
+    catalog=operations/runconfig/fixtures/lint-fixture-catalog.yaml
     backup_point=${backup_point:-2026-01-01T00:00:00Z} clock_initial=${clock_initial:-2026-01-01T00:00:00Z}
-    parent_run_id=${parent_run_id:-LINT-ONLY-PARENT} prep_manifest=${prep_manifest:-ops/runconfig/fixtures/lint-image-digests.json}
+    parent_run_id=${parent_run_id:-LINT-ONLY-PARENT} prep_manifest=${prep_manifest:-operations/runconfig/fixtures/lint-image-digests.json}
   fi
   if [[ $release == ai-gateway-restore && $mode != lint ]]; then
     [[ -n $backup_point && -n $clock_initial ]] || error RESTORE_INPUT_MISSING
@@ -182,7 +182,7 @@ if [[ $app == 1 ]]; then
   if [[ $suite != none ]]; then
     # M-10: 실제 SPEC 바이트만 결속한다. 부재 exit 2·기준선 불일치 exit 3, 둘 다 렌더 전.
     [[ -n $spec_file && -f $spec_file ]] || error SPEC_INPUT_MISSING
-    spec_sha=$(python3 -B ops/deploy/app_render.py spec "$spec_file" "$baseline" "$tmp/spec.json") || exit $?
+    spec_sha=$(python3 -B operations/deploy/app_render.py spec "$spec_file" "$baseline" "$tmp/spec.json") || exit $?
     spec_values=$tmp/spec.json
   fi
   if [[ $mode == suite-only ]]; then
@@ -212,7 +212,7 @@ if [[ $app == 1 ]]; then
   fi
   helm lint "$package" "${common[@]}" "${extra[@]}" >"$tmp/lint.log" 2>&1 || error HELM_LINT_FAILED
   helm template "$release" "$package" "${common[@]}" "${extra[@]}" >"$tmp/render.yaml" 2>"$tmp/error" || error HELM_RENDER_FAILED
-  python3 -B ops/deploy/app_render.py matrix "$tmp/render.yaml" "$release" "$suite" "${spec_sha:-}" "$tmp/values.json" || exit 1
+  python3 -B operations/deploy/app_render.py matrix "$tmp/render.yaml" "$release" "$suite" "${spec_sha:-}" "$tmp/values.json" || exit 1
   if [[ $mode == lint ]]; then
     # guard 음성: 각각 기대 사유로만 실패해야 한다(하나라도 다르면 exit 1).
     negative() {  # $1 = 기대 사유, 나머지 = 추가 helm 인자
@@ -247,18 +247,18 @@ if [[ $app == 1 ]]; then
     if helm template invalid-release "$package" "${common[@]}" "${extra[@]}" >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
     grep -Fq RENDER_INVALID_RELEASE "$tmp/error" || error RENDER_GUARD_MISMATCH 1
     # §11.9 렌더 행렬: lint 전용 SPEC 바이트·기준선으로 이 release 의 모든 배포 suite 를 렌더해 행과 대조한다.
-    lint_spec_sha=$(python3 -B ops/deploy/app_render.py spec ops/runconfig/fixtures/lint-spec-bytes.md ops/runconfig/fixtures/lint-spec-baseline.md "$tmp/lint-spec.json") || exit 1
+    lint_spec_sha=$(python3 -B operations/deploy/app_render.py spec operations/runconfig/fixtures/lint-spec-bytes.md operations/runconfig/fixtures/lint-spec-baseline.md "$tmp/lint-spec.json") || exit 1
     rows=(F1 F2 F3-PROBE F3 F3-ACL F3-RULEVER F4 F4-PERF); [[ $release == ai-gateway ]] || rows=(F4-RESTORE)
     for row in "${rows[@]}"; do
       suite_args "$row" row_args "$tmp/lint-spec.json" "$catalog"
       helm template "$release" "$package" "${common[@]}" "${row_args[@]}" >"$tmp/row.yaml" 2>"$tmp/error" || error "RENDER_MATRIX_FAILED:$row" 1
-      python3 -B ops/deploy/app_render.py matrix "$tmp/row.yaml" "$release" "$row" "$lint_spec_sha" "$tmp/values.json" || error "RENDER_MATRIX_MISMATCH:$row" 1
+      python3 -B operations/deploy/app_render.py matrix "$tmp/row.yaml" "$release" "$row" "$lint_spec_sha" "$tmp/values.json" || error "RENDER_MATRIX_MISMATCH:$row" 1
       if [[ $row == F1 || $row == F4 ]]; then
         # 재배포 0 suite(suite-only)는 수용 Job 값만 바꾼다: 같은 행의 Deployment 렌더가 바이트 그대로여야 한다.
-        before=$(python3 -B ops/deploy/app_render.py deployment-sha "$tmp/row.yaml" "$release")
+        before=$(python3 -B operations/deploy/app_render.py deployment-sha "$tmp/row.yaml" "$release")
         reuse=(--set-string acceptance.suite=F1-RUBRIC --set-string 'acceptance.rubricTargets=[]'); [[ $row == F1 ]] || reuse=(--set-string acceptance.suite=F4-CLOCK)
         helm template "$release" "$package" "${common[@]}" "${row_args[@]}" "${reuse[@]}" >"$tmp/reuse.yaml" 2>"$tmp/error" || error SUITE_ONLY_RENDER_FAILED 1
-        [[ $(python3 -B ops/deploy/app_render.py deployment-sha "$tmp/reuse.yaml" "$release") == "$before" ]] || error SUITE_ONLY_DEPLOYMENT_CHANGED 1
+        [[ $(python3 -B operations/deploy/app_render.py deployment-sha "$tmp/reuse.yaml" "$release") == "$before" ]] || error SUITE_ONLY_DEPLOYMENT_CHANGED 1
         [[ $row == F1 ]] && negative RUBRIC_TARGETS_REQUIRED "${row_args[@]}" --set-string acceptance.suite=F1-RUBRIC
       fi
     done
@@ -268,7 +268,7 @@ if [[ $app == 1 ]]; then
   if [[ $mode == render ]]; then cat "$tmp/render.yaml"; fi
   if [[ $mode == deploy ]]; then
     case $suite in none|F1) stage=F1;; F2|F3-PROBE) stage=F2;; F3|F3-ACL|F3-RULEVER) stage=F3;; F4|F4-PERF) stage=F4;; F4-RESTORE) stage=RESTORE;; esac
-    AIGW_RUNCONFIG="$runconfig" bash ops/gates/aigw-runtime-credentials.sh check --stage "$stage"
+    AIGW_RUNCONFIG="$runconfig" bash operations/gates/aigw-runtime-credentials.sh check --stage "$stage"
     deployment_started=1
     helm upgrade --install "$release" "$package" "${common[@]}" "${extra[@]}" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
     kubectl -n tc rollout status "deployment/$release" --timeout=300s >"$tmp/rollout.log" 2>&1 || error APP_ROLLOUT_FAILED 1
@@ -293,7 +293,7 @@ fi
 # ── DB release(ai-gateway-db·ai-gateway-db-restore) ────────────────────────────────────────
 chart=$exec_dir/deploy/helm/ai-gateway/db-chart
 [[ -f $chart/Chart.yaml ]] || error EXEC_CHART_MISSING
-args=(-n tc -f "$chart/values.yaml" -f "$chart/values-$profile.yaml" -f "$tmp/values.json" --set-file bootstrap.sql=ops/postgres/bootstrap.sql --set-file hba.overlay=ops/postgres/acceptance-pg_hba.conf)
+args=(-n tc -f "$chart/values.yaml" -f "$chart/values-$profile.yaml" -f "$tmp/values.json" --set-file bootstrap.sql=operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql --set-file hba.overlay=ops/postgres/acceptance-pg_hba.conf)
 # 백업 CronJob 이미지 = image-digests.json 의 backup(주 DB release 만 렌더).
 [[ $release != ai-gateway-db || -z $image_digests ]] || args+=(--set-string "backup.image.digest=$(digest backup)")
 if [[ -n $acceptance_role ]]; then
@@ -315,7 +315,7 @@ if [[ -n $expect ]]; then
 fi
 helm lint "$package" "${args[@]}" >"$tmp/lint.log" 2>&1 || error HELM_LINT_FAILED
 helm template "$release" "$package" "${args[@]}" >"$tmp/render.yaml" 2>"$tmp/error" || error HELM_RENDER_FAILED
-python3 -B ops/deploy/hba_policy.py render "$tmp/render.yaml" "$release" || error HBA_POLICY_INVALID
+python3 -B operations/deploy/hba_policy.py render "$tmp/render.yaml" "$release" || error HBA_POLICY_INVALID
 # 성공 경로에서도 두 필수 guard가 실제로 작동하는지 확인합니다.
 if helm template "$release" "$package" "${args[@]}" --set-string persistence.size= >"$tmp/negative" 2>"$tmp/error"; then error RENDER_GUARD_MISSING 1; fi
 grep -Fq RENDER_REQUIRED_persistence.size "$tmp/error" || error RENDER_GUARD_MISMATCH 1
@@ -346,7 +346,7 @@ if [[ $mode == render ]]; then cat "$tmp/render.yaml"; fi
 if [[ $mode == deploy ]]; then
   # 클러스터 변경은 승인 운영자가 이 모드를 실행할 때만 발생합니다.
   stage=F1; [[ $release != *-restore ]] || stage=RESTORE
-  AIGW_RUNCONFIG="$runconfig" bash ops/gates/aigw-runtime-credentials.sh check --stage "$stage"
+  AIGW_RUNCONFIG="$runconfig" bash operations/gates/aigw-runtime-credentials.sh check --stage "$stage"
   if [[ $acceptance_role != disabled ]]; then
     kubectl -n tc get secret ai-gateway-db-acceptance-ro -o 'go-template={{range $k,$v := .data}}{{printf "%s\n" $k}}{{end}}' 2>/dev/null | grep -qx password || error RUNTIME_CREDENTIALS_MISSING 13
   fi
@@ -354,7 +354,7 @@ if [[ $mode == deploy ]]; then
   helm upgrade --install "$release" "$package" "${args[@]}" --wait --timeout 600s >"$tmp/upgrade.log" 2>&1 || error HELM_UPGRADE_FAILED 1
   kubectl -n tc rollout status "statefulset/$release" --timeout=300s >"$tmp/rollout.log" 2>&1 || error HBA_ROLLOUT_FAILED 1
   kubectl -n tc wait --for=condition=complete "job/$release-bootstrap" --timeout=300s >"$tmp/bootstrap.log" 2>&1 || error BOOTSTRAP_FAILED 1
-  python3 -B ops/deploy/hba_policy.py live "$release" "$tmp/hba-check.json" || error HBA_DEPLOY_CHECK_FAILED 1
+  python3 -B operations/deploy/hba_policy.py live "$release" "$tmp/hba-check.json" || error HBA_DEPLOY_CHECK_FAILED 1
   helm status "$release" -n tc -o json >"$tmp/status.json" 2>"$tmp/error" || error HELM_STATUS_FAILED 1
   python3 -B - "$release" "$actual_sha" "$chart_digest" "$tmp/status.json" "$tmp/values.json" "$tmp/hba-check.json" <<'PY'
 import datetime,hashlib,json,pathlib,sys,uuid
@@ -364,7 +364,7 @@ if data.get('info',{}).get('status')!='deployed' or not isinstance(data.get('ver
     sys.exit('HELM_NOT_DEPLOYED')
 out=pathlib.Path('evidence/F1/gates'); out.mkdir(parents=True,exist_ok=True)
 stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+uuid.uuid4().hex[:8]
-record=dict(release=release,execSha=sha,chartDigest=digest,bootstrapSqlSha256=hashlib.sha256(pathlib.Path('ops/postgres/bootstrap.sql').read_bytes()).hexdigest(),helmRevision=data['version'],imageDigest=json.loads(pathlib.Path(values).read_text())['pgImage']['digest'])
+record=dict(release=release,execSha=sha,chartDigest=digest,bootstrapSqlSha256=hashlib.sha256(pathlib.Path('operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql').read_bytes()).hexdigest(),helmRevision=data['version'],imageDigest=json.loads(pathlib.Path(values).read_text())['pgImage']['digest'])
 record.update(json.loads(pathlib.Path(hba).read_text()))
 (out/f'deploy-{release}-{stamp}.json').write_text(json.dumps(record,indent=2)+'\n')
 PY

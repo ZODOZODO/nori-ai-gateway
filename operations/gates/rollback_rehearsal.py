@@ -128,7 +128,7 @@ def migrations_label(digest):
 
 
 def deploy(arguments, digests_file):
-    result = run(['bash', 'ops/deploy/aigw-helm.sh', '--release', 'ai-gateway', '--mode', 'deploy', '--exec-sha', arguments['exec_sha'],
+    result = run(['bash', 'operations/deploy/aigw-helm.sh', '--release', 'ai-gateway', '--mode', 'deploy', '--exec-sha', arguments['exec_sha'],
                   '--runconfig', arguments['runconfig'], '--image-digests', digests_file, '--suite', 'none'])
     if result.returncode != 0:
         raise Stop('DEPLOY_FAILED', 1)

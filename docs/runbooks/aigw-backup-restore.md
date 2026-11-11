@@ -25,7 +25,7 @@ kubectl -n tc create job --from=cronjob/ai-gateway-db-backup ai-gateway-db-backu
 
 ## 백업 내용
 
-같은 snapshot(세션 A `REPEATABLE READ READ ONLY` + `pg_export_snapshot`)으로 `pg_dump -Fc --exclude-table-data=gw.job`(스키마·제약·sequence 포함)과 `gw.job` sanitised binary COPY(열 = `ops/backup/job-columns-v1.txt`, `delegation_id` 는 항상 NULL)를 각각 `age` 로 암호화하고, 업무 값 없는 manifest(형식 버전·snapshot 시각·Flyway 최신 V·열 목록 SHA·암호문 SHA·`gw.job` 행 수·`delegationExcluded=true`)도 암호화해 하나의 `aigw-<UTC>.bundle`(tar)로 업로드한 뒤 보관 기간 초과분을 지운다. 평문 덤프는 파일로 쓰지 않는다.
+같은 snapshot(세션 A `REPEATABLE READ READ ONLY` + `pg_export_snapshot`)으로 `pg_dump -Fc --exclude-table-data=gw.job`(스키마·제약·sequence 포함)과 `gw.job` sanitised binary COPY(열 = `operations/backup/job-columns-v1.txt`, `delegation_id` 는 항상 NULL)를 각각 `age` 로 암호화하고, 업무 값 없는 manifest(형식 버전·snapshot 시각·Flyway 최신 V·열 목록 SHA·암호문 SHA·`gw.job` 행 수·`delegationExcluded=true`)도 암호화해 하나의 `aigw-<UTC>.bundle`(tar)로 업로드한 뒤 보관 기간 초과분을 지운다. 평문 덤프는 파일로 쓰지 않는다.
 
 ## 격리 복원(복원 실행자 Linux 호스트)
 
@@ -53,4 +53,4 @@ TOC 필터는 bootstrap(superuser)이 이미 만든 항목만 뺀다: `EXTENSION
 
 ## 경보 주입
 
-`ops/gates/aigw-backup-alert-injection.sh` 는 수동 Job 의 컨테이너 env 에만 `AIGW_BACKUP_DEST_OVERRIDE=unreachable-probe` 를 넣어 실패 행·경보를 확인한 뒤 override 없는 수동 백업으로 복귀를 확인한다(스크립트는 그 고정 값 외 override 를 exit 2 로 거부).
+`operations/gates/aigw-backup-alert-injection.sh` 는 수동 Job 의 컨테이너 env 에만 `AIGW_BACKUP_DEST_OVERRIDE=unreachable-probe` 를 넣어 실패 행·경보를 확인한 뒤 override 없는 수동 백업으로 복귀를 확인한다(스크립트는 그 고정 값 외 override 를 exit 2 로 거부).

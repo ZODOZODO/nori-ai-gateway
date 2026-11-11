@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 class BackupColumnCoverageIT {
     @Test void jobColumnFileCoversEveryJobColumnExceptDelegation() throws Exception {
         Path root = Path.of(System.getProperty("aigw.rootDir"));
-        List<String> listed = Files.readAllLines(root.resolve("ops/backup/job-columns-v1.txt")).stream().filter(line -> !line.isBlank()).toList();
+        List<String> listed = Files.readAllLines(root.resolve("operations/backup/job-columns-v1.txt")).stream().filter(line -> !line.isBlank()).toList();
         try (var database = new PgTestDatabase(System.getProperty("aigw.pgTestImage"), root).start()) {
             database.bootstrap();
             database.migrate();

@@ -33,4 +33,4 @@ SELECT has_function_privilege('pg_control_system()', 'EXECUTE');
 
 ## 시험 환경의 재현
 
-우리가 superuser 인 임시 인스턴스(격리 시험 컨테이너·복원 리허설 인스턴스)에서는 `ops/postgres/bootstrap.sql` 이 같은 선행조건(vector·DB 를 소유하는 단일 계정·`pg_control_system()` PUBLIC 실행)을 env 로 받은 계정 이름으로 재현한다. 이 스크립트는 운영 공유 서버에 실행하지 않는다.
+우리가 superuser 인 임시 인스턴스(격리 시험 컨테이너·복원 리허설 인스턴스)에서는 `operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql` 이 같은 선행조건(vector·DB 를 소유하는 단일 계정·`pg_control_system()` PUBLIC 실행)을 env 로 받은 계정 이름으로 재현한다. 이 스크립트는 운영 공유 서버에 실행하지 않는다.

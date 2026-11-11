@@ -19,19 +19,19 @@ ACCEPTANCE_PODS = {'job-name=ai-gateway-acceptance': [pod('a1', 0, ACC)], 'job-n
 
 with tempfile.TemporaryDirectory(prefix='aigw-stage-gate-test-') as temporary:
     work = pathlib.Path(temporary)
-    shutil.copytree(root / 'ops', work / 'ops')
+    shutil.copytree(root / 'operations', work / 'operations')
     (work / 'docs/gates').mkdir(parents=True)
     shutil.copy(root / 'docs/gates/spec-baseline.md', work / 'docs/gates/spec-baseline.md')
     bin_dir = work / 'bin'; bin_dir.mkdir()
     calls_log, gradle_log, helm_args = work / 'calls.log', work / 'gradle.jsonl', work / 'helm-args.json'
     def script(path, body):
         path.write_text(body); path.chmod(0o755)
-    script(bin_dir / 'kubectl', '#!/bin/sh\nexec python3 -B ' + str(work / 'ops/gates/selftest_kubectl_stub.py') + ' "$@"\n')
+    script(bin_dir / 'kubectl', '#!/bin/sh\nexec python3 -B ' + str(work / 'operations/gates/selftest_kubectl_stub.py') + ' "$@"\n')
     # helm test stub: 상태 줄·블록 밖 원문(버려야 함)·STUB_BLOCK=valid 면 aigw-helm 이 받은 부모 회차·SPEC 으로 봉인한 RUN COMPLETED 블록.
     script(bin_dir / 'helm', '#!/bin/sh\nexec python3 -B ' + str(bin_dir / 'helm_stub.py') + ' "$@"\n')
     (bin_dir / 'helm_stub.py').write_text(r'''
 import base64, hashlib, json, os, sys, uuid
-sys.path.insert(0, 'ops/gates')
+sys.path.insert(0, 'operations/gates')
 from evidence_record import seal
 from stage_gate import MATRIX
 open(os.environ['STUB_CALLS'], 'a').write('helm ' + ' '.join(sys.argv[1:]) + '\n')
@@ -70,10 +70,10 @@ if words[0] == 'gate':
     sys.exit(int(os.environ.get('STUB_GATE_RC', '0')))
 sys.exit(9)
 ''')
-    script(work / 'ops/deploy/aigw-helm.sh', '#!/usr/bin/env bash\nprintf "aigw-helm %s\\n" "$*" >> "$STUB_CALLS"\n'
+    script(work / 'operations/deploy/aigw-helm.sh', '#!/usr/bin/env bash\nprintf "aigw-helm %s\\n" "$*" >> "$STUB_CALLS"\n'
            'python3 -B -c "import json,sys; json.dump(sys.argv[1:], open(\'$STUB_HELM_ARGS\', \'w\'))" "$@"\nexit "${STUB_DEPLOY_RC:-0}"\n')
-    script(work / 'ops/gates/aigw-verify-credentials.sh', '#!/usr/bin/env bash\nprintf "verify-credentials %s\\n" "$*" >> "$STUB_CALLS"\nexit "${STUB_VERIFY_RC:-0}"\n')
-    script(work / 'ops/gates/aigw-runtime-credentials.sh', '#!/usr/bin/env bash\nprintf "runtime-credentials %s runconfig=%s\\n" "$*" "$AIGW_RUNCONFIG" >> "$STUB_CALLS"\nexit "${STUB_RUNTIME_RC:-0}"\n')
+    script(work / 'operations/gates/aigw-verify-credentials.sh', '#!/usr/bin/env bash\nprintf "verify-credentials %s\\n" "$*" >> "$STUB_CALLS"\nexit "${STUB_VERIFY_RC:-0}"\n')
+    script(work / 'operations/gates/aigw-runtime-credentials.sh', '#!/usr/bin/env bash\nprintf "runtime-credentials %s runconfig=%s\\n" "$*" "$AIGW_RUNCONFIG" >> "$STUB_CALLS"\nexit "${STUB_RUNTIME_RC:-0}"\n')
     spec = work / 'spec.md'; spec.write_bytes('# 시험 SPEC\n'.encode())
     tampered = work / 'tampered.md'; tampered.write_bytes('# 변조 SPEC\n'.encode())
     (work / 'main.json').write_text(json.dumps({'purpose': 'deploy', 'profile': 'main'}))
@@ -95,7 +95,7 @@ sys.exit(9)
         for path in (calls_log, gradle_log, work / 'kubectl.jsonl'):
             path.write_text('')
         state.write_text(json.dumps({'pods': pods_seq or [[pod('u1', 0)]], 'selector_pods': ACCEPTANCE_PODS if selector_pods is None else selector_pods}))
-        result = subprocess.run(['bash', 'ops/gates/aigw-stage-gate.sh', *args], cwd=work, env=dict(base_env, **extra_env), capture_output=True, text=True)
+        result = subprocess.run(['bash', 'operations/gates/aigw-stage-gate.sh', *args], cwd=work, env=dict(base_env, **extra_env), capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
         if stderr is not None:
             assert result.stderr.strip().splitlines()[0] == stderr, result.stderr

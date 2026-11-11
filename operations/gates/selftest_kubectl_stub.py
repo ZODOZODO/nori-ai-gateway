@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ops/gates selftest 전용 kubectl stub(실제 클러스터 호출 0). 상태 = STUB_STATE JSON, 호출 기록 = STUB_LOG jsonl.
+"""operations/gates selftest 전용 kubectl stub(실제 클러스터 호출 0). 상태 = STUB_STATE JSON, 호출 기록 = STUB_LOG jsonl.
 
 state 키: secrets{name:{key:b64}}, present{kind:[names]}, fail{"<동작>:<대상>": rc}, sql_outputs{pod: stdout}, probe_outputs{pod: 수용 접속 분류 출력},
 cronjobs{name: obj}, jobs{name: obj}, job_conditions{name: Complete|Failed}, pods[[pod...] 호출 순서별 목록],

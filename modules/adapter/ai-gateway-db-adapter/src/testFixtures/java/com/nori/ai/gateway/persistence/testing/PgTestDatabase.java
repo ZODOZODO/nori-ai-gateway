@@ -36,7 +36,7 @@ public final class PgTestDatabase implements AutoCloseable {
         if (image == null || !image.matches("[^\\s/@]+(?:/[^\\s/@]+)*:[^\\s/@:]+@sha256:[0-9a-f]{64}"))
             throw new IllegalArgumentException("고정된 PostgreSQL 시험 이미지가 필요합니다");
         this.image = image; this.root = root.toAbsolutePath().normalize();
-        verifySource("ops/postgres/bootstrap.sql", "aigw.pgBootstrapSha256");
+        verifySource("operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql", "aigw.pgBootstrapSha256");
     }
     private void verifySource(String file, String property) {
         try {
@@ -53,7 +53,7 @@ public final class PgTestDatabase implements AutoCloseable {
                 .withLabel(OWNER_LABEL, owner).withStartupTimeout(java.time.Duration.ofMinutes(3)).withEnv("PGDATA", "/var/lib/postgresql/18/docker")
                 .withEnv("AI_GATEWAY_DB_USER", account)
                 .withEnv("AI_GATEWAY_DB_PASSWORD", passwords.get(account))
-                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("ops/postgres/bootstrap.sql")), "/tmp/p07-bootstrap.sql");
+                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql")), "/tmp/p07-bootstrap.sql");
             container.start();
             try (var connection = connection("postgres"); var statement = connection.createStatement();
                     var result = statement.executeQuery("SHOW server_version")) {

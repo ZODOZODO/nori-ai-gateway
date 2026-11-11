@@ -48,7 +48,7 @@ NORI 공용 AI Gateway(Java 21, Spring Boot 4, Gradle 멀티 모듈, 헥사고�
 
 - 금지 의존: core → 다른 모듈/Spring/JDBC, adapter ↔ adapter, tc-mock → db/integration/app, eval → gateway 모듈. ArchUnit 시험이 강제한다.
 - 빈 등록은 `@ComponentScan` 없이 각 모듈 `*ModuleConfiguration` 의 `@Import` 로 명시한다. 새 `@Component`·`@Service`·`@RestController` 를 추가하면 같은 모듈 `*ModuleConfiguration` 의 import 와 `@Import` 를 함께 바꾼다. core 타입 빈은 app 의 `CoreBeansConfiguration` `@Bean` 으로만 등록한다. `ModuleConfigurationCompletenessTest` 가 누락을 FAIL 로 잡는다.
-- 운영 도구는 `operations/`(현재 `ops/`, U6 에서 이동), Dockerfile 은 `operations/deploy/docker/`, helm 차트는 `operations/deploy/helm/ai-gateway/`·`operations/deploy/helm/ai-gateway-db-restore/`(U6 에서 `nori-tc-exec` 에서 이관), 배포 설정은 루트 `config/ai-gateway-*.properties`(U6), runbook 은 `docs/runbooks/` 다.
+- 운영 도구는 `operations/`, Dockerfile 은 `operations/deploy/docker/`, helm 차트는 `operations/deploy/helm/ai-gateway/`·`operations/deploy/helm/ai-gateway-db-restore/`(U6 에서 `nori-tc-exec` 에서 이관), 배포 설정은 루트 `config/ai-gateway-*.properties`, runbook 은 `docs/runbooks/` 다.
 
 ## 5. 검증 명령
 

@@ -4,7 +4,7 @@ Status: NOT_RUN
 
 실제 클러스터 자격의 조회·생성·교체를 이번 구현에서 실행하지 않았습니다. 아래는 namespace tc의 기존 쓰기 권한을 가진 승인 운영자 절차입니다. 권한 부여·Secret 값의 출력·파일 저장은 하지 않습니다.
 
-`bash ops/gates/aigw-runtime-credentials.sh provision-db`는 superuser/migrator/app/backup 네 역할 Secret이 없는 경우에만 OpenSSL CSPRNG 32바이트의 base64 값을 stdin 파이프로 생성합니다. 기존 Secret은 PRESENT로 건너뜁니다. 조회 권한·통신 오류를 NotFound로 해석하지 않습니다. `--from-file=password=/dev/stdin`을 사용하며 비밀번호는 argv에 없습니다. 동시 provision 경쟁 시 create 실패를 전파하고 재실행하면 기존 Secret을 보존합니다.
+`bash operations/gates/aigw-runtime-credentials.sh provision-db`는 superuser/migrator/app/backup 네 역할 Secret이 없는 경우에만 OpenSSL CSPRNG 32바이트의 base64 값을 stdin 파이프로 생성합니다. 기존 Secret은 PRESENT로 건너뜁니다. 조회 권한·통신 오류를 NotFound로 해석하지 않습니다. `--from-file=password=/dev/stdin`을 사용하며 비밀번호는 argv에 없습니다. 동시 provision 경쟁 시 create 실패를 전파하고 재실행하면 기존 Secret을 보존합니다.
 
 `check --stage F1|F2|F3|F4|RESTORE`는 DB 네 역할의 password·GitLab token을 검사합니다. F1~F4는 백업 목적지의 s3 access-key/secret-key 또는 sftp ssh-private-key/known-hosts, F3/F4/RESTORE는 Seaweed access-key/secret-key가 필요합니다. 추론 자격 Secret은 어느 단계에도 없습니다(F2~F4 = F1 + SeaweedFS read(F3~), Plan §11.9). RESTORE는 백업 목적지를 요구하지 않습니다. 모든 누락을 표시하고 exit 13을 반환합니다. 증거는 evidence/<stage>/gates/runtime-credentials-check-<UTC+고유값>.json에 이름·필드·PRESENT/MISSING만 기록합니다. 원시 Secret JSON은 조회하지 않습니다. 존재 검사는 identity 권한·값의 유효성을 증명하지 않습니다.
 
@@ -22,7 +22,7 @@ P06 검토 보정: F1~F4의 `check`는 `AIGW_RUNCONFIG`에서 `purpose=deploy`, 
 
 회전 전에는 모든 대상 bootstrap Job의 release 이름·label·namespace와 종료 상태(Complete 또는 Failed, active=0)를 확인합니다. 실행 중이거나 종료 상태가 불명확하면 BOOTSTRAP_JOB_BUSY로 Secret 생성·변경 전에 중단합니다. 운영자는 동시 Helm 배포·회전을 중지한 상태에서 실행합니다. 서버 생성 식별자를 제거한 종료 Job template은 메모리에만 유지하며 일반 delete --wait=true 후 create로 재생성합니다. 강제 교체는 사용하지 않습니다. 양쪽 DB hook이 모두 완료된 뒤에만 앱을 재시작합니다. Secret 교체 후 hook 실패 시 앱을 재시작하지 않고 RECOVERY_REQUIRED로 중단합니다. 삭제 후 생성 실패로 Job이 없어진 경우에는 승인된 동일 release 차트의 hook을 현재 Secret으로 복구하고 양쪽 완료를 확인하는 운영자 복구가 필요합니다. 새 비밀번호를 다시 생성하는 rotate 재실행으로 복구하지 않습니다.
 
-selftest 소스 배치: 기본값은 Gateway checkout과 같은 부모 디렉터리의 `../nori-tc-exec`입니다. 컨테이너 등에서 exec checkout을 다른 위치(예: `/exec`)에 두었다면 `AIGW_SELFTEST_EXEC_DIR=/exec bash ops/gates/aigw-runtime-credentials-selftest.sh` 및 `AIGW_SELFTEST_EXEC_DIR=/exec python3 -B ops/deploy/runconfig-selftest.py`처럼 기존 지원 변수를 지정합니다. 실제 exec 소스 checkout(HEAD와 DB 차트 포함)이 필요하며, 이 변수는 selftest 입력 경로만 지정합니다. sibling 배치에서는 지정하지 않아도 됩니다.
+selftest 소스 배치: 기본값은 Gateway checkout과 같은 부모 디렉터리의 `../nori-tc-exec`입니다. 컨테이너 등에서 exec checkout을 다른 위치(예: `/exec`)에 두었다면 `AIGW_SELFTEST_EXEC_DIR=/exec bash operations/gates/aigw-runtime-credentials-selftest.sh` 및 `AIGW_SELFTEST_EXEC_DIR=/exec python3 -B operations/deploy/runconfig-selftest.py`처럼 기존 지원 변수를 지정합니다. 실제 exec 소스 checkout(HEAD와 DB 차트 포함)이 필요하며, 이 변수는 selftest 입력 경로만 지정합니다. sibling 배치에서는 지정하지 않아도 됩니다.
 
 ## 승인된 검증 역할 접속 경계
 

@@ -189,16 +189,16 @@ def db_inputs(releases):
     if not re.fullmatch(r'[0-9a-f]{40}', exec_sha):
         raise Failure('INPUT_INVALID:AIGW_EXEC_CHART_SHA', 2)
     with tempfile.TemporaryDirectory(prefix='aigw-inputs-') as directory:
-        if subprocess.run(['python3', '-B', 'ops/deploy/app_render.py', 'digests', os.environ['AIGW_IMAGE_DIGESTS'], os.path.join(directory, 'digests.json')],
+        if subprocess.run(['python3', '-B', 'operations/deploy/app_render.py', 'digests', os.environ['AIGW_IMAGE_DIGESTS'], os.path.join(directory, 'digests.json')],
                           capture_output=True).returncode != 0:
             raise Failure('INPUT_INVALID:AIGW_IMAGE_DIGESTS', 2)
         for release in releases:
             runconfig = os.environ[DB_RELEASES[release]]
-            if subprocess.run(['python3', '-B', 'ops/deploy/runconfig.py', runconfig, release, 'deploy', os.path.join(directory, 'values.json'), exec_sha],
+            if subprocess.run(['python3', '-B', 'operations/deploy/runconfig.py', runconfig, release, 'deploy', os.path.join(directory, 'values.json'), exec_sha],
                               capture_output=True).returncode != 0:
                 raise Failure('INPUT_INVALID:' + DB_RELEASES[release], 2)
             stage = 'RESTORE' if release.endswith('-restore') else 'F1'
-            if subprocess.run(['bash', 'ops/gates/aigw-runtime-credentials.sh', 'check', '--stage', stage], capture_output=True,
+            if subprocess.run(['bash', 'operations/gates/aigw-runtime-credentials.sh', 'check', '--stage', stage], capture_output=True,
                               env=dict(os.environ, AIGW_RUNCONFIG=runconfig)).returncode != 0:
                 raise Failure('DB_RUNTIME_CREDENTIALS_NOT_READY:' + release, 1)
 
@@ -206,7 +206,7 @@ def db_inputs(releases):
 def hba_live(release):
     """P06 정본 검사 재사용: overlay 경로·SHA·기동 인자 결과 hba_file·pg_hba_file_rules 앞 4 규칙(정본 SHA·오류 0)."""
     with tempfile.TemporaryDirectory(prefix='aigw-hba-') as directory:
-        if subprocess.run(['python3', '-B', 'ops/deploy/hba_policy.py', 'live', release, os.path.join(directory, 'hba.json')], capture_output=True).returncode != 0:
+        if subprocess.run(['python3', '-B', 'operations/deploy/hba_policy.py', 'live', release, os.path.join(directory, 'hba.json')], capture_output=True).returncode != 0:
             raise Failure('HBA_LIVE_CHECK_FAILED:' + release, 1)
     print(release, 'HBA_LIVE_PASS')
 
@@ -217,7 +217,7 @@ def db_releases():
 
 
 def redeploy_db(release, role_state):
-    command = ['bash', 'ops/deploy/aigw-helm.sh', '--release', release, '--mode', 'deploy', '--exec-sha', os.environ['AIGW_EXEC_CHART_SHA'],
+    command = ['bash', 'operations/deploy/aigw-helm.sh', '--release', release, '--mode', 'deploy', '--exec-sha', os.environ['AIGW_EXEC_CHART_SHA'],
                '--runconfig', os.environ[DB_RELEASES[release]], '--image-digests', os.environ['AIGW_IMAGE_DIGESTS'], '--acceptance-role', role_state]
     # aigw-helm.sh deploy 는 bootstrap hook Job complete·P06 HBA live 검사까지 확인한 뒤에만 0 이다.
     if subprocess.run(command, capture_output=True).returncode != 0:

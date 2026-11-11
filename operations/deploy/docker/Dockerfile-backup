@@ -34,7 +34,7 @@ RUN [[ "$TARGETARCH" =~ ^(amd64|arm64)$ ]] \
       *) printf '%s\n' BACKUP_DEST_TYPE_UNSUPPORTED >&2; exit 2 ;; \
       esac \
     && rm -rf /tmp/age /tmp/age.tgz /tmp/rclone* /var/lib/apt/lists/*
-COPY --chown=root:root ops/backup/aigw-backup.sh ops/backup/aigw-restore.sh ops/backup/job-columns-v1.txt /opt/aigw/
+COPY --chown=root:root operations/backup/aigw-backup.sh operations/backup/aigw-restore.sh operations/backup/job-columns-v1.txt /opt/aigw/
 RUN chmod 0555 /opt/aigw/aigw-backup.sh /opt/aigw/aigw-restore.sh \
     && chmod 0444 /opt/aigw/job-columns-v1.txt
 USER postgres

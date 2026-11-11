@@ -27,7 +27,7 @@
 레포 루트(로컬)에서 스크립트를 표준 입력으로 서버 셸에 넘긴다. 서버에는 파일이 남지 않는다.
 
 ```bash
-<승인된 로컬 SSH 수단> 'bash -s -- <기대 digest 64자>' < ops/inference-server/bin/aigw-ps-summary.sh
+<승인된 로컬 SSH 수단> 'bash -s -- <기대 digest 64자>' < operations/inference-server/bin/aigw-ps-summary.sh
 ```
 
 스크립트가 서버에서 하는 일은 loopback `GET http://127.0.0.1:11434/api/ps` 1회(`curl -s --fail --max-time 5`)뿐이다. 응답은 메모리에서 `python3 -I` 필터로만 넘어가고, 필터는 형식을 확인한 모델별 `name`·`digest`·`context_length` 와 `resident_count`·`ok` 만 출력한다. 서버에 `curl`·`python3`·`bash` 가 있어야 한다.
@@ -98,8 +98,8 @@ curl -s -o /dev/null -w '%{http_code}\n' --max-time 600 http://127.0.0.1:11434/a
 `--input-file <path>` 는 fixture 로 파싱만 시험하는 로컬 전용 옵션이며 서버 실행에 쓰지 않는다. `AIGW_PS_PYTHON` 은 로컬에 `python3` 가 없을 때 인터프리터 경로만 바꾼다(기본 `python3`).
 
 ```bash
-bash -n ops/inference-server/bin/aigw-ps-summary.sh
-bash ops/inference-server/bin/tests/aigw-ps-summary-selftest.sh   # SELFTEST_PASSED·exit 0
+bash -n operations/inference-server/bin/aigw-ps-summary.sh
+bash operations/inference-server/bin/tests/aigw-ps-summary-selftest.sh   # SELFTEST_PASSED·exit 0
 ```
 
 시험 사례: 정상(두 모델 상주·8192·기대 digest) → `ok=true`·exit 0, 생성 모델 미상주·`bge-m3` 미상주·`context_length=4096`·digest 불일치 → `ok=false`·exit 1, 비 JSON·빈 입력·digest 형식 오류 → `PS_SUMMARY_PARSE_FAILED`·exit 2·원문 미출력, 입력에 넣은 sentinel 최상위 필드와 모델별 미지 필드 → 출력에 없음, 사용법 오류 → exit 2.

@@ -26,10 +26,10 @@ DB 재배포에 쓰는 env 를 부작용 전에 모두 확인한다(누락 → e
 ## 명령
 
 ```bash
-bash ops/gates/aigw-verify-credentials.sh provision --stage F1   # F1..F4
-bash ops/gates/aigw-verify-credentials.sh check --stage F1
-bash ops/gates/aigw-verify-credentials.sh rotate --stage F1
-bash ops/gates/aigw-verify-credentials.sh cleanup
+bash operations/gates/aigw-verify-credentials.sh provision --stage F1   # F1..F4
+bash operations/gates/aigw-verify-credentials.sh check --stage F1
+bash operations/gates/aigw-verify-credentials.sh rotate --stage F1
+bash operations/gates/aigw-verify-credentials.sh cleanup
 ```
 
 ### check
@@ -73,5 +73,5 @@ bash ops/gates/aigw-verify-credentials.sh cleanup
 ## 로컬 확인
 
 ```bash
-bash ops/gates/aigw-verify-credentials-selftest.sh   # stub kubectl·aigw-helm·hba_policy, 실제 자격·클러스터·DB 0
+bash operations/gates/aigw-verify-credentials-selftest.sh   # stub kubectl·aigw-helm·hba_policy, 실제 자격·클러스터·DB 0
 ```

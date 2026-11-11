@@ -105,7 +105,7 @@ def validate(data, release, mode, exec_sha=None):
         if not isinstance(value, dict) or 'value' not in value or 'approvalRef' not in value:
             fail('RUNCONFIG_MISSING:' + key)
         approval(value['approvalRef'], key, deploy)
-    schema = json.loads(Path('ops/runconfig/verify.schema.json').read_text(encoding='utf-8'))
+    schema = json.loads(Path('operations/runconfig/verify.schema.json').read_text(encoding='utf-8'))
     errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(data), key=lambda e: str(list(e.path)))
     if errors:
         fail('RUNCONFIG_INVALID:' + '.'.join(map(str, errors[0].path)))

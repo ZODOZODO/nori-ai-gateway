@@ -15,20 +15,20 @@ ALLOWED_DELETES = {'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client
                    'ai-gateway-test-hooks', 'ai-gateway-actor-jwks', 'ai-gateway-service-tokens', 'ai-gateway-acceptance', 'ai-gateway-restore-acceptance'}
 with tempfile.TemporaryDirectory(prefix='aigw-verify-creds-test-') as temporary:
     work = pathlib.Path(temporary)
-    shutil.copytree(root / 'ops', work / 'ops')
+    shutil.copytree(root / 'operations', work / 'operations')
     bin_dir = work / 'bin'; bin_dir.mkdir()
-    (bin_dir / 'kubectl').write_text('#!/bin/sh\nexec python3 -B ' + str(work / 'ops/gates/selftest_kubectl_stub.py') + ' "$@"\n'); (bin_dir / 'kubectl').chmod(0o755)
+    (bin_dir / 'kubectl').write_text('#!/bin/sh\nexec python3 -B ' + str(work / 'operations/gates/selftest_kubectl_stub.py') + ' "$@"\n'); (bin_dir / 'kubectl').chmod(0o755)
     # 같은 경로의 aigw-helm.sh·hba_policy.py 를 기록·종료 코드만 가진 stub 으로 바꾼다.
-    (work / 'ops/deploy/aigw-helm.sh').write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_HELM_LOG"\n'
+    (work / 'operations/deploy/aigw-helm.sh').write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_HELM_LOG"\n'
         'for a in "$@"; do case $a in ai-gateway-db|ai-gateway-db-restore) r=$a;; esac; done\n'
         'eval "code=\\${STUB_HELM_RC_${r//-/_}:-0}"; exit "$code"\n')
-    (work / 'ops/deploy/hba_policy.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("hba "+" ".join(sys.argv[1:3])+"\\n")\n'
+    (work / 'operations/deploy/hba_policy.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("hba "+" ".join(sys.argv[1:3])+"\\n")\n'
         'sys.exit(int(os.environ.get("STUB_HBA_RC_"+sys.argv[2].replace("-","_"),"0")))\n')
     # 부작용 전 입력 검사 stub: runconfig.py(<runconfig> <release> <mode> <out> <exec sha>)·app_render.py digests·런타임 자격 check.
-    (work / 'ops/deploy/runconfig.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("runconfig "+" ".join([sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[5]])+"\\n")\n'
+    (work / 'operations/deploy/runconfig.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("runconfig "+" ".join([sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[5]])+"\\n")\n'
         'sys.exit(int(os.environ.get("STUB_RUNCONFIG_RC_"+sys.argv[2].replace("-","_"),"0")))\n')
-    (work / 'ops/deploy/app_render.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("digests "+sys.argv[2]+"\\n")\nsys.exit(int(os.environ.get("STUB_DIGESTS_RC","0")))\n')
-    (work / 'ops/gates/aigw-runtime-credentials.sh').write_text('#!/usr/bin/env bash\nprintf "runtime %s %s\\n" "$*" "$AIGW_RUNCONFIG" >> "$STUB_HELM_LOG"\n'
+    (work / 'operations/deploy/app_render.py').write_text('import os,sys\nopen(os.environ["STUB_HELM_LOG"],"a").write("digests "+sys.argv[2]+"\\n")\nsys.exit(int(os.environ.get("STUB_DIGESTS_RC","0")))\n')
+    (work / 'operations/gates/aigw-runtime-credentials.sh').write_text('#!/usr/bin/env bash\nprintf "runtime %s %s\\n" "$*" "$AIGW_RUNCONFIG" >> "$STUB_HELM_LOG"\n'
         's=${3:-x}; eval "code=\\${STUB_RUNTIME_RC_$s:-0}"; exit "$code"\n')
     state_path, log_path, helm_log = work / 'state.json', work / 'calls.jsonl', work / 'helm.log'
     env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'], STUB_STATE=str(state_path), STUB_LOG=str(log_path), STUB_HELM_LOG=str(helm_log),
@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-verify-creds-test-') as temporary:
     calls = lambda: [json.loads(line) for line in log_path.read_text().splitlines()]
     decode = lambda s, name, key: base64.b64decode(s['secrets'][name][key])
     def run(args, expected, stderr=None, extra_env=None):
-        result = subprocess.run(['bash', 'ops/gates/aigw-verify-credentials.sh', *args], cwd=work, env=dict(env, **(extra_env or {})), capture_output=True, text=True)
+        result = subprocess.run(['bash', 'operations/gates/aigw-verify-credentials.sh', *args], cwd=work, env=dict(env, **(extra_env or {})), capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
         if stderr is not None:
             assert result.stderr.strip() == stderr, (args, result.stderr)

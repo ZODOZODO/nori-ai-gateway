@@ -24,9 +24,9 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 url = f'http://127.0.0.1:{server.server_address[1]}'
 with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as temporary:
     work = pathlib.Path(temporary)
-    shutil.copytree(root / 'ops', work / 'ops')
+    shutil.copytree(root / 'operations', work / 'operations')
     bin_dir = work / 'bin'; bin_dir.mkdir()
-    (bin_dir / 'kubectl').write_text('#!/bin/sh\nexec python3 -B ' + str(work / 'ops/gates/selftest_kubectl_stub.py') + ' "$@"\n'); (bin_dir / 'kubectl').chmod(0o755)
+    (bin_dir / 'kubectl').write_text('#!/bin/sh\nexec python3 -B ' + str(work / 'operations/gates/selftest_kubectl_stub.py') + ' "$@"\n'); (bin_dir / 'kubectl').chmod(0o755)
     (bin_dir / 'sleep').write_text('#!/bin/sh\nexit 0\n'); (bin_dir / 'sleep').chmod(0o755)
     (work / 'gradlew').write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_GRADLE_LOG"\nexit "${STUB_GRADLE_RC:-0}"\n')
     spec = work / 'spec.md'; spec.write_text('# 시험 SPEC 바이트\n')
@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
         state_path.write_text(json.dumps(state)); log_path.write_text(''); gradle_log.write_text('')
         shutil.rmtree(work / 'evidence', ignore_errors=True)
     def run(args, expected, stderr=None):
-        result = subprocess.run(['bash', 'ops/gates/aigw-backup-alert-injection.sh', *args], cwd=work, env=env, capture_output=True, text=True)
+        result = subprocess.run(['bash', 'operations/gates/aigw-backup-alert-injection.sh', *args], cwd=work, env=env, capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
         if stderr is not None:
             assert result.stderr.strip() == stderr, result.stderr

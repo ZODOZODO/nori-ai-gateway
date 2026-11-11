@@ -13,11 +13,11 @@ exec_dir = Path(os.environ.get('AIGW_SELFTEST_EXEC_DIR', str(root.parent / 'nori
 checks = []
 with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
     work = Path(temporary)
-    shutil.copytree(root / 'ops', work / 'ops')
-    fixture = json.loads((work / 'ops/runconfig/fixtures/lint-verify.json').read_text())
+    shutil.copytree(root / 'operations', work / 'operations')
+    fixture = json.loads((work / 'operations/runconfig/fixtures/lint-verify.json').read_text())
     def run(data, expected=0, error=None, release='ai-gateway-db', mode='lint', sha='', raw=False):
         (work / 'input.json').write_text(data if raw else json.dumps(data))
-        args = ['python3', '-B', 'ops/deploy/runconfig.py', 'input.json', release, mode, 'values.json', sha]
+        args = ['python3', '-B', 'operations/deploy/runconfig.py', 'input.json', release, mode, 'values.json', sha]
         result = subprocess.run(args, cwd=work, capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
         assert 'Traceback' not in result.stderr and 'untrusted-sentinel' not in result.stdout + result.stderr
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
                 continue
             values = run(data, release=release)
             assert values['persistence']['size'] == '1Gi'
-            result = subprocess.run(['bash', 'ops/deploy/aigw-helm.sh', '--release', release, '--mode', 'render', '--exec-dir', str(exec_dir), '--runconfig', 'input.json'], cwd=work, capture_output=True, text=True)
+            result = subprocess.run(['bash', 'operations/deploy/aigw-helm.sh', '--release', release, '--mode', 'render', '--exec-dir', str(exec_dir), '--runconfig', 'input.json'], cwd=work, capture_output=True, text=True)
             assert result.returncode == 0, result.stderr
             import yaml
             statefulset = next(d for d in yaml.safe_load_all(result.stdout) if d['kind'] == 'StatefulSet')

@@ -6,7 +6,7 @@ python3 -B - <<'PY'
 import base64,json,os,pathlib,secrets,shutil,subprocess,tempfile
 root=pathlib.Path.cwd()
 with tempfile.TemporaryDirectory(prefix='aigw-credentials-test-') as temporary:
-    work=pathlib.Path(temporary); shutil.copytree(root/'ops',work/'ops')
+    work=pathlib.Path(temporary); shutil.copytree(root / 'operations',work / 'operations')
     binary=work/'bin'; binary.mkdir()
     gate=work/'docs/gates/f1'; gate.mkdir(parents=True)
     (gate/'synthetic.md').write_text('Status: APPROVED\n')
@@ -112,7 +112,7 @@ with open(os.environ['TEST_LOG'],'a') as log: log.write(json.dumps(record)+'\n')
         if error: assert error in result.stderr,(error,result.stderr)
         checks.append(dict(command=arguments,exit=code,expectedError=error))
         return result
-    script='ops/gates/aigw-runtime-credentials.sh'
+    script='operations/gates/aigw-runtime-credentials.sh'
     run([script,'provision-db'],0)
     records=lambda:[json.loads(line) for line in (work/'calls.jsonl').read_text().splitlines()]
     assert not any('create' in r['args'] for r in records())
@@ -180,7 +180,7 @@ with open(os.environ['TEST_LOG'],'a') as log: log.write(json.dumps(record)+'\n')
     (work/'calls.jsonl').unlink()
     run([script,'rotate-db','--role','app'],1,'ROTATION_BOOTSTRAP_FAILED_RECOVERY_REQUIRED',{'JOB_TEST':'wait-fail'})
     assert not any('rollout' in r['args'] for r in records())
-    helm=['ops/deploy/aigw-helm.sh','--release','ai-gateway-db','--mode','lint','--exec-sha',requested_sha,'--runconfig','ops/runconfig/fixtures/lint-verify.json']
+    helm=['operations/deploy/aigw-helm.sh','--release','ai-gateway-db','--mode','lint','--exec-sha',requested_sha,'--runconfig','operations/runconfig/fixtures/lint-verify.json']
     # 실제 helm 실행 이전 clone 보안 경계만 stub git으로 검사합니다.
     env.pop('CI_JOB_TOKEN',None); env['CI']='false'; env.pop('AIGW_EXEC_READ_TOKEN',None); env.pop('AIGW_EXEC_READ_USER',None)
     run(helm,2,'EXEC_READ_CREDENTIAL_MISSING')
@@ -195,7 +195,7 @@ with open(os.environ['TEST_LOG'],'a') as log: log.write(json.dumps(record)+'\n')
     # 수명 제어는 Secret 참조만 바꾸며 접속 제한은 비활성 시에도 유지합니다.
     run(helm+['--acceptance-role','invalid'],2,'ACCEPTANCE_ROLE_INVALID',auth)
     run(helm+['--acceptance-role',''],2,'ACCEPTANCE_ROLE_INVALID',auth)
-    local=['ops/deploy/aigw-helm.sh','--release','ai-gateway-db','--mode','render','--exec-dir',str(exec_dir),'--runconfig','ops/runconfig/fixtures/lint-verify.json']
+    local=['operations/deploy/aigw-helm.sh','--release','ai-gateway-db','--mode','render','--exec-dir',str(exec_dir),'--runconfig','operations/runconfig/fixtures/lint-verify.json']
     import yaml
     for release in ['ai-gateway-db','ai-gateway-db-restore']:
         command=local.copy(); command[2]=release
@@ -229,7 +229,7 @@ if args[0]=='upgrade': sys.exit(0)
 if args[0]=='status': print(json.dumps(dict(info=dict(status='deployed'),version=1))); sys.exit(0)
 sys.exit(subprocess.call([os.environ['REAL_HELM'],*args]))
 ''')
-    deploy_data=json.loads((work/'ops/runconfig/fixtures/lint-verify.json').read_text())
+    deploy_data=json.loads((work/'operations/runconfig/fixtures/lint-verify.json').read_text())
     deploy_data['purpose']='deploy'; deploy_data['execChartSha']['value']=requested_sha
     deploy_data['backup']['type']['value']='sftp'
     deploy_data['backup']['destination']['value']='sftp://lint-only.invalid/backup'

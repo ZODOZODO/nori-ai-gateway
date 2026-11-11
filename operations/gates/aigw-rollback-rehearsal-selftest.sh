@@ -13,9 +13,9 @@ registry_mode = {}
 checks = []
 with tempfile.TemporaryDirectory(prefix='aigw-rollback-test-') as temporary:
     work = pathlib.Path(temporary)
-    (work / 'ops/gates').mkdir(parents=True)
-    (work / 'ops/deploy').mkdir(parents=True)
-    shutil.copyfile(root / 'ops/gates/rollback_rehearsal.py', work / 'ops/gates/rollback_rehearsal.py')
+    (work / 'operations/gates').mkdir(parents=True)
+    (work / 'operations/deploy').mkdir(parents=True)
+    shutil.copyfile(root / 'operations/gates/rollback_rehearsal.py', work / 'operations/gates/rollback_rehearsal.py')
     bin_dir = work / 'bin'; bin_dir.mkdir()
     state_path = work / 'state.json'
     registry_path = work / 'registry.json'
@@ -64,11 +64,11 @@ def transport(self, request):
     response.msg = 'fixture'
     return response
 urllib.request.HTTPSHandler.https_open = transport
-sys.argv = ['ops/gates/rollback_rehearsal.py', *sys.argv[1:]]
+sys.argv = ['operations/gates/rollback_rehearsal.py', *sys.argv[1:]]
 runpy.run_path(sys.argv[0], run_name='__main__')
 '''
     (work / 'registry_fixture.py').write_text(fixture)
-    (work / 'ops/gates/aigw-rollback-rehearsal.sh').write_text('#!/bin/sh\nexec python3 registry_fixture.py "$@"\n')
+    (work / 'operations/gates/aigw-rollback-rehearsal.sh').write_text('#!/bin/sh\nexec python3 registry_fixture.py "$@"\n')
     stub = r'''#!/usr/bin/env python3
 import json, os, sys
 p = os.environ['STUB_STATE']; s = json.load(open(p)); a = sys.argv[1:]
@@ -101,7 +101,7 @@ save()
 '''
     for name in ('helm', 'kubectl'):
         (bin_dir / name).write_text(stub); (bin_dir / name).chmod(0o755)
-    (work / 'ops/deploy/aigw-helm.sh').write_text('#!/bin/sh\nexec python3 ' + str(bin_dir / 'aigw-helm') + ' "$@"\n')
+    (work / 'operations/deploy/aigw-helm.sh').write_text('#!/bin/sh\nexec python3 ' + str(bin_dir / 'aigw-helm') + ' "$@"\n')
     (bin_dir / 'aigw-helm').write_text(stub); (bin_dir / 'aigw-helm').chmod(0o755)
     for name, digest in (('a.json', A), ('b.json', B), ('c.json', C)):
         (work / name).write_text(json.dumps({'app': digest}))
@@ -112,7 +112,7 @@ save()
         registry_path.write_text(json.dumps(registry_mode))
         shutil.rmtree(work / 'evidence', ignore_errors=True)
     def run(args, expected, reason=None, extra_env=None):
-        result = subprocess.run(['bash', 'ops/gates/aigw-rollback-rehearsal.sh', *args], cwd=work, env=dict(env, **(extra_env or {})), capture_output=True, text=True)
+        result = subprocess.run(['bash', 'operations/gates/aigw-rollback-rehearsal.sh', *args], cwd=work, env=dict(env, **(extra_env or {})), capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
         assert TOKEN not in result.stdout + result.stderr and 'c2VjcmV0' not in result.stdout + result.stderr
         evidence = [json.loads(p.read_text()) for p in (work / 'evidence').rglob('rollback-rehearsal-*.json')]
