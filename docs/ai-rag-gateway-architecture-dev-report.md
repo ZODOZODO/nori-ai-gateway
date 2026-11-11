@@ -7929,3 +7929,87 @@ Schema version: 7
 - ⑧ 남은 29줄은 모두 Plan U5 2026-11-11 이관 대상 파일에 있다(`hba_policy.py` 4, `acceptance-pg_hba.conf` 4, `verify_credentials.py` 8, `rollback_rehearsal.py`·`aigw-backup-alert-injection.sh`·`selftest_kubectl_stub.py`·두 selftest 각 1, runbook 5·3). 근거 줄 `aigw-helm.sh:71`·`:296`, `verify_credentials.py:369` 를 직접 확인했다.
 - 보완: 루트 buildscript 의 `classpath("org.postgresql:postgresql:42.7.11")` 를 catalog `libs.postgresql`(`postgresql = "42.7.11"`, Spring Boot 4.0.7 BOM `postgresql.version` 과 같음)로 바꿨다. nori-wm-ui-backend `build.gradle.kts:14`·`gradle/libs.versions.toml:60,212` 와 같은 형태다. `buildEnvironment` 에서 `org.postgresql:postgresql:42.7.11` 그대로 해석되고, 변경 뒤 test 11개 verify 가 `TEST_EVIDENCE_VERIFIED` 다(시험 fingerprint 입력 밖).
 - ⑦ 재실행(root, 보완 뒤): 로컬 격리 컨테이너(같은 pgvector pin, `127.0.0.1` 임의 포트)에 DB `nori_ai_gateway` 생성과 `bootstrap.sql`(exit 0) 뒤, 셸 안에서 만든 무작위 계정·비밀번호를 env 로만 주고 `flywayInfo` exit 0(`<< Empty Schema >>`, 7개 Pending) → `flywayMigrate` exit 0 → `flywayInfo` exit 0 `Schema version: 7`, 7개 `Success`, Pending 0. `gw_flyway.flyway_schema_history` 성공 행 8(스키마 생성 행 포함), 스키마 `gw`·`kn`·`gw_flyway` 존재, `gw` 소유자 = 단일 계정. 컨테이너는 지웠다.
+
+## U6 config·Secret 모델·helm 레포 이관·exec 정리 (2026-11-11, 구현·로컬 검증)
+
+- worktree `nori-ai-gateway-u6`, 브랜치 `aigw/align-u6`, 기준 `65ba263`. 클러스터·공유 서버(192.168.0.150) 접속 0, push 0. `nori-tc-exec` 는 읽기만 했다(HEAD `c34518d`, 작업 트리 clean 유지).
+- commit(순서대로):
+  1. `94fb7b3` `refactor: move ops/* and deploy/docker/* to operations/ without content changes (U6 commit 1)` — 53개 순수 rename, `0 insertions(+), 0 deletions(-)`.
+  2. `509c9ab` `build: update ops/ and deploy/docker/ path strings to operations/ (U6 commit 2)` — 경로 문자열만(39개 파일, 202/202줄). `.gitlab-ci.yml` 의 `migrations_sha` 입력을 `flyway/sql` 로(U5 이관 ③).
+  3. `22a0053` `chore: import the AI Gateway helm charts from nori-tc-exec c34518d unchanged (U6 commit 3)` — exec 29개 파일을 바이트 그대로 복사(blob id 가 exec commit 과 같음을 대조).
+  4. `9ccf20c` `feat: load the shared-server datasource from config/ai-gateway-db.properties (U6)`.
+  5. `4fa6184` `deploy: charts read Secret ai-gateway-config and target the shared DB server; drop the exec clone (U6)`.
+  6. `20a0d23` `ops: gate and credential tools use the checkout chart, Secret ai-gateway-config and the shared DB (U6)`.
+  7. 이 절(문서 commit).
+
+### 옛 경로 → 새 경로
+
+| 종전 | U6 |
+|---|---|
+| `ops/{backup,deploy,gates,inference-server,monitoring,runconfig,seaweedfs}/**` | `operations/<같은 이름>/**` |
+| `deploy/docker/Dockerfile{,-acceptance,-backup}` | `operations/deploy/docker/` 같은 이름 |
+| `ops/postgres/bootstrap.sql` | `operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql`(차트가 `.Files.Get` 으로 읽음) |
+| `ops/postgres/acceptance-pg_hba.conf`, `ops/deploy/hba_policy.py`, `ops/deploy/read-exec.py` | 삭제 |
+| `exec:deploy/helm/ai-gateway/**`(db-chart 제외) | `operations/deploy/helm/ai-gateway/**` |
+| `exec:deploy/helm/ai-gateway/db-chart/**` | `operations/deploy/helm/ai-gateway-db-restore/**`(release `ai-gateway-db-restore` 만. `hba-configmap.yaml`·`backup-cronjob.yaml`·`values-{restore,verify}.yaml` 삭제, 백업 CronJob 은 앱 차트로) |
+| exec 앱 차트 `templates/migrate-job.yaml` | 삭제(CI `migrate` stage — U7) |
+| (없음) | `config/ai-gateway-db.properties` |
+
+### 바꾼 내용
+
+- **config:** `config/ai-gateway-db.properties` = `spring.datasource.url=jdbc:postgresql://${AI_GATEWAY_DB_HOST:192.168.0.150}:${AI_GATEWAY_DB_PORT:15432}/${AI_GATEWAY_DB_NAME:nori_ai_gateway}`, `username=${AI_GATEWAY_DB_USER}`, `password=${AI_GATEWAY_DB_PASSWORD}`(기본값 0). 앱 `application.yaml` 에 `spring.config.import: optional:file:config/ai-gateway-db.properties`(nori-wm `application.yaml:34-47` 방식).
+- **앱 차트:** Secret `ai-gateway-config` 하나를 참조만 한다(`configSecret: {create: false, name: ai-gateway-config}`, schema `const` — 다른 값은 렌더 거부). Pod 는 그 행에 필요한 키만 `items` 로 `/app/config` 에 투영한다(`ai-gateway-db.properties`·`service-tokens.json`·`jwks.json`·`token`, SeaweedFS 읽기 행 `access-key`·`secret-key`, test hooks `hook-token-sha256`). 자격 파일 env 는 `/app/config/<파일>` 이다. 단일 계정은 같은 Secret 의 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 키를 env 로 받는다. 복원 release 만 env `SPRING_DATASOURCE_URL=jdbc:postgresql://ai-gateway-db-restore:15432/nori_ai_gateway`. NetworkPolicy DB egress = 주 `192.168.0.150/32`:15432(ipBlock), 복원 = 복원 인스턴스 Pod 5432. `aigw.nori/db-target` 라벨은 복원 release 에만 붙는다(종전 `db.release` 값 삭제). 백업 CronJob `ai-gateway-db-backup` 을 앱 차트로 옮겼다(주 release 만, `PGHOST=192.168.0.150`·`PGPORT=15432`·`PGDATABASE=nori_ai_gateway`, `PGUSER`·`PGPASSWORD` = 같은 두 키, 목적지 Secret `ai-gateway-backup-destination` 그대로). `credentialsRef` 는 수용 하네스 Secret 3종(signer·client·fixture-writer)만 남았다.
+- **복원 DB 차트:** release `ai-gateway-db-restore` 외 렌더 거부, namespace `tc` 고정, HBA overlay·`hba_file` 인자 삭제, `POSTGRES_DB=nori_ai_gateway`, Service 15432 → Pod 5432, bootstrap Job env `PGPORT=15432`·`PGUSER=postgres`·`PGPASSWORD`·`AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD`(모두 `ai-gateway-config`). bootstrap 은 U5 의 임시 인스턴스용 `bootstrap.sql`(vector 0.8.7 + env 이름 계정을 DB 소유자로) 그대로다.
+- **배포 도구(`aigw-helm.sh`·`app_render.py`·`runconfig.py`):** `--exec-sha`·`--exec-dir`·`--acceptance-role`·exec clone·ASKPASS·HBA 정책 검사를 지웠다. 차트는 cwd checkout 의 `operations/deploy/helm/**` 이다. `deploy`·`suite-only` 는 부작용 전에 `app_render.py checkout` 으로 `git status --porcelain --untracked-files=all -- operations` 가 비어 있고(아니면 `CHART_CHECKOUT_DIRTY`) 앱 release 는 HEAD = `image-digests.json` 의 `buildIdentity.gitSha`(아니면 `CHART_CHECKOUT_SHA_MISMATCH`)인지 확인한다(exit 2). 배포 증거는 `execSha` 대신 `chartRepoSha`(HEAD)·`chartDigest`(`helm package` SHA-256)다. lint 대상은 3 release(`ai-gateway`·`ai-gateway-restore`·`ai-gateway-db-restore`). runconfig 에서 `execChartSha`·`pvcSizeGi`(main)를 지우고(schema·fixture·`RESTORE_KEYS`), 배포 승인 문서 목록에서 `exec-chart-ref` 를 뺐다. 주 release 의 backup 값은 앱 release 값으로 넘긴다. §11.9 렌더 행렬 대조에 config Secret 투영 키·단일 계정 env·config mount·복원 datasource·DB egress·수용 DB 자격·백업 CronJob 수를 더했다. lint fixture 의 egress probe `db-main` = `192.168.0.150:15432`(P15 2026-11-10 `EgressProbeHook` ALLOWED DB 대상).
+- **게이트 도구:** stage gate·rollback 리허설의 `--exec-sha` 를 지우고, 부작용(부모 회차 발급·증거·배포) 전에 같은 checkout 검사를 한다. rollback 리허설 증거는 `chartRepoSha` 를 쓴다. runtime-credentials 의 `provision-db`·`rotate-db`(DB 역할 Secret 4종 생성·회전)를 지우고 `check` 는 `ai-gateway-config` 의 키 이름(값 0)과 백업 목적지 Secret 을 본다. verify-credentials 의 승인 A 수용 역할 provision/cleanup·HBA live·DB 재배포·DB Pod 접속 probe 를 지웠고, Gateway 쪽 신뢰 키(`jwks.json`·`service-tokens.json`·`hook-token-sha256`)는 `ai-gateway-config` 키를 `kubectl patch --type merge --patch-file /dev/stdin` 으로만 바꾼다(그 밖 키 불변, `kubectl apply` 의 last-applied annotation 에 값 복제 0). 주 DB Pod(`ai-gateway-db-0`) exec 경로(`rollback_rehearsal.py` Flyway 최신 V, `aigw-backup-alert-injection.sh` 의 `gw.backup_run`)는 운영자 호스트 `psql` 로 공유 서버를 읽게 바꿨다(자격 = `ai-gateway-config` 두 키 → psql 프로세스 env, 명령행·출력 0).
+- **CI:** `helm-validate` 는 3 release lint, `deploy-verify` 는 `--exec-sha` 없음, Dockerfile 경로 `operations/deploy/docker/*`.
+- **runbook:** `aigw-runtime-credentials.md`(Secret 키 표·check·배포 관계로 다시 씀, 승인 A HBA 문단·HBA 로컬 시험 명령 삭제 — U5 이관 ⑤), `aigw-verify-credentials.md`(Secret 표·provision/rotate/cleanup 단계), `aigw-backup-restore.md`(대상·Secret·port-forward `15432:15432`), `operations/runconfig/README.md`.
+- 빈 등록 변경 0(Java main 은 `application.yaml` 한 줄 묶음만), `*ModuleConfiguration` 변경 0.
+
+### 결정과 근거
+
+- **수용 Job 의 DB 자격 공급 경로(Plan U6 ①):** 같은 Secret `ai-gateway-config` 의 `AI_GATEWAY_DB_USER`(env, `secretKeyRef`)와 `AI_GATEWAY_DB_PASSWORD`(`items` 로 `/run/aigw/db/password` 파일 1개)로 준다. `AIGW_DB_HOST` = 주 `192.168.0.150`, 복원 `ai-gateway-db-restore`.
+  - 제약(파일 단위): 수용 하네스는 env `AIGW_DB_HOST`·`AI_GATEWAY_DB_USER` 와 파일 경로 env `AIGW_DB_PASSWORD_FILE` 만 읽고(`F1Runtime.java:29`, `AcceptanceConfig.secret`), 포트는 15432 고정이다(`OracleQueries.java:61-66`). acceptance-app 은 U6 allowed_writes 밖이므로 공급이 이 입력에 맞아야 한다. 백업 CronJob(`aigw-backup.sh` 의 `PGUSER`·`PGPASSWORD`)과 복원 bootstrap(`bootstrap.sql:8-9` `\getenv AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD`)도 properties 파일을 해석하지 못하고 계정 값 자체가 필요하다. AGENTS.md §6 은 두 env 를 "k8s 는 Secret ai-gateway-config" 에서 주입한다고 정한다 — 그래서 Plan 이 정한 env 이름을 그대로 Secret 키 이름으로 쓴다(새 이름 0).
+  - 시나리오: 앱만 배포 → 앱이 같은 두 키를 env 로 받고 수용 Job 은 렌더되지 않는다. 복원 release → 수용 Job 이 `ai-gateway-db-restore:15432` 에 같은 계정으로 붙는다(복원 bootstrap 이 같은 두 키로 그 역할을 만든다). Job 추가 → 같은 두 키를 투영하면 되고 새 Secret·역할이 없다.
+  - 선례: nori-wm 은 앱 config Secret 을 `/app/config` 에 통째로 mount 한다(`deployment.yaml:153-160`)·수용 Job 은 없다. 기존 ai-gateway 차트는 Secret 마다 필요한 키만 `items` 로 투영했다(exec `deployment.yaml:159-171`, `acceptance-job.yaml:92-103`). 수용 Pod 에 앱 자격 전체를 노출하지 않도록 기존 차트의 `items` 방식을 따랐다.
+  - 따름 결과: 계정 값은 두 키에만 두고 Secret 의 `ai-gateway-db.properties` 키는 레포 파일과 같은 placeholder 로 둔다(runbook 에 기록). Plan U6 ① 의 "`ai-gateway-db.properties`(실제 계정 값)" 문구와 다르다 — root 보고 항목.
+- **`spring.config.import` 는 파일을 하나씩 적는다:** Plan 의 `optional:file:config/ai-gateway*.properties` 는 Spring Boot 4.0.7 이 거부한다(`spring-boot-4.0.7.jar` `LocationResourceLoader` 의 `Location '%s' must end with '*/'` — wildcard 는 디렉터리 단위만). `ai-gateway.properties`·`ai-gateway-messaging.properties` 는 지금 담을 값이 없어(앱 설정은 `AI_GATEWAY_*` env 로 직접 바인딩, Kafka 소비는 P24) 만들지 않았고 import 줄도 두지 않았다. 생길 때 한 줄씩 더한다.
+- **앱 IT 의 datasource 가 덮이지 않음(U5 이관 ②):** `file:config/...` 는 작업 디렉터리 기준이고, 앱 IT 와 자식 프로세스는 작업 디렉터리를 바꾸지 않는다(`git grep "\.directory(\|workingDir\|user.dir"` 결과 = 루트 `build.gradle.kts` 의 JavaExec 와 `CiEvidence.java:188` 뿐 — Spring 앱을 띄우지 않음). Test task 작업 디렉터리 = 모듈 디렉터리이고 그 아래 `config/` 가 없다. ③ 에서 앱 IT 167건 실패 0 으로 확인했다.
+- **복원 release 의 datasource 를 env `SPRING_DATASOURCE_URL` 로:** OS env 는 import 한 설정 파일보다 우선하므로 Secret 파일 내용과 무관하게 복원 앱이 공유 운영 DB 로 가지 않는다(§11.8 복원 격리).
+- **복원 인스턴스 superuser 비밀번호 = `AI_GATEWAY_DB_PASSWORD`:** Plan U6 ③ 이 DB 역할 Secret 4종(superuser 포함) provision 을 지우고 런타임 check 를 `ai-gateway-config` 하나로 바꾸므로 별도 superuser Secret 을 두지 않았다. 인스턴스는 리허설 동안만 있고 ingress 는 `aigw.nori/db-target: ai-gateway-db-restore` 라벨 Pod 만이다. 사용자 결정 항목으로 보고한다.
+- **복원 DB Service 포트 15432:** 클러스터 안 수용 Job 은 port-forward 를 쓸 수 없고 `OracleQueries` 가 15432 고정이다. runbook 의 port-forward 는 `15432:15432` 로 바꿨다.
+- **checkout 검사 범위 = `operations/`:** 게이트가 같은 checkout 의 `evidence/` 에 기록하므로 전체 트리를 보면 같은 부모 회차의 두 번째 suite 가 막힌다. 차트·배포 도구는 모두 `operations/` 아래다. GIT_SHA 비교 대상은 `image-digests.json` 의 `buildIdentity.gitSha` 다 — CI `build-image` 가 같은 값을 `GIT_SHA` build-arg(= label `aigw.git-sha`)로 넘기고 `CI_COMMIT_SHA` 와 같음을 검사한다(`.gitlab-ci.yml:102-110`).
+- **rollback 리허설은 A 를 배포하지 않는다:** checkout 은 B 의 commit 이어야 하므로 이 checkout 의 차트로 A 를 배포하면 §4.1 규칙을 어긴다. A 가 이미 배포돼 있지 않으면 `FROM_NOT_DEPLOYED`(NOT_RUN, exit 2)다. Plan P15/P16 rollback 절차 문구와 다르다 — root 보고 항목.
+- **승인 문서 목록:** `exec-chart-ref` 만 뺐고 `pvc-capacity`·`pvc-protection` 은 그대로 두었다(복원 인스턴스 PVC 가 남음. Plan §5 2026-11-10 은 운영 DB 범위에서 폐기라고만 함) — root 확인 항목.
+- **백업 CronJob NetworkPolicy:** exec 차트에도 백업 Pod egress 정책이 없었고, 목적지 egress 대상이 runconfig 에 없어 새로 만들지 않았다(Plan §11.3 2026-11-10 의 "백업 CronJob pod egress 도 같은 ipBlock" 은 미구현으로 보고).
+
+### allowed_writes 밖 변경(보고)
+
+- U6 allowed_writes 는 모듈 쪽을 `build.gradle.kts` 경로 상수만 허용하지만, 이동으로 깨지는 시험 경로 문자열 5개 파일을 바꿨다: `PgTestDatabase.java`·`DbBootstrapOrderIT.java`·`MigrationApplyIT.java`·`BackupScriptIT.java`·`BackupColumnCoverageIT.java`(경로 문자열만). 바꾸지 않으면 ③ 이 실패하고 ⑦ 도 0줄이 될 수 없다.
+- `AGENTS.md:51` 의 "현재 `ops/`, U6 에서 이동" 을 지웠다(이동 뒤 틀린 경로 문자열).
+
+### 명령 결과 (각 별도, `--offline --no-daemon`, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값)
+
+- ① spec-guard exit 0 — `{"specInputOrigin":"LOCAL_FILE","specSha":"9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19","specShaSource":"FILE_HASHED"}`.
+- ② `build`(`20a0d23`) exit 0 `BUILD SUCCESSFUL in 17m 53s`. JUnit XML(실패·오류·skip 0): eval 283, core 117, db-adapter 12, inference-adapter 43, source-support 8, loki-adapter 38, tempo-adapter 10, gitlab-adapter 24, tc-mock-adapter 48, app 70, acceptance-app 41 — 합 694. `test-evidence verify --tasks <test 11개>` exit 0 `TEST_EVIDENCE_VERIFIED`.
+- 사전 확인(증거로 쓰지 않음): `:adapter:ai-gateway-db-adapter:integrationTest --tests "*DbBootstrapOrderIT" --tests "*MigrationApplyIT"` exit 0 `BUILD SUCCESSFUL in 1m 50s`, `:apps:ai-gateway-app:integrationTest --tests "*StackSmokeIT" --tests "*AppContextWiringIT" --tests "*BackupScriptIT" --tests "*BackupColumnCoverageIT"` exit 0 `BUILD SUCCESSFUL in 10m 46s`.
+- ③ `integrationTest -Paigw.requireDocker=true`(비한정) exit 0 `BUILD SUCCESSFUL in 46m 45s`(02:55:05Z~03:41:52Z). JUnit XML: db-adapter 8개 85건, inference-adapter 1개 1건, app 44개 167건, 모두 실패·오류·skip 0. 직후 `-Paigw.requireDocker=true … test-evidence verify --selector integrationTest --required ci/integration-required.txt --require-docker` exit 0 `TEST_EVIDENCE_VERIFIED`, `--tasks` 3개 `--require-docker` exit 0 `TEST_EVIDENCE_VERIFIED`. `IdempotentAdmissionIT` 일시 실패 없음. IT 클래스 이름 변경 0 이라 `ci/integration-required.txt` 변경 0.
+- ④ `aigwPackage -Paigw.gitSha=20a0d23ab2ef04bdefcadd5653be280e97004c52`(깨끗한 트리, 코드 마지막 commit) exit 0 `BUILD SUCCESSFUL in 36s`. `build/package/build-identity.json` = `{"appJarSha256":"8129a93ff2fb9469ae774fad4cfa7f7468f12199b8ce3a272098b6869e3c409c","gitSha":"20a0d23ab2ef04bdefcadd5653be280e97004c52","runtimeClasspathSha256":"9ff034e683c75cb61819dc239b52883d2b8d1472c79e50fd1d427bfd463a27fb"}`, 산출물 `app.jar`·`acceptance/`·`runtime-classpath.txt`.
+- ⑤ `aigw-p06-tools:local`(Helm v4.2.2, Python 3.12.10), `--network none`, worktree readonly mount, cwd 레포 루트:
+  - `--release ai-gateway --mode lint …lint-verify.json …lint-image-digests.json --suite none` exit 0 `LOCAL_CHART_OK release=ai-gateway suite=none chartRepoSha=UNCHECKED chartDigest=f661627ebec3fe50f96f3b38b5db4f631b6383ef2a1dfadf6c8d24784335b140`(내부 guard 음성·§11.9 행렬 8행·백업 CronJob 양성/음성 포함).
+  - `--release ai-gateway-restore` 같은 형식 exit 0 `LOCAL_CHART_OK release=ai-gateway-restore suite=none chartRepoSha=UNCHECKED chartDigest=f661627e…b140`.
+  - `--release ai-gateway-db-restore` 같은 형식 exit 0 `LOCAL_CHART_OK release=ai-gateway-db-restore chartRepoSha=UNCHECKED chartDigest=aa26b935f011fcd68b6e656d1bf2fa18a10c3e4386730631f41da2abe1ef8299`.
+  - 음성 render: `ai-gateway-db-restore` + `negative-missing-pvc.json` `--expect-fail RENDER_REQUIRED_persistence.size` exit 0, `ai-gateway` + `negative-missing-backup.json` `--expect-fail RENDER_REQUIRED_backup.destination` exit 0, `ai-gateway-restore` + `negative-restore-ingest.json` `--expect-fail RUNCONFIG_KEY_CONFLICT:ingest.enabled` exit 0(각 `EXPECTED_FAILURE:<code>`). 대조: 정상 fixture 에 `--expect-fail` → `EXPECTED_FAILURE_ABSENT` exit 1, 옛 release `ai-gateway-db` → `RENDER_INVALID_RELEASE` exit 2.
+- ⑥ 같은 컨테이너, `20a0d23` 트리: stage-gate exit 0 `PASS` 31(checkout 음성 2 추가), runtime-credentials exit 0 `PASS` 64(실제 git·Helm, deploy 경계 포함), verify-credentials exit 0 `PASS` 31, rollback-rehearsal exit 0 `PASS` 94(`actualNetworkCalls=0`), backup-alert-injection exit 0 `PASS` 9, runconfig exit 0 `PASS` 24.
+- ⑦ `git grep -nE "exec-sha|AIGW_EXEC_CHART_SHA|execChartSha|db-chart|(^|[^a-z])ops/" -- . <제외 5>` — **0줄 아님, 5줄.** 모두 증거 디렉터리 `evidence/<stage>/ops/`(ingest source `ops`) 표기이며 옛 운영 도구 경로가 아니다: `gateway-eval/src/test/java/com/nori/ai/gateway/eval/EvidenceRepositoryFsTest.java:31,72`(allowed_writes 밖), `operations/gates/aigw-backup-alert-injection.sh:6`(주석)·`:93`(`out=evidence/F4/ops/…`), `operations/gates/stage_gate.py:176`(주석).
+- U5 ⑧ `git grep -nwE "aigw_(migrator|app|backup|acceptance_ro)|ai_gateway" -- . <제외 5>` — 0줄(작업 전 29줄).
+- 환경: `docker ps -a --filter label=org.testcontainers=true -q` 빈 출력. 직접 만든 컨테이너·이미지 없음(selftest 는 `--rm`). pgvector·ryuk·`aigw-p06-tools:local`·seaweedfs·다른 프로젝트 자원은 건드리지 않았다. `../nori-common` clean(`--write-locks` 미실행). `evidence/**`·SPEC·Plan·`docs/gates/**` 변경 0.
+
+### exec 에서 지울 경로(root, 검증 뒤 별도 commit)
+
+`nori-tc-exec` HEAD `c34518d` 의 `deploy/helm/ai-gateway/` 아래 추적 파일 29개 전부(이 레포 commit 3 에 바이트 그대로 있음): `.helmignore`, `Chart.yaml`, `values.yaml`, `values-prod.yaml`, `values-restore.yaml`, `values-verify.yaml`, `values.schema.json`, `templates/{_helpers.tpl,deployment.yaml,egress-probe-configmap.yaml,fixture-catalog-configmap.yaml,migrate-job.yaml,networkpolicy.yaml,service.yaml,spec-verify-configmap.yaml}`, `templates/tests/{acceptance-job.yaml,acceptance-networkpolicy.yaml}`, `db-chart/{Chart.yaml,values.yaml,values-restore.yaml,values-verify.yaml}`, `db-chart/templates/{_helpers.tpl,backup-cronjob.yaml,bootstrap-configmap.yaml,bootstrap-job.yaml,hba-configmap.yaml,networkpolicy.yaml,service.yaml,statefulset.yaml}`. 즉 `git rm -r deploy/helm/ai-gateway`.
+
+### root 에 넘기는 항목
+
+- Plan 변경 필요: ① U6 ① "`ai-gateway-db.properties`(실제 계정 값)" → 계정 값은 같은 Secret 의 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 키, 파일 키는 placeholder(위 결정). ② U6 allowed_writes 의 `spring.config.import: optional:file:config/ai-gateway*.properties` → 파일별 줄(Spring wildcard 제약), `ai-gateway.properties`·`ai-gateway-messaging.properties` 는 내용이 생길 때. ③ U6 allowed_writes 에 모듈 시험의 `ops/`·`deploy/docker/` 경로 문자열(5개 파일) 추가. ④ ⑦ 의 grep 이 증거 디렉터리 `evidence/<stage>/ops/` 를 잡는다 — 제외 조건(예: `:!gateway-eval/src/test` 와 `evidence/[^ ]*ops/` 표기 제외) 또는 판정 문구 조정. ⑤ rollback 리허설: A 는 A 의 commit checkout 에서 먼저 배포(`FROM_NOT_DEPLOYED`). ⑥ 운영자 호스트 도구에 `psql` 추가(rollback 리허설·백업 경보 주입). ⑦ `pvc-capacity`·`pvc-protection` 승인 문서를 배포 필수 목록에 남길지. ⑧ 백업 CronJob egress NetworkPolicy(§11.3)는 목적지 egress 대상 입력이 없어 미구현.
+- 사용자 결정 필요: 복원 리허설 인스턴스 superuser 비밀번호를 단일 계정 비밀번호와 같게 둔 것(위 결정).
