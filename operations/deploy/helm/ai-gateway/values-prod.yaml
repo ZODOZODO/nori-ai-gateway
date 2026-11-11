@@ -1,0 +1,16 @@
+profile: prod
+restoreMode: false
+testHooks:
+  enabled: false
+inference:
+  enabled: true
+knowledgeSource:
+  read:
+    enabled: false
+ingest:
+  enabled: false
+  fixtureCatalog:
+    enabled: false
+acceptance:
+  enabled: false
+  suite: none

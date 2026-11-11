@@ -1,0 +1,71 @@
+{{- include "db.guard" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "db.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}
+  replicas: {{ .Values.replicas }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      {{- include "db.labels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/hba-overlay: {{ required "RENDER_REQUIRED_hba.overlay" .Values.hba.overlay | sha256sum | quote }}
+      labels:
+        {{- include "db.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ include "db.image" . | quote }}
+          args: ["postgres", "-c", "hba_file=/etc/aigw/postgres/pg_hba.conf"]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: ai_gateway
+            - name: PGDATA
+              value: /var/lib/postgresql/18/docker
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-db-superuser
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: hba-overlay
+              mountPath: /etc/aigw/postgres
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, postgres, -d, ai_gateway]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: hba-overlay
+          configMap:
+            name: {{ .Release.Name }}-hba
+            optional: false
+            defaultMode: 0444
+            items:
+              - key: pg_hba.conf
+                path: pg_hba.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "db.labels" . | nindent 10 }}
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: {{ required "RENDER_REQUIRED_persistence.size" .Values.persistence.size | quote }}

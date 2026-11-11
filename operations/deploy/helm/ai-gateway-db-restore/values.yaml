@@ -1,0 +1,22 @@
+replicas: 1
+pgImage:
+  tag: ""
+  digest: ""
+persistence:
+  size: ""
+hba:
+  overlay: ""
+bootstrap:
+  sql: ""
+  acceptanceRole:
+    enabled: false
+backup:
+  enabled: false
+  # runconfig backup.* 승인값으로만 채운다(aigw-helm.sh). 비어 있으면 렌더 실패.
+  type: ""
+  schedule: ""
+  destination: ""
+  ageRecipient: ""
+  retentionDays: ""
+  image:
+    digest: ""

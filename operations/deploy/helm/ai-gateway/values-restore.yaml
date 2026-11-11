@@ -1,0 +1,19 @@
+profile: verify
+restoreMode: true
+db:
+  release: ai-gateway-db-restore
+inference:
+  enabled: false
+knowledgeSource:
+  read:
+    enabled: true
+ingest:
+  enabled: false
+  fixtureCatalog:
+    enabled: true
+testHooks:
+  enabled: true
+  clock:
+    mode: FROZEN
+acceptance:
+  suite: F4-RESTORE

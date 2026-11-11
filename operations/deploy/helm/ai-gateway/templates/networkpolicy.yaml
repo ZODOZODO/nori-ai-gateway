@@ -1,0 +1,56 @@
+{{- include "aigw.guard" . -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+  {{- if or (not .Values.restoreMode) .Values.acceptance.enabled }}
+  ingress:
+    - from:
+        {{- if not .Values.restoreMode }}
+        - podSelector:
+            matchLabels:
+              app: tc-ui-backend
+        {{- end }}
+        {{- if and (eq .Values.profile "verify") .Values.acceptance.enabled }}
+        - podSelector:
+            matchLabels:
+              app: ai-gateway-acceptance
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+      ports:
+        - {protocol: TCP, port: 8080}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ai-gateway-db
+              aigw.nori/db-instance: {{ .Values.db.release }}
+      ports:
+        - {protocol: TCP, port: 5432}
+    {{- $targets := list "dns" "loki" "tempo" "alloy" "gitlab" -}}
+    {{- if .Values.inference.enabled }}{{- $targets = append $targets "inference" -}}{{ end -}}
+    {{- if .Values.knowledgeSource.read.enabled }}{{- $targets = append $targets "seaweed" -}}{{ end -}}
+    {{- if .Values.ingest.enabled }}{{- $targets = append $targets "kafka" -}}{{ end -}}
+    {{- range $key := $targets }}
+    {{- $target := index $.Values.netpol.targets $key }}
+    - to:
+        {{- include "aigw.peer" $target | nindent 8 }}
+      ports:
+        - protocol: {{ ternary "UDP" "TCP" (eq $key "dns") }}
+          port: {{ $target.port }}
+        {{- if eq $key "dns" }}
+        - protocol: TCP
+          port: {{ $target.port }}
+        {{- end }}
+    {{- end }}

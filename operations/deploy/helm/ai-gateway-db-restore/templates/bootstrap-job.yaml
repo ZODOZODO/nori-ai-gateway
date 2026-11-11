@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  labels:
+    {{- include "db.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: ai-gateway-db-bootstrap
+        aigw.nori/db-instance: {{ .Release.Name }}
+        aigw.nori/db-target: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: {{ include "db.image" . | quote }}
+          command: [psql]
+          args: ["-X", "-w", "-v", "ON_ERROR_STOP=1", "-v", "acceptance_role_enabled={{ .Values.bootstrap.acceptanceRole.enabled }}", "-f", "/bootstrap/bootstrap.sql"]
+          env:
+            - name: PGHOST
+              value: {{ .Release.Name }}
+            - name: PGDATABASE
+              value: ai_gateway
+            - name: PGUSER
+              value: postgres
+            {{- range $entry := list (dict "env" "PGPASSWORD" "role" "superuser") (dict "env" "AIGW_MIGRATOR_PASSWORD" "role" "migrator") (dict "env" "AIGW_APP_PASSWORD" "role" "app") (dict "env" "AIGW_BACKUP_PASSWORD" "role" "backup") }}
+            - name: {{ $entry.env }}
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-db-{{ $entry.role }}
+                  key: password
+            {{- end }}
+            {{- if .Values.bootstrap.acceptanceRole.enabled }}
+            - name: AIGW_ACCEPTANCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-db-acceptance-ro
+                  key: password
+            {{- end }}
+          volumeMounts:
+            - name: bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: {{ .Release.Name }}-bootstrap

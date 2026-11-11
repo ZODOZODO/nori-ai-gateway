@@ -1,0 +1,13 @@
+{{- include "aigw.guard" . -}}
+{{- if eq .Values.profile "verify" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-egress-probe
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+data:
+  {{- $targets := list -}}
+  {{- range .Values.egressProbe.targets }}{{- $targets = append $targets (dict "id" .id "host" .host "port" .port "expect" .expect) -}}{{ end }}
+  targets.json: {{ $targets | toJson | quote }}
+{{- end }}

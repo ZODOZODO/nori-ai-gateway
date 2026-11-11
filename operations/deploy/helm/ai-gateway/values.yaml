@@ -1,0 +1,82 @@
+# 확인하지 않은 주소·digest·자격 참조는 배포 기본값으로 허용하지 않습니다.
+profile: verify
+replicaCount: 1
+image:
+  repository: harbor.nori.local/nori-tc/ai-gateway
+  digest: ""
+capacity:
+  maxRunningJobs: 1
+  generationConcurrency: 1
+  queuedDepth: 4
+  queueWaitLimit: 60s
+  jobLifetimeLimit: 180s
+db:
+  release: ai-gateway-db
+restoreMode: false
+recovery:
+  backupPointAt: ""
+inference:
+  enabled: false
+  baseUrl: ""
+  port: 0
+knowledgeSource:
+  read:
+    enabled: false
+ingest:
+  enabled: false
+  fixtureCatalog:
+    enabled: false
+fixtureCatalog:
+  content: ""
+  prefix: ""
+seaweed:
+  s3Endpoint: ""
+kafka:
+  bootstrapServers: ""
+  topic: ""
+  groupId: ""
+# 검증 전용 sanitize 규칙 버전 표지(F3-RULEVER 만 mask-v1r, --set-extra 로만). 소비는 P24.
+sanitize:
+  verifyRuleSet: mask-v1
+testHooks:
+  enabled: false
+  clock:
+    mode: ""
+    initial: ""
+credentialsRef:
+  serviceTokens: ""
+  actorJwks: ""
+  dbApp: ""
+  dbMigrator: ""
+  gitlabRead: ""
+  seaweedRead: ""
+  testHooks: ""
+  acceptanceSigner: ""
+  acceptanceClient: ""
+  acceptanceDbRead: ""
+  acceptanceFixtureWriter: ""
+netpol:
+  targets: {}
+egressProbe:
+  targets: []
+specVerify:
+  version: v1
+  gzipBase64: ""
+  sha256: ""
+  expectedSha256: ""
+acceptance:
+  enabled: false
+  suite: none
+  parentRunId: ""
+  outagePhase: ""
+  prepManifest: ""
+  rubricTargets: ""
+  buildIdentityJson: ""
+  image:
+    repository: harbor.nori.local/nori-tc/ai-gateway-acceptance
+    digest: ""
+  readback:
+    loki: ""
+    tempo: ""
+    metrics: ""
+    approvalRef: ""

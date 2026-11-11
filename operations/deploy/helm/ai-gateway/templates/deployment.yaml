@@ -1,0 +1,183 @@
+{{- include "aigw.guard" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "aigw.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.ingest.fixtureCatalog.enabled }}
+        checksum/fixture-catalog: {{ .Values.fixtureCatalog.content | sha256sum }}
+        {{- end }}
+        {{- if eq .Values.profile "verify" }}
+        checksum/egress-probe: {{ .Values.egressProbe.targets | toJson | sha256sum }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 3000
+        runAsGroup: 2000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: {{ include "aigw.image" . | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.profile | quote }}
+            - name: SPRING_DATASOURCE_URL
+              value: {{ printf "jdbc:postgresql://%s:5432/ai_gateway" .Values.db.release | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              value: aigw_app
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentialsRef.dbApp }}
+                  key: password
+            - name: AI_GATEWAY_INFERENCE_MODE
+              value: {{ ternary "enabled" "disabled" .Values.inference.enabled | quote }}
+            - name: AI_GATEWAY_CAPACITY_MAX_RUNNING_JOBS
+              value: "1"
+            - name: AI_GATEWAY_CAPACITY_GENERATION_CONCURRENCY
+              value: "1"
+            - name: AI_GATEWAY_CAPACITY_QUEUED_DEPTH
+              value: "4"
+            - name: AI_GATEWAY_CAPACITY_QUEUE_WAIT_LIMIT
+              value: 60s
+            - name: AI_GATEWAY_CAPACITY_JOB_LIFETIME_LIMIT
+              value: 180s
+            - name: AI_GATEWAY_RECOVERY_RESTORE_MODE
+              value: {{ .Values.restoreMode | quote }}
+            - name: AI_GATEWAY_KNOWLEDGE_SOURCE_READ_ENABLED
+              value: {{ .Values.knowledgeSource.read.enabled | quote }}
+            - name: AI_GATEWAY_INGEST_ENABLED
+              value: {{ .Values.ingest.enabled | quote }}
+            - name: AI_GATEWAY_INGEST_FIXTURE_CATALOG_ENABLED
+              value: {{ .Values.ingest.fixtureCatalog.enabled | quote }}
+            - name: AI_GATEWAY_TEST_HOOKS_ENABLED
+              value: {{ .Values.testHooks.enabled | quote }}
+            - name: AI_GATEWAY_SANITIZE_VERIFY_RULE_SET
+              value: {{ .Values.sanitize.verifyRuleSet | quote }}
+            - name: AI_GATEWAY_SECURITY_SERVICE_TOKENS_FILE
+              value: /run/aigw/service/service-tokens.json
+            - name: AI_GATEWAY_SECURITY_ACTOR_JWKS_FILE
+              value: /run/aigw/actor/jwks.json
+            - name: DJL_CACHE_DIR
+              value: /tmp/djl
+            {{- if .Values.inference.enabled }}
+            - name: AI_GATEWAY_INFERENCE_BASEURL
+              value: {{ .Values.inference.baseUrl | quote }}
+            {{- end }}
+            {{- if .Values.knowledgeSource.read.enabled }}
+            - name: AI_GATEWAY_SEAWEED_S3_ENDPOINT
+              value: {{ .Values.seaweed.s3Endpoint | quote }}
+            - name: AI_GATEWAY_SEAWEED_CREDENTIALS_PATH
+              value: /run/aigw/seaweed
+            {{- end }}
+            {{- if .Values.ingest.enabled }}
+            - name: AI_GATEWAY_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            - name: AI_GATEWAY_KAFKA_TOPIC
+              value: {{ .Values.kafka.topic | quote }}
+            - name: AI_GATEWAY_KAFKA_GROUP_ID
+              value: {{ .Values.kafka.groupId | quote }}
+            {{- end }}
+            {{- if .Values.ingest.fixtureCatalog.enabled }}
+            - name: AI_GATEWAY_INGEST_FIXTURE_CATALOG_PATH
+              value: /run/aigw/fixture/catalog.yaml
+            - name: AI_GATEWAY_INGEST_FIXTURE_CATALOG_PREFIX
+              value: {{ .Values.fixtureCatalog.prefix | quote }}
+            {{- end }}
+            {{- if .Values.restoreMode }}
+            - name: AI_GATEWAY_RECOVERY_BACKUP_POINT_AT
+              value: {{ .Values.recovery.backupPointAt | quote }}
+            {{- end }}
+            {{- if .Values.testHooks.enabled }}
+            - name: AI_GATEWAY_TEST_HOOKS_TOKEN_SHA256_FILE
+              value: /run/aigw/hooks/hook-token-sha256
+            - name: AI_GATEWAY_TCMOCK_STATE_DIR
+              value: /work/mock
+            - name: AI_GATEWAY_TEST_HOOKS_EGRESS_TARGETS_FILE
+              value: /run/aigw/egress/targets.json
+            {{- if .Values.testHooks.clock.mode }}
+            - name: AI_GATEWAY_TEST_HOOKS_CLOCK_MODE
+              value: {{ .Values.testHooks.clock.mode | quote }}
+            - name: AI_GATEWAY_TEST_HOOKS_CLOCK_INITIAL
+              value: {{ .Values.testHooks.clock.initial | quote }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- range $name := list "service" "actor" "db" "gitlab" }}
+            - {name: {{ $name }}, mountPath: /run/aigw/{{ $name }}, readOnly: true}
+            {{- end }}
+            {{- if .Values.knowledgeSource.read.enabled }}
+            - {name: seaweed, mountPath: /run/aigw/seaweed, readOnly: true}
+            {{- end }}
+            {{- if .Values.ingest.fixtureCatalog.enabled }}
+            - {name: fixture, mountPath: /run/aigw/fixture, readOnly: true}
+            {{- end }}
+            {{- if .Values.testHooks.enabled }}
+            - {name: hooks, mountPath: /run/aigw/hooks, readOnly: true}
+            - {name: egress, mountPath: /run/aigw/egress, readOnly: true}
+            - {name: mock, mountPath: /work/mock}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 64Mi}
+        {{- $secrets := dict "service" (list .Values.credentialsRef.serviceTokens (list "service-tokens.json")) "actor" (list .Values.credentialsRef.actorJwks (list "jwks.json")) "db" (list .Values.credentialsRef.dbApp (list "password")) "gitlab" (list .Values.credentialsRef.gitlabRead (list "token")) -}}
+        {{- if .Values.knowledgeSource.read.enabled }}{{- $_ := set $secrets "seaweed" (list .Values.credentialsRef.seaweedRead (list "access-key" "secret-key")) -}}{{ end -}}
+        {{- if .Values.testHooks.enabled }}{{- $_ := set $secrets "hooks" (list .Values.credentialsRef.testHooks (list "hook-token-sha256")) -}}{{ end -}}
+        {{- range $name, $secret := $secrets }}
+        - name: {{ $name }}
+          secret:
+            secretName: {{ index $secret 0 }}
+            defaultMode: 0440
+            items:
+              {{- range index $secret 1 }}
+              - {key: {{ . }}, path: {{ . }}}
+              {{- end }}
+        {{- end }}
+        {{- if .Values.ingest.fixtureCatalog.enabled }}
+        - name: fixture
+          configMap:
+            name: {{ .Release.Name }}-fixture-catalog
+        {{- end }}
+        {{- if .Values.testHooks.enabled }}
+        - name: mock
+          emptyDir: {medium: Memory, sizeLimit: 64Mi}
+        - name: egress
+          configMap:
+            name: {{ .Release.Name }}-egress-probe
+        {{- end }}

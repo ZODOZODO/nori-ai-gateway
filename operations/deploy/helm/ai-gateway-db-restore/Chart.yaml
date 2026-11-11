@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ai-gateway-db
+description: AI Gateway 전용 PostgreSQL
+type: application
+version: 0.1.0

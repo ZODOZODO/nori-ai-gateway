@@ -1,0 +1,12 @@
+{{- include "aigw.guard" . -}}
+{{- if and (eq .Values.profile "verify") .Values.ingest.fixtureCatalog.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-fixture-catalog
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+data:
+  catalog.yaml: |
+    {{- .Values.fixtureCatalog.content | nindent 4 }}
+{{- end }}

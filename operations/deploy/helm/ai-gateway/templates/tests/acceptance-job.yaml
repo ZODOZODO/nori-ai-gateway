@@ -1,0 +1,104 @@
+{{- include "aigw.guard" . -}}
+{{- if .Values.acceptance.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-acceptance
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: ai-gateway-acceptance
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        aigw.nori/db-target: {{ .Values.db.release }}
+      annotations:
+        checksum/spec-verify: {{ .Values.specVerify.sha256 | quote }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 3000
+        runAsGroup: 2000
+        fsGroup: 2000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: acceptance
+          image: {{ printf "%s@sha256:%s" .Values.acceptance.image.repository .Values.acceptance.image.digest | quote }}
+          {{- if hasSuffix "-RUBRIC" .Values.acceptance.suite }}
+          # rubric suite 는 같은 배포본의 viewer 모드(127.0.0.1 bind, 검토자 port-forward)로 실행한다.
+          args: ["--mode", "rubric-view"]
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          env:
+            - name: JAVA_OPTS
+              value: {{ printf "-Daigw.acceptance.suite=%s -Daigw.acceptance.signer=secret-file" .Values.acceptance.suite | quote }}
+            - {name: AIGW_GATEWAY_BASE_URL, value: {{ printf "http://%s:8080" .Release.Name | quote }}}
+            - {name: AIGW_PARENT_RUN_ID, value: {{ .Values.acceptance.parentRunId | quote }}}
+            - {name: AIGW_DB_HOST, value: {{ .Values.db.release | quote }}}
+            - {name: AIGW_DB_USERNAME, value: aigw_acceptance_ro}
+            - {name: AIGW_DB_PASSWORD_FILE, value: /run/aigw/db/password}
+            - {name: AIGW_SIGNER_PRIVATE_JWK_FILE, value: /run/aigw/signer/signer-private.jwk}
+            - {name: AIGW_SERVICE_TOKEN_FILE, value: /run/aigw/client/service-token}
+            - {name: AIGW_HOOK_TOKEN_FILE, value: /run/aigw/client/hook-token}
+            - {name: AIGW_SPEC_GZIP_FILE, value: /run/aigw/spec/spec.md.gz}
+            - {name: AIGW_EXPECTED_SPEC_SHA256, value: {{ .Values.specVerify.expectedSha256 | quote }}}
+            # image-digests.json 의 digest·buildIdentity 와 렌더 SHA(비밀 아님, aigw-helm.sh 가 렌더 입력에서 만든 값).
+            - {name: AIGW_BUILD_IDENTITY_JSON, value: {{ required "ACCEPTANCE_BUILD_IDENTITY_REQUIRED" .Values.acceptance.buildIdentityJson | quote }}}
+            - {name: AIGW_LOKI_READ_URL, value: {{ .Values.acceptance.readback.loki | quote }}}
+            - {name: AIGW_TEMPO_READ_URL, value: {{ .Values.acceptance.readback.tempo | quote }}}
+            - {name: AIGW_METRICS_READ_URL, value: {{ .Values.acceptance.readback.metrics | quote }}}
+            - {name: AIGW_FIXTURE_PREFIX, value: {{ .Values.fixtureCatalog.prefix | quote }}}
+            - {name: AIGW_OUTAGE_PHASE, value: {{ .Values.acceptance.outagePhase | quote }}}
+            {{- if eq (include "aigw.fixtureWriter" .) "true" }}
+            - {name: AIGW_FIXTURE_WRITER_CREDENTIALS_PATH, value: /run/aigw/fixture-writer}
+            - {name: AIGW_SEAWEED_S3_ENDPOINT, value: {{ .Values.seaweed.s3Endpoint | quote }}}
+            {{- end }}
+            {{- if hasSuffix "-RUBRIC" .Values.acceptance.suite }}
+            - {name: AIGW_RUBRIC_TARGETS_FILE, value: /run/aigw/spec/rubric-targets.json}
+            {{- end }}
+            {{- if eq .Values.acceptance.suite "F4-RESTORE" }}
+            - {name: AIGW_PREP_MANIFEST_FILE, value: /run/aigw/spec/prep-manifest.json}
+            - {name: AIGW_BACKUP_POINT_AT, value: {{ .Values.recovery.backupPointAt | quote }}}
+            - {name: AIGW_RESTORE_CLOCK_AT, value: {{ .Values.testHooks.clock.initial | quote }}}
+            {{- end }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: spec, mountPath: /run/aigw/spec, readOnly: true}
+            {{- range $name := list "signer" "client" "db" }}
+            - {name: {{ $name }}, mountPath: /run/aigw/{{ $name }}, readOnly: true}
+            {{- end }}
+            {{- if eq (include "aigw.fixtureWriter" .) "true" }}
+            - {name: fixture-writer, mountPath: /run/aigw/fixture-writer, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 64Mi}
+        # 부재해도 pod 는 뜨고 SpecInputVerifier 가 RUN ABORTED(SPEC_INPUT_MISSING) 증거를 남긴다(M-10).
+        - name: spec
+          configMap:
+            name: {{ .Release.Name }}-spec-verify
+            optional: true
+            defaultMode: 0444
+        {{- $secrets := dict "signer" (list .Values.credentialsRef.acceptanceSigner (list "signer-private.jwk")) "client" (list .Values.credentialsRef.acceptanceClient (list "service-token" "hook-token")) "db" (list .Values.credentialsRef.acceptanceDbRead (list "password")) -}}
+        {{- if eq (include "aigw.fixtureWriter" .) "true" }}{{- $_ := set $secrets "fixture-writer" (list .Values.credentialsRef.acceptanceFixtureWriter (list "access-key" "secret-key")) -}}{{ end -}}
+        {{- range $name, $secret := $secrets }}
+        - name: {{ $name }}
+          secret:
+            secretName: {{ index $secret 0 }}
+            defaultMode: 0440
+            items:
+              {{- range index $secret 1 }}
+              - {key: {{ . }}, path: {{ . }}}
+              {{- end }}
+        {{- end }}
+{{- end }}

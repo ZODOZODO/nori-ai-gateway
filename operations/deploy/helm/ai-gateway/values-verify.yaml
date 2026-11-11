@@ -1,0 +1,6 @@
+profile: verify
+restoreMode: false
+db:
+  release: ai-gateway-db
+testHooks:
+  enabled: true

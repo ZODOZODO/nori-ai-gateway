@@ -1,0 +1,44 @@
+{{- include "aigw.guard" . -}}
+{{- if .Values.acceptance.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-acceptance
+  labels:
+    {{- include "aigw.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-gateway-acceptance
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: {{ .Release.Name }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - {protocol: TCP, port: 8080}
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ai-gateway-db
+              aigw.nori/db-instance: {{ .Values.db.release }}
+      ports:
+        - {protocol: TCP, port: 5432}
+    {{- $readTargets := list "dns" "loki" "tempo" "metrics" -}}
+    {{- if eq (include "aigw.fixtureWriter" .) "true" }}{{- $readTargets = append $readTargets "seaweed" -}}{{ end -}}
+    {{- range $key := $readTargets }}
+    {{- $target := index $.Values.netpol.targets $key }}
+    - to:
+        {{- include "aigw.peer" $target | nindent 8 }}
+      ports:
+        - protocol: {{ ternary "UDP" "TCP" (eq $key "dns") }}
+          port: {{ $target.port }}
+        {{- if eq $key "dns" }}
+        - {protocol: TCP, port: {{ $target.port }}}
+        {{- end }}
+    {{- end }}
+{{- end }}
