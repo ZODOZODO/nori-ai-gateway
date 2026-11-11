@@ -20,7 +20,7 @@ buildscript {
     dependencies {
         classpath(libs.flyway.gradle.plugin)
         classpath(libs.flyway.database.postgresql)
-        classpath("org.postgresql:postgresql:42.7.11")
+        classpath(libs.postgresql)
     }
 }
 

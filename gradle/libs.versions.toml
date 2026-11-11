@@ -16,6 +16,8 @@ openaiJava = "4.80.0"
 slf4j = "2.0.18"
 # 루트 외부 Flyway 도구(U5)용. Spring Boot 4.0.7 BOM 의 flyway.version 과 같다.
 flyway = "11.14.1"
+# 루트 Flyway buildscript classpath 의 JDBC 드라이버. Spring Boot 4.0.7 BOM 의 postgresql.version 과 같다.
+postgresql = "42.7.11"
 # noricloud GitLab Package Registry project 33 의 고정 release.
 noriObjectStorage = "0.0.1"
 
@@ -43,6 +45,7 @@ slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 flyway-gradle-plugin = { module = "org.flywaydb:flyway-gradle-plugin", version.ref = "flyway" }
 flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
