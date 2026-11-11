@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-hba
-  labels:
-    {{- include "db.labels" . | nindent 4 }}
-data:
-  pg_hba.conf: |
-    {{- required "RENDER_REQUIRED_hba.overlay" .Values.hba.overlay | nindent 4 }}

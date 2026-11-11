@@ -2,6 +2,12 @@ spring:
   # migration 은 앱 밖(루트 Gradle Flyway·CI migrate stage)이다. 앱은 SchemaVersionGuard 로 버전만 확인한다.
   flyway:
     enabled: false
+  # 외부 설정 파일(nori-wm application.yaml 과 같은 방식). file:config/... 는 실행 작업 디렉터리 기준이며
+  # 컨테이너에서는 WORKDIR /app 의 /app/config(Secret ai-gateway-config mount)다. 파일이 없어도 기동은 계속된다.
+  # 파일 이름 wildcard(config/ai-gateway*.properties)는 Spring Boot 가 거부하므로(wildcard 는 '*/' 디렉터리 단위만) 파일마다 한 줄씩 적는다.
+  config:
+    import:
+      - optional:file:config/ai-gateway-db.properties
 management:
   endpoint:
     health:

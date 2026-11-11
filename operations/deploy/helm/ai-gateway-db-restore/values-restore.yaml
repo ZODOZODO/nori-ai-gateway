@@ -1,5 +1,0 @@
-bootstrap:
-  acceptanceRole:
-    enabled: true
-backup:
-  enabled: false
