@@ -8024,3 +8024,69 @@ Schema version: 7
 - 보완: `operations/deploy/runconfig.py` 배포 게이트 목록에서 `pvc-capacity`·`pvc-protection` 을 뺐다(P07 2026-11-10 ⑥). 두 selftest 의 승인 fixture 목록과 `operations/runconfig/README.md` 문구를 같이 고쳤다. 수정 뒤 runconfig selftest 24·runtime-credentials 64 를 포함한 6종 PASS, lint 3 release exit 0. 이 파일들을 읽는 Gradle 시험은 0건이라 시험 증거에 영향이 없다.
 - 백업 목적지 egress 미생성은 G-BACKUP-DEST `BLOCKED` 때문이며 Plan U6 2026-11-11 ⑧ 에 순서를 기록했다.
 - exec 삭제 commit(root, 2026-11-11): `nori-tc-exec` `f1d5e0a` `chore(deploy): remove AI Gateway helm charts moved to nori-ai-gateway operations/deploy/helm` — `deploy/helm/ai-gateway` 29개 파일 삭제(1948줄), exec 안 다른 참조 0(`git grep "helm/ai-gateway"`). push 전이며 그 레포의 미push commit 은 이 commit 포함 7개(`cd15491`, `6d744aa`…`c34518d` 5개, `f1d5e0a`).
+
+## U7 CI 단계 정렬 (migrate stage) (2026-11-11, 구현·로컬 검증)
+
+- worktree `nori-ai-gateway-u7`, 브랜치 `aigw/align-u7`, 기준 `f3449da`. 공유 서버(192.168.0.150)·GitLab 접속 0, 파이프라인 생성 0, push 0. 원격 `ci lint` 는 프로젝트가 없어 실행하지 않았다.
+- commit: `af61a1f` `ci: add migrate stage that applies root Flyway to the shared DB before deploy (U7)`(`.gitlab-ci.yml` +31/-1, runbook +1), 이 절(문서 commit).
+
+### 바꾼 내용
+
+- `stages` = `[check, package, verify, build, scan, migrate, deploy]`(`scan` 과 `deploy` 사이에 `migrate`).
+- `migrate` job(nori-wm `.gitlab-ci.yml:217-245` 형태): `stage: migrate`, `tags: [nori-msa]`, `dependencies: []`(앞 stage artifact 불필요 — 다른 job 과 같은 표기), `allow_failure: false`, variables `AI_GATEWAY_DB_URL: "jdbc:postgresql://192.168.0.150:15432/nori_ai_gateway"` 하나. 계정 이름·비밀번호는 CI 변수 `AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 로만 받는다(nori-wm 은 계정 이름을 yaml 에 적는다 — 의도된 차이). script:
+  1. 두 변수 중 하나라도 비면 stderr 메시지 후 `exit 1`(Gradle 호출 전).
+  2. `git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.noricloud.org/norisystem/nori-tc/nori-common.git ../nori-common` — `package` job 의 줄과 같은 문자열.
+  3. `bash ./gradlew flywayInfo -q --no-daemon` → `bash ./gradlew flywayMigrate --no-daemon` → `bash ./gradlew flywayInfo -q --no-daemon > flyway-info-after.txt`(gradlew 는 100644 라 기존 job 처럼 `bash` 로 실행, `chmod` 없음).
+  4. `flyway-info-after.txt` 에 `Pending` 이 있으면 `exit 1`.
+  - artifacts `when: always`(Pending 실패 때도 남김 — nori-wm 과 같음), `paths: [flyway-info-after.txt]`, `expire_in: 30 days`. rules = `$CI_COMMIT_BRANCH == "main"`, `$CI_COMMIT_TAG`(U7-Q1 ⓐ, nori-wm 과 같음). `needs:` 미사용(P15 규약).
+  - 자격은 `-Pflyway.*` 가 아니라 env 로만 간다(루트 `build.gradle.kts:48-50` 이 `-Pflyway.*` 다음 env `AI_GATEWAY_DB_URL`·`AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` 를 읽음).
+- 기존 job 변경 0. `docs/runbooks/aigw-db-server-prerequisites.md` 접속 절에 CI 변수 이름 두 개와 속성(masked / protected·masked), URL 이 yaml 일반 값이라는 점, 비면 실패한다는 점만 한 줄 추가했다.
+
+### 근거
+
+- **migrate 실패 시 deploy 미실행:** GitLab CI YAML 참조 `stages` 절 "If any job fails, the pipeline is marked as `failed` and jobs in later stages do not start."(docs.gitlab.com/ci/yaml, 2026-11-11 조회). `migrate` 는 `allow_failure: false` 라 실패가 파이프라인 실패로 잡히고, `deploy` stage 의 `deploy-verify`(`when: manual`, `allow_failure: false`)는 시작되지 않는다. 기존 `deploy-verify` 가 `scan-image` 뒤에만 실행되는 것도 같은 stage 순서 방식이다(nori-wm 의 `needs: [scan, migrate]` 와 같은 효과).
+- **artifact 에 자격이 들어가지 않음:** Flyway 11.14.1(`libs.versions.toml:18`) `FlywayInfoTask` 는 `System.out.println` 으로 "Schema version: …" 한 줄과 `MigrationInfoDumper.dumpToAsciiTable` 표만 출력한다(javap 확인). 표 열은 Category·Version·Description·Type·Installed On·State·Undoable 이고 `getInstalledBy` 호출이 없다(U5 ⑦ 실제 출력과 같음). Flyway 로그("Database: <URL> …")는 Gradle INFO/LIFECYCLE 로 가서 `-q` 에서 출력되지 않는다. Gradle 은 System.out 을 QUIET 수준으로 받으므로 `-q` 에서도 표는 남는다. 실패 메시지는 stderr 로 가서 `>` 대상 파일에 들어가지 않는다. URL 에는 비밀번호가 없다. 따라서 별도 필터를 두지 않았다. 작업 로그(stderr)에는 PostgreSQL 인증 오류 등에 계정 이름이 나올 수 있으며 이는 masked 변수 가림에 맡긴다.
+
+### 시험 결과
+
+- ① spec-guard(`AIGW_SPEC_FILE`=worktree SPEC, `--offline --no-daemon`) exit 0:
+
+```
+> Task :gateway-eval:run
+{"specInputOrigin":"LOCAL_FILE","specSha":"9270488294079f4bc17e387be9f64e07e96f75916761e895dd21ff21f94aad19","specShaSource":"FILE_HASHED"}
+BUILD SUCCESSFUL in 25s
+```
+
+- ② 로컬 YAML 파싱(`aigw-p06-tools:local`, `--network none`, 읽기 전용 mount, PyYAML 6.0.3)으로 변경 전(`f3449da`)·후 파일을 비교했다. exit 0:
+
+```
+added keys: ['migrate']
+removed keys: []
+changed keys: ['stages']
+PASS only stages changed and migrate added
+...
+PASS rules main/tag (U7-Q1 a)
+PASS deploy-verify unchanged stage/manual/allow_failure
+PASS scan < migrate < deploy
+jobs by stage: {"check": ["test", "helm-validate"], "package": ["package"], "verify": ["integration-test", "integration-evidence", "integration-mode-guard"], "build": ["build-image", "build-backup-image", "build-acceptance-image"], "scan": ["scan-image"], "migrate": ["migrate"], "deploy": ["deploy-verify"]}
+RESULT ALL PASS
+```
+
+  단언 17개(stages, migrate 의 stage·tags·allow_failure·variables·script 6줄·artifacts·rules, 전체 `needs` 0, `-Pflyway` 0, clone 줄 = `package` 의 줄, 기존 job 동일) 모두 PASS.
+- ② 보조 — script 분기 모의(같은 컨테이너, `gradlew`·`git` stub, 네트워크 0, 줄마다 실행하고 첫 비 0 에서 중단하는 runner 동작 재현):
+
+```
+user empty                   exit=1 gradleCalls=0 []
+password empty               exit=1 gradleCalls=0 []
+both empty                   exit=1 gradleCalls=0 []
+both set, pending remains    exit=1 gradleCalls=3 ['flywayInfo', 'flywayMigrate', 'flywayInfo']
+both set, no pending         exit=0 gradleCalls=3 ['flywayInfo', 'flywayMigrate', 'flywayInfo']
+```
+
+- ③ NOT_RUN — F4 뒤 사용자가 만드는 첫 파이프라인에서 확인한다. 외부 선행: 운영 GitLab 프로젝트 생성, job-token allowlist(프로젝트 33 과 `nori-common`), CI 변수 `AI_GATEWAY_DB_USER`(masked)·`AI_GATEWAY_DB_PASSWORD`(protected·masked) 등록(사용자·운영자), 서버 담당자 pg_hba 의 k8s 노드 IP 192.168.0.101~106 허용.
+
+### 남은 위험(관찰)
+
+- `AI_GATEWAY_DB_PASSWORD` 가 protected 라 tag 파이프라인에서는 tag 가 protected 여야 값이 들어온다. 아니면 1단계에서 실패한다(fail-closed, 적용 0).
+- GitLab masked 변수는 값 길이·문자 조건이 있어 계정 이름이 그 조건을 만족하지 않으면 masked 로 등록되지 않는다(등록 시 확인).
+- `deploy-verify` 에는 rules 가 없어 main/tag 가 아닌 파이프라인에서는 `migrate` 없이 수동 배포가 가능하다. 이 경우 앱 `SchemaVersionGuard` 가 스키마 버전 불일치로 기동을 막는다. Plan U7 범위 밖이라 바꾸지 않았다.
