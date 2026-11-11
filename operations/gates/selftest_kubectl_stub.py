@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """operations/gates selftest 전용 kubectl stub(실제 클러스터 호출 0). 상태 = STUB_STATE JSON, 호출 기록 = STUB_LOG jsonl.
 
-state 키: secrets{name:{key:b64}}, present{kind:[names]}, fail{"<동작>:<대상>": rc}, sql_outputs{pod: stdout}, probe_outputs{pod: 수용 접속 분류 출력},
-cronjobs{name: obj}, jobs{name: obj}, job_conditions{name: Complete|Failed}, pods[[pod...] 호출 순서별 목록],
-selector_pods{"<-l selector>": [pod...]}(있으면 그 selector 조회에 고정 응답 — 시퀀스 소비 0).
+state 키: secrets{name:{key:b64}}, present{kind:[names]}, fail{"<동작>:<대상>": rc}, cronjobs{name: obj}, jobs{name: obj},
+job_conditions{name: Complete|Failed}, pods[[pod...] 호출 순서별 목록], selector_pods{"<-l selector>": [pod...]}(있으면 그 selector 조회에 고정 응답 — 시퀀스 소비 0).
+`patch secret <name> --type merge --patch-file /dev/stdin` 은 data 키를 병합한다(값 null = 키 삭제, 없는 Secret 은 실패).
+`get secret <name> -o 'go-template={{index .data "<키>" | base64decode}}'` 는 그 키 값 하나를 출력한다.
 """
+import base64
 import json
 import os
+import re
 import sys
 
 state_path, log_path = os.environ['STUB_STATE'], os.environ['STUB_LOG']
@@ -14,7 +17,7 @@ state = json.load(open(state_path, encoding='utf-8'))
 args = sys.argv[1:]
 if args[:2] == ['-n', 'tc']:
     args = args[2:]
-stdin = sys.stdin.buffer.read() if ('-' in args or '-i' in args) else b''
+stdin = sys.stdin.buffer.read() if ('-' in args or '/dev/stdin' in args) else b''
 with open(log_path, 'a', encoding='utf-8') as log:
     log.write(json.dumps({'args': args, 'stdin': stdin.decode('utf-8', 'replace')}) + '\n')
 
@@ -35,8 +38,13 @@ if verb == 'get':
     failed(f'get-{kind}:{name}')
     if kind == 'secret':
         data = state.get('secrets', {}).get(name)
-        if data is not None and '-o' in args and args[args.index('-o') + 1] == 'json':
+        output = args[args.index('-o') + 1] if '-o' in args else ''
+        single = re.fullmatch(r'go-template=\{\{index \.data "([^"]+)" \| base64decode\}\}', output)
+        if data is not None and output == 'json':
             print(json.dumps({'metadata': {'name': name}, 'data': data}))
+        elif data is not None and single:
+            # 키 하나의 값(kubectl go-template base64decode 와 같음). 키가 없으면 빈 출력.
+            sys.stdout.write(base64.b64decode(data[single.group(1)]).decode() if single.group(1) in data else '')
         elif data is not None:
             print('\n'.join(sorted(data)))
     elif kind in ('statefulset', 'deployment', 'cronjob') and '-o' in args and args[args.index('-o') + 1] == 'name':
@@ -75,6 +83,18 @@ elif verb in ('apply', 'create'):
     else:
         state.setdefault('jobs', {})[obj['metadata']['name']] = obj
     save()
+elif verb == 'patch':
+    kind, name = args[1], args[2]
+    failed(f'patch-{kind}:{name}')
+    target = state.get('secrets', {}).get(name) if kind == 'secret' else None
+    if target is None or args[3:7] != ['--type', 'merge', '--patch-file', '/dev/stdin']:
+        sys.exit(1)
+    for key, value in json.loads(stdin).get('data', {}).items():
+        if value is None:
+            target.pop(key, None)
+        else:
+            target[key] = value
+    save()
 elif verb == 'delete':
     failed(f'delete-{args[1]}:{args[2]}')
     state.setdefault('secrets', {}).pop(args[2], None) if args[1] == 'secret' else state.setdefault('jobs', {}).pop(args[2], None)
@@ -88,18 +108,5 @@ elif verb == 'wait':
     condition = next((v for k, v in conditions.items() if target.endswith(k)), 'Complete' if target.endswith('-recovery') else 'Failed')
     wanted = 'Complete' if 'condition=complete' in ' '.join(args) else 'Failed'
     sys.exit(0 if condition == wanted else 1)
-elif verb == 'exec':
-    pod = args[2]
-    failed(f'exec:{pod}')
-    if any('probe()' in a for a in args):
-        # 수용 역할 접속 분류(기본 = 역할 부재: ai_gateway 실패·다른 DB HBA 거부). state.probe_outputs{pod: 출력}.
-        default = 'select FAILED\ntcp-postgres HBA_REJECT\ntcp-template1 HBA_REJECT\nunix-postgres HBA_REJECT\nunix-template1 HBA_REJECT\n'
-        sys.stdout.write(state.get('probe_outputs', {}).get(pod, default))
-    elif b'count(*) FROM pg_roles' in stdin:
-        sys.stdout.write(state.get('sql_outputs', {}).get(pod, '0'))
-    elif b'gw.backup_run' in stdin:
-        rows = state.setdefault('backup_rows', [])
-        sys.stdout.write(rows.pop(0) if len(rows) > 1 else (rows[0] if rows else ''))
-        save()
 else:
     sys.exit(1)

@@ -3,5 +3,5 @@
 set -euo pipefail
 set +x
 export PYTHONDONTWRITEBYTECODE=1
-[[ -f operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql && -f operations/gates/verify_credentials.py ]] || { printf '%s\n' AI_ROOT_REQUIRED >&2; exit 2; }
+[[ -f operations/runconfig/verify.schema.json && -f operations/gates/verify_credentials.py ]] || { printf '%s\n' AI_ROOT_REQUIRED >&2; exit 2; }
 exec python3 -B operations/gates/verify_credentials.py "$@"

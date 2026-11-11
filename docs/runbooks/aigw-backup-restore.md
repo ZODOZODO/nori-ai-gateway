@@ -1,12 +1,12 @@
 # AI Gateway 검증 환경 백업·격리 복원 runbook
 
-대상: namespace `tc` 의 주 DB release `ai-gateway-db`(백업 CronJob 은 이 release 에만)와 격리 복원 release `ai-gateway-db-restore`(Plan §11.8). 실제 배포·첫 백업 실행·복원 리허설은 G-BACKUP-DEST·G-PG-IMAGE·G-EXEC-CHART-REF 승인과 승인 backup 이미지 digest 뒤에만 한다(현재 NOT_RUN).
+대상: namespace `tc` 의 앱 release `ai-gateway` 차트가 렌더하는 백업 CronJob `ai-gateway-db-backup`(대상 = 공유 서버 192.168.0.150:15432 의 `nori_ai_gateway`, 단일 계정)과 격리 복원 release `ai-gateway-db-restore`(리허설 동안만 쓰는 임시 인스턴스, Plan §11.8). 실제 배포·첫 백업 실행·복원 리허설은 G-BACKUP-DEST·G-PG-IMAGE 승인과 승인 backup 이미지 digest 뒤에만 한다(현재 NOT_RUN).
 
 ## 입력
 
-- runconfig(main) `backup.{enabled,type,schedule,destination,ageRecipient,retentionDays}` — 승인 문서 참조 필수. `aigw-helm.sh --release ai-gateway-db --image-digests <image-digests.json>` 가 `backup` digest 와 함께 차트에 넘기며 하나라도 없으면 렌더 실패.
+- runconfig(main) `backup.{enabled,type,schedule,destination,ageRecipient,retentionDays}` — 승인 문서 참조 필수. `aigw-helm.sh --release ai-gateway --image-digests <image-digests.json>` 가 `backup` digest 와 함께 차트에 넘기며 하나라도 없으면 렌더 실패.
 - `backup.destination` 형식: `s3` = `https://<endpoint host[:port]>/<bucket>[/<prefix>]`(경로 방식 S3 호환), `sftp` = `sftp://<user>@<host>[:port]/<path>`. 유형은 이미지 빌드 인자 `BACKUP_DEST_TYPE` 와 같아야 한다.
-- Secret: `ai-gateway-db-backup`(`password`, 단일 DB 계정 — 이름은 env 로만), `ai-gateway-backup-destination`(s3 = `access-key`·`secret-key`, sftp = `ssh-private-key`·`known-hosts`). age 수신자 공개키는 runconfig 값(비밀 아님). 개인키는 복원 실행자만 보유하며 클러스터·이미지·레포에 두지 않는다.
+- Secret: `ai-gateway-config`(`AI_GATEWAY_DB_USER`·`AI_GATEWAY_DB_PASSWORD` → CronJob `PGUSER`·`PGPASSWORD`, 단일 DB 계정), `ai-gateway-backup-destination`(s3 = `access-key`·`secret-key`, sftp = `ssh-private-key`·`known-hosts`). age 수신자 공개키는 runconfig 값(비밀 아님). 개인키는 복원 실행자만 보유하며 클러스터·이미지·레포에 두지 않는다.
 
 ## 백업 확인
 
@@ -30,7 +30,7 @@ kubectl -n tc create job --from=cronjob/ai-gateway-db-backup ai-gateway-db-backu
 ## 격리 복원(복원 실행자 Linux 호스트)
 
 1. 복원 DB release 를 새로 설치해 bootstrap hook 완료를 확인한다(`ai-gateway-db-restore`, 주 DB 를 대상으로 쓰지 않음).
-2. 다른 터미널에서 `kubectl -n tc port-forward svc/ai-gateway-db-restore 15432:5432`(복원 release Service 만).
+2. 다른 터미널에서 `kubectl -n tc port-forward svc/ai-gateway-db-restore 15432:15432`(복원 release Service 만 — Service 포트 15432 → Pod 5432).
 3. bundle 을 목적지에서 내려받아 읽기 전용 디렉터리에 두고, 같은 backup 이미지 digest 로 실행한다. 비밀번호는 env 로만 넣는다(명령행·출력 0).
 
 ```bash

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 임시 복사본의 배포 stub·HTTPS handler fixture로 인증/redirect 경계를 검증한다. 모든 실제 전송 차단.
+# 임시 복사본(git checkout)의 배포 stub·psql stub·HTTPS handler fixture로 checkout·인증/redirect 경계를 검증한다. 모든 실제 전송 차단.
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 exec python3 -B - "$@" <<'PY'
@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-rollback-test-') as temporary:
     (work / 'operations/gates').mkdir(parents=True)
     (work / 'operations/deploy').mkdir(parents=True)
     shutil.copyfile(root / 'operations/gates/rollback_rehearsal.py', work / 'operations/gates/rollback_rehearsal.py')
+    shutil.copyfile(root / 'operations/deploy/app_render.py', work / 'operations/deploy/app_render.py')
     bin_dir = work / 'bin'; bin_dir.mkdir()
     state_path = work / 'state.json'
     registry_path = work / 'registry.json'
@@ -91,20 +92,29 @@ elif tool == 'kubectl':
     elif a[:2] == ['get', 'pods']:
         ready = 'True' if s['deployed'] not in s.get('unready', []) else 'False'
         print(json.dumps({'items': [{'status': {'conditions': [{'type': 'Ready', 'status': ready}], 'containerStatuses': [{'ready': ready == 'True', 'imageID': 'docker-pullable://x@' + s['deployed']}]}}]}))
-    elif a[:2] == ['get', 'secret']:
-        print(json.dumps({'data': {'password': 'c2VjcmV0LWRiLXBhc3N3b3JkLXNlbnRpbmVs'}}))
-    elif a[0] == 'exec':
-        s['stdin'] = sys.stdin.read(); versions = s['flyway']; print(versions.pop(0) if len(versions) > 1 else versions[0])
+    elif a[:3] == ['get', 'secret', 'ai-gateway-config']:
+        print(json.dumps({'data': {'AI_GATEWAY_DB_USER': 'YWNjb3VudC1uYW1lLXNlbnRpbmVs', 'AI_GATEWAY_DB_PASSWORD': 'c2VjcmV0LWRiLXBhc3N3b3JkLXNlbnRpbmVs'}}))
     elif a[0] == 'rollout':
         pass
+elif tool == 'psql':
+    # 공유 서버 읽기: 자격은 env 로만(명령행 0), 대상은 192.168.0.150:15432/nori_ai_gateway.
+    ok = (os.environ.get('PGPASSWORD'), os.environ.get('PGUSER'), os.environ.get('PGHOST'), os.environ.get('PGPORT'), os.environ.get('PGDATABASE')) == \
+         ('secret-db-password-sentinel', 'account-name-sentinel', '192.168.0.150', '15432', 'nori_ai_gateway')
+    if not ok: save(); sys.exit(2)
+    versions = s['flyway']; print(versions.pop(0) if len(versions) > 1 else versions[0])
 save()
 '''
-    for name in ('helm', 'kubectl'):
+    for name in ('helm', 'kubectl', 'psql'):
         (bin_dir / name).write_text(stub); (bin_dir / name).chmod(0o755)
     (work / 'operations/deploy/aigw-helm.sh').write_text('#!/bin/sh\nexec python3 ' + str(bin_dir / 'aigw-helm') + ' "$@"\n')
     (bin_dir / 'aigw-helm').write_text(stub); (bin_dir / 'aigw-helm').chmod(0o755)
+    # 차트 checkout = B 의 commit: operations/ 를 commit 하고 to-digests 의 gitSha = HEAD.
+    git = lambda *a: subprocess.run(['git', '-c', 'user.name=selftest', '-c', 'user.email=selftest@invalid', *a], cwd=work, check=True, capture_output=True, text=True).stdout.strip()
+    git('init', '-q'); git('add', 'operations'); git('commit', '-q', '-m', 'selftest checkout')
+    head = git('rev-parse', 'HEAD')
     for name, digest in (('a.json', A), ('b.json', B), ('c.json', C)):
-        (work / name).write_text(json.dumps({'app': digest}))
+        (work / name).write_text(json.dumps({'app': digest, 'buildIdentity': {'gitSha': head}}))
+    (work / 'b-other.json').write_text(json.dumps({'app': B, 'buildIdentity': {'gitSha': 'f' * 40}}))
     env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'], STUB_STATE=str(state_path), STUB_REGISTRY=str(registry_path),
                AIGW_REGISTRY_URL='https://harbor.nori.local', AIGW_HARBOR_READ_USER='robot$reader', AIGW_HARBOR_READ_TOKEN=TOKEN)
     def reset(**extra):
@@ -114,15 +124,25 @@ save()
     def run(args, expected, reason=None, extra_env=None):
         result = subprocess.run(['bash', 'operations/gates/aigw-rollback-rehearsal.sh', *args], cwd=work, env=dict(env, **(extra_env or {})), capture_output=True, text=True)
         assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
-        assert TOKEN not in result.stdout + result.stderr and 'c2VjcmV0' not in result.stdout + result.stderr
+        assert TOKEN not in result.stdout + result.stderr and 'c2VjcmV0' not in result.stdout + result.stderr and 'secret-db-password-sentinel' not in result.stdout + result.stderr
         evidence = [json.loads(p.read_text()) for p in (work / 'evidence').rglob('rollback-rehearsal-*.json')]
         if reason:
             assert result.stderr.strip() == reason and evidence[-1]['reasonCode'] == reason, (result.stderr, evidence)
         checks.append({'args': args[-4:], 'exit': expected, 'reason': reason})
         return evidence[-1] if evidence else None, json.loads(state_path.read_text())
-    base = ['--exec-sha', '0' * 40, '--runconfig', 'main.json']
+    base = ['--runconfig', 'main.json']
     reset(); run(base + ['--from-digests', 'a.json'], 2)
     assert not (work / 'evidence').exists()
+    # checkout: HEAD ≠ B 의 gitSha·operations/ 미커밋 변경 → exit 2, 증거·배포·레지스트리 조회 0.
+    for setup, reason in ((None, 'CHART_CHECKOUT_SHA_MISMATCH'), ('dirty', 'CHART_CHECKOUT_DIRTY')):
+        if setup:
+            (work / 'operations/deploy/untracked.txt').write_text('x\n')
+        reset(); result = subprocess.run(['bash', 'operations/gates/aigw-rollback-rehearsal.sh', *base, '--from-digests', 'a.json', '--to-digests', 'b-other.json' if not setup else 'b.json'],
+                                         cwd=work, env=env, capture_output=True, text=True)
+        assert result.returncode == 2 and result.stderr.strip() == reason, (reason, result.stderr)
+        assert not (work / 'evidence').exists() and not json.loads(state_path.read_text()).get('calls') and not json.loads(registry_path.read_text()).get('calls')
+        checks.append({'args': ['checkout'], 'exit': 2, 'reason': reason})
+    (work / 'operations/deploy/untracked.txt').unlink()
     # 정상: 이미 A(rev 3) → B(4) → rollback 3(5), imageID = A, V 불변, 비밀 출력 0, 레지스트리 자격은 token 교환에만.
     reset()
     evidence, state = run(base + ['--from-digests', 'a.json', '--to-digests', 'b.json'], 0)
@@ -132,12 +152,13 @@ save()
     calls = json.loads(registry_path.read_text())['calls']
     assert [c['auth'] for c in calls] == [None, 'Basic', 'Bearer'] * 4
     assert all(c['url'].startswith('https://harbor.nori.local/') for c in calls)
-    assert all(TOKEN not in ' '.join(c) for c in state['calls']) and 'c2VjcmV0' not in json.dumps(state['calls'])
-    assert set(evidence) <= {'execSha', 'result', 'fromAppDigest', 'toAppDigest', 'migrationsSha256', 'revisions', 'flywayLatestBefore', 'flywayLatestAfter', 'reasonCode'}
-    # A 가 배포돼 있지 않으면 먼저 A 배포.
+    assert all(TOKEN not in ' '.join(c) for c in state['calls']) and 'c2VjcmV0' not in json.dumps(state['calls']) and 'secret-db-password-sentinel' not in json.dumps(state['calls'])
+    assert evidence['chartRepoSha'] == head and ['psql', '-X', '-q', '-w', '-A', '-t', '-c', 'SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1'] in state['calls']
+    assert set(evidence) <= {'chartRepoSha', 'result', 'fromAppDigest', 'toAppDigest', 'migrationsSha256', 'revisions', 'flywayLatestBefore', 'flywayLatestAfter', 'reasonCode'}
+    # A 가 배포돼 있지 않으면 이 checkout(B commit) 차트로 A 를 배포하지 않고 NOT_RUN.
     reset(deployed=B, history={'3': B})
-    evidence, state = run(base + ['--from-digests', 'a.json', '--to-digests', 'b.json'], 0)
-    assert evidence['revisions'] == [4, 5, 6]
+    evidence, state = run(base + ['--from-digests', 'a.json', '--to-digests', 'b.json'], 2, 'FROM_NOT_DEPLOYED')
+    assert evidence['result'] == 'NOT_RUN' and not any(c[0] in ('aigw-helm', 'helm') for c in state.get('calls', []))
     # NOT_RUN: 같은 이미지·다른 스키마·label 없음 → exit 2, 배포 호출 0.
     for to, reason, extra in (('a.json', 'SECOND_SAME_SCHEMA_IMAGE_MISSING', None), ('c.json', 'SCHEMA_DIFFERS', None), ('c.json', 'LABEL_MISSING', {'NO_LABEL': '1'})):
         registry_mode['no_label'] = bool(extra)

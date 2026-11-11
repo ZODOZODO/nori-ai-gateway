@@ -1,6 +1,6 @@
 """단계 게이트(Plan P15 `aigw-stage-gate.sh`, §4.1 단계 게이트 명령 정본·§11.9 행렬). P16·P21·P22·P25·P28·P29 가 운영자 호스트에서 쓴다.
 
-순서: 입력·SPEC 실제 바이트·runconfig profile·부모 회차 신원 확인 → ① spec-guard(exit≠0 → 3) → ② 검증 자격 check(MISSING → RUN ABORTED·12)
+순서: 입력·SPEC 실제 바이트·runconfig profile·차트 checkout(operations/ 미커밋 0·HEAD = 이미지 GIT_SHA, 실패 exit 2 — §4.1 2026-11-10)·부모 회차 신원 확인 → ① spec-guard(exit≠0 → 3) → ② 검증 자격 check(MISSING → RUN ABORTED·12)
 → ②' 런타임 자격 check(MISSING → RUN ABORTED·13) → ③ aigw-helm deploy|suite-only(실패·재배포 0 suite 의 앱 Pod 변화 → RUN ABORTED·11)
 → ④ helm test --logs(성공·실패 무관 저장 — 블록·helm 상태 줄만, .sha256) → ⑤ ingest(acceptance, 복원 RTO 는 ops) → ⑥ gate(행렬의 생략 suite 제외)
 → ⑦ 종료 코드(수집·보고 뒤에만 전파): deploy 11, test 10, 자격 12/13, ingest·gate 실패는 그 rc, 그 밖 0(게이트 PASS 아님 — 판정은 GATE-REPORT.md).
@@ -37,7 +37,7 @@ MATRIX = {
     'F4-RESTORE-MUTATE': ('ai-gateway', 'suite-only', 'F4', 'F4', 'F4', 'evidence/F4/restore/acceptance-F4-RESTORE-MUTATE-{utc}.log', False),
     'F4-RESTORE': ('ai-gateway-restore', 'deploy', 'F4', 'RESTORE', 'F4', 'evidence/F4/restore/acceptance-F4-RESTORE-{utc}.log', True),
 }
-VALUE_FLAGS = ('--stage', '--exec-sha', '--image-digests', '--runconfig', '--test-timeout-seconds', '--spec', '--release', '--parent-run-id',
+VALUE_FLAGS = ('--stage', '--image-digests', '--runconfig', '--test-timeout-seconds', '--spec', '--release', '--parent-run-id',
                '--rubric-targets', '--outage-phase', '--fixture-catalog', '--set-extra', '--clock-initial', '--backup-point', '--prep-manifest', '--restore-started-at')
 HELM_STATUS = re.compile(r'^(NAME|LAST DEPLOYED|NAMESPACE|STATUS|REVISION|TEST SUITE|Last Started|Last Completed|Phase):')
 ISO = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$')
@@ -71,10 +71,10 @@ def parse(argv, environ):
     suite = options.get('--stage')
     if suite not in MATRIX:
         raise Stop('STAGE_INVALID', 2)
-    for flag in ('--exec-sha', '--image-digests', '--runconfig', '--test-timeout-seconds'):
+    for flag in ('--image-digests', '--runconfig', '--test-timeout-seconds'):
         if not options.get(flag):
             raise Stop('ARGUMENT_MISSING:' + flag[2:], 2)
-    if not re.fullmatch(r'[0-9a-f]{40}', options['--exec-sha']) or not re.fullmatch(r'[1-9][0-9]{0,4}', options['--test-timeout-seconds']):
+    if not re.fullmatch(r'[1-9][0-9]{0,4}', options['--test-timeout-seconds']):
         raise Stop('ARGUMENT_INVALID', 2)
     spec = options.get('--spec') or environ.get('AIGW_SPEC_FILE')
     if not spec or not pathlib.Path(spec).is_file():
@@ -113,6 +113,14 @@ def image_identity(path):
         if run(['python3', '-B', 'operations/deploy/app_render.py', 'digests', path, str(out)]).returncode != 0:
             raise Stop('IMAGE_DIGESTS_INVALID', 2)
         return json.loads(json.loads(out.read_text())['buildIdentityJson'])
+
+
+def chart_checkout(digests):
+    """배포 checkout 검사(aigw-helm.sh 와 같은 app_render.py checkout). 실패는 부작용(부모 회차 발급·증거) 전 exit 2."""
+    result = run(['python3', '-B', 'operations/deploy/app_render.py', 'checkout', digests])
+    if result.returncode != 0:
+        raise Stop(result.stderr.decode('ascii', 'replace').strip() or 'CHART_CHECKOUT_UNREADABLE', 2)
+    return result.stdout.decode('ascii', 'replace').strip()
 
 
 def parent_manifest(stage, parent):
@@ -192,7 +200,7 @@ class Gate:
                          'buildIdentity': dict(identity, appImageDigest=app_digest or 'UNVERIFIED', acceptanceImageDigest=acceptance_digest or 'UNVERIFIED')}, 'parent-manifest')
 
     def helm_arguments(self, mode):
-        args = ['bash', 'operations/deploy/aigw-helm.sh', '--release', self.release, '--mode', mode, '--exec-sha', self.options['--exec-sha'],
+        args = ['bash', 'operations/deploy/aigw-helm.sh', '--release', self.release, '--mode', mode,
                 '--runconfig', self.options['--runconfig'], '--image-digests', self.options['--image-digests'], '--suite', self.suite,
                 '--spec-file', self.spec, '--parent-run-id', self.parent]
         for flag in ('--fixture-catalog', '--clock-initial', '--backup-point', '--outage-phase', '--set-extra', '--prep-manifest', '--rubric-targets'):
@@ -203,6 +211,7 @@ class Gate:
     def execute(self):
         runconfig_profile(self.options['--runconfig'], self.release)
         identity = image_identity(self.options['--image-digests'])
+        chart_checkout(self.options['--image-digests'])
         if run(['bash', './gradlew', ':gateway-eval:run', '--args=spec-guard --spec ' + self.spec + ' --baseline docs/gates/spec-baseline.md', '--no-daemon']).returncode != 0:
             raise Stop('SPEC_GUARD_FAILED', 3)
         new_parent = self.parent is None

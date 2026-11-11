@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 검증 환경 일일 백업(Plan P15 M-6). 백업 이미지 안에서 db-chart CronJob 명령으로만 실행한다.
+# 검증 환경 일일 백업(Plan P15 M-6). 백업 이미지 안에서 앱 차트 CronJob(ai-gateway-db-backup) 명령으로만 실행한다.
 # 입력(env): PGHOST·PGUSER(단일 계정 — 이름은 env 로만)·PGPASSWORD(Secret)·PGDATABASE(nori_ai_gateway)·PGPORT,
 #   AIGW_BACKUP_DESTINATION, AIGW_BACKUP_AGE_RECIPIENT, AIGW_BACKUP_RETENTION_DAYS, AIGW_BACKUP_DEST_TYPE(이미지 고정),
 #   AIGW_BACKUP_CREDENTIALS_DIR(목적지 Secret 마운트), 선택 AIGW_BACKUP_DEST_OVERRIDE=unreachable-probe(경보 주입 전용).

@@ -78,6 +78,10 @@ sys.exit(9)
     tampered = work / 'tampered.md'; tampered.write_bytes('# 변조 SPEC\n'.encode())
     (work / 'main.json').write_text(json.dumps({'purpose': 'deploy', 'profile': 'main'}))
     (work / 'restore.json').write_text(json.dumps({'purpose': 'deploy', 'profile': 'restore'}))
+    # 차트 checkout 검사(§4.1 2026-11-10): operations/(stub 포함)를 commit 한 git checkout 이고 이미지 gitSha = HEAD 여야 진행한다.
+    git = lambda *a: subprocess.run(['git', '-c', 'user.name=selftest', '-c', 'user.email=selftest@invalid', *a], cwd=work, check=True, capture_output=True, text=True).stdout.strip()
+    git('init', '-q'); git('add', 'operations'); git('commit', '-q', '-m', 'selftest checkout')
+    IDENTITY['gitSha'] = git('rev-parse', 'HEAD')
     (work / 'digests.json').write_text(json.dumps({'app': APP, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
     (work / 'other-digests.json').write_text(json.dumps({'app': 'sha256:' + '9' * 64, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
     for name in ('targets.json', 'prep.json', 'catalog.yaml'):
@@ -88,7 +92,7 @@ sys.exit(9)
                     STUB_IDENTITY=json.dumps({'appImageDigest': APP, 'acceptanceImageDigest': ACC, 'buildIdentity': IDENTITY}))
     for key in ('AIGW_SPEC_FILE', 'AIGW_STAGE_GATE_EXPORT', 'AIGW_STAGE_GATE_REAL_SPEC'):
         base_env.pop(key, None)
-    common = ['--exec-sha', 'a' * 40, '--image-digests', 'digests.json', '--test-timeout-seconds', '60']
+    common = ['--image-digests', 'digests.json', '--test-timeout-seconds', '60']
     def run(args, expected, stderr=None, pods_seq=None, selector_pods=None, keep_evidence=False, **extra_env):
         if not keep_evidence:
             shutil.rmtree(work / 'evidence', ignore_errors=True)
@@ -119,7 +123,16 @@ sys.exit(9)
     result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(tampered)] + common, 3, 'SPEC_GUARD_FAILED')
     assert not deployed(calls) and not ingests()
     result, calls = run(['--stage', 'F9', '--runconfig', 'main.json', '--spec', str(spec)] + common, 2, 'STAGE_INVALID'); assert calls == []
-    run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--exec-sha', 'a' * 40, '--image-digests', 'digests.json'], 2, 'ARGUMENT_MISSING:test-timeout-seconds')
+    run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--image-digests', 'digests.json'], 2, 'ARGUMENT_MISSING:test-timeout-seconds')
+
+    # ── 차트 checkout: operations/ 미추적·수정 파일 또는 이미지 gitSha ≠ HEAD → exit 2, 부모 회차·자격·배포·증거 0 ──
+    (work / 'mismatch-digests.json').write_text(json.dumps({'app': APP, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': dict(IDENTITY, gitSha='f' * 40)}))
+    result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--image-digests', 'mismatch-digests.json', '--test-timeout-seconds', '60'], 2, 'CHART_CHECKOUT_SHA_MISMATCH')
+    assert calls == [] and gradle_calls() == [] and result.stdout == '' and not (work / 'evidence').exists()
+    (work / 'operations/deploy/helm/ai-gateway/templates/untracked.yaml').write_text('kind: ConfigMap\n')
+    result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec)] + common, 2, 'CHART_CHECKOUT_DIRTY')
+    assert calls == [] and gradle_calls() == [] and result.stdout == '' and not (work / 'evidence').exists()
+    (work / 'operations/deploy/helm/ai-gateway/templates/untracked.yaml').unlink()
 
     # ── 정상 F1(새 부모): stdout 에 AIGW_PARENT_RUN_ID= 정확히 1줄, 그 값 = PARENT runId = parentRunId, 실제 앱·수용 Pod digest ──
     result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec)] + common, 0)
@@ -150,7 +163,7 @@ sys.exit(9)
     # ── 같은 부모로 다른 앱 digest → exit 2 PARENT_IDENTITY_MISMATCH·배포 0 / 같은 digest 는 진행 ──
     run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec)] + common, 0)
     parent = next(r['parentRunId'] for r in records('F1') if r['status'] == 'PARENT')
-    result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--parent-run-id', parent, '--exec-sha', 'a' * 40,
+    result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--parent-run-id', parent,
                          '--image-digests', 'other-digests.json', '--test-timeout-seconds', '60'], 2, 'PARENT_IDENTITY_MISMATCH', keep_evidence=True)
     assert not deployed(calls)
     run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--parent-run-id', 'F1-unknown'] + common, 2, 'PARENT_MANIFEST_MISSING', keep_evidence=True)
@@ -176,7 +189,7 @@ sys.exit(9)
     assert list((work / 'evidence/F1').glob('acceptance-*.log.sha256')) and any('--source acceptance' in c for c in ingests()) and gates()
     # ── helm test 무응답 → --test-timeout-seconds+120 초에 강제 종료, 로그·ingest·gate 뒤 exit 10 ──
     started = time.monotonic()
-    run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--exec-sha', 'a' * 40, '--image-digests', 'digests.json', '--test-timeout-seconds', '1'], 10, STUB_TEST_SLEEP='600')
+    run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--image-digests', 'digests.json', '--test-timeout-seconds', '1'], 10, STUB_TEST_SLEEP='600')
     assert 120 <= time.monotonic() - started < 200
     assert list((work / 'evidence/F1').glob('acceptance-*.log.sha256')) and any('--source acceptance' in c for c in ingests()) and gates() and report('F1')
     # ── 자격: 검증 MISSING → 배포 0·12, 런타임 MISSING → 배포 0·13 ──

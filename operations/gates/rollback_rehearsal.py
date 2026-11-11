@@ -1,8 +1,11 @@
 """배포 rollback 리허설(Plan P15 L-6, P16 사용). 같은 스키마(aigw.migrations.sha256 label 동일)의 서로 다른 두 앱 이미지 A·B 로
 A 배포(revision N) → B 업그레이드(N+1) → helm rollback N(N+2) → readiness·Pod imageID = A·Flyway 최신 V 불변을 확인한다.
-증거 = evidence/F1/gates/rollback-rehearsal-<UTC>.json(revision 3개·digest 2개·V 값·판정만). 자격 값은 env·stdin·메모리만.
+차트는 이 checkout 에서 읽으므로(§4.1 2026-11-10) checkout 은 B 의 commit 이어야 한다(operations/ 미커밋 0·HEAD = B 의 gitSha, 아니면 부작용 전 exit 2).
+A 는 이 checkout 의 차트로 배포하지 않는다 — A 의 commit checkout 에서 먼저 배포돼 있어야 하며 아니면 NOT_RUN(FROM_NOT_DEPLOYED).
+Flyway 최신 V 는 공유 서버 nori_ai_gateway 를 운영자 호스트 psql 로 읽는다(자격 = Secret ai-gateway-config 의 단일 계정 두 키 → psql 프로세스 env, 명령행·출력 0).
+증거 = evidence/F1/gates/rollback-rehearsal-<UTC>.json(chartRepoSha·revision 3개·digest 2개·V 값·판정만). 자격 값은 env·stdin·메모리만.
 
-종료: 0 PASS, 1 FAIL(단계 실패 — 증거 기록), 2 입력 오류·NOT_RUN(SECOND_SAME_SCHEMA_IMAGE_MISSING·SCHEMA_DIFFERS·LABEL_MISSING — 증거 기록).
+종료: 0 PASS, 1 FAIL(단계 실패 — 증거 기록), 2 입력 오류(checkout 포함 — 증거 0)·NOT_RUN(SECOND_SAME_SCHEMA_IMAGE_MISSING·SCHEMA_DIFFERS·LABEL_MISSING·FROM_NOT_DEPLOYED — 증거 기록).
 """
 import base64
 import datetime
@@ -19,8 +22,7 @@ import urllib.request
 
 REGISTRY, REPOSITORY = 'harbor.nori.local', 'nori-tc/ai-gateway'
 MANIFEST_TYPES = 'application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
-FLYWAY_PROBE = ('IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -X -q -w -A -t -h 127.0.0.1 -U aigw_acceptance_ro -d ai_gateway '
-                '-c "SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"')
+FLYWAY_QUERY = 'SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1'
 
 
 class Stop(Exception):
@@ -128,7 +130,7 @@ def migrations_label(digest):
 
 
 def deploy(arguments, digests_file):
-    result = run(['bash', 'operations/deploy/aigw-helm.sh', '--release', 'ai-gateway', '--mode', 'deploy', '--exec-sha', arguments['exec_sha'],
+    result = run(['bash', 'operations/deploy/aigw-helm.sh', '--release', 'ai-gateway', '--mode', 'deploy',
                   '--runconfig', arguments['runconfig'], '--image-digests', digests_file, '--suite', 'none'])
     if result.returncode != 0:
         raise Stop('DEPLOY_FAILED', 1)
@@ -175,12 +177,16 @@ def pods_ready_with(digest):
 
 
 def flyway_latest():
-    secret = kubectl_json('get', 'secret', 'ai-gateway-db-acceptance-ro')
+    secret = kubectl_json('get', 'secret', 'ai-gateway-config')
     try:
-        password = base64.b64decode(secret['data']['password'])
+        user, password = (base64.b64decode(secret['data'][key]).decode().strip() for key in ('AI_GATEWAY_DB_USER', 'AI_GATEWAY_DB_PASSWORD'))
     except (KeyError, ValueError, TypeError):
-        raise Stop('ACCEPTANCE_DB_SECRET_MISSING', 1)
-    result = run(['kubectl', '-n', 'tc', 'exec', '-i', 'ai-gateway-db-0', '--', 'sh', '-c', FLYWAY_PROBE], stdin=password.strip() + b'\n')
+        raise Stop('DB_ACCOUNT_SECRET_MISSING', 1)
+    environment = dict(os.environ, PGHOST='192.168.0.150', PGPORT='15432', PGDATABASE='nori_ai_gateway', PGUSER=user, PGPASSWORD=password)
+    try:
+        result = subprocess.run(['psql', '-X', '-q', '-w', '-A', '-t', '-c', FLYWAY_QUERY], capture_output=True, env=environment)
+    except OSError:
+        raise Stop('FLYWAY_QUERY_FAILED', 1)
     version = result.stdout.decode('ascii', 'replace').strip()
     if result.returncode != 0 or not re.fullmatch(r'[0-9][0-9._]{0,31}', version):
         raise Stop('FLYWAY_QUERY_FAILED', 1)
@@ -204,9 +210,9 @@ def rehearse(arguments, evidence):
     evidence['migrationsSha256'] = label_a
     if label_a != label_b:
         raise Stop('SCHEMA_DIFFERS', 2)
-    # ① A(이미 A 면 현재 revision 을 N 으로 확인)
+    # ① A 가 이미 배포돼 있어야 한다(현재 revision = N). 이 checkout(B commit)의 차트로 A 를 배포하지 않는다.
     if deployed_digest() != a:
-        deploy(arguments, arguments['from'])
+        raise Stop('FROM_NOT_DEPLOYED', 2)
     if not pods_ready_with(a):
         raise Stop('FROM_NOT_READY', 1)
     base, version_before = revision(), flyway_latest()
@@ -232,8 +238,16 @@ def rehearse(arguments, evidence):
         raise Stop('SCHEMA_VERSION_CHANGED', 1)
 
 
+def chart_checkout(digests_path):
+    """aigw-helm.sh 와 같은 checkout 검사(app_render.py checkout). stdout = chartRepoSha."""
+    result = run(['python3', '-B', 'operations/deploy/app_render.py', 'checkout', digests_path])
+    if result.returncode != 0:
+        raise Stop(result.stderr.decode('ascii', 'replace').strip() or 'CHART_CHECKOUT_UNREADABLE', 2)
+    return result.stdout.decode('ascii', 'replace').strip()
+
+
 def main(argv):
-    names = {'--exec-sha': 'exec_sha', '--runconfig': 'runconfig', '--from-digests': 'from', '--to-digests': 'to'}
+    names = {'--runconfig': 'runconfig', '--from-digests': 'from', '--to-digests': 'to'}
     arguments = {}
     if len(argv) % 2:
         print('ARGUMENT_MISSING', file=sys.stderr); return 2
@@ -242,9 +256,13 @@ def main(argv):
             print('ARGUMENT_INVALID', file=sys.stderr); return 2
         arguments[names[flag]] = value
     missing = [flag for flag, key in names.items() if not arguments.get(key)]
-    if missing or not re.fullmatch(r'[0-9a-f]{40}', arguments['exec_sha']):
-        print('ARGUMENT_MISSING' if missing else 'EXEC_SHA_REQUIRED', file=sys.stderr); return 2
-    evidence = {'execSha': arguments['exec_sha'], 'result': 'PASS'}
+    if missing:
+        print('ARGUMENT_MISSING', file=sys.stderr); return 2
+    try:
+        chart_repo_sha = chart_checkout(arguments['to'])
+    except Stop as stop:
+        print(stop.code, file=sys.stderr); return stop.exit_code
+    evidence = {'chartRepoSha': chart_repo_sha, 'result': 'PASS'}
     code = 0
     try:
         rehearse(arguments, evidence)

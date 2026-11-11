@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aigw-backup-alert-injection.sh 셀프시험(Plan P15 ④'): stub kubectl·stub gradlew·loopback 가짜 Prometheus 로만 실행한다. 실제 클러스터·경보 전달 0.
+# aigw-backup-alert-injection.sh 셀프시험(Plan P15 ④'): stub kubectl·stub psql·stub gradlew·loopback 가짜 Prometheus 로만 실행한다. 실제 클러스터·DB·경보 전달 0.
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 exec python3 -B - "$@" <<'PY'
@@ -28,15 +28,31 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
     bin_dir = work / 'bin'; bin_dir.mkdir()
     (bin_dir / 'kubectl').write_text('#!/bin/sh\nexec python3 -B ' + str(work / 'operations/gates/selftest_kubectl_stub.py') + ' "$@"\n'); (bin_dir / 'kubectl').chmod(0o755)
     (bin_dir / 'sleep').write_text('#!/bin/sh\nexit 0\n'); (bin_dir / 'sleep').chmod(0o755)
+    # psql stub: 공유 서버·단일 계정 자격이 env 로만 왔을 때 state.backup_rows 를 차례로 낸다. state.fail.psql 이면 실패.
+    (bin_dir / 'psql').write_text('''#!/usr/bin/env python3
+import json, os, sys
+state_path = os.environ['STUB_STATE']; state = json.load(open(state_path))
+sql = sys.stdin.read()
+env_ok = (os.environ.get('PGHOST'), os.environ.get('PGPORT'), os.environ.get('PGDATABASE'), os.environ.get('PGUSER'), os.environ.get('PGPASSWORD')) == \\
+    ('192.168.0.150', '15432', 'nori_ai_gateway', 'account-name-sentinel', 'DB-PASSWORD-SENTINEL-VALUE')
+open(os.environ['STUB_LOG'], 'a').write(json.dumps({'args': ['psql'] + sys.argv[1:], 'stdin': sql, 'envOk': env_ok}) + '\\n')
+if state.get('fail', {}).get('psql') or not env_ok:
+    sys.exit(2)
+rows = state.setdefault('backup_rows', [])
+sys.stdout.write(rows.pop(0) if len(rows) > 1 else (rows[0] if rows else ''))
+json.dump(state, open(state_path, 'w'))
+'''); (bin_dir / 'psql').chmod(0o755)
     (work / 'gradlew').write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_GRADLE_LOG"\nexit "${STUB_GRADLE_RC:-0}"\n')
     spec = work / 'spec.md'; spec.write_text('# 시험 SPEC 바이트\n')
     state_path, log_path, gradle_log = work / 'state.json', work / 'calls.jsonl', work / 'gradle.log'
     env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'], STUB_STATE=str(state_path), STUB_LOG=str(log_path), STUB_GRADLE_LOG=str(gradle_log))
     env.pop('AIGW_SPEC_FILE', None)
     secret_value = 'S3CRET-DESTINATION-SENTINEL-VALUE'
+    db_password = 'DB-PASSWORD-SENTINEL-VALUE'
     cron = {'spec': {'jobTemplate': {'spec': {'template': {'spec': {'containers': [{'name': 'backup', 'env': [{'name': 'AIGW_BACKUP_DESTINATION', 'value': 'https://dest/x'}]}]}}}}}}
     def reset(**extra):
-        state = {'cronjobs': {'ai-gateway-db-backup': cron}, 'secrets': {'ai-gateway-backup-destination': {'secret-key': base64.b64encode(secret_value.encode()).decode()}},
+        state = {'cronjobs': {'ai-gateway-db-backup': cron}, 'secrets': {'ai-gateway-backup-destination': {'secret-key': base64.b64encode(secret_value.encode()).decode()},
+                 'ai-gateway-config': {'AI_GATEWAY_DB_USER': base64.b64encode(b'account-name-sentinel').decode(), 'AI_GATEWAY_DB_PASSWORD': base64.b64encode(db_password.encode()).decode()}},
                  'backup_rows': ['7', '1:8:FAILED:UPLOAD', '1:9:SUCCESS:'], 'fail': {}}
         state.update(extra)
         state_path.write_text(json.dumps(state)); log_path.write_text(''); gradle_log.write_text('')
@@ -70,8 +86,9 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
     assert not any(c['args'][0] in ('apply', 'patch', 'edit', 'replace', 'delete', 'set', 'annotate', 'label') for c in log), '공유 리소스 변경 0'
     assert json.loads(state_path.read_text())['cronjobs']['ai-gateway-db-backup'] == cron
     # 새 행 결속: 기준 id 조회 → 기준 이후 행 → 주입 행 이후 행(고정 SQL 의 id 경계).
-    sql = [c['stdin'] for c in log if c['args'][0] == 'exec']
+    sql = [c['stdin'] for c in log if c['args'][0] == 'psql']
     assert len(sql) == 3 and 'max(id)' in sql[0] and 'WHERE id > 7' in sql[1] and 'WHERE id > 8' in sql[2]
+    assert all(c['envOk'] for c in log if c['args'][0] == 'psql') and all(db_password not in ' '.join(c['args']) for c in log), '자격은 env 로만'
     files = list((work / 'evidence/F4/ops').glob('*.json'))
     record = record_file()
     assert len(files) == 1 and isinstance(record, dict)
@@ -80,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
     assert record['values']['alertFiring'] is True and record['values']['alertReceiptConfirmed'] is False
     assert record['specShaSource'] == 'FILE_HASHED' and len(record['contentSha256']) == 64
     text = json.dumps(record) + out.stdout + out.stderr
-    assert secret_value not in text and 'https://dest' not in text
+    assert secret_value not in text and 'https://dest' not in text and db_password not in text
     ingest = gradle_log.read_text()
     assert f'ingest --stage F4 --parent-run-id {parent}' in ingest and '--source ops' in ingest and str(spec) in ingest
 
@@ -97,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
     run(['--parent-run-id', parent] + base, 1)
     assert record_file()['values']['failedRowObserved'] is False
     # 기준 id 조회 실패는 0 행이 아니라 중단: Job 생성 0·레코드 0.
-    reset(fail={'exec:ai-gateway-db-0': 1})
+    reset(fail={'psql': 1})
     run(['--parent-run-id', parent] + base, 1, 'BACKUP_RUN_QUERY_FAILED')
     assert not any(c['args'][0] == 'create' for c in calls()) and not (work / 'evidence/F4/ops').exists()
     # Job 생성 실패는 레코드 없이 exit 1.
@@ -105,5 +122,5 @@ with tempfile.TemporaryDirectory(prefix='aigw-alert-injection-test-') as tempora
     run(['--parent-run-id', parent] + base, 1, 'JOB_CREATE_FAILED')
     assert not (work / 'evidence/F4/ops').exists() or not list((work / 'evidence/F4/ops').glob('*.json'))
 server.shutdown()
-print(json.dumps({'status': 'PASS', 'boundary': 'LOCAL stub kubectl/gradlew/loopback Prometheus only', 'count': len(checks)}))
+print(json.dumps({'status': 'PASS', 'boundary': 'LOCAL stub kubectl/psql/gradlew/loopback Prometheus only', 'count': len(checks)}))
 PY
