@@ -49,7 +49,7 @@ class EvidenceBlockWriterTest {
     @Test void blockCarriesRunMeasurementAndRubricRecordsWithVerifiableHash() {
         var records = List.of(
             EvidenceBlockWriter.record(CONTEXT, Map.of("kind", "RUN", "status", "COMPLETED", "executedTestCount", 3)),
-            EvidenceBlockWriter.record(CONTEXT, Map.of("kind", "MEASUREMENT", "measurementId", "ops:restore-rto", "values", Map.of("seconds", 12.5))),
+            EvidenceBlockWriter.record(CONTEXT, Map.of("kind", "MEASUREMENT", "measurementId", "f4:job-latency-samples", "values", Map.of("seconds", 12.5))),
             EvidenceBlockWriter.record(CONTEXT, Map.of("kind", "LEAF", "producer", "RUBRIC", "componentId", "RB:F4-RUBRIC", "leafId", "AC-02-MISSING", "result", "PASS", "answerSha256", "d".repeat(64))));
         var buffer = new ByteArrayOutputStream();
         EvidenceBlockWriter.write(new PrintStream(buffer, true, StandardCharsets.UTF_8), records);

@@ -48,7 +48,7 @@ NORI 공용 AI Gateway(Java 21, Spring Boot 4, Gradle 멀티 모듈, 헥사고�
 
 - 금지 의존: core → 다른 모듈/Spring/JDBC, adapter ↔ adapter, tc-mock → db/integration/app, eval → gateway 모듈. ArchUnit 시험이 강제한다.
 - 빈 등록은 `@ComponentScan` 없이 각 모듈 `*ModuleConfiguration` 의 `@Import` 로 명시한다. 새 `@Component`·`@Service`·`@RestController` 를 추가하면 같은 모듈 `*ModuleConfiguration` 의 import 와 `@Import` 를 함께 바꾼다. core 타입 빈은 app 의 `CoreBeansConfiguration` `@Bean` 으로만 등록한다. `ModuleConfigurationCompletenessTest` 가 누락을 FAIL 로 잡는다.
-- 운영 도구는 `operations/`, Dockerfile 은 `operations/deploy/docker/`, helm 차트는 `operations/deploy/helm/ai-gateway/`·`operations/deploy/helm/ai-gateway-db-restore/`(U6 에서 `nori-tc-exec` 에서 이관), 배포 설정은 루트 `config/ai-gateway-*.properties`, runbook 은 `docs/runbooks/` 다.
+- 운영 도구는 `operations/`, Dockerfile 은 `operations/deploy/docker/`, helm 차트는 `operations/deploy/helm/ai-gateway/`(U6 에서 `nori-tc-exec` 에서 이관), 배포 설정은 루트 `config/ai-gateway-*.properties`, runbook 은 `docs/runbooks/` 다.
 
 ## 5. 검증 명령
 
@@ -69,7 +69,7 @@ Windows PowerShell, cwd `C:/workspace_nori/nori-ai-gateway`, 각 명령은 별�
 - 스키마 정본은 루트 `flyway/sql/` 의 순서대로 적용된 최종 상태다(U5 이전에는 `modules/adapter/ai-gateway-db-adapter/src/main/resources/db/migration/gateway/`). 이력 schema 는 `gw_flyway` 다. 적용은 루트 Gradle Flyway 플러그인과 CI `migrate` stage 가 하며, 앱은 `spring.flyway.enabled=false` + `SchemaVersionGuard`(빌드 때 앱 리소스로 복사한 `flyway/sql` 사본과 실제 이력 비교)다.
 - migration 은 forward-only 다. 적용된 V 파일을 고치거나 지우거나 번호를 바꾸지 않는다. 새 V 번호는 Plan 의 phase 별 예약(§7 L-1·§8)을 따른다.
 - 공유 서버에 대한 `flywayMigrate`, 수동 DDL/DML 은 CI `migrate` stage 또는 사용자의 명시 지시로만 한다. 로컬 확인은 격리된 시험 컨테이너에 한다.
-- 복원 리허설 대상은 리허설 동안만 쓰는 임시 k8s PostgreSQL 인스턴스다(운영 DB 아님).
+- 자동 백업·복원은 없다. 백업·복원은 사용자가 요청할 때만 별도 작업으로 한다(SPEC §12.4).
 
 ## 7. nori-wm 과 의도적으로 다른 점
 

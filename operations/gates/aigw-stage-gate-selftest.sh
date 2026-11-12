@@ -15,7 +15,7 @@ def pod(uid, restarts, digest=APP, ready='2026-11-07T01:00:30Z'):
     return {'metadata': {'uid': uid, 'labels': {'pod-template-hash': 'h1'}},
             'status': {'conditions': [{'type': 'Ready', 'status': 'True', 'lastTransitionTime': ready}],
                        'containerStatuses': [{'restartCount': restarts, 'imageID': 'docker-pullable://x@' + digest}]}}
-ACCEPTANCE_PODS = {'job-name=ai-gateway-acceptance': [pod('a1', 0, ACC)], 'job-name=ai-gateway-restore-acceptance': [pod('a2', 0, ACC)]}
+ACCEPTANCE_PODS = {'job-name=ai-gateway-acceptance': [pod('a1', 0, ACC)]}
 
 with tempfile.TemporaryDirectory(prefix='aigw-stage-gate-test-') as temporary:
     work = pathlib.Path(temporary)
@@ -82,8 +82,8 @@ sys.exit(9)
     git = lambda *a: subprocess.run(['git', '-c', 'user.name=selftest', '-c', 'user.email=selftest@invalid', *a], cwd=work, check=True, capture_output=True, text=True).stdout.strip()
     git('init', '-q'); git('add', 'operations'); git('commit', '-q', '-m', 'selftest checkout')
     IDENTITY['gitSha'] = git('rev-parse', 'HEAD')
-    (work / 'digests.json').write_text(json.dumps({'app': APP, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
-    (work / 'other-digests.json').write_text(json.dumps({'app': 'sha256:' + '9' * 64, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
+    (work / 'digests.json').write_text(json.dumps({'app': APP, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
+    (work / 'other-digests.json').write_text(json.dumps({'app': 'sha256:' + '9' * 64, 'acceptance': ACC, 'buildIdentity': IDENTITY}))
     for name in ('targets.json', 'prep.json', 'catalog.yaml'):
         (work / name).write_text('{}\n')
     state = work / 'state.json'
@@ -126,7 +126,7 @@ sys.exit(9)
     run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--image-digests', 'digests.json'], 2, 'ARGUMENT_MISSING:test-timeout-seconds')
 
     # ── 차트 checkout: operations/ 미추적·수정 파일 또는 이미지 gitSha ≠ HEAD → exit 2, 부모 회차·자격·배포·증거 0 ──
-    (work / 'mismatch-digests.json').write_text(json.dumps({'app': APP, 'backup': 'sha256:' + '2' * 64, 'acceptance': ACC, 'buildIdentity': dict(IDENTITY, gitSha='f' * 40)}))
+    (work / 'mismatch-digests.json').write_text(json.dumps({'app': APP, 'acceptance': ACC, 'buildIdentity': dict(IDENTITY, gitSha='f' * 40)}))
     result, calls = run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec), '--image-digests', 'mismatch-digests.json', '--test-timeout-seconds', '60'], 2, 'CHART_CHECKOUT_SHA_MISMATCH')
     assert calls == [] and gradle_calls() == [] and result.stdout == '' and not (work / 'evidence').exists()
     (work / 'operations/deploy/helm/ai-gateway/templates/untracked.yaml').write_text('kind: ConfigMap\n')
@@ -201,22 +201,12 @@ sys.exit(9)
     result, calls = run(['--stage', 'F3-PROBE', '--runconfig', 'main.json', '--spec', str(spec)] + common, 0)
     assert 'verify-credentials check --stage F2' in calls and any(c.startswith('runtime-credentials check --stage F2') for c in calls)
     assert not gates() and list((work / 'evidence/F3/gates').glob('acceptance-probe-*.log')) and all(' --stage F3 ' in c for c in ingests())
-    # ── F4-RESTORE: 필수 인자·profile·RESTORE 런타임 단계·RTO 측정·gate 실행(Plan 의 gate 생략 = F3-PROBE·F4-PERF·F4-RESTORE-PREP·F4-RESTORE-MUTATE 만) ──
-    restore_args = ['--stage', 'F4-RESTORE', '--spec', str(spec), '--prep-manifest', 'prep.json', '--backup-point', '2026-11-06T00:00:00Z',
-                    '--clock-initial', '2026-11-06T00:00:00Z', '--restore-started-at', '2026-11-07T01:00:00Z', '--fixture-catalog', 'catalog.yaml'] + common
-    for drop in ('--prep-manifest', '--backup-point', '--clock-initial', '--restore-started-at'):
-        index = restore_args.index(drop)
-        result, calls = run(restore_args[:index] + restore_args[index + 2:] + ['--runconfig', 'restore.json'], 2, 'ARGUMENT_MISSING:' + drop[2:]); assert calls == []
-    result, calls = run(restore_args + ['--runconfig', 'main.json'], 2, 'RUNCONFIG_PROFILE_MISMATCH'); assert not deployed(calls) and not any(c.startswith('helm') for c in calls)
+    # 철회된 백업/복원 suite는 부작용 전에 거부한다.
+    for retired in ('F4-RESTORE-PREP', 'F4-RESTORE-MUTATE', 'F4-RESTORE'):
+        result, calls = run(['--stage', retired, '--runconfig', 'main.json', '--spec', str(spec)] + common, 2, 'STAGE_INVALID')
+        assert calls == []
+    # runconfig profile 은 main 하나뿐이다. 다른 profile 은 배포 전에 거부한다.
     result, calls = run(['--stage', 'F4', '--runconfig', 'restore.json', '--spec', str(spec)] + common, 2, 'RUNCONFIG_PROFILE_MISMATCH'); assert not deployed(calls)
-    result, calls = run(restore_args + ['--runconfig', 'restore.json'], 0, pods_seq=[[pod('r1', 0, ready='2026-11-07T01:07:30Z')]])
-    assert any(c.startswith('runtime-credentials check --stage RESTORE') for c in calls) and 'verify-credentials check --stage F4' in calls
-    helm_call = deployed(calls)[0]
-    assert '--release ai-gateway-restore' in helm_call and '--fixture-catalog catalog.yaml' in helm_call and '--backup-point 2026-11-06T00:00:00Z' in helm_call
-    rto = records('F4', 'measurements')
-    assert len(rto) == 1 and rto[0]['measurementId'] == 'ops:restore-rto' and rto[0]['values'] == {'restoreStartedAt': '2026-11-07T01:00:00Z', 'readyAt': '2026-11-07T01:07:30Z', 'seconds': 450}
-    assert gates() and ' --stage F4 ' in gates()[0] and report('F4')
-    assert [r['buildIdentity']['acceptanceImageDigest'] for r in records('F4') if r['status'] == 'PARENT'] == [ACC]
     # ── ingest·gate 실패 rc 전파(수집 뒤) ──
     run(['--stage', 'F1', '--runconfig', 'main.json', '--spec', str(spec)] + common, 5, STUB_INGEST_RC='5')
     assert gates()
@@ -230,12 +220,10 @@ sys.exit(9)
     if export and real_spec:
         shutil.copy(real_spec, work / 'real-spec.md')
         real_sha = hashlib.sha256((work / 'real-spec.md').read_bytes()).hexdigest()
-        restore_real = [a for a in restore_args if a not in ('--spec', str(spec))] + ['--runconfig', 'restore.json']
         scenarios = {
             'f1-normal': (['--stage', 'F1', '--runconfig', 'main.json'] + common, 0, {}, None),
             'f1-verify-missing': (['--stage', 'F1', '--runconfig', 'main.json'] + common, 12, {'STUB_VERIFY_RC': '12'}, None),
             'f1-no-block': (['--stage', 'F1', '--runconfig', 'main.json'] + common, 0, {'STUB_BLOCK': 'none'}, None),
-            'f4-restore': (restore_real, 0, {}, [[pod('r1', 0, ready='2026-11-07T01:07:30Z')]]),
         }
         for name, (args, expected, extra, pods_seq) in scenarios.items():
             run(args + ['--spec', 'real-spec.md'], expected, pods_seq=pods_seq, STUB_SPEC_SHA=real_sha, **extra)

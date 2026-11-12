@@ -58,16 +58,10 @@ tasks.named<Test>("integrationTest") {
     val pgImage = providers.environmentVariable("AIGW_PG_TEST_IMAGE").orElse("").get()
     inputs.property("aigw.pgTestImage", pgImage)
     systemProperty("aigw.pgTestImage", pgImage)
-    // P15 BackupScriptIT: 승인 backup 이미지(-Paigw.backupImage, 없으면 Dockerfile-backup 로컬 빌드)와 이미지 context 입력 바이트를 시험 지문에 결속한다.
-    val backupImage = providers.gradleProperty("aigw.backupImage").orElse("").get()
-    inputs.property("aigw.backupImage", backupImage)
-    systemProperty("aigw.backupImage", backupImage)
     // 시험 Flyway 는 루트 flyway/sql 을 filesystem 위치로 읽는다. 값은 aigw.rootDir 기준 상대 경로다.
     inputs.dir(rootProject.file("flyway/sql"))
     systemProperty("aigw.flyway.sql.dir", "flyway/sql")
-    for ((key, path) in mapOf("pgBootstrapSha256" to "operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql",
-            "backupDockerfileSha256" to "operations/deploy/docker/Dockerfile-backup", "backupScriptSha256" to "operations/backup/aigw-backup.sh",
-            "restoreScriptSha256" to "operations/backup/aigw-restore.sh", "backupJobColumnsSha256" to "operations/backup/job-columns-v1.txt")) {
+    for ((key, path) in mapOf("pgBootstrapSha256" to "operations/postgres/bootstrap.sql")) {
         val source = rootProject.file(path)
         val digest = MessageDigest.getInstance("SHA-256").digest(source.readBytes()).joinToString("") { "%02x".format(it) }
         inputs.file(source)
@@ -77,8 +71,6 @@ tasks.named<Test>("integrationTest") {
     doFirst {
         if (!pgImage.matches(Regex("[^\\s/@]+(?:/[^\\s/@]+)*:[^\\s/@:]+@sha256:[0-9a-f]{64}")))
             throw GradleException("고정된 PostgreSQL 시험 이미지가 필요합니다")
-        if (backupImage.isNotEmpty() && !backupImage.matches(Regex("harbor\\.nori\\.local/nori-tc/ai-gateway-backup@sha256:[0-9a-f]{64}")))
-            throw GradleException("aigw.backupImage 는 harbor.nori.local/nori-tc/ai-gateway-backup@sha256:<64hex> 형식만 허용합니다")
     }
 }
 

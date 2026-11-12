@@ -32,12 +32,12 @@ class RecordCliTest {
         try(var files=Files.walk(directory.resolve("evidence"))){for(Path file:files.filter(Files::isRegularFile).toList())assertThat(Files.readString(file)).doesNotContain("PRIVATE_SENTINEL");}
     }
     @Test void userRunHasNoAllowlistedLeafAfterTenantPrinciple() throws Exception {
-        // SPEC §26.1 임차 원칙: 서버 측 계층 leaf 3개는 catalog 에서 빠졌고, 남은 AC-33-LOADING·AC-24-RESTORE 의 권위는 readiness stub 수용·복원 수용(§12.4)이라 user-run schema 항목이 없다.
+        // 서버 측 leaf와 철회된 복원 leaf는 catalog에서 제거했고, readiness 수용 leaf는 user-run으로 등록할 수 없다.
         TestSupport f=new TestSupport(directory);EvidenceRepositoryFs repository=new EvidenceRepositoryFs(directory);
         repository.store(f.parent("F2","p"));repository.store(f.parent("F4","p"));ManualRecorder recorder=new ManualRecorder(f.catalog,repository);
         for(String retired:new String[]{"AC-35-TOKEN","AC-35-FW","AC-35-LOCAL"}) TestSupport.error(()->recorder.record("user-run","F2",retired,"r","p",List.of(),f.binding()),4,"UNKNOWN_LEAF_TAG");
         TestSupport.error(()->recorder.record("user-run","F2","AC-33-LOADING","r","p",List.of("restartAt=2026-11-09T00:00:00Z","readinessTransitions=[\"READY\"]"),f.binding()),2,"USER_RUN_LEAF_FORBIDDEN");
-        TestSupport.error(()->recorder.record("user-run","F4","AC-24-RESTORE","r","p",List.of("startedAt=2026-11-09T00:00:00Z","readyAt=2026-11-09T00:01:00Z"),f.binding()),2,"USER_RUN_LEAF_FORBIDDEN");
+        TestSupport.error(()->recorder.record("user-run","F4","AC-24-RESTORE","r","p",List.of("startedAt=2026-11-09T00:00:00Z","readyAt=2026-11-09T00:01:00Z"),f.binding()),4,"UNKNOWN_LEAF_TAG");
         assertThat(repository.readAll("F2").stream().filter(n->n.path("kind").asText().equals("LEAF"))).isEmpty();
         assertThat(repository.readAll("F4").stream().filter(n->n.path("kind").asText().equals("LEAF"))).isEmpty();
     }

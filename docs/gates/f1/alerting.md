@@ -22,7 +22,7 @@
 | AIGW-RETENTION-PURGE-FAILED | `aigw_retention_purge_failures_total` + 고정 로그 코드 `RETENTION_PURGE_FAILED` (정리 Job 실패, 또는 성공한 주기 뒤 남은 가장 오래된 대화 만료가 그 주기 Gateway Clock보다 24h 초과 — 정각은 초과 아님, 주기당 1회) | P14 | 규칙 후보 `ops/monitoring/aigw-alerts.yaml`. 운영 rule 전달은 G-ALERT 미확인으로 NOT_RUN. |
 | AIGW-INFERENCE-NOT-READY-PERSISTENT | `aigw_inference_alert{state}` | P19 | state 값 집합 미정 — 규칙 없음 |
 | AIGW-INFERENCE-CONTEXT-MISMATCH | `aigw_inference_alert{state}` | P19 | 규칙 없음 |
-| AIGW-BACKUP-FAILED / AIGW-BACKUP-STALE | `aigw_backup_last_run_failed`, `aigw_backup_last_success_timestamp_seconds` | P15 | 규칙 없음 |
+| AIGW-BACKUP-FAILED / AIGW-BACKUP-STALE | — (2026-11-12 철회(seq17), SPEC §12.4 — 이력: `aigw_backup_last_run_failed`, `aigw_backup_last_success_timestamp_seconds`) | — (이력: P15) | 철회 — 지표·규칙 제거 |
 | AIGW-DB-UNAVAILABLE | readiness DB DOWN 2분 | P15 | 지표 신호 없음 — 규칙 없음 |
 | AIGW-INGEST-FAILING | `aigw_ingest_events_total{outcome="FAILED"}` | P24 | 임계값 F3 측정 후 |
-| AIGW-RESTORE-SOURCE-UNVERIFIED | 복원 원천 대조 | P27 | 규칙 없음 |
+| AIGW-RESTORE-SOURCE-UNVERIFIED | — (2026-11-12 철회(seq17), SPEC §12.4 — 이력: 복원 원천 대조) | — (이력: P27) | 철회 |

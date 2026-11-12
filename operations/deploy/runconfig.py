@@ -11,8 +11,7 @@ class InputError(Exception):
     pass
 
 
-APP_RELEASES = ('ai-gateway', 'ai-gateway-restore')
-RESTORE_KEYS = ('purpose', 'profile', 'pgImage', 'restore', 'seaweed', 'netpol', 'egressProbe')
+APP_RELEASES = ('ai-gateway',)
 
 
 def fail(code):
@@ -76,28 +75,15 @@ def validate(data, release, mode):
     for key in ('purpose', 'profile'):
         if key not in data:
             fail('RUNCONFIG_MISSING:' + key)
-    for key, allowed in (('purpose', ('lint', 'deploy')), ('profile', ('main', 'restore'))):
+    for key, allowed in (('purpose', ('lint', 'deploy')), ('profile', ('main',))):
         if data[key] not in allowed:
             fail('RUNCONFIG_INVALID:' + key)
     deploy = mode == 'deploy'
-    profile = 'restore' if release.endswith('-restore') else 'main'
-    if data.get('purpose') != 'lint' and data.get('profile') != profile:
-        fail('RUNCONFIG_PROFILE_MISMATCH')
+    if release not in APP_RELEASES:
+        fail('RENDER_INVALID_RELEASE')
     if deploy and data.get('purpose') != 'deploy':
         fail('RUNCONFIG_NOT_APPROVED:purpose')
-    if data.get('profile') == 'restore':
-        # §11.9 복원 runconfig = 공통 키·restore.*·seaweed.s3Endpoint 만. 첫 위반 leaf 이름만 낸다(값 0).
-        for key in data:
-            if key not in RESTORE_KEYS:
-                fail('RUNCONFIG_KEY_CONFLICT:' + next((path for path, _ in leaves({key: data[key]})), key))
-        for key in data.get('seaweed', {}) if isinstance(data.get('seaweed'), dict) else ():
-            if key != 's3Endpoint':
-                fail('RUNCONFIG_KEY_CONFLICT:seaweed.' + key)
-    # PVC 는 복원 리허설 임시 인스턴스에만 있다(주 profile 의 pvcSizeGi 없음 — 운영 DB 는 공유 서버).
-    size_key = 'restore.pvcSizeGi' if profile == 'restore' else None
-    # 음성 렌더 fixture만 누락 PVC를 차트 required까지 전달합니다.
-    missing_size = size_key is not None and data.get('purpose') == 'lint' and size_key not in dict(leaves(data))
-    for key in ['pgImage.tag', 'pgImage.digest'] + ([size_key] if size_key and not missing_size else []):
+    for key in ['pgImage.tag', 'pgImage.digest']:
         item(data, key, deploy)
     for key, value in leaves(data):
         if not isinstance(value, dict) or 'value' not in value or 'approvalRef' not in value:
@@ -109,19 +95,9 @@ def validate(data, release, mode):
         fail('RUNCONFIG_INVALID:' + '.'.join(map(str, errors[0].path)))
     if deploy:
         # pvc-capacity·pvc-protection 은 배포 게이트가 아니다(Plan P07 2026-11-10 ⑥ — 운영 DB PVC 범위는 이력).
-        gates = ['postgres-image', 'corpus-inventory', 'backup-destination']
-        if release in APP_RELEASES:
-            gates.append('netpol-targets')
-        for name in gates:
+        for name in ['postgres-image', 'corpus-inventory', 'netpol-targets']:
             approval('docs/gates/f1/' + name + '.md', name, True)
-    if release == 'ai-gateway':
-        return dict(app_values(data), backup=backup_values(data, deploy))
-    if release in APP_RELEASES:
-        return app_values(data)
-    return {
-        'pgImage': {'tag': item(data, 'pgImage.tag', deploy), 'digest': item(data, 'pgImage.digest', deploy)},
-        'persistence': {'size': '' if missing_size else str(int(item(data, size_key, deploy))) + 'Gi'},
-    }
+    return app_values(data)
 
 
 def value(data, key):
@@ -131,20 +107,6 @@ def value(data, key):
             return None
         node = node[part]
     return node
-
-
-def backup_values(data, deploy):
-    """주 앱 release 의 백업 CronJob 값(공유 서버 백업). lint 누락 키는 차트 required 로 넘겨 RENDER_REQUIRED_backup.<key> 로 실패시킨다."""
-    enabled = value(data, 'backup.enabled')
-    out = {'enabled': enabled is not None and enabled['value'] is True}
-    for key in ('type', 'schedule', 'destination', 'ageRecipient', 'retentionDays'):
-        node = value(data, 'backup.' + key)
-        if node is None:
-            if deploy and out['enabled']:
-                fail('RUNCONFIG_MISSING:backup.' + key)
-            continue
-        out[key] = node['value']
-    return out
 
 
 def app_values(data):

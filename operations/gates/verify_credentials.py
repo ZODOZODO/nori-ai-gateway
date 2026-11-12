@@ -17,7 +17,7 @@ import uuid
 NAMESPACE = 'tc'
 CONFIG = 'ai-gateway-config'
 SIGNER, CLIENT, WRITER = 'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client', 'ai-gateway-acceptance-fixture-writer'
-APP_RELEASES = ('ai-gateway', 'ai-gateway-restore')
+APP_RELEASES = ('ai-gateway',)
 STAGES = ('F1', 'F2', 'F3', 'F4')
 
 

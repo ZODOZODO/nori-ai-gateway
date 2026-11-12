@@ -25,7 +25,7 @@
 | AC-21 | 부모: TOOL, SOURCE | F1 | — | P16 집계 | — | 이번 |
 | AC-22 | 부모: 6 leaf | F2 | — | P21 집계 | — | 이번 |
 | AC-23 | 부모: 30 leaf(2026-11-11 대체(seq16): 기존 25 + QUERYINPUT·HYBRID·RERANK·CONTEXT·QUALITY. 이력: 25 leaf) | F3(LOAD 제외), F4(LOAD) | — | P25, P29 집계 | — | 이번 |
-| AC-24 | 부모: 26 leaf (+공유 AC-03-RES·AC-03-TIME)(2026-11-11 대체(seq16): 기존 24 + EVIDENCEFLOW·REPORT. 이력: 24 leaf) | F4, F5a(EVIDENCEFLOW·REPORT 의 F5a component, 2026-11-11 seq16. 이력: F4) | — | P29 집계, F5a 인계 | — | 이번(F4) / 후속(F5a) |
+| AC-24 | 부모: 24 leaf (+공유 AC-03-RES·AC-03-TIME)(2026-11-12 대체(seq17): seq16 26 − 철회 2(RESTORE·BACKUP-ALERT). 이력: 2026-11-11 대체(seq16) 기존 24 + EVIDENCEFLOW·REPORT = 26, 그 전 24 leaf) | F4, F5a(EVIDENCEFLOW·REPORT 의 F5a component, 2026-11-11 seq16. 이력: F4) | — | P29 집계, F5a 인계 | — | 이번(F4) / 후속(F5a) |
 | AC-25 | 부모: 11 leaf (+공유 AC-40) | F5a | — | — | TC_LIVE | 후속 |
 | AC-26 | 부모: 9 leaf | F5b | — | — | TC_LIVE | 후속 |
 | AC-27 | 부모: 6 leaf | R1, R2 | — | — | WM_LIVE/HRM_LIVE | 후속 |
@@ -64,7 +64,7 @@
 | ISO-14 | 부모: USER, STREAM, SUMMARY, CACHE | F4, F5b(STREAM) | — | P29 집계 | — | 이번(F4) / 후속(F5b STREAM) |
 | ISO-15 | 부모: QUERY, INJECT, WINDOW | F1(QUERY·WINDOW), F4 | — | P16, P29 집계 | — | 이번 |
 
-### 12.2 leaf 222개 (2026-11-11 대체(seq16): 기존214+신규8, 신규 상세는 §16.9. 이력: leaf 214개 (2026-11-09 ⓕ 결정: 213 + AC-33-DIGEST 1 = 214. 이력 — 2026-11-09 대체(임차 원칙): 216 − 폐기 3(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL) = 213. 폐기 3행은 아래 표에 이력으로 남기며 수에 넣지 않는다))
+### 12.2 leaf 220개 (2026-11-12 대체(seq17): seq15 214 − 철회 2(AC-24-RESTORE·AC-24-BACKUP-ALERT) + seq16 신규 8 = 220. 철회 2행은 아래 표에 이력으로 남기며 수에 넣지 않는다. 이력: leaf 222개 (2026-11-11 대체(seq16): 기존214+신규8, 신규 상세는 §16.9. 이력: leaf 214개 (2026-11-09 ⓕ 결정: 213 + AC-33-DIGEST 1 = 214. 이력 — 2026-11-09 대체(임차 원칙): 216 − 폐기 3(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL) = 213. 폐기 3행은 아래 표에 이력으로 남기며 수에 넣지 않는다)))
 
 | leaf | 부모 | §27.2 게이트·라벨 | 구현 | 이번 판정 | Source·LLM | 범위 |
 |---|---|---|---|---|---|---|
@@ -151,8 +151,6 @@
 | AC-24-RETAIN-PURGE | AC-24 | F4 | P14 | P29 | M, 제어 시계 | 이번 |
 | AC-24-AUDIT-ALLOW | AC-24 | F4 | P14 | P29 | M+FX sentinel, OTLP 읽기(G-OBS-READBACK) | 이번 |
 | AC-24-AUDIT-EXPIRY | AC-24 | F4 | P14 | P29 | 제어 시계 | 이번 |
-| AC-24-RESTORE | AC-24 | F4 | P06, P15, P23, P27 | P29 | RP 격리 복원 DB·앱(G-RESTORE-ENV) + RS 현재 원천 대조·catalog 정합(fixture 삭제·fixture 목록 변형 권한 회수 음성/양성) | 이번(원천 확인 불가·fixture 쓰기 identity 부재면 NOT_RUN) |
-| AC-24-BACKUP-ALERT | AC-24 | F4 | P15, P27 | P29 | 저장 공간 접근 실패 주입(G-ALERT) | 이번 |
 | AC-25-DELEG | AC-25 | F5a[TC_LIVE] | — | — | — | 후속 |
 | AC-25-OBS | AC-25 | F5a | — | — | — | 후속 |
 | AC-25-LOT-ACTIVE | AC-25 | F5a | — | — | — | 후속 |
@@ -315,7 +313,7 @@ seq16에서 추가한 다음 8개도 §12.2 목록의 일부다. 전체 catalog 
 | AC-21 | 2 | AC-43 | 2 |
 | AC-22 | 6 | AC-46 | 3 |
 | AC-23 | 30 (seq16, 이력25) | ISO-04 | 20 |
-| AC-24 | 26 (seq16, 이력24) | ISO-05 | 2 |
+| AC-24 | 24 (2026-11-12 대체(seq17): seq16 26 − 철회 2. 이력: 26(seq16), 24) | ISO-05 | 2 |
 | AC-25 | 11 | ISO-06 | 6 |
 | AC-26 | 9 | ISO-07 | 4 |
 | AC-27 | 6 | ISO-08 | 4 |
@@ -326,7 +324,7 @@ seq16에서 추가한 다음 8개도 §12.2 목록의 일부다. 전체 catalog 
 | | | ISO-14 | 4 |
 | | | ISO-15 | 3 |
 
-**현재(seq16): AC 하위161 + ISO 하위61 = 222, 원자23·상위61 유지.** (이력: AC 하위 합 153 + ISO 하위 합 61 = **214**(2026-11-09 ⓕ 결정: AC-33 하위 3 → 4, AC 하위 합 152 + 1 = 153, 전체 213 + 1 = 214. 원자 23·상위 61 은 그대로 — AC-33 은 이미 하위를 가진 부모다. 이력: AC 하위 합 152 + ISO 하위 합 61 = 213 — 2026-11-09 대체(임차 원칙): AC-35 하위 4 → 1, AC 하위 합 155 − 3 = 152, 전체 216 − 3 = 213. 원자 23·상위 61 은 그대로 — AC-35 는 하위 1개를 가진 부모로 남는다. 이력: AC 하위 합 155 + ISO 하위 합 61 = 216)). 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
+**현재(seq17): AC 하위159 + ISO 하위61 = 220, 원자23·상위61 유지(2026-11-12 대체(seq17): AC-24 하위 26 → 24).** (이력: 2026-11-11 seq16 AC 하위161 + ISO 하위61 = 222. 그 전 이력: AC 하위 합 153 + ISO 하위 합 61 = **214**(2026-11-09 ⓕ 결정: AC-33 하위 3 → 4, AC 하위 합 152 + 1 = 153, 전체 213 + 1 = 214. 원자 23·상위 61 은 그대로 — AC-33 은 이미 하위를 가진 부모다. 이력: AC 하위 합 152 + ISO 하위 합 61 = 213 — 2026-11-09 대체(임차 원칙): AC-35 하위 4 → 1, AC 하위 합 155 − 3 = 152, 전체 216 − 3 = 213. 원자 23·상위 61 은 그대로 — AC-35 는 하위 1개를 가진 부모로 남는다. 이력: AC 하위 합 155 + ISO 하위 합 61 = 216)). 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
 
 ### 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력. 2026-11-11 대체(seq16): 신규 8 leaf·단계 확장은 아래 표의 seq16 행과 §16.9 를 적용한다. 이력: leaf·원자 ID 추가·삭제 0)
 
@@ -353,8 +351,8 @@ seq16에서 추가한 다음 8개도 §12.2 목록의 일부다. 전체 catalog 
 | F4 | AC-33-LOADING, AC-44 | `ACC:F4-OUTAGE`(각각 `LOADING`·`STOPPED` 회차) |
 | F4 | AC-18-WORKER-RUN, AC-18-WORKER-QUEUED-VALID, AC-18-WORKER-QUEUED-EXPIRED, AC-18-WORKER-RACE-PRECOMMIT, AC-18-WORKER-RACE-POSTCOMMIT | `IT`(P09 `AppProcessHarness` — 현재 `integrationTest` 컴파일 classpath 자식 JVM, bootJar 아님, 같은 commit·빌드 신원) |
 | F4 | AC-23-LOAD, AC-24-PERF | `PF`(`f4:job-latency-samples` — AC-23-LOAD 는 백필 중 회차) |
-| F4 | AC-24-RESTORE | `ACC:F4-RESTORE` + `OP:restore-rto` |
-| F4 | AC-24-BACKUP-ALERT | `OP:backup-alert` |
+| — (2026-11-12 철회(seq17), 이력: F4) | AC-24-RESTORE | 없음(이력: `ACC:F4-RESTORE` + `OP:restore-rto`) |
+| — (2026-11-12 철회(seq17), 이력: F4) | AC-24-BACKUP-ALERT | 없음(이력: `OP:backup-alert`) |
 | F2 | AC-32-NEEDS | `IT` + `ACC:F2` (seq16 신규, 세부 fixture는 §16.9) |
 | F3 | AC-23-QUERYINPUT, AC-23-HYBRID, AC-23-RERANK, AC-23-CONTEXT | `IT` + `ACC:F3` (seq16 신규) |
 | F3 | AC-23-QUALITY | `PF` + `RB:F3-QUALITY` (측정 ID는 §16.9) |

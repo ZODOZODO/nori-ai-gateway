@@ -8,4 +8,4 @@ Status: BLOCKED
 
 임베딩 예상 바이트 = C × d × 4. 초기 d=1024는 [BGE-M3 공개 사양](https://github.com/FlagOpen/FlagEmbedding/tree/master/research/BGE_M3)의 가정이며 실제 모델 digest/dimension은 P22 probe 후 재검토합니다. Knowledge 예상 K = T + C×1024×4 + I + M + L. PVC 예산은 K + D30 + A90 + W + Knowledge 테이블 1배 재색인 임시 공간 + 명시 근거가 있는 운영 여유를 합산한 뒤 GiB로 올림합니다. chunk 경계·중복률·색인 부가량·일일 발생량은 아직 입력이 없으므로 숫자를 임의 대입하지 않습니다.
 
-백업 덤프/암호화 작업 공간은 DB PVC 밖에 별도 확보합니다(P15). Longhorn replicas=3에 따른 물리 소비·snapshot 여유·각 노드별 현재 free/reserved/scheduled를 확인해야 하며 단순 총 여유 합계로 프로비저닝 가능을 단정하지 않습니다. 현재 클러스터 조회·PV 변경은 하지 않았습니다. 승인 후 main pvcSizeGi와 restore.pvcSizeGi를 별도로 기록합니다. restore 용량은 G-RESTORE-ENV 승인값이어야 합니다.
+백업 덤프/암호화 작업 공간은 DB PVC 밖에 별도 확보합니다(P15). Longhorn replicas=3에 따른 물리 소비·snapshot 여유·각 노드별 현재 free/reserved/scheduled를 확인해야 하며 단순 총 여유 합계로 프로비저닝 가능을 단정하지 않습니다. 현재 클러스터 조회·PV 변경은 하지 않았습니다. 승인 후 main pvcSizeGi와 restore.pvcSizeGi를 별도로 기록합니다. restore 용량은 G-RESTORE-ENV 승인값이어야 합니다(2026-11-12 철회(seq17), SPEC §12.4: 이 문단의 백업 덤프/암호화 작업 공간·restore.pvcSizeGi·G-RESTORE-ENV 문장은 이력입니다).

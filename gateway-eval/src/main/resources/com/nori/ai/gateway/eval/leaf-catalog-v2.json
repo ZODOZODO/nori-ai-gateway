@@ -1,7 +1,7 @@
 {
   "version": 3,
   "revision": "seq16",
-  "sourcePlanSha256": "8d88acdf5d90e8fb970bbc6f86a0f40dec0b3aefcda1a3dffde449da21e68b2b",
+  "sourcePlanSha256": "0d5363c4110b27a47863b80362d5985a567e3eab467b58c2e87f0e6e2ec361d3",
   "parents": [
     {
       "id": "AC-01",
@@ -290,8 +290,6 @@
         "AC-24-RETAIN-PURGE",
         "AC-24-AUDIT-ALLOW",
         "AC-24-AUDIT-EXPIRY",
-        "AC-24-RESTORE",
-        "AC-24-BACKUP-ALERT",
         "AC-24-EVIDENCEFLOW",
         "AC-24-REPORT"
       ],
@@ -3007,59 +3005,6 @@
             "componentId": "ACC:F4-CLOCK",
             "producer": "ACCEPTANCE",
             "suite": "F4-CLOCK"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-24-RESTORE",
-      "parentIds": [
-        "AC-24"
-      ],
-      "gates": [
-        "F4"
-      ],
-      "gateText": "F4",
-      "labelsByStage": {
-        "F4": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F4": [
-          {
-            "componentId": "ACC:F4-RESTORE",
-            "producer": "ACCEPTANCE",
-            "suite": "F4-RESTORE"
-          },
-          {
-            "componentId": "OP:restore-rto",
-            "producer": "OPS",
-            "measurementId": "ops:restore-rto"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-24-BACKUP-ALERT",
-      "parentIds": [
-        "AC-24"
-      ],
-      "gates": [
-        "F4"
-      ],
-      "gateText": "F4",
-      "labelsByStage": {
-        "F4": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F4": [
-          {
-            "componentId": "OP:backup-alert",
-            "producer": "OPS",
-            "measurementId": "ops:backup-alert"
           }
         ]
       }
@@ -7400,15 +7345,6 @@
       "AC-23-LOAD",
       "AC-24-PERF"
     ],
-    "F4-RESTORE": [
-      "AC-24-RESTORE"
-    ],
-    "ops:restore-rto": [
-      "AC-24-RESTORE"
-    ],
-    "ops:backup-alert": [
-      "AC-24-BACKUP-ALERT"
-    ],
     "f3:index-resources": [
       "AC-23-PERF"
     ],
@@ -7430,8 +7366,6 @@
     "f2:llm-latency-samples",
     "f3:search-latency-samples",
     "f3:index-resources",
-    "f4:job-latency-samples",
-    "ops:restore-rto",
-    "restore-prep-manifest"
+    "f4:job-latency-samples"
   ]
 }

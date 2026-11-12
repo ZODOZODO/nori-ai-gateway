@@ -6,15 +6,13 @@ import shutil
 import subprocess
 import tempfile
 
-import yaml
-
 root = Path.cwd()
 checks = []
 with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
     work = Path(temporary)
     shutil.copytree(root / 'operations', work / 'operations')
     fixture = json.loads((work / 'operations/runconfig/fixtures/lint-verify.json').read_text())
-    def run(data, expected=0, error=None, release='ai-gateway-db-restore', mode='lint', raw=False):
+    def run(data, expected=0, error=None, release='ai-gateway', mode='lint', raw=False):
         (work / 'input.json').write_text(data if raw else json.dumps(data))
         args = ['python3', '-B', 'operations/deploy/runconfig.py', 'input.json', release, mode, 'values.json']
         result = subprocess.run(args, cwd=work, capture_output=True, text=True)
@@ -32,28 +30,21 @@ with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
         data = copy.deepcopy(fixture); data[key] = []
         run(data, 2, 'RUNCONFIG_INVALID:' + key)
     run(fixture)
-    # 운영 DB 는 공유 서버라 주 profile 의 PVC 키는 없다(Plan U6 ③ — restore.pvcSizeGi 만). 남아 있으면 schema(additionalProperties) 위반이다.
-    data = copy.deepcopy(fixture); data['pvcSizeGi'] = {'value': 1, 'approvalRef': 'operations/runconfig/fixtures/LINT-ONLY.md'}
-    run(data, 2, 'RUNCONFIG_INVALID:', release='ai-gateway')
-    for size in [1.0, 1.1, 0, -1]:
-        data = copy.deepcopy(fixture)
-        data['restore']['pvcSizeGi']['value'] = size
-        if size != 1.0:
-            run(data, 2, 'RUNCONFIG_INVALID:restore.pvcSizeGi.value')
-            continue
-        values = run(data)
-        assert values['persistence']['size'] == '1Gi'
-        result = subprocess.run(['bash', 'operations/deploy/aigw-helm.sh', '--release', 'ai-gateway-db-restore', '--mode', 'render', '--runconfig', 'input.json'], cwd=work, capture_output=True, text=True)
-        assert result.returncode == 0, result.stderr
-        statefulset = next(d for d in yaml.safe_load_all(result.stdout) if d['kind'] == 'StatefulSet')
-        assert statefulset['spec']['volumeClaimTemplates'][0]['spec']['resources']['requests']['storage'] == '1Gi'
-        checks.append(dict(kind='actual Helm integral size render', release='ai-gateway-db-restore', exit=0))
-    # 주 앱 release 는 runconfig backup.* 를 차트 값으로 넘긴다(공유 서버 백업 CronJob — 주 release 만).
-    values = run(fixture, release='ai-gateway')
-    assert values['backup'] == {'enabled': False, 'type': 's3', 'schedule': '15 3 * * *', 'destination': 'https://lint-only.invalid/aigw-backup/verify', 'ageRecipient': 'age1lintonly', 'retentionDays': 7}
-    assert 'backup' not in run(fixture, release='ai-gateway-restore') and 'persistence' not in run(fixture, release='ai-gateway')
-    data = copy.deepcopy(fixture); data['purpose'] = 'deploy'; data['profile'] = 'restore'
-    run(data, 2, 'RUNCONFIG_PROFILE_MISMATCH', release='ai-gateway')
+    # 운영 DB 는 공유 서버라 PVC 키가 없고, 자동 백업·복원 입력도 없다. 남아 있으면 schema(additionalProperties) 위반이다.
+    for key, node in (('pvcSizeGi', {'value': 1, 'approvalRef': 'operations/runconfig/fixtures/LINT-ONLY.md'}),
+                      ('restore', {'pvcSizeGi': {'value': 1, 'approvalRef': 'operations/runconfig/fixtures/LINT-ONLY.md'}}),
+                      ('backup', {'enabled': {'value': True, 'approvalRef': 'operations/runconfig/fixtures/LINT-ONLY.md'}})):
+        data = copy.deepcopy(fixture); data[key] = node
+        run(data, 2, 'RUNCONFIG_INVALID:')
+    values = run(fixture)
+    assert 'backup' not in values and 'persistence' not in values
+    data = copy.deepcopy(fixture); data['profile'] = 'restore'
+    run(data, 2, 'RUNCONFIG_INVALID:profile')
+    for release in ('ai-gateway-restore', 'ai-gateway-db-restore'):
+        run(fixture, 2, 'RENDER_INVALID_RELEASE', release=release)
+        result = subprocess.run(['bash', 'operations/deploy/aigw-helm.sh', '--release', release, '--mode', 'lint', '--runconfig', 'input.json'], cwd=work, capture_output=True, text=True)
+        assert result.returncode == 2 and result.stderr.strip() == 'RENDER_INVALID_RELEASE', result.stderr
+        checks.append(dict(kind='retired release rejected', release=release, exit=result.returncode))
     gate = work / 'docs/gates/f1'; gate.mkdir(parents=True)
     (gate / 'synthetic.md').write_text('Status: APPROVED\n')
     data = copy.deepcopy(fixture); data['purpose'] = 'deploy'
@@ -66,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-runconfig-test-') as temporary:
                     refs(value)
     refs(data)
     run(data, 2, 'RUNCONFIG_MISSING:postgres-image', mode='deploy', release='ai-gateway')
-    for name in ['postgres-image', 'corpus-inventory', 'backup-destination']:
+    for name in ['postgres-image', 'corpus-inventory']:
         (gate / (name + '.md')).write_text('Status: APPROVED\n')
     run(data, 2, 'RUNCONFIG_MISSING:netpol-targets', mode='deploy', release='ai-gateway')
     (gate / 'netpol-targets.md').write_text('Status: APPROVED\n')

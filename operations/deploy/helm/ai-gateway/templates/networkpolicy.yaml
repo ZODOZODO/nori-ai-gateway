@@ -11,14 +11,11 @@ spec:
       app: {{ .Release.Name }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   policyTypes: [Ingress, Egress]
-  {{- if or (not .Values.restoreMode) .Values.acceptance.enabled }}
   ingress:
     - from:
-        {{- if not .Values.restoreMode }}
         - podSelector:
             matchLabels:
               app: tc-ui-backend
-        {{- end }}
         {{- if and (eq .Values.profile "verify") .Values.acceptance.enabled }}
         - podSelector:
             matchLabels:
@@ -27,9 +24,6 @@ spec:
         {{- end }}
       ports:
         - {protocol: TCP, port: 8080}
-  {{- else }}
-  ingress: []
-  {{- end }}
   egress:
     {{- include "aigw.dbEgress" . | nindent 4 }}
     {{- $targets := list "dns" "loki" "tempo" "alloy" "gitlab" -}}

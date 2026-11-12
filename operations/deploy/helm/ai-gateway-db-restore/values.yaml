@@ -1,6 +1,0 @@
-replicas: 1
-pgImage:
-  tag: ""
-  digest: ""
-persistence:
-  size: ""

@@ -39,7 +39,7 @@ bash operations/gates/aigw-verify-credentials.sh cleanup
 1. 부작용 전 판정: Secret 조회(오류 = 실패), `ai-gateway-config` 부재 → `CONFIG_SECRET_MISSING` exit 2. 하나라도 실패하면 Secret 을 바꾸지 않는다.
 2. 수용 Secret 2종(signer·client)이 모두 있으면 덮어쓰지 않고 check 만 한다. 일부만 있으면 `PROVISION_PARTIAL_STATE` exit 2(불일치는 rotate 로만 고친다).
 3. 새 자격 한 벌을 만든다. 키는 `openssl ecparam -name prime256v1 -genkey` 파이프로 만들고, 토큰은 32바이트 CSPRNG 다. 수용 쪽 Secret 을 먼저 apply 하고, Gateway 쪽 공개키·해시를 나중에 `ai-gateway-config` 키로 patch 한다.
-4. 존재하는 앱 Deployment(`ai-gateway`·`ai-gateway-restore`)를 `rollout restart` 하고 status 를 확인한다(Gateway 는 기동 시 1회 로드). 그다음 check 결과로 종료한다.
+4. 존재하는 앱 Deployment(`ai-gateway`. 2026-11-12 철회(seq17) — 이력: `ai-gateway`·`ai-gateway-restore`)를 `rollout restart` 하고 status 를 확인한다(Gateway 는 기동 시 1회 로드). 그다음 check 결과로 종료한다.
 
 ### rotate
 
@@ -50,7 +50,7 @@ bash operations/gates/aigw-verify-credentials.sh cleanup
 한 단계라도 실패하면 그 자리에서 exit ≠0 이고, 뒤 단계는 하지 않는다.
 
 1. 부작용 전: Secret 조회(오류 = 실패)와 신뢰 제거 결과 계산(`jwks.json`·`service-tokens.json` 형식 오류 → `JWKS_FORMAT_INVALID`·`SERVICE_TOKENS_FORMAT_INVALID`, 변경 0 — 수용 kid·해시가 남아 고친 뒤 재시도할 수 있다).
-2. 수용 Job `ai-gateway-acceptance`·`ai-gateway-restore-acceptance` 삭제(새 수용 연결 차단, 다른 workload 무변경).
+2. 수용 Job `ai-gateway-acceptance` 삭제(2026-11-12 철회(seq17) — 이력: `ai-gateway-acceptance`·`ai-gateway-restore-acceptance`)(새 수용 연결 차단, 다른 workload 무변경).
 3. 수용 Secret 3종(signer·client·fixture-writer) 삭제.
 4. Gateway 쪽 신뢰 제거: `ai-gateway-config` 의 `jwks.json` 에서 `test-` kid 와 수용 kid 를 빼고, `service-tokens.json` 에서 수용 토큰 해시만 빼며(남는 항목이 없으면 빈 집합으로 키 유지 — 앱 Pod 의 키 투영 유지), `hook-token-sha256` 키를 지운다.
 5. 실행 중 앱 Deployment 마다 `<app> RESTART_OR_UNINSTALL_REQUIRED` 를 출력한다. 제거된 신뢰는 재기동 전까지 Gateway 메모리에 남으므로 운영자가 재배포 또는 uninstall 한다.

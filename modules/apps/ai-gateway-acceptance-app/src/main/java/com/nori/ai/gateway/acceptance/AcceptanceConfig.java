@@ -15,7 +15,7 @@ import java.util.Optional;
 public record AcceptanceConfig(Map<String,String> env, Map<String,String> properties) {
     public AcceptanceConfig { env = Map.copyOf(env); properties = Map.copyOf(properties); }
 
-    /** suite 의 ingest 단계(§11.9) = 접두 단계(F1-RUBRIC→F1, F2-OUTAGE→F2, F3-PROBE→F3, F4-RESTORE-PREP→F4). */
+    /** suite 의 ingest 단계(§11.9) = 접두 단계(F1-RUBRIC→F1, F2-OUTAGE→F2, F3-PROBE→F3, F4-CLOCK→F4). */
     public static Optional<String> stageOf(String suite) {
         if (suite == null || !suite.matches("F[1-4](-[A-Z]+(-[A-Z]+)?)?")) return Optional.empty();
         return Optional.of(suite.substring(0, 2));

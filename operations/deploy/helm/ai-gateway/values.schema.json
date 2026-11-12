@@ -62,22 +62,6 @@
         "jobLifetimeLimit"
       ]
     },
-    "restoreMode": {
-      "type": "boolean"
-    },
-    "recovery": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "backupPointAt": {
-          "type": "string",
-          "pattern": "^(|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z)$"
-        }
-      },
-      "required": [
-        "backupPointAt"
-      ]
-    },
     "inference": {
       "type": "object",
       "additionalProperties": false,
@@ -283,48 +267,6 @@
       "required": [
         "create",
         "name"
-      ]
-    },
-    "backup": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "type": {
-          "type": "string"
-        },
-        "schedule": {
-          "type": "string"
-        },
-        "destination": {
-          "type": "string"
-        },
-        "ageRecipient": {
-          "type": "string"
-        },
-        "retentionDays": {
-          "type": [
-            "integer",
-            "string"
-          ]
-        },
-        "image": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "digest": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "digest"
-          ]
-        }
-      },
-      "required": [
-        "enabled"
       ]
     },
     "netpol": {
@@ -757,10 +699,7 @@
             "F4-RUBRIC",
             "F4-OUTAGE",
             "F4-CLOCK",
-            "F4-PERF",
-            "F4-RESTORE-PREP",
-            "F4-RESTORE-MUTATE",
-            "F4-RESTORE"
+            "F4-PERF"
           ]
         },
         "parentRunId": {
@@ -774,9 +713,6 @@
             "STOPPED",
             "LOADING"
           ]
-        },
-        "prepManifest": {
-          "type": "string"
         },
         "image": {
           "type": "object",
@@ -832,7 +768,6 @@
         "suite",
         "parentRunId",
         "outagePhase",
-        "prepManifest",
         "image",
         "readback"
       ]
@@ -843,8 +778,6 @@
     "replicaCount",
     "image",
     "capacity",
-    "restoreMode",
-    "recovery",
     "inference",
     "knowledgeSource",
     "ingest",
@@ -854,7 +787,6 @@
     "testHooks",
     "credentialsRef",
     "configSecret",
-    "backup",
     "netpol",
     "egressProbe",
     "specVerify",

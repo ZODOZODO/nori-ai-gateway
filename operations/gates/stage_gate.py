@@ -2,7 +2,7 @@
 
 순서: 입력·SPEC 실제 바이트·runconfig profile·차트 checkout(operations/ 미커밋 0·HEAD = 이미지 GIT_SHA, 실패 exit 2 — §4.1 2026-11-10)·부모 회차 신원 확인 → ① spec-guard(exit≠0 → 3) → ② 검증 자격 check(MISSING → RUN ABORTED·12)
 → ②' 런타임 자격 check(MISSING → RUN ABORTED·13) → ③ aigw-helm deploy|suite-only(실패·재배포 0 suite 의 앱 Pod 변화 → RUN ABORTED·11)
-→ ④ helm test --logs(성공·실패 무관 저장 — 블록·helm 상태 줄만, .sha256) → ⑤ ingest(acceptance, 복원 RTO 는 ops) → ⑥ gate(행렬의 생략 suite 제외)
+→ ④ helm test --logs(성공·실패 무관 저장 — 블록·helm 상태 줄만, .sha256) → ⑤ ingest(acceptance) → ⑥ gate(행렬의 생략 suite 제외)
 → ⑦ 종료 코드(수집·보고 뒤에만 전파): deploy 11, test 10, 자격 12/13, ingest·gate 실패는 그 rc, 그 밖 0(게이트 PASS 아님 — 판정은 GATE-REPORT.md).
 """
 import datetime
@@ -33,14 +33,10 @@ MATRIX = {
     'F4-OUTAGE': ('ai-gateway', 'suite-only', 'F4', 'F4', 'F4', 'evidence/F4/outage-{phase}-{utc}.log', True),
     'F4-CLOCK': ('ai-gateway', 'suite-only', 'F4', 'F4', 'F4', 'evidence/F4/clock-{utc}.log', True),
     'F4-PERF': ('ai-gateway', 'deploy', 'F4', 'F4', 'F4', 'evidence/F4-PERF/acceptance-{utc}.log', False),
-    'F4-RESTORE-PREP': ('ai-gateway', 'suite-only', 'F4', 'F4', 'F4', 'evidence/F4/restore/acceptance-F4-RESTORE-PREP-{utc}.log', False),
-    'F4-RESTORE-MUTATE': ('ai-gateway', 'suite-only', 'F4', 'F4', 'F4', 'evidence/F4/restore/acceptance-F4-RESTORE-MUTATE-{utc}.log', False),
-    'F4-RESTORE': ('ai-gateway-restore', 'deploy', 'F4', 'RESTORE', 'F4', 'evidence/F4/restore/acceptance-F4-RESTORE-{utc}.log', True),
 }
 VALUE_FLAGS = ('--stage', '--image-digests', '--runconfig', '--test-timeout-seconds', '--spec', '--release', '--parent-run-id',
-               '--rubric-targets', '--outage-phase', '--fixture-catalog', '--set-extra', '--clock-initial', '--backup-point', '--prep-manifest', '--restore-started-at')
+               '--rubric-targets', '--outage-phase', '--fixture-catalog', '--set-extra', '--clock-initial')
 HELM_STATUS = re.compile(r'^(NAME|LAST DEPLOYED|NAMESPACE|STATUS|REVISION|TEST SUITE|Last Started|Last Completed|Phase):')
-ISO = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$')
 
 
 class Stop(Exception):
@@ -87,23 +83,17 @@ def parse(argv, environ):
         raise Stop('RUBRIC_TARGETS_MISSING', 2)
     if suite.endswith('-OUTAGE') != bool(options.get('--outage-phase')) or options.get('--outage-phase', 'STOPPED') not in ('STOPPED', 'LOADING'):
         raise Stop('OUTAGE_PHASE_INVALID', 2)
-    if suite == 'F4-RESTORE':
-        for flag in ('--prep-manifest', '--backup-point', '--clock-initial', '--restore-started-at'):
-            if not options.get(flag):
-                raise Stop('ARGUMENT_MISSING:' + flag[2:], 2)
-        if not ISO.match(options['--restore-started-at']):
-            raise Stop('ARGUMENT_INVALID', 2)
     if options.get('--parent-run-id') is not None and not re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', options['--parent-run-id']):
         raise Stop('ARGUMENT_INVALID', 2)
     return suite, options
 
 
-def runconfig_profile(path, release):
+def runconfig_profile(path):
     try:
         profile = json.loads(pathlib.Path(path).read_text(encoding='utf-8')).get('profile')
     except (OSError, ValueError, AttributeError):
         raise Stop('RUNCONFIG_INVALID', 2)
-    if profile != ('restore' if release == 'ai-gateway-restore' else 'main'):
+    if profile != 'main':
         raise Stop('RUNCONFIG_PROFILE_MISMATCH', 2)
 
 
@@ -156,14 +146,6 @@ def pod_digest(selector):
     return digests_.pop() if len(digests_) == 1 else None
 
 
-def ready_at(release):
-    result = run(['kubectl', '-n', 'tc', 'get', 'pods', '-l', 'app=' + release, '-o', 'json'])
-    if result.returncode != 0:
-        return None
-    times = [c['lastTransitionTime'] for p in json.loads(result.stdout)['items'] for c in p.get('status', {}).get('conditions', [])
-             if c.get('type') == 'Ready' and c.get('status') == 'True']
-    return max(times) if times else None
-
 
 class Gate:
     def __init__(self, suite, options):
@@ -203,13 +185,13 @@ class Gate:
         args = ['bash', 'operations/deploy/aigw-helm.sh', '--release', self.release, '--mode', mode,
                 '--runconfig', self.options['--runconfig'], '--image-digests', self.options['--image-digests'], '--suite', self.suite,
                 '--spec-file', self.spec, '--parent-run-id', self.parent]
-        for flag in ('--fixture-catalog', '--clock-initial', '--backup-point', '--outage-phase', '--set-extra', '--prep-manifest', '--rubric-targets'):
+        for flag in ('--fixture-catalog', '--clock-initial', '--outage-phase', '--set-extra', '--rubric-targets'):
             if self.options.get(flag):
                 args += [flag, self.options[flag]]
         return args
 
     def execute(self):
-        runconfig_profile(self.options['--runconfig'], self.release)
+        runconfig_profile(self.options['--runconfig'])
         identity = image_identity(self.options['--image-digests'])
         chart_checkout(self.options['--image-digests'])
         if run(['bash', './gradlew', ':gateway-eval:run', '--args=spec-guard --spec ' + self.spec + ' --baseline docs/gates/spec-baseline.md', '--no-daemon']).returncode != 0:
@@ -267,13 +249,6 @@ class Gate:
         log.write_text(''.join(line + '\n' for line in kept), encoding='utf-8')
         pathlib.Path(str(log) + '.sha256').write_text(hashlib.sha256(log.read_bytes()).hexdigest() + '  ' + log.name + '\n', encoding='utf-8')
         self.ingest_rc = gradle(f'ingest --stage {self.stage} --parent-run-id {self.parent} --input {log} --source acceptance --spec {self.spec}')
-        if self.suite == 'F4-RESTORE':
-            ready = ready_at(self.release)
-            if ready:
-                started = datetime.datetime.fromisoformat(self.options['--restore-started-at'].replace('Z', '+00:00'))
-                seconds = int((datetime.datetime.fromisoformat(ready.replace('Z', '+00:00')) - started).total_seconds())
-                self.ops_record({'kind': 'MEASUREMENT', 'measurementId': 'ops:restore-rto', 'producer': 'OPS', 'componentId': 'OP:restore-rto',
-                                 'runId': str(uuid.uuid4()), 'values': {'restoreStartedAt': self.options['--restore-started-at'], 'readyAt': ready, 'seconds': seconds}}, 'restore-rto')
         return self.finish(10 if test.returncode != 0 else 0)
 
 

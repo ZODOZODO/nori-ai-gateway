@@ -2,9 +2,6 @@
 app: {{ .Release.Name }}
 app.kubernetes.io/name: ai-gateway
 app.kubernetes.io/instance: {{ .Release.Name }}
-{{- if .Values.restoreMode }}
-aigw.nori/db-target: ai-gateway-db-restore
-{{- end }}
 {{- end -}}
 
 {{- define "aigw.image" -}}
@@ -13,37 +10,19 @@ aigw.nori/db-target: ai-gateway-db-restore
 
 {{- define "aigw.guard" -}}
 {{- $v := .Values -}}
-{{- if not (has .Release.Name (list "ai-gateway" "ai-gateway-restore")) }}{{ fail "RENDER_INVALID_RELEASE" }}{{ end -}}
+{{- if ne .Release.Name "ai-gateway" }}{{ fail "RENDER_INVALID_RELEASE" }}{{ end -}}
 {{- if ne .Release.Namespace "tc" }}{{ fail "RENDER_INVALID_NAMESPACE" }}{{ end -}}
 {{- if or (ne (int $v.replicaCount) 1) (ne (int $v.capacity.maxRunningJobs) 1) (ne (int $v.capacity.generationConcurrency) 1) }}{{ fail "용량 확장 게이트 전 초기 프로필만 허용" }}{{ end -}}
 {{- if not (regexMatch "^[a-f0-9]{64}$" $v.image.digest) }}{{ fail "APP_IMAGE_DIGEST_REQUIRED" }}{{ end -}}
 {{- if or (ne (int $v.capacity.queuedDepth) 4) (ne $v.capacity.queueWaitLimit "60s") (ne $v.capacity.jobLifetimeLimit "180s") }}{{ fail "CAPACITY_PROFILE_CONFLICT" }}{{ end -}}
-{{- if eq .Release.Name "ai-gateway-restore" -}}
-  {{- if not $v.restoreMode }}{{ fail "RESTORE_RELEASE_CONFLICT" }}{{ end -}}
-{{- else -}}
-  {{- if $v.restoreMode }}{{ fail "MAIN_RELEASE_CONFLICT" }}{{ end -}}
-{{- end -}}
 {{- if and $v.ingest.enabled (not $v.knowledgeSource.read.enabled) }}{{ fail "INGEST_REQUIRES_SOURCE_READ" }}{{ end -}}
 {{- if and (eq $v.sanitize.verifyRuleSet "mask-v1r") (or (ne $v.profile "verify") (ne $v.acceptance.suite "F3-RULEVER")) }}{{ fail "VERIFY_RULE_SET_SUITE_ONLY" }}{{ end -}}
-{{- if $v.restoreMode -}}
-  {{- if or $v.ingest.enabled $v.inference.enabled (not $v.knowledgeSource.read.enabled) (not $v.ingest.fixtureCatalog.enabled) (ne $v.profile "verify") (not $v.testHooks.enabled) (ne $v.acceptance.suite "F4-RESTORE") }}{{ fail "RESTORE_FLAGS_CONFLICT" }}{{ end -}}
-  {{- $_ := required "RESTORE_BACKUP_POINT_REQUIRED" $v.recovery.backupPointAt -}}
-  {{- $_ := required "RESTORE_CLOCK_REQUIRED" $v.testHooks.clock.initial -}}
-  {{- if ne $v.testHooks.clock.mode "FROZEN" }}{{ fail "RESTORE_CLOCK_MODE_CONFLICT" }}{{ end -}}
-{{- else if or $v.recovery.backupPointAt (eq $v.acceptance.suite "F4-RESTORE") }}{{ fail "RESTORE_INPUT_ON_MAIN" }}{{ end -}}
 {{- if eq $v.profile "prod" -}}
   {{- fail "PRODUCTION_RENDER_BLOCKED: tcAdapter http 구현은 F5a" -}}
 {{- else if not $v.testHooks.enabled }}{{ fail "VERIFY_HOOKS_REQUIRED" }}{{ end -}}
 {{- if and (not $v.inference.enabled) (not (and (eq $v.profile "verify") $v.testHooks.enabled)) }}{{ fail "DISABLED_INFERENCE_VERIFY_HOOKS_REQUIRED" }}{{ end -}}
 {{- /* 앱 자격·DB 설정은 운영자가 만드는 파일 Secret 하나(ai-gateway-config)에서만 받는다. 차트는 만들지 않는다(Plan U6 ①). */ -}}
 {{- if or $v.configSecret.create (ne $v.configSecret.name "ai-gateway-config") }}{{ fail "CONFIG_SECRET_REFERENCE_ONLY" }}{{ end -}}
-{{- if $v.backup.enabled -}}
-  {{- if ne .Release.Name "ai-gateway" }}{{ fail "RENDER_RESTORE_BACKUP_FORBIDDEN" }}{{ end -}}
-  {{- $type := required "RENDER_REQUIRED_backup.type" $v.backup.type -}}
-  {{- if not (has $type (list "s3" "sftp")) }}{{ fail "RENDER_INVALID_backup.type" }}{{ end -}}
-  {{- range $key := list "schedule" "destination" "ageRecipient" "retentionDays" }}{{- $_ := required (printf "RENDER_REQUIRED_backup.%s" $key) (index $v.backup $key) -}}{{ end -}}
-  {{- if not (regexMatch "^[a-f0-9]{64}$" (required "RENDER_REQUIRED_backup.image.digest" $v.backup.image.digest)) }}{{ fail "RENDER_INVALID_backup.image.digest" }}{{ end -}}
-{{- end -}}
 {{- if eq $v.profile "verify" -}}
   {{- $allowed := 0 -}}{{- $blocked := 0 -}}
   {{- range $v.egressProbe.targets -}}
@@ -92,20 +71,19 @@ aigw.nori/db-target: ai-gateway-db-restore
   {{- $s := $v.acceptance.suite -}}
   {{- $f1 := has $s (list "F1" "F1-RUBRIC") -}}
   {{- $f2 := has $s (list "F2" "F2-OUTAGE" "F2-RUBRIC" "F3-PROBE") -}}
-  {{- $f3 := has $s (list "F3" "F3-ACL" "F3-RULEVER" "F4" "F4-RUBRIC" "F4-OUTAGE" "F4-CLOCK" "F4-PERF" "F4-RESTORE-PREP" "F4-RESTORE-MUTATE") -}}
+  {{- $f3 := has $s (list "F3" "F3-ACL" "F3-RULEVER" "F4" "F4-RUBRIC" "F4-OUTAGE" "F4-CLOCK" "F4-PERF") -}}
   {{- if or (and $f1 (or $v.inference.enabled $v.knowledgeSource.read.enabled $v.ingest.enabled $v.ingest.fixtureCatalog.enabled)) (and $f2 (or (not $v.inference.enabled) $v.knowledgeSource.read.enabled $v.ingest.enabled $v.ingest.fixtureCatalog.enabled)) (and $f3 (or (not $v.inference.enabled) (not $v.knowledgeSource.read.enabled) (not $v.ingest.enabled) (not $v.ingest.fixtureCatalog.enabled))) }}{{ fail "SUITE_FLAGS_CONFLICT" }}{{ end -}}
-  {{- if and (not $f1) (not $f2) (not $f3) (ne $s "F4-RESTORE") }}{{ fail "SUITE_UNSUPPORTED" }}{{ end -}}
+  {{- if and (not $f1) (not $f2) (not $f3) }}{{ fail "SUITE_UNSUPPORTED" }}{{ end -}}
   {{- if hasSuffix "-OUTAGE" $s -}}
     {{- if not (has $v.acceptance.outagePhase (list "STOPPED" "LOADING")) }}{{ fail "OUTAGE_PHASE_REQUIRED" }}{{ end -}}
   {{- else if $v.acceptance.outagePhase }}{{ fail "OUTAGE_PHASE_FORBIDDEN" }}{{ end -}}
-  {{- if eq $s "F4-RESTORE" }}{{- $_ := required "RESTORE_PREP_MANIFEST_REQUIRED" $v.acceptance.prepManifest -}}{{ end -}}
   {{- if hasSuffix "-RUBRIC" $s }}{{- $_ := required "RUBRIC_TARGETS_REQUIRED" $v.acceptance.rubricTargets -}}{{ end -}}
   {{- if eq (include "aigw.fixtureWriter" .) "true" }}{{- $_ := required "FIXTURE_WRITER_REF_REQUIRED" $v.credentialsRef.acceptanceFixtureWriter -}}{{ end -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "aigw.fixtureWriter" -}}
-{{- has .Values.acceptance.suite (list "F3" "F3-ACL" "F3-RULEVER" "F4" "F4-PERF" "F4-RESTORE-PREP" "F4-RESTORE-MUTATE" "F4-RESTORE") -}}
+{{- has .Values.acceptance.suite (list "F3" "F3-ACL" "F3-RULEVER" "F4" "F4-PERF") -}}
 {{- end -}}
 
 {{- define "aigw.peer" -}}
@@ -122,25 +100,15 @@ aigw.nori/db-target: ai-gateway-db-restore
 {{- end }}
 {{- end -}}
 
-{{- /* DB 대상(Plan §11.3 2026-11-10): 주 release = 공유 서버 192.168.0.150:15432(ipBlock), 복원 release = 임시 인스턴스 ai-gateway-db-restore(Service 15432 → Pod 5432). */ -}}
+{{- /* DB 대상(Plan §11.3 2026-11-10): 공유 서버 192.168.0.150:15432(ipBlock). */ -}}
 {{- define "aigw.dbHost" -}}
-{{ ternary "ai-gateway-db-restore" "192.168.0.150" .Values.restoreMode }}
+192.168.0.150
 {{- end -}}
 
 {{- define "aigw.dbEgress" -}}
-{{- if .Values.restoreMode }}
-- to:
-    - podSelector:
-        matchLabels:
-          app: ai-gateway-db
-          aigw.nori/db-instance: ai-gateway-db-restore
-  ports:
-    - {protocol: TCP, port: 5432}
-{{- else }}
 - to:
     - ipBlock:
         cidr: 192.168.0.150/32
   ports:
     - {protocol: TCP, port: 15432}
-{{- end }}
 {{- end -}}

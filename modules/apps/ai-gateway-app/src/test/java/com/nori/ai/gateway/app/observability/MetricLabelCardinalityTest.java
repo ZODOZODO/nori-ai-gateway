@@ -17,7 +17,7 @@ class MetricLabelCardinalityTest {
     private static final List<String> SECTION_10_2 = List.of("aigw.jobs.accepted", "aigw.jobs.rejected", "aigw.jobs.terminal", "aigw.job.queue.wait",
         "aigw.job.execution", "aigw.job.e2e", "aigw.queue.depth", "aigw.running.jobs", "aigw.generation.inflight", "aigw.llm.call", "aigw.llm.tokens",
         "aigw.llm.budget.reduction", "aigw.llm.retry", "aigw.tool.call", "aigw.source.authz", "aigw.inference.readiness.state", "aigw.inference.alert",
-        "aigw.knowledge.search", "aigw.ingest.events", "aigw.ingest.tx", "aigw.backup.last.success.timestamp", "aigw.backup.last.run.failed",
+        "aigw.knowledge.search", "aigw.ingest.events", "aigw.ingest.tx",
         "aigw.retention.purged.rows", "aigw.sse.connections", "aigw.sse.closed");
 
     @Test void catalogCoversSection10AndHasNoHighCardinalityIdentifierLabels() {
