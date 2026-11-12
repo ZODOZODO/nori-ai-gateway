@@ -24,8 +24,8 @@
 | AC-20 | 부모: INC, REPLAY | F4·F5b(INC), 3차(REPLAY) | — | P29 집계(INC) | — | 일부 이번 |
 | AC-21 | 부모: TOOL, SOURCE | F1 | — | P16 집계 | — | 이번 |
 | AC-22 | 부모: 6 leaf | F2 | — | P21 집계 | — | 이번 |
-| AC-23 | 부모: 25 leaf | F3(LOAD 제외), F4(LOAD) | — | P25, P29 집계 | — | 이번 |
-| AC-24 | 부모: 24 leaf (+공유 AC-03-RES·AC-03-TIME) | F4 | — | P29 집계 | — | 이번 |
+| AC-23 | 부모: 30 leaf(2026-11-11 대체(seq16): 기존 25 + QUERYINPUT·HYBRID·RERANK·CONTEXT·QUALITY. 이력: 25 leaf) | F3(LOAD 제외), F4(LOAD) | — | P25, P29 집계 | — | 이번 |
+| AC-24 | 부모: 26 leaf (+공유 AC-03-RES·AC-03-TIME)(2026-11-11 대체(seq16): 기존 24 + EVIDENCEFLOW·REPORT. 이력: 24 leaf) | F4, F5a(EVIDENCEFLOW·REPORT 의 F5a component, 2026-11-11 seq16. 이력: F4) | — | P29 집계, F5a 인계 | — | 이번(F4) / 후속(F5a) |
 | AC-25 | 부모: 11 leaf (+공유 AC-40) | F5a | — | — | TC_LIVE | 후속 |
 | AC-26 | 부모: 9 leaf | F5b | — | — | TC_LIVE | 후속 |
 | AC-27 | 부모: 6 leaf | R1, R2 | — | — | WM_LIVE/HRM_LIVE | 후속 |
@@ -33,13 +33,13 @@
 | AC-29 | 원자 | F2, F4, F5a | P20 | P21, P29 | M, LL | 이번(F2·F4) / 후속(F5a) |
 | AC-30 | 부모: EQ, WM, ABSENT | F2, F4 | — | P21, P29 집계 | — | 이번 |
 | AC-31 | 원자 | F2 | P18, P19, P20 | P21 | M, LL(Composer usage), G-USAGE 의존 | 이번 |
-| AC-32 | 부모: SCHEMA, LENGTH, RETRYOK | F2 | — | P21 집계 | — | 이번 |
+| AC-32 | 부모: SCHEMA, LENGTH, RETRYOK, NEEDS(2026-11-11 대체(seq16). 이력: SCHEMA, LENGTH, RETRYOK) | F2, F4·F5a(NEEDS 의 F4·F5a component. 이력: F2) | — | P21 집계, P29(NEEDS F4), F5a 인계 | — | 이번(F2·F4) / 후속(F5a) |
 | AC-33 | 부모: LOADING, PERSIST, CTX, DIGEST(2026-11-09 ⓕ 결정 추가) | F2, F4 | — | P21, P29 집계 | — | 이번 |
 | AC-34 | 원자 | F5b | — | — | TC_LIVE | 후속 |
 | AC-35 | 부모: EGRESS(2026-11-09 대체(임차 원칙), 이력: TOKEN, FW, LOCAL, EGRESS — TOKEN·FW·LOCAL 2026-11-09 폐기) | F2 | — | P21 집계 | — | 이번 |
 | AC-36 | 원자 | F1, F4, F5a | P11, P12, P13, P14(보존 탐침 저장·스케줄·소비, N13) | P16, P29 | M(설정 확정 Source)+RL(verifiedOldestAt) | 이번(F1·F4) / 후속(F5a) |
-| AC-37 | 부모: CMP, OUT-NORMAL, OUT-MAX, OUT-ESCAPE | F0 | — | P03 집계 | — | 이번 |
-| AC-38 | 부모: F0, F2, F4 | F0, F2, F4 | — | P03, P21, P29 | — | 이번 |
+| AC-37 | 부모: CMP, OUT-NORMAL, OUT-MAX, OUT-ESCAPE | F0 | — | P03 집계 | — | 이번 **v4.1 대체(2026-11-05):** 단계는 F5a로 이동하고 실행/판정 책임은 §13.1이다. 이번 구현·실행 없음·NOT_RUN이다. |
+| AC-38 | 부모: F0, F2, F4 | F0, F2, F4 | — | P03, P21, P29 | — | 이번 **v4.1 대체(2026-11-05):** AC-38-F0만 F5a로 이동하고 F2/F4는 유지한다. 상위 집계는 F5a 실행 전 NOT_RUN이다. |
 | AC-39 | 부모: 299, 300, 301 | F5a | — | — | TC_LIVE | 후속 |
 | AC-40 | 원자(AC-25 공유 하위) | F5a | — | — | TC_LIVE | 후속 |
 | AC-41 | 원자 | F1, F5a | P07, P09, P14 | P16 | M, L0(`delegation_id` terminal NULL·백업 표현 제외 포함) | 이번(F1) / 후속(F5a) |
@@ -53,7 +53,7 @@
 | ISO-03 | 원자 | F4 | P05, P20 | P29 | LS 또는 Plan seam(WM capability) | 이번 |
 | ISO-04 | 부모: 20 leaf | F1, F4, F5a | — | P16, P29 집계 | — | 이번(F1·F4) / 후속(F5a) |
 | ISO-05 | 부모: READ, MESSAGE | F4 | — | P29 집계 | — | 이번 |
-| ISO-06 | 부모: V/K 4 + H 2 | F3·F4(V/K), 후속 Hybrid(H) | — | P25, P29 집계(V/K) | — | V/K 이번, H 후속. 상위 ISO-06 전체 PASS 주장 금지 |
+| ISO-06 | 부모: V/K/H 6개 | F3·F4 | P23 | P25, P29 전체 집계 | 실제 Hybrid 호출 | 2026-11-11 대체(seq16): H2개도 필수. 이력: 부모 = V/K 4 + H 2, 단계 = F3·F4(V/K)·후속 Hybrid(H), 구현 = —, 이번 판정 = P25·P29 집계(V/K), 범위 = V/K 이번·H 후속, 상위 ISO-06 전체 PASS 주장 금지 |
 | ISO-07 | 부모: CITE, RAW, CHART, DOWNLOAD | F4 | — | P29 집계 | — | 이번 |
 | ISO-08 | 부모: JOB, CONNECT, RECONNECT, EVENT | F4, F5b | — | P29 집계 | — | 이번(F4) / 후속(F5b) |
 | ISO-09 | 원자 | F4 | P13 | P29 | FX(WM 캐시 키 충돌) | 이번 |
@@ -64,7 +64,7 @@
 | ISO-14 | 부모: USER, STREAM, SUMMARY, CACHE | F4, F5b(STREAM) | — | P29 집계 | — | 이번(F4) / 후속(F5b STREAM) |
 | ISO-15 | 부모: QUERY, INJECT, WINDOW | F1(QUERY·WINDOW), F4 | — | P16, P29 집계 | — | 이번 |
 
-### 12.2 leaf 214개 (2026-11-09 ⓕ 결정: 213 + AC-33-DIGEST 1 = 214. 이력 — 2026-11-09 대체(임차 원칙): 216 − 폐기 3(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL) = 213. 폐기 3행은 아래 표에 이력으로 남기며 수에 넣지 않는다)
+### 12.2 leaf 222개 (2026-11-11 대체(seq16): 기존214+신규8, 신규 상세는 §16.9. 이력: leaf 214개 (2026-11-09 ⓕ 결정: 213 + AC-33-DIGEST 1 = 214. 이력 — 2026-11-09 대체(임차 원칙): 216 − 폐기 3(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL) = 213. 폐기 3행은 아래 표에 이력으로 남기며 수에 넣지 않는다))
 
 | leaf | 부모 | §27.2 게이트·라벨 | 구현 | 이번 판정 | Source·LLM | 범위 |
 |---|---|---|---|---|---|---|
@@ -207,11 +207,11 @@
 | AC-35-FW | AC-35 | — (2026-11-09 폐기(임차 원칙) — 수·게이트 제외, 이력: F2) | — (이력: P17) | — (이력: P21) | 이력: 실제 방화벽, LAN 호스트(사용자) | 폐기(이력: 이번) |
 | AC-35-LOCAL | AC-35 | — (2026-11-09 폐기(임차 원칙) — 수·게이트 제외, 이력: F2) | — (이력: P17) | — (이력: P21) | 이력: 추론 서버 listen 관찰(사용자) | 폐기(이력: 이번) |
 | AC-35-EGRESS | AC-35 | F2 | P15 | P21 | 실제 NetworkPolicy, Gateway Pod 내 `EgressProbeHook`(고정 대상 id·양성 제어 = 추론 endpoint `192.168.0.160:11434`·DB — 2026-11-09) | 이번 |
-| AC-37-CMP | AC-37 | F0[LLM_LIVE, Gateway 없음] | P02 | P03 | 실제 Ollama, LL, 정확도 = 문항당 회차 1 표본(분모 = 문항 수)·지연 = R=5 전 회차 | 이번 |
-| AC-37-OUT-NORMAL | AC-37 | F0 | P02 | P03 | 실제 Ollama·공식/GGUF tokenizer 계수 + `f0 boundary-gen` 실제 생성(완결 JSON·인자 정확 일치), LL | 이번 |
-| AC-37-OUT-MAX | AC-37 | F0 | P02 | P03 | 같음 + G-ARG-LIMITS 등록 최대 길이 | 이번(UNRESOLVED 있으면 NOT_RUN) |
-| AC-37-OUT-ESCAPE | AC-37 | F0 | P02 | P03 | 같음 + G-ARG-LIMITS | 이번(UNRESOLVED 있으면 NOT_RUN) |
-| AC-38-F0 | AC-38 | F0 | P02 | P03 | 실제 Ollama, LL, Tool 없음 | 이번 |
+| AC-37-CMP | AC-37 | F5a[TC_LIVE·LLM_LIVE] | P02 | §13.1 통합 단계 | 실제 Ollama, LL, 정확도 = 문항당 회차 1 표본(분모 = 문항 수)·지연 = R=5 전 회차 | 이번 **v4.1 대체(2026-11-05):** 후속 NOT_RUN. 실제 TC Backend→Gateway→LLM·Source 경로로 실행하고 종전 직접 Ollama/f0 boundary-gen은 이력이다. MAX/ESCAPE는64-codepoint eqp·내부ID형토큰·escape 실모델 무손실을 포함한다. F1 비차단이다. **종전 배정 이력:** 단계=F0[LLM_LIVE, Gateway 없음], 구현=P02, 검증=P03, 범위=이번. **v4.1 대체(2026-11-05):** 현재 F5a·§13.1 배정과 후속 NOT_RUN이 유효하다. |
+| AC-37-OUT-NORMAL | AC-37 | F5a | P02 | §13.1 통합 단계 | 실제 Ollama·공식/GGUF tokenizer wire 계수 + 종료 여유 ≤ 등록 출력 상한(2026-11-11 대체(seq16): 분류 wire v3 답변 256·사고 4,864·요청 5,120, SPEC §28.3. 이력: v2 192) + `f0 boundary-gen` 실제 생성(완결 qRef wire JSON·유효 참조·복원 q 포함 인자 코드포인트 정확 일치), LL | 이번 **v4.1 대체(2026-11-05):** 후속 NOT_RUN. 실제 TC Backend→Gateway→LLM·Source 경로로 실행하고 종전 직접 Ollama/f0 boundary-gen은 이력이다. MAX/ESCAPE는64-codepoint eqp·내부ID형토큰·escape 실모델 무손실을 포함한다. F1 비차단이다. **종전 배정 이력:** 단계=F0, 구현=P02, 검증=P03, 범위=이번. **v4.1 대체(2026-11-05):** 현재 F5a·§13.1 배정과 후속 NOT_RUN이 유효하다. |
+| AC-37-OUT-MAX | AC-37 | F5a | P02 | §13.1 통합 단계 | 같음 + G-ARG-LIMITS 등록 최대 길이 | 후속 NOT_RUN **v4.1 대체(2026-11-05):** 후속 NOT_RUN. 실제 TC Backend→Gateway→LLM·Source 경로로 실행하고 종전 직접 Ollama/f0 boundary-gen은 이력이다. MAX/ESCAPE는64-codepoint eqp·내부ID형토큰·escape 실모델 무손실을 포함한다. F1 비차단이다. **종전 배정 이력:** 단계=F0, 구현=P02, 검증=P03, 범위=이번(UNRESOLVED 있으면 NOT_RUN). **v4.1 대체(2026-11-05):** 현재 F5a·§13.1 배정과 후속 NOT_RUN이 유효하다. |
+| AC-37-OUT-ESCAPE | AC-37 | F5a | P02 | §13.1 통합 단계 | 같음 + G-ARG-LIMITS | 후속 NOT_RUN **v4.1 대체(2026-11-05):** 후속 NOT_RUN. 실제 TC Backend→Gateway→LLM·Source 경로로 실행하고 종전 직접 Ollama/f0 boundary-gen은 이력이다. MAX/ESCAPE는64-codepoint eqp·내부ID형토큰·escape 실모델 무손실을 포함한다. F1 비차단이다. **종전 배정 이력:** 단계=F0, 구현=P02, 검증=P03, 범위=이번(UNRESOLVED 있으면 NOT_RUN). **v4.1 대체(2026-11-05):** 현재 F5a·§13.1 배정과 후속 NOT_RUN이 유효하다. |
+| AC-38-F0 | AC-38 | F5a | P02 | §13.1 통합 단계 | 실제 Ollama, LL, Tool 없음 | 이번 **v4.1 대체(2026-11-05):** 후속 NOT_RUN. 실제 TC Backend→Gateway→LLM·Source 경로로 실행하고 종전 직접 Ollama/f0 boundary-gen은 이력이다. MAX/ESCAPE는64-codepoint eqp·내부ID형토큰·escape 실모델 무손실을 포함한다. F1 비차단이다. **종전 배정 이력:** 단계=F0, 구현=P02, 검증=P03, 범위=이번. **v4.1 대체(2026-11-05):** 현재 F5a·§13.1 배정과 후속 NOT_RUN이 유효하다. |
 | AC-38-F2 | AC-38 | F2 | P20 | P21 | M+RL 양성 제어, LL | 이번 |
 | AC-38-F4 | AC-38 | F4 | P26 | P29 | M+RL 양성 제어, LL | 이번 |
 | AC-39-299 | AC-39 | F5a | — | — | — | 후속 |
@@ -250,8 +250,8 @@
 | ISO-06-V-TAMPER | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
 | ISO-06-K-MISSING | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
 | ISO-06-K-TAMPER | ISO-06 | F3, F4 | P23 | P25, P29 | RP+FX seam | 이번 |
-| ISO-06-H-MISSING | ISO-06 | 후속 기능(Hybrid 활성) | — | — | — | 후속(미구현 전략, NOT_RUN 별도 보고) |
-| ISO-06-H-TAMPER | ISO-06 | 후속 기능(Hybrid 활성) | — | — | — | 후속(미구현 전략, NOT_RUN 별도 보고) |
+| ISO-06-H-MISSING | ISO-06 | F3; F4 | P23 | P25/P29 | 실제 Hybrid 범위 필터 누락 seam | 2026-11-11 대체(seq16): 필수, 단순 비활성 거부 PASS 금지. 이력: 단계 = 후속 기능(Hybrid 활성), 구현·판정·Source = —, 범위 = 후속(미구현 전략, NOT_RUN 별도 보고) |
+| ISO-06-H-TAMPER | ISO-06 | F3; F4 | P23 | P25/P29 | 실제 Hybrid owner 변조 seam | 2026-11-11 대체(seq16): 필수, 타 owner/전역 fallback 0. 이력: 단계 = 후속 기능(Hybrid 활성), 구현·판정·Source = —, 범위 = 후속(미구현 전략, NOT_RUN 별도 보고) |
 | ISO-07-CITE | ISO-07 | F4 | P10, P13 | P29 | FX(WM evidenceRef) | 이번 |
 | ISO-07-RAW | ISO-07 | F4 | P10, P23 | P29 | FX(WM sourceRef) | 이번 |
 | ISO-07-CHART | ISO-07 | F4 | P10, P13 | P29 | FX(WM dataRef) | 이번 |
@@ -286,13 +286,26 @@
 | ISO-15-INJECT | ISO-15 | F4 | P12, P26 | P29 | RL, LL | 이번 |
 | ISO-15-WINDOW | ISO-15 | F1, F4 | P12, P14 | P16, P29 | RL 양성 제어, 최대 창 fixture(§P12 L-2, 미정의면 NOT_RUN — `verifiedOldestAt` 은 P14 스케줄러 저장값)·하위 창 분할 | 이번 |
 
+seq16에서 추가한 다음 8개도 §12.2 목록의 일부다. 전체 catalog 수는 기존214+8=222이며 단계별 권위 component는 §16.9를 따른다.
+
+| leaf | 부모 | 게이트·라벨 | 구현 | 판정 | Source·LLM | 범위 |
+|---|---|---|---|---|---|---|
+| AC-32-NEEDS | AC-32 | F2/F4[LLM_STUB], F5a[TC_LIVE·LLM_LIVE] | P20/P26 | P21/P29, F5a 인계 | 분류 wire v3·서버 근거 요구 | 이번 계약/후속 실환경 |
+| AC-23-QUERYINPUT | AC-23 | F3 | P23 | P25 | 현재 Job 의미 입력·exact q | 이번 |
+| AC-23-HYBRID | AC-23 | F3 | P23 | P25 | 실제 SQL·RRF oracle | 이번 |
+| AC-23-RERANK | AC-23 | F3 | P22/P23 | P25 | 실제 선정 CPU runtime·오류 주입 | 이번 |
+| AC-23-CONTEXT | AC-23 | F3 | P23(KnowledgeContextBuilder·인접 확장·예산)/P24(형식별 구조 parser·locator) | P25 | 실제 parser·문맥/ACL/revision | 이번 |
+| AC-23-QUALITY | AC-23 | F3 | P22/P25 | P25 | 실제 고정 corpus·4전략 비교 | 이번 |
+| AC-24-EVIDENCEFLOW | AC-24 | F4[MOCK_API·LLM_STUB(분류)], F5a[TC_LIVE·LLM_LIVE] | P20/P26 | P29, F5a 인계 | 정상 절차·관측·한도 | 이번 계약/후속 실환경 |
+| AC-24-REPORT | AC-24 | F4[MOCK_API·LLM_STUB(분류)·LLM_LIVE(Composer)], F5a[TC_LIVE·LLM_LIVE] | P20/P26 | P29, F5a 인계 | 상세 블록·요약·Evidence | 이번 계약/후속 실환경 |
+
 ### 12.3 leaf 수 대조
 
 | 부모 | leaf 수 | 부모 | leaf 수 |
 |---|---:|---|---:|
 | AC-02 | 2 | AC-28 | 14 |
 | AC-03 | 2 | AC-30 | 3 |
-| AC-10 | 2 | AC-32 | 3 |
+| AC-10 | 2 | AC-32 | 4 (seq16, 이력3) |
 | AC-15 | 2 | AC-33 | 4 (2026-11-09 ⓕ 결정, 이력 3) |
 | AC-16 | 2 | AC-35 | 1 (2026-11-09 대체, 이력 4) |
 | AC-17 | 5 | AC-37 | 4 |
@@ -301,8 +314,8 @@
 | AC-20 | 2 | AC-42 | 2 |
 | AC-21 | 2 | AC-43 | 2 |
 | AC-22 | 6 | AC-46 | 3 |
-| AC-23 | 25 | ISO-04 | 20 |
-| AC-24 | 24 | ISO-05 | 2 |
+| AC-23 | 30 (seq16, 이력25) | ISO-04 | 20 |
+| AC-24 | 26 (seq16, 이력24) | ISO-05 | 2 |
 | AC-25 | 11 | ISO-06 | 6 |
 | AC-26 | 9 | ISO-07 | 4 |
 | AC-27 | 6 | ISO-08 | 4 |
@@ -313,16 +326,16 @@
 | | | ISO-14 | 4 |
 | | | ISO-15 | 3 |
 
-AC 하위 합 153 + ISO 하위 합 61 = **214**(2026-11-09 ⓕ 결정: AC-33 하위 3 → 4, AC 하위 합 152 + 1 = 153, 전체 213 + 1 = 214. 원자 23·상위 61 은 그대로 — AC-33 은 이미 하위를 가진 부모다. 이력: AC 하위 합 152 + ISO 하위 합 61 = 213 — 2026-11-09 대체(임차 원칙): AC-35 하위 4 → 1, AC 하위 합 155 − 3 = 152, 전체 216 − 3 = 213. 원자 23·상위 61 은 그대로 — AC-35 는 하위 1개를 가진 부모로 남는다. 이력: AC 하위 합 155 + ISO 하위 합 61 = 216). 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
+**현재(seq16): AC 하위161 + ISO 하위61 = 222, 원자23·상위61 유지.** (이력: AC 하위 합 153 + ISO 하위 합 61 = **214**(2026-11-09 ⓕ 결정: AC-33 하위 3 → 4, AC 하위 합 152 + 1 = 153, 전체 213 + 1 = 214. 원자 23·상위 61 은 그대로 — AC-33 은 이미 하위를 가진 부모다. 이력: AC 하위 합 152 + ISO 하위 합 61 = 213 — 2026-11-09 대체(임차 원칙): AC-35 하위 4 → 1, AC 하위 합 155 − 3 = 152, 전체 216 − 3 = 213. 원자 23·상위 61 은 그대로 — AC-35 는 하위 1개를 가진 부모로 남는다. 이력: AC 하위 합 155 + ISO 하위 합 61 = 216)). 원자 AC 19개(AC-01, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 29, 31, 34, 36, 40, 41, 44, 45) + 원자 ISO 4개(ISO-01, 02, 03, 09) = 23. 상위 ID = AC 46 + ISO 15 = 61. 공유 하위(AC-03-RES·AC-03-TIME ↔ AC-24, ISO-05-MESSAGE ↔ AC-03, ISO-08-RECONNECT ↔ AC-18, AC-40 ↔ AC-25)는 한 번 실행해 두 상위에 함께 쓴다.
 
-### 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력, leaf·원자 ID 추가·삭제 0)
+### 12.4 권위 producer 정본 (N1 — `leaf-catalog-v2.json` 의 component 입력. 2026-11-11 대체(seq16): 신규 8 leaf·단계 확장은 아래 표의 seq16 행과 §16.9 를 적용한다. 이력: leaf·원자 ID 추가·삭제 0)
 
-표기: `ACC:<suite>` = 배포 수용(§11.9 suite), `IT` = `:apps:ai-gateway-app:integrationTest` 정제 결과(같은 commit 의 CI 통합 증거로 수용 — 실제 PG·`AppProcessHarness` 재시작 경쟁이 권위인 leaf 만), `F0R` = `f0 report` 판정(측정·재판정), `SPR` = `f0 report --spec-record-check`, `RB:<suite>` = §4.4 viewer 수동 rubric, `UR` = `record user-run`, `PF` = `perf report`(원시 `MEASUREMENT` → nearest-rank), `OP:<id>` = 운영자 스크립트 측정. 한 칸의 `+` 는 component AND(§4.4 집계 ③)이며, 모든 component 는 판정하는 부모 회차 p 안의 마지막 시도만 쓴다(§4.4 집계 ② — `IT` 는 p 에 묶은 원시 실행 불변 참조, 다른 부모 회차 혼합 0). 아래에 없는 단계·leaf 조합(후속 단계 F5a·F5b·R1·R2·용량 확장·후속 기능 게이트의 leaf 와 원자 AC-06·AC-07·AC-08·AC-09·AC-11·AC-12·AC-13·AC-14·AC-34·AC-40)은 이 Plan 에서 component 0 이며 NOT_RUN 으로 handoff 한다. 같은 leaf 의 다른 producer 레코드(예: AC-23 하위의 Testcontainers IT, AC-18-WORKER-* 의 배포 halt, AC-28-FULL 의 P28 장애 주입)는 정보용이다.
+표기: `ACC:<suite>` = 배포 수용(§11.9 suite), `IT` = `:gateway-app:integrationTest`(2026-11-10 U3 이후 `:apps:ai-gateway-app:integrationTest` — `leaf-catalog-v2.json` 의 `task` 값 갱신은 U3, leaf·원자 ID 변경 0) 정제 결과(같은 commit 의 CI 통합 증거로 수용 — 실제 PG·`AppProcessHarness` 재시작 경쟁이 권위인 leaf 만), `F0R` = `f0 report` 판정(측정·재판정), `SPR` = `f0 report --spec-record-check`, `RB:<suite>` = §4.4 viewer 수동 rubric, `UR` = `record user-run`, `PF` = `perf report`(원시 `MEASUREMENT` → nearest-rank), `OP:<id>` = 운영자 스크립트 측정. 한 칸의 `+` 는 component AND(§4.4 집계 ③)이며, 모든 component 는 판정하는 부모 회차 p 안의 마지막 시도만 쓴다(§4.4 집계 ② — `IT` 는 p 에 묶은 원시 실행 불변 참조, 다른 부모 회차 혼합 0). 아래에 없는 단계·leaf 조합(후속 단계 F5a·F5b·R1·R2·용량 확장·후속 기능 게이트의 leaf 와 원자 AC-06·AC-07·AC-08·AC-09·AC-11·AC-12·AC-13·AC-14·AC-34·AC-40)은 이 Plan 에서 component 0 이며 NOT_RUN 으로 handoff 한다. 같은 leaf 의 다른 producer 레코드(예: AC-23 하위의 Testcontainers IT, AC-18-WORKER-* 의 배포 halt, AC-28-FULL 의 P28 장애 주입)는 정보용이다. **v4.1 대체(2026-11-05):** F0R/SPR는 종전 하네스의 역사 component다. 이관5 leaf의 F5a producer는 실제 Backend→Gateway 통합 수용 시험과 §14.5 확정 기록이며 하네스 재구현 호출을 쓰지 않는다. 이 개정에서 실행 도구·catalog 코드는 변경하지 않는다.
 
 | 단계 | leaf·원자 | 권위 component |
 |---|---|---|
-| F0 | AC-37-CMP, AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE | `F0R` + `SPR` |
-| F0 | AC-38-F0 | `F0R` |
+| F5a (이관·후속) | AC-37-CMP, AC-37-OUT-NORMAL, AC-37-OUT-MAX, AC-37-OUT-ESCAPE | 실제 통합 수용 시험 + SPEC §14.5 확정 기록(§13.1); 종전 F0R+SPR는 이력 **종전 권위 producer 이력:** 단계 F0, producer `F0R` + `SPR`. **v4.1 대체(2026-11-05):** 현재 F5a 실제 통합 수용 producer와 §13.1 기록 책임으로 대체한다. |
+| F5a (이관·후속) | AC-38-F0 | 실제 TC Backend→Gateway→LLM 분류·기대 workflow 판정(§13.1); 종전 F0R는 이력 **종전 권위 producer 이력:** 단계 F0, producer `F0R`. **v4.1 대체(2026-11-05):** 현재 F5a 실제 통합 수용 producer와 §13.1 기록 책임으로 대체한다. |
 | F1 | AC-17-P, AC-17-U, AC-17-D, AC-17-PHASE, AC-17-VERSION, AC-21-TOOL, AC-21-SOURCE, AC-36, AC-41, AC-45, AC-46-TRIM, ISO-04 하위 20개, ISO-15-QUERY, ISO-15-WINDOW | `ACC:F1` |
 | F1 | AC-46-EMPTY, AC-46-HIT | `ACC:F1` + `RB:F1-RUBRIC` |
 | F2 | AC-22-STUB-TOOL, AC-22-STUB-SYSTEM, AC-22-GQ-HELP, AC-29, AC-30-EQ, AC-30-WM, AC-30-ABSENT, AC-31, AC-32-SCHEMA, AC-32-LENGTH, AC-32-RETRYOK, AC-33-PERSIST, AC-33-CTX, AC-33-DIGEST, AC-35-EGRESS, AC-38-F2, AC-43-CLS, AC-43-COMP | `ACC:F2` |
@@ -342,8 +355,16 @@ AC 하위 합 153 + ISO 하위 합 61 = **214**(2026-11-09 ⓕ 결정: AC-33 하
 | F4 | AC-23-LOAD, AC-24-PERF | `PF`(`f4:job-latency-samples` — AC-23-LOAD 는 백필 중 회차) |
 | F4 | AC-24-RESTORE | `ACC:F4-RESTORE` + `OP:restore-rto` |
 | F4 | AC-24-BACKUP-ALERT | `OP:backup-alert` |
+| F2 | AC-32-NEEDS | `IT` + `ACC:F2` (seq16 신규, 세부 fixture는 §16.9) |
+| F3 | AC-23-QUERYINPUT, AC-23-HYBRID, AC-23-RERANK, AC-23-CONTEXT | `IT` + `ACC:F3` (seq16 신규) |
+| F3 | AC-23-QUALITY | `PF` + `RB:F3-QUALITY` (측정 ID는 §16.9) |
+| F3-RERANK-PROBE(측정 전용, leaf 없음) | — | `MEASUREMENT` 만(`f3-probe:reranker-latency-samples`·`f3-probe:reranker-resource-samples`, seq16 — G-RERANK-RUNTIME 근거, 어떤 leaf 의 component 도 아님) |
+| F3 | ISO-06-H-MISSING, ISO-06-H-TAMPER | `ACC:F3` (seq16 후속→필수 이동) |
+| F4 | AC-32-NEEDS, AC-24-EVIDENCEFLOW | `IT` + `ACC:F4` (seq16 신규) |
+| F4 | AC-24-REPORT | `IT` + `ACC:F4` + `RB:F4-RUBRIC` (seq16 신규) |
+| F4 | ISO-06-H-MISSING, ISO-06-H-TAMPER | `ACC:F4` (seq16 후속→필수 이동) |
 
-- 대조(LeafCatalogTest 가 기계 검사): 이 표의 F0~F4 행 leaf 집합 = §6·P03·P16·P21·P25·P29 필수 leaf 목록(SPEC §27.2 매핑)과 단계별로 정확히 같고, 이번 범위 원자 13개(AC-01·04·05·29·31·36·41·44·45, ISO-01·02·03·09) 모두 그 원자가 속한 단계 행에 있다. leaf 216·원자 23·상위 61 수는 그대로다(새 leaf·원자 0, 새 시험 클래스는 기존 leaf 의 component·실패 경계 보강용이며 ID 를 늘리지 않음). **2026-11-09 대체(임차 원칙):** leaf 수는 213(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL 폐기 3 제외)·원자 23·상위 61 이다. 위 "leaf 216" 과 "ID 수216" 은 이력이다. 폐기 3 leaf 는 어떤 단계 행에도 권위 component 를 두지 않으며, catalog·`LeafCatalogTest` 정합은 P15 "2026-11-09 임차 원칙 반영 코드 정합 책임" 이다. **2026-11-09 대체(ⓕ 결정):** AC-33-DIGEST 1개를 추가해 leaf 214·원자 23·상위 61 이다(위 "leaf 213" 과 표 머리말의 "leaf·원자 ID 추가·삭제 0" 은 이 결정 전 이력). AC-33-DIGEST 의 권위 component 는 AC-33-CTX 와 같이 F2 `ACC:F2`·F4 `ACC:F4` 이며, catalog(`leaf-catalog-v2.json`)·`LeafCatalogTest`·`plan-catalog-contract.txt` 정합은 P19 책임이다.
+- 대조(LeafCatalogTest 가 기계 검사): 이 표의 F0~F4 행 leaf 집합 = §6·P03·P16·P21·P25·P29 필수 leaf 목록(SPEC §27.2 매핑)과 단계별로 정확히 같고, 이번 범위 원자 13개(AC-01·04·05·29·31·36·41·44·45, ISO-01·02·03·09) 모두 그 원자가 속한 단계 행에 있다. leaf 216·원자 23·상위 61 수는 그대로다(새 leaf·원자 0, 새 시험 클래스는 기존 leaf 의 component·실패 경계 보강용이며 ID 를 늘리지 않음). **v4.1 대체(2026-11-05):** ID 수216·원자23·상위61은 유지하고5 leaf의 단계만 F0→F5a로 이동한다. 위 기계 대조 주장은 과거 고정 catalog에 대한 이력이며 새 SPEC 매핑이 하네스에 구현됐다는 뜻이 아니다. F5a producer/catalog 정합은 §13.1 이관 책임이다. **2026-11-09 대체(임차 원칙):** leaf 수는 213(AC-35-TOKEN·AC-35-FW·AC-35-LOCAL 폐기 3 제외)·원자 23·상위 61 이다. 위 "leaf 216" 과 "ID 수216" 은 이력이다. 폐기 3 leaf 는 어떤 단계 행에도 권위 component 를 두지 않으며, catalog·`LeafCatalogTest` 정합은 P15 "2026-11-09 임차 원칙 반영 코드 정합 책임" 이다. **2026-11-09 대체(ⓕ 결정):** AC-33-DIGEST 1개를 추가해 leaf 214·원자 23·상위 61 이다(위 "leaf 213" 과 표 머리말의 "leaf·원자 ID 추가·삭제 0" 은 이 결정 전 이력). AC-33-DIGEST 의 권위 component 는 AC-33-CTX 와 같이 F2 `ACC:F2`·F4 `ACC:F4` 이며, catalog(`leaf-catalog-v2.json`)·`LeafCatalogTest`·`plan-catalog-contract.txt` 정합은 P19 책임이다. **2026-11-11 대체(seq16):** leaf 222·원자 23·상위 61 이다(위 "leaf 214" 는 이력). 위 표의 seq16 행을 포함한 F0~F4 행 leaf 집합은 seq16 필수 목록 — §6 F3 exit, P21 24개, P25 AC-23 29개 + ISO-06 6개, P29 대체 목록 — 과 단계별로 같다. 단, `LeafCatalogTest` 의 기계 검사 입력은 이 Plan 파일이 아니라 시험 자원 `gateway-eval/src/test/resources/policy/plan-catalog-contract.txt` 의 §12.4 사본이며, 그 사본과 `leaf-catalog-v2.json` 은 아직 214 기준이다. 사본·catalog·`LeafCatalogTest` 를 seq16 표와 맞추는 일은 P20-R1 책임이고(§16.3·§16.9), 그 전까지 위 일치는 문서 대조이며 기계 검사 PASS 가 아니다.
 
 ---
 

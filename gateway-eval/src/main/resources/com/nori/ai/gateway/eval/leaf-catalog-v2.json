@@ -1,6 +1,7 @@
 {
-  "version": 2,
-  "sourcePlanSha256": "28cfae26d6574d65d68a2597449f3f2395c72060a6ac4a73a185a8b8acf24506",
+  "version": 3,
+  "revision": "seq16",
+  "sourcePlanSha256": "8d88acdf5d90e8fb970bbc6f86a0f40dec0b3aefcda1a3dffde449da21e68b2b",
   "parents": [
     {
       "id": "AC-01",
@@ -249,7 +250,12 @@
         "AC-23-ING-RULEVER",
         "AC-23-QUERYFAIL",
         "AC-23-PERF",
-        "AC-23-LOAD"
+        "AC-23-LOAD",
+        "AC-23-QUERYINPUT",
+        "AC-23-HYBRID",
+        "AC-23-RERANK",
+        "AC-23-CONTEXT",
+        "AC-23-QUALITY"
       ],
       "gates": [
         "F3",
@@ -285,10 +291,13 @@
         "AC-24-AUDIT-ALLOW",
         "AC-24-AUDIT-EXPIRY",
         "AC-24-RESTORE",
-        "AC-24-BACKUP-ALERT"
+        "AC-24-BACKUP-ALERT",
+        "AC-24-EVIDENCEFLOW",
+        "AC-24-REPORT"
       ],
       "gates": [
-        "F4"
+        "F4",
+        "F5a"
       ]
     },
     {
@@ -410,10 +419,13 @@
       "children": [
         "AC-32-SCHEMA",
         "AC-32-LENGTH",
-        "AC-32-RETRYOK"
+        "AC-32-RETRYOK",
+        "AC-32-NEEDS"
       ],
       "gates": [
-        "F2"
+        "F2",
+        "F4",
+        "F5a"
       ]
     },
     {
@@ -2299,6 +2311,156 @@
       }
     },
     {
+      "id": "AC-23-QUERYINPUT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3[MOCK_API]",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-HYBRID",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3[MOCK_API]",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-RERANK",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3[MOCK_API]",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-CONTEXT",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3[MOCK_API]",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-23-QUALITY",
+      "parentIds": [
+        "AC-23"
+      ],
+      "gates": [
+        "F3"
+      ],
+      "gateText": "F3",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "PF",
+            "producer": "PERF",
+            "measurementId": "f3:quality-samples",
+            "measurementIds": [
+              "f3:quality-samples",
+              "f3:reranker-latency-samples",
+              "f3:reranker-resource-samples"
+            ]
+          },
+          {
+            "componentId": "RB:F3-QUALITY",
+            "producer": "RUBRIC",
+            "suite": "F3-QUALITY"
+          }
+        ]
+      }
+    },
+    {
       "id": "AC-24-AUTHZ",
       "parentIds": [
         "AC-24"
@@ -2898,6 +3060,82 @@
             "componentId": "OP:backup-alert",
             "producer": "OPS",
             "measurementId": "ops:backup-alert"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-EVIDENCEFLOW",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F5a": [
+          "TC_LIVE",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-24-REPORT",
+      "parentIds": [
+        "AC-24"
+      ],
+      "gates": [
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F4; F5a",
+      "labelsByStage": {
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB",
+          "LLM_LIVE"
+        ],
+        "F5a": [
+          "TC_LIVE",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          },
+          {
+            "componentId": "RB:F4-RUBRIC",
+            "producer": "RUBRIC",
+            "suite": "F4-RUBRIC"
           }
         ]
       }
@@ -3858,6 +4096,58 @@
             "componentId": "ACC:F2",
             "producer": "ACCEPTANCE",
             "suite": "F2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-32-NEEDS",
+      "parentIds": [
+        "AC-32"
+      ],
+      "gates": [
+        "F2",
+        "F4",
+        "F5a"
+      ],
+      "gateText": "F2[LLM_STUB], F4; F5a",
+      "labelsByStage": {
+        "F2": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F4": [
+          "MOCK_API",
+          "LLM_STUB"
+        ],
+        "F5a": [
+          "TC_LIVE",
+          "LLM_LIVE"
+        ]
+      },
+      "components": {
+        "F2": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F2",
+            "producer": "ACCEPTANCE",
+            "suite": "F2"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "IT",
+            "producer": "JUNIT_OTR",
+            "task": ":apps:ai-gateway-app:integrationTest"
+          },
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
           }
         ]
       }
@@ -5459,20 +5749,70 @@
       "parentIds": [
         "ISO-06"
       ],
-      "gates": [],
-      "gateText": "후속 기능(Hybrid 활성)",
-      "labelsByStage": {},
-      "components": {}
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
     },
     {
       "id": "ISO-06-H-TAMPER",
       "parentIds": [
         "ISO-06"
       ],
-      "gates": [],
-      "gateText": "후속 기능(Hybrid 활성)",
-      "labelsByStage": {},
-      "components": {}
+      "gates": [
+        "F3",
+        "F4"
+      ],
+      "gateText": "F3, F4",
+      "labelsByStage": {
+        "F3": [
+          "MOCK_API"
+        ],
+        "F4": [
+          "MOCK_API"
+        ]
+      },
+      "components": {
+        "F3": [
+          {
+            "componentId": "ACC:F3",
+            "producer": "ACCEPTANCE",
+            "suite": "F3"
+          }
+        ],
+        "F4": [
+          {
+            "componentId": "ACC:F4",
+            "producer": "ACCEPTANCE",
+            "suite": "F4"
+          }
+        ]
+      }
     },
     {
       "id": "ISO-07-CITE",
@@ -6842,7 +7182,8 @@
       "AC-43-COMP",
       "AC-22-LIVE",
       "AC-22-GQ-BYPASS-DATA",
-      "AC-22-GQ-BYPASS-XSYS"
+      "AC-22-GQ-BYPASS-XSYS",
+      "AC-32-NEEDS"
     ],
     "F2-RUBRIC": [
       "AC-22-LIVE",
@@ -6878,7 +7219,13 @@
       "ISO-06-V-MISSING",
       "ISO-06-V-TAMPER",
       "ISO-06-K-MISSING",
-      "ISO-06-K-TAMPER"
+      "ISO-06-K-TAMPER",
+      "AC-23-QUERYINPUT",
+      "AC-23-HYBRID",
+      "AC-23-RERANK",
+      "AC-23-CONTEXT",
+      "ISO-06-H-MISSING",
+      "ISO-06-H-TAMPER"
     ],
     "F3-ACL": [
       "AC-23-ING-ACL"
@@ -7000,7 +7347,12 @@
       "AC-46-HIT",
       "ISO-10-LOG",
       "ISO-10-CODE",
-      "ISO-10-RAG"
+      "ISO-10-RAG",
+      "AC-24-EVIDENCEFLOW",
+      "AC-24-REPORT",
+      "AC-32-NEEDS",
+      "ISO-06-H-MISSING",
+      "ISO-06-H-TAMPER"
     ],
     "F4-RUBRIC": [
       "AC-02-MISSING",
@@ -7013,7 +7365,8 @@
       "AC-46-HIT",
       "ISO-10-LOG",
       "ISO-10-CODE",
-      "ISO-10-RAG"
+      "ISO-10-RAG",
+      "AC-24-REPORT"
     ],
     "F4-CLOCK": [
       "AC-24-RETAIN-EXPIRY",
@@ -7034,7 +7387,14 @@
       "AC-18-WORKER-QUEUED-VALID",
       "AC-18-WORKER-QUEUED-EXPIRED",
       "AC-18-WORKER-RACE-PRECOMMIT",
-      "AC-18-WORKER-RACE-POSTCOMMIT"
+      "AC-18-WORKER-RACE-POSTCOMMIT",
+      "AC-23-QUERYINPUT",
+      "AC-23-HYBRID",
+      "AC-23-RERANK",
+      "AC-23-CONTEXT",
+      "AC-24-EVIDENCEFLOW",
+      "AC-24-REPORT",
+      "AC-32-NEEDS"
     ],
     "f4:job-latency-samples": [
       "AC-23-LOAD",
@@ -7051,6 +7411,18 @@
     ],
     "f3:index-resources": [
       "AC-23-PERF"
+    ],
+    "f3:quality-samples": [
+      "AC-23-QUALITY"
+    ],
+    "f3:reranker-latency-samples": [
+      "AC-23-QUALITY"
+    ],
+    "f3:reranker-resource-samples": [
+      "AC-23-QUALITY"
+    ],
+    "F3-QUALITY": [
+      "AC-23-QUALITY"
     ]
   },
   "measurementIds": [
