@@ -8260,6 +8260,8 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 | `869aa14` | R5 IT fixture wire v3·LlmClassificationNeedsIT·EvidenceWorkflowContractIT·ReportSectionsContractIT·ⓑ fixture 수정·AppContextWiringIT·ci 등록·hook 계약 |
 | `df2b203` | 이 절 최초 기록 |
 | `c67796c` | R3 보완(root 판단 반영) — 승인 프로필의 workflow 밖 단계를 1차 계획에 추가, 근거 보완 round 1회를 같은 실행기로 실행, 프로필 필수/선택 조정·loader 리소스 argument 검사, 관련 단위·IT |
+| `388f73c` | 이 절 보완 기록 |
+| `b2f9731` | R3 추가 보완(SPEC 우선) — 프로필에 매핑된 Manifest 단계는 v3 계획에서 필수 여부와 무관하게 프로필이 실행을 정함(INC Trace·DLQ 포함, 일반 규칙), I 의 당시 배포 Trace 항목, 남은 단계가 받지 않는 리소스의 계획 대상 제외, 관련 단위·IT |
 
 **R1 — 타입·예산·프로필·catalog**
 - `core.workflow.EvidenceNeed`(S,H,N,I,C,R)·`AnswerMode`(B,D) 신설(시스템 독립). `core.llm.Classification` 에 evidenceNeeds·serverAdded·answerMode·wireVersion(`classify-wire-v3`) 추가, `jobClassification()` 투영(`evidenceNeeds`·`serverAddedNeeds`·`answerMode`·`wireVersion`).
@@ -8267,7 +8269,7 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 - `TokenBudgetPolicy.current()` CLASSIFY 3,072/256/4,864(요청 5,120). COMPOSER 2,816/128/5,120(5,248)·PLAN 불변. PreCallBudgetAssert·AnswerCheck·ScriptedChatTransport 는 정책 값만 읽어 코드 변경 0(ClassificationServiceTest "answer over 256", InferenceRequestContractIT 의 3,072+5,120 경계는 그대로).
 - `EvidencePlanProfile`·`EvidenceRequirement`·`EvidencePlan`·`EvidencePlanBuilder`·`EvidenceCoverage`·`EvidenceCoverageEvaluator`·`ToolCallBudget`(core.workflow), `core.knowledge.KnowledgeSearchContext`, `core.dispatch.ExecutionContext` 에 `Optional<KnowledgeSearchContext>` 추가(기존 2·3인자 생성자 empty 위임).
 - app `job/EvidenceProfileLoader` + `resources/workflows/tc/evidence-profile-v1.json`(index.json 과 분리). 닫힌 키, owner = 대상 시스템, need ∈ S/H/N/I/R(C 원천 금지), Registry 존재·타 owner·Mutation(operation READ·sideEffects NONE), argument 이름 = 입력 schema 속성, 리소스 argument(`x-resourceType`)는 그 Capability 의 `resourceTypes` 안, STEP_FIELD 경로 = 선행 근거 Capability 출력 schema 속성, 선행 근거는 앞선 항목만(중복·순환 0).
-- 프로필 항목(필수 = 1차 계획, 선택 = 보완 후보): S 운영 snapshot(필수), H 통신 로그·로그(필수)·Trace·DLQ·최근 이벤트(선택), N Knowledge·모델 READ(필수, 모델 READ 는 승인 argument 없음 — EQP 를 받지 않는 Capability), I Git(필수, 로그 결과 필드 바인딩), R Knowledge(필수).
+- 프로필 항목(필수 = 1차 계획, 선택 = 보완 후보): S 운영 snapshot(필수), H 통신 로그·로그(필수)·Trace·DLQ·최근 이벤트(선택), N Knowledge·모델 READ(필수, 모델 READ 는 승인 argument 없음 — EQP 를 받지 않는 Capability), I Git(필수, 로그 결과 필드 바인딩)·당시 배포 Trace(필수, `tc.impl.deployTrace`), R Knowledge(필수).
 - gateway-eval `leaf-catalog-v2.json`(파일명 유지): version 3·revision seq16·sourcePlanSha256 = seq16 Plan, 신규 8 leaf·부모 링크·단계 component(Plan §12.4 seq16 행), ISO-06-H 2개 F3/F4 `ACC` 필수, 기존 214 leaf·producerIndex 순서 보존(추가만). `plan-catalog-contract.txt` = seq16 Plan §12 사본. `LeafCatalogTest` 222/23/61·AC-23 30·AC-24 26·AC-32 4·신규 component·F5a component 0.
 
 **R2 — 질문 이해·서버 입력 결속**
@@ -8276,11 +8278,12 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 - QRefContext·JobWorker(scoped reader 로 복원한 같은 JobRequestInput 을 분류·계획·Composer 에 전달)는 WIP 그대로 재사용. Knowledge 단계는 WorkflowExecutor 가 현재 Job·선택 단계·검증 대상·결속 근거 종류로 만든 KnowledgeSearchContext 만 받는다(정확 q 와 의미 입력 분리, toString 보호).
 
 **R3 — 조건부 수집**
-- `EvidencePlanBuilder.plan(…, StepFactory)`: Manifest 필수 단계는 그대로 유지한다. 결속 근거의 프로필 항목이 workflow 단계면 그 단계를 제공자로 쓰고 선택 단계면 실행 대상으로 고른다. workflow 밖 항목은 Registry view 활성·READ·승인 argument 결속·선행 근거가 모두 갖춰질 때만 단계로 만든다 — 필수 항목은 1차 계획(`addedSteps`), 선택 항목은 보완 후보(`supplementSteps`). 실행할 수 없는 항목은 단계를 만들지 않고 `CAPABILITY_INACTIVE`(→ Coverage `UNSUPPORTED`)·`INPUT_UNAVAILABLE`·`OPTION_BLOCKED`(→ `NOT_EXECUTED`)로 남긴다. 선행 근거 결과 필드(STEP_FIELD)를 받는 workflow 밖 항목은 그 바인딩을 만드는 workflow 단계가 없으므로 입력 부족이다. 같은 Capability 는 한 번만 계획한다.
-- `WorkflowPlanBuilder`: JobContext 에 서버 결속 evidenceNeeds 가 있으면 위 계획을 만들고, 1차 프로필 단계를 Manifest 기본 경로 뒤에 같은 `WorkflowExecutionPlan`·`PlanEnvelope` 의 단계로 붙인다. 인자는 프로필이 선언한 argument 이름만 기본 경로와 같은 서버 값(검증 리소스·해석된 시간창·결속 q)으로 채우고, 단계 리소스는 그 Capability 의 `resourceTypes` 로 한정한다(예: 모델 READ 에 EQP 0). 결속 값이 없는 F1 구조화 분류 경로는 기존 동작, 프로필 없는 builder 에 v3 Job 이 오면 거부.
+- `EvidencePlanBuilder.plan(…, StepFactory)`: Capability 가 프로필 항목에 있는 Manifest 단계(`profileMappedSteps`)는 v3 계획에서 Manifest `optional` 값과 무관하게 프로필이 실행을 정한다 — 결속 근거의 필수 항목이 고르면 1차(`selectedWorkflowSteps`), 선택 항목이면 보완 후보, 아니면 실행하지 않는다. 프로필에 매핑되지 않은 Manifest 필수 단계(처리 단계 `summary` 포함)는 그대로 필수다. INC 특수 분기 없는 일반 규칙이다. workflow 밖 항목은 Registry view 활성·READ·승인 argument 결속·선행 근거가 모두 갖춰질 때만 단계로 만든다 — 필수 항목은 1차 계획(`addedSteps`), 선택 항목은 보완 후보(`supplementSteps`). 실행할 수 없는 항목은 단계를 만들지 않고 `CAPABILITY_INACTIVE`(→ Coverage `UNSUPPORTED`)·`INPUT_UNAVAILABLE`·`OPTION_BLOCKED`(→ `NOT_EXECUTED`)로 남긴다. 선행 근거 결과 필드(STEP_FIELD)를 받는 workflow 밖 항목은 그 바인딩을 만드는 workflow 단계가 없으므로 입력 부족이다. 같은 Capability 는 한 번만 계획한다.
+- `WorkflowPlanBuilder`: JobContext 에 서버 결속 evidenceNeeds 가 있으면 위 계획을 만들고, 고르지 않은 매핑 필수 단계를 Manifest 사본에서 빼며 그 단계를 가리키던 선행 관계는 그 단계의 선행으로 잇는다(예: INC `summary` 는 `logs` 또는 `trace` 를 선행으로 받는다 — Git 의 Trace 바인딩 경로 유지). 남은 단계가 받지 않는 리소스 종류는 계획 대상에서 뺀다(예: 모델 READ 만 남은 KQ 의 EQP). 1차 프로필 단계를 Manifest 기본 경로 뒤에 같은 `WorkflowExecutionPlan`·`PlanEnvelope` 의 단계로 붙인다. 인자는 프로필이 선언한 argument 이름만 기본 경로와 같은 서버 값(검증 리소스·해석된 시간창·결속 q)으로 채우고, 단계 리소스는 그 Capability 의 `resourceTypes` 로 한정한다(예: 모델 READ 에 EQP 0). 결속 값이 없는 F1 구조화 분류 경로는 기존 동작, 프로필 없는 builder 에 v3 Job 이 오면 거부.
 - `WorkflowExecutor`: 단계 실행을 `runSteps` 하나로 두고 1차 단계와 보완 단계가 같은 기록·의존성·바인딩·호출 한도(`RunState`)를 공유한다. 1차 뒤 Coverage 로 `EvidenceCoverageEvaluator.supplement`(근거 `NO_DATA`·`NOT_EXECUTED`·`UNSUPPORTED`, 미리 준비된 선택 후보, 1차 계획에 없던 Capability, round 1회)를 부르고, 후보가 있으면 같은 `PlanValidator.prepare` → 단계별 Source 인가 → Dispatcher → recorder/cache/Evidence 경로로 실행한다. 준비가 거절되면 후보마다 `SUPPLEMENT_REJECTED` trace 만 남긴다. 전체 12·같은 Tool 3·Knowledge search 2 는 dispatcher 직전 같은 `ToolCallBudget` 로 보완 호출까지 세고(초과 단계 `TOOL_LIMIT_REACHED`), 만료·취소는 같은 `ExpiryCheckpoint` 검사를 거친다. 보완 결과는 `EvidencePlan.withSupplement` 로 제공자에 더해 Coverage·Outcome·ReportSections·Composer 입력·resultSourceDeps 에 그대로 반영된다.
 - Registry 비활성 예: 최근 이벤트 READ 는 manifest `requiredPermission` 이 비어 Registry view 에 들어오지 않고(`CapabilityRegistry.view` 의 권한 조건), F3 Knowledge 는 PLANNED 다 — 둘 다 단계 0·Coverage `UNSUPPORTED`. IMPLEMENTED 등록 0.
-- INC Manifest 는 Trace·DLQ 를 필수 단계로 두므로 INC 는 여전히 항상 Trace·DLQ 를 조회한다(아래 남은 항목). Git 은 I 가 결속될 때만 선택한다.
+- v3 INC 결과: 모델이 H 를 요청하지 않아도 서버 보완 단계 A 로 H 가 결속되어 통신 로그·로그만 1차 실행, H 가 수집되면 Trace·DLQ 0, 1차 H 가 `NO_DATA` 면 보완 round 로 Trace·DLQ 각 1회. I 가 결속되면 Git 과 당시 배포 Trace 를 1차에 실행한다. KQ 의 Knowledge(PLANNED)는 프로필이 고르지 않아 빠지고, 같은 N 의 활성 승인 READ(모델)가 있으면 그것만 실행, 하나도 없으면 단계 0 → PlanValidator ⑨ 기존 `UNSUPPORTED`.
+- F1 경로(결속 근거 없음, 구조화 분류 hook)는 `INCIDENT_ANALYSIS.json` 을 바꾸지 않은 고정 workflow 그대로다(`EvidencePlanBuilderTest` legacy 단언 = Manifest 동일·단계 snapshot→commLogs→logs→trace→dlq→summary→git, F1 `WorkflowMockIT`·`DeploymentLineageIT` 회귀 통과).
 
 **R4 — 보고와 Composer**
 - `ReportSections`(core.workflow): D 요청이고 검증 블록·Evidence 가 하나 이상일 때만 기존 `table` 블록 1개(구역·근거·상태·근거 단계·최근 관측 시각·누락 항목·serverAdded)를 더한다. UiSchemaValidator 검증, 새 블록 타입 0, 가설·조치 창작 0, 미수집 근거는 `미확인`.
@@ -8289,6 +8292,7 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 **R5 — 시험·배선**
 - 신규 단위: ClassificationNeedsV3Test, EvidencePlanBuilderTest, EvidenceCoverageEvaluatorTest, EvidenceSupplementExecutorTest, KnowledgeSearchContextTest(core), EvidenceProfileLoaderTest, ClassificationWireV3TokenBudgetTest(app — ⓞ pin tokenizer 실제 계수).
 - 신규 IT: LlmClassificationNeedsIT(`@Tag("AC-32-NEEDS")`, ⓐ~ⓝ 실제 Job 경로), EvidenceWorkflowContractIT, ReportSectionsContractIT — `ci/integration-required.txt` 등록.
+- 추가 보완 시험(단일 결함): v3 INC n=[S](H 서버 보완) → Trace·DLQ 0, v3 INC n=[S,H]+로그 있음 → Trace·DLQ 0, v3 INC n=[S,H]+`empty` 시나리오·빈 로그 → 보완 Trace·DLQ 각 1회(EvidenceWorkflowContractIT, core EvidenceSupplementExecutorTest INC 사례), F1 INC → 고정 workflow 그대로(EvidencePlanBuilderTest legacy·WorkflowMockIT·DeploymentLineageIT), KQ → PLANNED Knowledge 제외·모델 READ 만, 승인 제공자 0 → UNSUPPORTED·Composer 0.
 - 보완 지시 시험(단일 결함): ①workflow 밖 프로필 단계 1차 실행 — EvidenceWorkflowContractIT LQ+N 모델 READ·LQ+H 통신 로그·로그, EvidenceSupplementExecutorTest 첫 사례 ②Registry 비활성 → 실행 0·`UNSUPPORTED` — IT 모델 READ 권한 제거, EvidencePlanBuilderTest ③보완 round 1회·2회째 없음 — IT `empty` 시나리오+빈 로그에서 Trace·DLQ 각 1회 후 H `NO_DATA` 유지, EvidenceCoverageEvaluatorTest round 한도 ④보완 호출이 Job 한도에 포함 — EvidenceSupplementExecutorTest 전체 한도 4(1차 3+보완 1, DLQ `TOOL_LIMIT_REACHED`)·round 한도 0 ⑤동일 조회 반복 0 — IT Capability 별 실행 1회, 평가기 1차 계획 Capability 제외 ⑥타 owner·Mutation 거부 — EvidenceProfileLoaderTest(기동 거부)·EvidencePlanBuilderTest(Mutation 예외, 타 owner 미계획). 호출 한도 초과는 v1 프로필로 실제 Job 에서 만들 수 없어(활성 READ 12개 미만, 같은 Capability 는 계획당 1회) core 실행기 시험이 맡는다.
 - IT 지원: WorkflowSourceFixture `logText=null` = 빈 로그 이력, ReportSectionsContractIT 는 수집·미지원 근거가 한 보고에 함께 있도록 모델 READ 권한을 뺀다.
 - 수정: LlmStubSupport `wire` 를 분류 wire v3 고정 fixture 로(n·a 명시 overload), v2 결속 리터럴 보정, LlmComposerFailureMappingIT ⓑ fixture 교체(Dispatcher Source 검사 DENIED seam), AppContextWiringIT 배선 단언, test-hooks-v1.md llm-script 분류 응답 형식.
@@ -8302,7 +8306,9 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 ### 결정과 근거
 
 1. **실행 단계는 승인 프로필과 Registry 로 고르고, Manifest 는 기본 경로·필수 의존성 자료다(root 판단 반영).** SPEC §28.2 "실행 단계는 서버가 승인한 시스템별 근거 프로필과 Registry로 선택한다"·흐름도(C→D, 보완 1회 이내면 D 로)와 Plan §16.3 R3 "반환된 선택 단계로 기존 WorkflowExecutionPlan을 만든다. 기존 taskType별 Manifest는 기본 경로·필수 의존성의 자료로 재사용"에 따라 Manifest 는 선택 단계의 상한이 아니다. R1 "두 번째 실행 엔진/Job 큐를 만들지 않는다"는 별도 실행기를 금지하는 것이고, 프로필 단계를 기존 `WorkflowExecutionPlan`·`PlanEnvelope` 단계로 넣어 기존 PlanValidator.prepare → Source 인가 → Dispatcher → recorder/cache/Evidence 로 실행하는 것은 같은 엔진이다. 처음 구현은 workflow 밖 항목을 실행하지 않아 이 해석과 달랐고 `c67796c` 에서 고쳤다.
-   - 프로필 `required` 의 뜻: workflow 밖 항목에서 true = 1차 계획, false = 근거가 비었을 때만 쓰는 보완 후보(SPEC §28.2 "필수/선택", §28.8 ① "필요 근거가 비었고 승인된 미실행 READ"). workflow 단계인 항목은 Manifest 기본 경로·선택 단계 규칙을 따른다. H 의 Trace·DLQ 를 선택으로 둔 것은 "모든 INC에서 Trace·DLQ·Git을 무조건 조회하지 않는다"를 프로필 수준에서 지키기 위함이고(INC Manifest 의 필수 단계는 그대로), N 의 모델 READ 를 필수로 둔 것은 보완 지시의 예(LQ 의 N → `tc.model.read` 1차)를 따른 것이다.
+   - 프로필 `required` 의 뜻: true = 1차 계획, false = 근거가 비었을 때만 쓰는 보완 후보(SPEC §28.2 "필수/선택", §28.8 ① "필요 근거가 비었고 승인된 미실행 READ"). Manifest 단계인 항목에도 같다 — SPEC §28.2 "모든 INC에서 Trace·DLQ·Git을 무조건 조회하지 않는다"가 Manifest `optional:false` 보다 우선하며, 같은 절의 "기존 mandatory 단계가 요청 의도상 필요한 경우에는 사용자 옵션으로 생략하지 못한다"는 사용자 요청 옵션 규칙이지 프로필 선택을 막는 규칙이 아니다(root 판단, 앞선 "Manifest 필수 단계 유지" 지시는 root 지시 결함으로 정정됨). N 의 모델 READ 를 필수로 둔 것은 보완 지시의 예(LQ 의 N → `tc.model.read` 1차)를 따른 것이다.
+   - I 의 당시 배포 Trace(`tc.impl.deployTrace`, 필수): SPEC §28.2 표 I = "같은 시스템 Git·당시 배포… 현재 main으로 과거 대체 금지"이고, Git 실행기는 선행 Trace 의 `service.version` 으로만 배포 commit 을 찾는다(`DirectSourceToolExecutor.code` — Trace 바인딩이 없으면 `CURRENT_APPROVED_REF`·missingEvidence 로 떨어짐). Trace 가 H 선택 항목이 되면 I 요청에서도 당시 배포 근거가 사라지므로 I 의 필수 제공자로 선언했다(AC-02-LINK "이벤트→Trace→코드"·AC-20-INC 의 Trace 정상 전제와 정합). 이 항목은 I 요청에만 Trace 를 고르므로 "H 요청 + 로그 있음 → Trace 0" 규칙과 충돌하지 않는다.
+   - 수정 전 확인(지시 3): v3 경로(LlmStubSupport 계열) 시험 중 Trace 를 기대하는 것은 `LlmScriptedTransportIT` scripted-budget(기본 n=S,H,I — I 로 Trace 실행, 유지)과 `EvidenceWorkflowContractIT`(이번에 고침)뿐이고, `WorkflowMockIT`·`DeploymentLineageIT`·`SourceAuthzNegativeSeamIT`·`WorkflowSourceCompositionIT` 등은 F1 구조화 분류 hook 경로다. acceptance-app 에는 Trace·DLQ 기대가 없다. SPEC §27.2 Fixture 중 v3 INC 에서 Trace 호출을 항상 요구하는 것은 없다(AC-02-LINK·AC-20-INC 는 Trace 가 있는 코드 원인 조사 사례이며 위 I 항목으로 충족 경로를 둔다). 그래서 중단하지 않았다.
    - 보완 round 는 1차와 다른 계획이라 1차 단계를 선행으로 가리킬 수 없다. 그래서 선행 근거가 있는 선택 항목은 보완 후보가 되지 않는다(v1 프로필에는 해당 없음).
 2. **F1 경로 호환.** JobContext 분류 맵에 `evidenceNeeds` 가 없으면(추론 비활성의 구조화 분류 hook) 기존 고정 workflow 를 그대로 쓴다. 근거 요구가 결속됐는데 planner 가 없으면 거부한다(조용한 기본값 0).
 3. **C 는 판정하지 않는다.** v1 프로필에 승인 비교 조건이 없으므로 양쪽 근거가 있어도 `NO_APPROVED_CONDITION`, 한쪽이 없으면 `COMPARISON_SIDE_MISSING` 이다(SPEC §28.2·§28.8 "문자열 다름=고장 확정 금지").
@@ -8315,7 +8321,27 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 
 ### 검증(Plan §16.8)
 
-**보완 반영 후(`c67796c`) 결과** — 같은 환경 설정(in-process Kotlin 컴파일, 아래 보정 설명), 각 명령 별도 실행.
+**추가 보완 반영 후(`b2f9731`) 결과 — 현재 기준** — 같은 환경 설정, 각 명령 별도·순차 실행(같은 worktree Gradle 겹침 0).
+
+| # | 명령 | exit | 결과 |
+|---|---|---|---|
+| ① | `:gateway-eval:run --args="spec-guard --spec <worktree SPEC> --baseline docs/gates/spec-baseline.md"` | 0 | specSha `7831c76984893fb3e82fc18bf232d11de4c65bb79fde493e066b3c50984b727a`(`FILE_HASHED`, `LOCAL_FILE`) |
+| ② | `:gateway-eval:test` | 0 | 283건 실패·오류·skip 0 |
+| ③ | `test-evidence verify --tasks :gateway-eval:test` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ④ | `:ai-gateway-core:test` | 0 | 171건 실패·오류·skip 0 |
+| ⑤ | `test-evidence verify --tasks :ai-gateway-core:test` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ⑥ | `:apps:ai-gateway-app:test` | 0 | 79건 실패·오류·skip 0 |
+| ⑦ | `test-evidence verify --tasks :apps:ai-gateway-app:test` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ⑧ | `:apps:ai-gateway-app:integrationTest -Paigw.requireDocker=true`(비한정) | 0 | `BUILD SUCCESSFUL in 50m 32s`, XML 53·205건 실패·오류·skip 0 |
+| ⑨ | `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --tasks :apps:ai-gateway-app:integrationTest --require-docker"` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 28s` |
+| ⑩ | `build` | 0 | `BUILD SUCCESSFUL in 2m 22s`(`114 actionable tasks: 53 executed, 61 up-to-date`), test 11개 task 757건 실패·오류·skip 0 |
+| ⑪ | `-q :gateway-eval:run --args="test-evidence verify --tasks <test 11개 쉼표 목록>"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+
+- ⑩ 합 757 = U8 694 + core 54 + app 9. IT 는 app 205(U8 167 + WIP·P20 신규 38), db-adapter 85·inference 1 은 아래 `869aa14` 기록(adapter 는 `core.workflow` 비참조).
+- 커밋 전 단독 확인: v3·F1 관련 한정 IT(`*ClassificationSchemaLimitsIT`·`*Llm*IT`·`*EvidenceWorkflowContractIT`·`*ReportSectionsContractIT`·`*WorkflowMockIT`·`*DeploymentLineageIT`) 50건 중 1건(KQ 가 모델 READ 만 남았을 때 EQP 대상이 PlanValidator ⑧ 에 걸림)이 실패해 계획 대상 필터를 고쳤고, 그 클래스 재실행 7건 통과 뒤 위 비한정 실행으로 인증했다(한정 실행 결과는 인증에 쓰지 않음).
+- Docker: ⑧⑨ 뒤와 ⑩⑪ 뒤 `docker ps -a --filter label=org.testcontainers=true -q` 0줄.
+
+**보완 반영 후(`c67796c`) 결과**(이후 추가 보완으로 대체된 기록) — 같은 환경 설정(in-process Kotlin 컴파일, 아래 보정 설명), 각 명령 별도 실행.
 
 | # | 명령 | exit | 결과 |
 |---|---|---|---|
@@ -8378,12 +8404,13 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 
 ### 남은 항목(미구현·미실행·사용자/root 결정)
 
-- **INC Manifest 의 필수 Trace·DLQ(root 확인 필요).** `workflows/tc/INCIDENT_ANALYSIS.json` 은 `trace`·`dlq` 를 `optional:false` 로 둔다. 보완 지시대로 Manifest 필수 단계를 유지하므로 INC 는 근거 요구와 무관하게 항상 Trace·DLQ 를 조회하며, SPEC §28.2 "모든 INC에서 Trace·DLQ·Git을 무조건 조회하지 않는다" 중 Trace·DLQ 부분은 INC 에서 충족되지 않는다(Git 은 I 결속 때만). 두 지시를 함께 만족하려면 INC Manifest 의 Trace·DLQ 를 선택 단계로 바꾸고 프로필로 고르게 해야 하는데, 이는 기존 INC 기본 경로(F1 구조화 분류 경로 포함)를 바꾸는 결정이라 고치지 않았다.
-- **모델 READ 의 대상 결속.** `tc.model.read` 는 `resourceTypes=[MODEL]` 이고 입력 schema 에 모델 식별 argument 가 없어 승인 argument 0 으로 실행하며, TC mock 계약상 전체 모델 목록을 돌려준다. 질문 설비에 적용된 모델로 좁히는 바인딩은 현재 READ 계약에 없다.
+- **해소: INC 필수 Trace·DLQ.** `b2f9731` 에서 프로필 매핑 Manifest 단계를 v3 계획의 강제 조건으로 쓰지 않는 일반 규칙으로 해소했다(위 R3·결정 1). `INCIDENT_ANALYSIS.json` 은 바꾸지 않았고 F1 경로는 그대로다.
+- **F5a READ 계약 인계(Plan §16.10).** ①TC READ 계약에 모델 지정 인자 없음: `tc.model.read` 는 `resourceTypes=[MODEL]` 이고 입력 schema 에 모델 식별 argument 가 없어 승인 argument 0 으로 실행하며 TC mock 계약상 전체 모델 목록을 돌려준다 — SPEC §28 "실제 READ에 없는 자료는 조회 계약 추가 필요"에 따른 F5a READ 계약 인계. ②`tc.event.getRecent` 는 manifest `requiredPermission` 이 비어 `CapabilityRegistry.view` 의 권한 조건을 통과하지 못해 Registry view 에서 항상 비활성이다(프로필 H 선택 항목은 계획되지 않음). manifest 는 고치지 않았다.
+- **`IngressAuthIT` 교착 — P20 무관 간헐 실패.** 아래 검증 기록의 1회 `deadlock detected`(시험 정리 TRUNCATE 경합)는 P20 변경과 무관하며 단독·재실행에서 통과했다.
 - **AC-24-EVIDENCEFLOW·AC-24-REPORT·AC-32-NEEDS F4 component, F5a component** — P26/P29·P30 몫, 미실행.
 - **ACC:F2(AC-32-NEEDS)** — 수용 suite 구현은 P21 몫, 미실행. 이번 IT 결과는 IT component 의 로컬 실행일 뿐 leaf PASS·F2 게이트 판정이 아니다.
 - **Knowledge stub 의 IMPLEMENTED/verify origin 구분 부정 시험** — 이번 P20 시험은 시험 전용 Knowledge stub 을 쓰지 않아(F3 PLANNED 유지) 해당 사례가 없다. P23 에서 실제 Knowledge 등록과 함께 다룬다.
 - **원격 spec-input publish·보호 변수·CI·push** — 지시 범위 밖, 0.
 - **Plan §16.8 한정 IT 직후 verify — root 처리 예정.** 한정 IT 뒤 verify 의 `STALE_TEST_EVIDENCE` 는 시험 지문에 `testFilters` 가 의도적으로 들어간 결과이며, 인증은 비한정 실행으로 한다.
 - **실행 환경.** 공유 Kotlin compile daemon(다른 세션) 상태 때문에 in-process 컴파일 환경변수를 썼다. CI·다른 세션 재현 시 같은 증상이 나오면 daemon 재시작 또는 같은 설정이 필요하다.
-- **Plan 체크박스.** P20 `구현`·`검증` 체크박스는 위 INC Trace·DLQ 항목이 열려 있어 갱신하지 않았다.
+- **Plan 체크박스.** Plan 문서는 이 작업의 쓰기 대상이 아니고(root 가 main 의 seq17 합류와 함께 정리), 위 미실행 component 가 남아 있어 갱신하지 않았다.
