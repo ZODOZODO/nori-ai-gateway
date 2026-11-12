@@ -25,9 +25,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 고정 workflow 기본 경로(D50)의 분류·인자 추출(SPEC §14.5 qRef v2 계약, Plan P20 "qRef 실제 연결 책임").
- * 순서: 입력 literal 추출 → 원문 q256 검사 → 요청별 불변 바인딩 → 질문+후보 ID 목록 메시지 조립 → 분류 호출 → wire 검증(qRef 결속 포함)
- * → 원문 q 복원 → resolved {@link Classification}. 판정 실패는 같은 바인딩·고정 오류 요지로 1회만 재시도한다.
+ * 고정 workflow 기본 경로(D50)의 분류·인자 추출(SPEC §14.5 qRef 계약, §28.3 분류 wire v3, Plan P20 "qRef 실제 연결 책임"·§16.3 R1).
+ * 순서: 입력 literal 추출 → 원문 q256 검사 → 요청별 불변 바인딩 → 질문+후보 ID 목록 메시지 조립 → 분류 호출 → wire 검증(qRef 결속 포함, 기존 필드 뒤 n·a)
+ * → 원문 q 복원·근거 요구 정규화/보완 → resolved {@link Classification}. 판정 실패는 같은 바인딩·고정 오류 요지로 1회만 재시도한다.
  * 프롬프트·모델 출력·후보 원문은 결과·예외·로그에 싣지 않는다.
  */
 public final class ClassificationService {
@@ -36,7 +36,8 @@ public final class ClassificationService {
     /** arg-limits v2 CONFIRMED: eqp 64 CODEPOINT. 시간 35 CODEPOINT 는 아래 형식이 상한을 같이 강제한다. */
     static final int EQP_MAX_CODEPOINTS = 64;
     private static final Pattern TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2})?");
-    private static final Set<String> WIRE_KEYS = Set.of("t", "eqp", "from", "to", "qRef");
+    /** 분류 wire v3 일곱 키(모두 필수, 추가 키 금지). v2 다섯 키 응답은 기본값 보충 없이 SCHEMA_KEYS_INVALID 다. */
+    private static final Set<String> WIRE_KEYS = Set.of("t", "eqp", "from", "to", "qRef", "n", "a");
     private static final Map<String,TaskType> TASKS = Map.of("KQ", TaskType.KNOWLEDGE_QUERY, "LQ", TaskType.LIVE_QUERY, "INC", TaskType.INCIDENT_ANALYSIS,
         "GQ", TaskType.GENERAL_QUERY, "UNS", TaskType.UNSUPPORTED_REQUEST);
     private static final JsonMapper STRICT = JsonMapper.builder().build();
@@ -176,7 +177,14 @@ public final class ClassificationService {
             }
             values[i] = text;
         }
-        var classification = new Classification(TASKS.get(node.get("t").asString()), values[0], values[1], values[2], references.resolve(node.get("qRef")));
+        // 기존 필드 검사를 모두 통과한 뒤에만 신규 n·a 를 본다(SPEC §28.3 ① 검사 순서).
+        String taskCode = node.get("t").asString();
+        String needs = ClassificationNeeds.violation(taskCode, node.get("n"), node.get("a"));
+        if (needs != null) return invalid(needs);
+        TaskType task = TASKS.get(taskCode);
+        var resolved = ClassificationNeeds.resolve(task, ClassificationNeeds.codes(node.get("n")));
+        var classification = new Classification(task, values[0], values[1], values[2], references.resolve(node.get("qRef")),
+            resolved.evidenceNeeds(), resolved.serverAdded(), ClassificationNeeds.answerMode(node.get("a")), Classification.WIRE_V3);
         return new Verdict(classification, null);
     }
 

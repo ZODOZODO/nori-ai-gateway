@@ -1,0 +1,130 @@
+{
+  "schema" : "classify-wire-v3-messages-v1",
+  "prompt" : "modules/apps/ai-gateway-app/src/main/resources/prompts/classify-v3.txt",
+  "promptSha256" : "13aa84c8c909a2e22ad5cf3c17f5c702667e07c33c209b8a162d132ebcf56115",
+  "inputs" : "eval/golden/tc-f0-v2.jsonl 질문·Context, eval/f0/v2/output-boundary-cases.jsonl 질문·Context, eval/golden/tc-registry-fixture-v2.json Registry",
+  "rows" : [ {
+    "id" : "golden/G01/first",
+    "messagesSha256" : "0e80ecea115bb352f07cebc59c53e03ff6a811cf2a1d697f583ae5447bd3a1a3"
+  }, {
+    "id" : "golden/G01/retry/FINISH_LENGTH",
+    "messagesSha256" : "fcfbba0790f182b766b9a6ef74673bffbffc74b49f9c307f99f5470b34cb91ae"
+  }, {
+    "id" : "golden/G01/retry/FINISH_REASON_INVALID",
+    "messagesSha256" : "99ac7c469df6eba09f805aac5f043be606804fb5f8c3b199ee5e42a781b1a3aa"
+  }, {
+    "id" : "golden/G01/retry/USAGE_EXCEEDS_LIMIT",
+    "messagesSha256" : "abe3559235dc8f347a833cd80df84d2ac12e0db446c19b93725c8c8812a5b72c"
+  }, {
+    "id" : "golden/G01/retry/JSON_PARSE_FAILED",
+    "messagesSha256" : "7c0ab7d4a59a347f809e7ab02c91666002113deefe6b0330cb1ca0c849d0e83c"
+  }, {
+    "id" : "golden/G01/retry/SCHEMA_KEYS_INVALID",
+    "messagesSha256" : "5cefc9d0724ec1b149bff5e488a4e6c7ba166a937ec2eb23f1ce3a8cfbf363d7"
+  }, {
+    "id" : "golden/G01/retry/ENUM_INVALID",
+    "messagesSha256" : "06293ca5b536a044dda5d90a185f3d945feb64e2ca0c4d97806d1ed1a9c6329a"
+  }, {
+    "id" : "golden/G01/retry/QREF_INVALID",
+    "messagesSha256" : "576393963fe8d7ff43d627be91e3745fd890a175724bbbf17af1720eba8586fe"
+  }, {
+    "id" : "golden/G01/retry/TYPE_INVALID",
+    "messagesSha256" : "ebf8ab1c09109d907cdef4f564cc2fd46d5b170d070c0f0de8e1472f2277a78c"
+  }, {
+    "id" : "golden/G01/retry/FORMAT_INVALID",
+    "messagesSha256" : "3d2af13879edd0f48e4f222600a4381b96d7887177f0db77934320b42edf7f9c"
+  }, {
+    "id" : "golden/G01/retry/ARG_LENGTH_EXCEEDED",
+    "messagesSha256" : "ef16237491260d8676091374a9f725add6bf12923efd370505a095dafcff3019"
+  }, {
+    "id" : "golden/G02/first",
+    "messagesSha256" : "084170d7322711ceac1cca35e505f44f0301bb4df9166bb1f681bcc7472812f3"
+  }, {
+    "id" : "golden/G03/first",
+    "messagesSha256" : "03939fdcb999bc3f91c73b198b9b37997003304181d3f11c30c8371b773b6c45"
+  }, {
+    "id" : "golden/G04/first",
+    "messagesSha256" : "681e7aaa313d58f1f5d0c89b308bb03d5a07b993bc4ddf52334d9933d16c654b"
+  }, {
+    "id" : "golden/G05/first",
+    "messagesSha256" : "ab5f82019824712ea53e05f6772437d8d1281f1351add4dca9876e98478a70ee"
+  }, {
+    "id" : "golden/G06/first",
+    "messagesSha256" : "1f86d1e5bcbf0583c1933da79b768499f13002bdf72168eadc0c4dc09d339add"
+  }, {
+    "id" : "golden/G07/first",
+    "messagesSha256" : "ee72b403c0c25feb1a9f245120c2f5ffaa0f4531c874d2e60cc52be038c94abd"
+  }, {
+    "id" : "golden/G08/first",
+    "messagesSha256" : "af4fa7593098da2b7509ee7d94d25a7117898f19767f4a81af9a117c3165004c"
+  }, {
+    "id" : "golden/G09/first",
+    "messagesSha256" : "0fb858eaf8475761b6b89679ebd66c180a76eb22ab8136008f7161afb1e45403"
+  }, {
+    "id" : "golden/G10/first",
+    "messagesSha256" : "b0c2a306dd51e17f34dd79910a322d9bb99cf419bb98c05957fb112829d39e6b"
+  }, {
+    "id" : "golden/G11/first",
+    "messagesSha256" : "a6b130d626e1946ae6f43d8dcfcd4410fe3d05eee8f8fe9b0e08ccff9a55e33f"
+  }, {
+    "id" : "golden/G12/first",
+    "messagesSha256" : "db7bd575045566b925921f8abfacab7a39e0abcf1add6c4a4686a9ac42aabf1b"
+  }, {
+    "id" : "golden/G13/first",
+    "messagesSha256" : "ce69087f5c8ce56014f058719bbcfb92ddd9934e6fc1aa0a951d4f8f6e3bc8f9"
+  }, {
+    "id" : "golden/G14/first",
+    "messagesSha256" : "0027f95123932c473d597cfc3ef2114485141ae09ff783b9112ea17504ba5d2c"
+  }, {
+    "id" : "golden/G15/first",
+    "messagesSha256" : "49fab3dadc58c97c76f8be764c28d61b13bf94e2c2a3aa91aa1199538b0bf60d"
+  }, {
+    "id" : "golden/G16/first",
+    "messagesSha256" : "7a09753e7f234cc7e180ce0c49a4779c2da8a999c0de23687574c517ae4c1ba2"
+  }, {
+    "id" : "golden/G17/first",
+    "messagesSha256" : "d171b3fd380b99868dfbd81c2f028028f68cc735b7987372517682647fe71da8"
+  }, {
+    "id" : "golden/G18/first",
+    "messagesSha256" : "2900a9db464e377ab00d67332d6526a31a812cdb825e7062f579a68874460dcd"
+  }, {
+    "id" : "golden/G19/first",
+    "messagesSha256" : "5eac1fbc62797af2b17e7e2db6b83a841a129af13c795ce6da6f6570f42fdff2"
+  }, {
+    "id" : "golden/G20/first",
+    "messagesSha256" : "220f62914d4f377919c5631f84c30535fa012345f7ae41009b925b3fd8e85833"
+  }, {
+    "id" : "golden/G21/first",
+    "messagesSha256" : "6db792b58b271e6eceedc9ea260dc351c546c74fbce242fd5e5c9dd34c0dd7c9"
+  }, {
+    "id" : "golden/G22/first",
+    "messagesSha256" : "fe5fd247b36c881cff1805cb0f5f7e2182497af835f252ec8db0cbd4f62421f5"
+  }, {
+    "id" : "boundary/NORMAL-01/first",
+    "messagesSha256" : "2c097b3f7d827ddfe36fb91ae201a63dd24205369e8c680ff99c8e1509a369e0"
+  }, {
+    "id" : "boundary/NORMAL-PRECISE/first",
+    "messagesSha256" : "99ed3501f517abbf90fc0e92fb884c95b282087dc957efb12fd3d56866453874"
+  }, {
+    "id" : "boundary/MAX-MIXED/first",
+    "messagesSha256" : "9065faa6c8ece676721516e10fa04dd40d567de7dbd0a513ceec06579a292db5"
+  }, {
+    "id" : "boundary/MAX-HANGUL/first",
+    "messagesSha256" : "bd45783e710115993cd56bd8eb706c270e9b3ca382e57ba24514d486cbefd3cf"
+  }, {
+    "id" : "boundary/MAX-DIGIT/first",
+    "messagesSha256" : "7e89b9e64a01a5f80056de111685e63e7894b7ebd72b7c62a79132d3e9878f69"
+  }, {
+    "id" : "boundary/MAX-ASCII/first",
+    "messagesSha256" : "163edf467cea453bcaad4026c6e2962b08a86729288fa1d6debbec4d8097a692"
+  }, {
+    "id" : "boundary/MAX-SUPPLEMENTARY/first",
+    "messagesSha256" : "975131811973cbcf1dd07b9249480f07088c283bab54558221a08f02aa93f138"
+  }, {
+    "id" : "boundary/ESCAPE-01/first",
+    "messagesSha256" : "7e53a63adc6d325f8a3456fc17174542872eeef9fa860e03a41f1c45c299833c"
+  }, {
+    "id" : "boundary/ESCAPE-CONTROL/first",
+    "messagesSha256" : "74a6d5d76c539ac70830cfe85bcab9b4c29ec67d997d9b4b89238cf46f6c7ea3"
+  } ]
+}

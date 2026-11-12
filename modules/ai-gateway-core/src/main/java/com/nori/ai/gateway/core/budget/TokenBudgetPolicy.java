@@ -33,11 +33,11 @@ public final class TokenBudgetPolicy {
 
     /**
      * SPEC §14.5 현재 profile: 입력/답변 상한은 2026-11-02 기술 선정값, 사고 상한은 F5a 정식 시험 전 확정되는
-     * 잠정 안전 초기값(T_cls 4,928·T_pln 4,864·T_cmp 5,120)이다.
+     * 잠정 안전 초기값이다. 분류는 §28.3 분류 wire v3 예산(답변 256·T_cls 4,864·요청 5,120), 계획 T_pln 4,864, 서술 T_cmp 5,120.
      */
     public static TokenBudgetPolicy current() {
         return new TokenBudgetPolicy(Map.of(
-            CallType.CLASSIFY, new CallBudget(3_072, 192, 4_928),
+            CallType.CLASSIFY, new CallBudget(3_072, 256, 4_864),
             CallType.PLAN, new CallBudget(3_072, 256, 4_864),
             CallType.COMPOSER, new CallBudget(2_816, 128, 5_120)));
     }

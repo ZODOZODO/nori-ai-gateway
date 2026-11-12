@@ -9,6 +9,8 @@ import com.nori.ai.gateway.core.job.JobRequestInput;
 import com.nori.ai.gateway.core.port.InferenceClient;
 import com.nori.ai.gateway.core.registry.TaskType;
 import com.nori.ai.gateway.core.result.ErrorCode;
+import com.nori.ai.gateway.core.workflow.AnswerMode;
+import com.nori.ai.gateway.core.workflow.EvidenceNeed;
 import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -30,8 +32,13 @@ class ClassificationServiceTest {
     private ClassificationService.Request request(String question, Map<String,Object> fields) {
         return new ClassificationService.Request("job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, question, fields));
     }
+    /** 분류 wire v3 고정 fixture: n 은 상위 작업 최소 근거(KQ=N, LQ=S, INC=H, GQ·UNS=[]), a=B. 다른 값은 {@link #wire(String,String,String,String,String,String,String)}. */
     private static String wire(String t, String eqp, String from, String to, String qRef) {
-        return "{\"t\":\"" + t + "\",\"eqp\":" + quoted(eqp) + ",\"from\":" + quoted(from) + ",\"to\":" + quoted(to) + ",\"qRef\":" + quoted(qRef) + "}";
+        String n = switch (t) { case "KQ" -> "[\"N\"]"; case "LQ" -> "[\"S\"]"; case "INC" -> "[\"H\"]"; default -> "[]"; };
+        return wire(t, eqp, from, to, qRef, n, "\"B\"");
+    }
+    private static String wire(String t, String eqp, String from, String to, String qRef, String n, String a) {
+        return "{\"t\":\"" + t + "\",\"eqp\":" + quoted(eqp) + ",\"from\":" + quoted(from) + ",\"to\":" + quoted(to) + ",\"qRef\":" + quoted(qRef) + ",\"n\":" + n + ",\"a\":" + a + "}";
     }
     private static String quoted(String value) { return value == null ? "null" : "\"" + value + "\""; }
 
@@ -43,7 +50,8 @@ class ClassificationServiceTest {
         var result = service(client).classify(request("\"" + query + "\" 원인 찾아줘", CONTEXT));
         var classified = (ClassificationService.Classified) result;
         assertThat(classified.calls()).isOne();
-        assertThat(classified.classification()).isEqualTo(new com.nori.ai.gateway.core.llm.Classification(TaskType.INCIDENT_ANALYSIS, eqp, "2026-10-03T00:00:00.123456789+09:00", "2026-10-04T00:00Z", query));
+        assertThat(classified.classification()).isEqualTo(new com.nori.ai.gateway.core.llm.Classification(TaskType.INCIDENT_ANALYSIS, eqp, "2026-10-03T00:00:00.123456789+09:00", "2026-10-04T00:00Z", query,
+            List.of(EvidenceNeed.H), java.util.Set.of(), AnswerMode.B, Classification.WIRE_V3));
         assertThat(classified.classification().q().codePoints().toArray()).isEqualTo(query.codePoints().toArray());
         var sent = client.sent.getFirst();
         assertThat(sent.maxTokens()).isEqualTo(5_120);
@@ -51,11 +59,12 @@ class ClassificationServiceTest {
         String user = sent.messages().get(1).content();
         assertThat(user).contains("\"qRefCatalog\":[\"Q1\"]").startsWith("{\"context\":{\"referenceTime\":\"2026-10-20T10:00:00+09:00\",\"selectedResourceRefs\":[],\"timeWindow\":null,\"timezone\":\"+09:00\"}");
         assertThat(observed).containsExactly(sent.messages());
-        assertThat(classified.classification().jobClassification()).containsEntry("taskType", "INCIDENT_ANALYSIS").containsEntry("q", query).doesNotContainKey("qRef");
+        assertThat(classified.classification().jobClassification()).containsEntry("taskType", "INCIDENT_ANALYSIS").containsEntry("q", query).containsEntry("evidenceNeeds", List.of("H")).containsEntry("answerMode", "B")
+            .containsEntry("wireVersion", "classify-wire-v3").doesNotContainKey("qRef").doesNotContainKey("n");
     }
 
     @Test void schemaFailureRetriesOnceWithTheSameBindingAndOnlyAFixedErrorThenUsesTheRetryValues() {
-        var client = new ScriptedClient(reply("{\"t\":\"LQ\",\"eqp\":\"FIRST\",\"from\":null,\"to\":null,\"q\":\"invented\"}"), reply(wire("LQ", "SECOND", null, null, "Q2")));
+        var client = new ScriptedClient(reply("{\"t\":\"LQ\",\"eqp\":\"FIRST\",\"from\":null,\"to\":null,\"q\":\"invented\",\"n\":[\"S\"],\"a\":\"B\"}"), reply(wire("LQ", "SECOND", null, null, "Q2")));
         var result = (ClassificationService.Classified) service(client).classify(request("\"a\" 와 \"b\"", CONTEXT));
         assertThat(result.calls()).isEqualTo(2);
         assertThat(result.classification().eqp()).isEqualTo("SECOND");
@@ -68,9 +77,10 @@ class ClassificationServiceTest {
 
     @Test void everyWireOrAnswerViolationFailsBothAttemptsAndEndsAsPlanInvalidAfterExactlyTwoCalls() {
         var cases = new java.util.LinkedHashMap<String,InferenceClient.Completed>();
-        cases.put("missing key", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null}"));
-        cases.put("q key", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"q\":\"x\"}"));
-        cases.put("extra capability", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"capabilityId\":\"wm.inventory.get\"}"));
+        cases.put("missing key", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"n\":[\"S\"],\"a\":\"B\"}"));
+        cases.put("v2 five keys", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\"}"));
+        cases.put("q key", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"q\":\"x\",\"n\":[\"S\"],\"a\":\"B\"}"));
+        cases.put("extra capability", reply("{\"t\":\"LQ\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"n\":[\"S\"],\"a\":\"B\",\"capabilityId\":\"wm.inventory.get\"}"));
         cases.put("enum", reply(wire("XX", null, null, null, "Q1")));
         cases.put("forged ref", reply(wire("LQ", null, null, null, "Q2")));
         cases.put("null with candidate", reply(wire("LQ", null, null, null, null)));
@@ -80,7 +90,7 @@ class ClassificationServiceTest {
         cases.put("eqp 65", reply(wire("LQ", "E".repeat(65), null, null, "Q1")));
         cases.put("length", reply(wire("LQ", null, null, null, "Q1"), "length"));
         cases.put("other finish", reply(wire("LQ", null, null, null, "Q1"), "tool_calls"));
-        cases.put("answer over 192", reply("{\"t\":\"LQ\"," + " ".repeat(200) + "\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\"}"));
+        cases.put("answer over 256", reply("{\"t\":\"LQ\"," + " ".repeat(260) + "\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"n\":[\"S\"],\"a\":\"B\"}"));
         cases.put("think marker", reply("</think>" + wire("LQ", null, null, null, "Q1")));
         cases.put("not json", reply("LQ 입니다"));
         for (var entry : cases.entrySet()) {
@@ -89,7 +99,7 @@ class ClassificationServiceTest {
             assertThat(result).as(entry.getKey()).isEqualTo(new ClassificationService.Rejected(ErrorCode.PLAN_INVALID, 2));
             assertThat(client.sent).as(entry.getKey()).hasSize(2);
         }
-        var budget = new ScriptedClient(reply("{\"t\":\"LQ\"," + " ".repeat(200) + "\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":null}"), reply(wire("GQ", null, null, null, null)));
+        var budget = new ScriptedClient(reply("{\"t\":\"LQ\"," + " ".repeat(260) + "\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":null,\"n\":[\"S\"],\"a\":\"B\"}"), reply(wire("GQ", null, null, null, null)));
         service(budget).classify(request("질문", CONTEXT));
         assertThat(budget.sent.get(1).messages().getLast().content()).contains("(오류: USAGE_EXCEEDS_LIMIT)");
     }

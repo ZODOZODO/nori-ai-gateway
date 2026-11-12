@@ -44,7 +44,7 @@ public class JobConfiguration {
             ConversationRepository conversations,MessageRepository messages,JobRepository jobs,JobEventRepository events,ContentSanitizer sanitizer,Optional<TestHookRegistry> hooks,Optional<PausePointRegistry> pauses,ApplicationEventPublisher publisher,ReadinessGate recovery,com.nori.ai.gateway.app.observability.AuditRecorder audit){return new JobAdmissionService(manager,control,lookup,readiness,inferenceStates,capacity,queue,conversations,messages,jobs,events,sanitizer,hooks,pauses,publisher,recovery,audit);}
     @Bean JobWorker jobWorker(JobDelegationReader delegations,ScopeAssembler scopes,ConversationExpiryGuard expiry,Clock clock,TcSourceAuthorizationPort authorization,WorkflowExecutor workflow,JobTerminalCommitter terminal,JobRepository jobs,InferenceModeProperties inference,Optional<StructuredClassificationHook> hook,Optional<PausePointRegistry> pauses,Optional<FaultInjector> faults,SlotLedger slots,com.nori.ai.gateway.core.port.JobRequestInputReader inputs,Optional<com.nori.ai.gateway.core.llm.ClassificationService> classifier){return new JobWorker(delegations,scopes,expiry,clock,authorization,workflow,terminal,jobs,inference,hook,pauses,faults,slots,inputs,classifier);}
     /**
-     * 분류 서비스(Plan P20). 프롬프트는 F0 v2 등록 classify-v2 원문이고 {{REGISTRY}} 는 boundSystem Registry 와 시스템 소유 영역으로 기동 때 한 번 만든다.
+     * 분류 서비스(Plan P20·§16.3 R2). 프롬프트는 분류 wire v3 classify-v3(SPEC §28.3)이고 {{REGISTRY}} 는 boundSystem Registry 와 시스템 소유 영역으로 기동 때 한 번 만든다.
      * QRefContext 는 요청별 값이라 빈이 아니다. 답변 토큰은 pin tokenizer 로 센다(SPEC §14.5 방법 (b)).
      */
     @Bean @ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="enabled")
@@ -56,7 +56,7 @@ public class JobConfiguration {
             systems.add(new com.nori.ai.gateway.core.llm.ClassificationRegistryText.SystemArea(system.required("system").asString(),texts(system.required("aliases")),texts(system.required("ownedAreas"))));
         var lines=com.nori.ai.gateway.core.llm.ClassificationRegistryText.lines(com.nori.ai.gateway.core.scope.OwnerSystem.TC,loader.loadClasspath("manifests/tc/index.json"),registry::phaseActive);
         String reference=com.nori.ai.gateway.core.llm.ClassificationRegistryText.render(com.nori.ai.gateway.core.scope.OwnerSystem.TC,systems,lines);
-        return new com.nori.ai.gateway.core.llm.ClassificationService(inference,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),resource("prompts/classify-v2.txt"),reference);
+        return new com.nori.ai.gateway.core.llm.ClassificationService(inference,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),resource("prompts/classify-v3.txt"),reference);
     }
     static String resource(String path){
         try(var input=JobConfiguration.class.getClassLoader().getResourceAsStream(path)){

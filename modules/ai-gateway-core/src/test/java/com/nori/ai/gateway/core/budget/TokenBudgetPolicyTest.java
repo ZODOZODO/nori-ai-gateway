@@ -18,7 +18,7 @@ class TokenBudgetPolicyTest {
     @Test void currentProfileIsSpec145WithRequestMaxTokensAsAnswerPlusThinking() {
         var policy = TokenBudgetPolicy.current();
         assertThat(TokenBudgetPolicy.CONTEXT_TOKENS).isEqualTo(8_192);
-        assertThat(policy.budget(CallType.CLASSIFY)).isEqualTo(new CallBudget(3_072, 192, 4_928));
+        assertThat(policy.budget(CallType.CLASSIFY)).as("SPEC §28.3 분류 wire v3").isEqualTo(new CallBudget(3_072, 256, 4_864));
         assertThat(policy.budget(CallType.PLAN)).isEqualTo(new CallBudget(3_072, 256, 4_864));
         assertThat(policy.budget(CallType.COMPOSER)).isEqualTo(new CallBudget(2_816, 128, 5_120));
         assertThat(policy.budget(CallType.CLASSIFY).requestMaxTokens()).isEqualTo(5_120);
