@@ -41,8 +41,9 @@ class LeafCatalogTest {
             assertThat(catalog.leaf(id).path("gates").toString()).as(id).contains("F5a");
             assertThat(catalog.components("F5a", id)).as(id).isEmpty();
         }
-        // 기존 214 leaf ID 보존(신규 8 은 추가만).
-        assertThat(catalog.all().stream().map(n -> n.path("id").asText())).contains("AC-32-SCHEMA", "AC-32-LENGTH", "AC-32-RETRYOK", "AC-23-NW", "AC-23-LOAD", "AC-24-BACKUP-ALERT", "AC-33-DIGEST");
+        // 기존 leaf ID 보존(seq16 신규 8 은 추가만), seq17 철회 2 는 catalog 에서 제외.
+        assertThat(catalog.all().stream().map(n -> n.path("id").asText())).contains("AC-32-SCHEMA", "AC-32-LENGTH", "AC-32-RETRYOK", "AC-23-NW", "AC-23-LOAD", "AC-33-DIGEST");
+        assertThat(catalog.all().stream().map(n -> n.path("id").asText())).doesNotContain("AC-24-RESTORE", "AC-24-BACKUP-ALERT");
         assertThat(catalog.required("F2")).as("P21 seq16 필수 24 = 이력 23 + AC-32-NEEDS").hasSize(24);
     }
     @Test void matchesApprovedAuthorityTableForEveryStageAndComponent() throws Exception {

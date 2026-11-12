@@ -8414,3 +8414,11 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 - **Plan §16.8 한정 IT 직후 verify — root 처리 예정.** 한정 IT 뒤 verify 의 `STALE_TEST_EVIDENCE` 는 시험 지문에 `testFilters` 가 의도적으로 들어간 결과이며, 인증은 비한정 실행으로 한다.
 - **실행 환경.** 공유 Kotlin compile daemon(다른 세션) 상태 때문에 in-process 컴파일 환경변수를 썼다. CI·다른 세션 재현 시 같은 증상이 나오면 daemon 재시작 또는 같은 설정이 필요하다.
 - **Plan 체크박스.** Plan 문서는 이 작업의 쓰기 대상이 아니고(root 가 main 의 seq17 합류와 함께 정리), 위 미실행 component 가 남아 있어 갱신하지 않았다.
+
+### P20 root 합류 기록 (2026-11-12, root)
+
+- main `97fa139`(자동 백업 제거·SPEC seq17, 사용자 결정 — `docs/gates/spec-approvals/17.md`)을 P20 브랜치에 merge 했다(`4822d56`). 텍스트 충돌 4건 해결: `ci/integration-required.txt`(main 40 + P20 IT 9 = 49, 백업 IT 2 제외), `leaf-catalog-v2.json`(P20 seq16 222 − 철회 AC-24-RESTORE·AC-24-BACKUP-ALERT 와 그 producerIndex 3·measurementIds 2 = 220, `sourcePlanSha256` = 합류 Plan), `LeafCatalogTest`(220·AC-24 24·distinct 243), `plan-catalog-contract.txt`(합류 Plan §12 줄 사본). SPEC·기준선은 main 과 바이트 동일(seq17 `9a6a04b2…`).
+- 자동 병합분 의미 결함 1건: P20 의 `LeafCatalogTest` "기존 ID 보존" 목록에 철회된 `AC-24-BACKUP-ALERT` 가 있어 실패 → 보존 목록에서 빼고 철회 2개 부재 단언을 추가.
+- Plan 정리: §12.3 AC-24 행 26 → 24(seq17 누락), §16.8 한정 IT 직후 verifier 를 paired init-script verifier 로 대체(P08 선례; 포함 빌드 nori-common build-logic 때문에 `findProject`+null 검사 형식). 한정 IT 뒤 `-I` 없는 verifier 의 `STALE_TEST_EVIDENCE` 는 지문의 `testFilters` 포함에 따른 의도된 동작이다.
+- 검증(순차, worktree): spec-guard exit 0(`9a6a04b2…`); `build` exit 0 — test 757건 실패·오류·skip 0, 11개 test task `test-evidence verify` `TEST_EVIDENCE_VERIFIED`; db-adapter IT 85건·inference IT 1건 exit 0 + verify `TEST_EVIDENCE_VERIFIED`; app IT 비한정 전체 exit 0(45m 47s) + verify `TEST_EVIDENCE_VERIFIED`(merge 커밋 기준 — 이후 변경은 gateway-eval 시험 1개·문서뿐이라 app 입력 불변); §16.8 한정 app IT 55건 exit 0 + paired verifier `TEST_EVIDENCE_VERIFIED`, 같은 결과에 필터 없는 verifier 는 `STALE_TEST_EVIDENCE`(대조). Testcontainers 잔여 0.
+- 남은 범위는 위 "남은 항목"과 같다(F4·F5a component, ACC:F2 수용 suite, P21). Plan P20 체크박스는 근거 범위에 맞춰 root 가 판단한다.
