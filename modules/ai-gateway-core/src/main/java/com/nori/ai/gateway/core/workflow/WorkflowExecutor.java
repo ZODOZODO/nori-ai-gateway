@@ -20,10 +20,13 @@ public final class WorkflowExecutor {
     }
     private final CapabilityRegistry registry;private final PlanValidator validator;private final ToolDispatcher dispatcher;private final SourceAuthorizationStep authorization;
     private final ExpiryCheckpoint expiry;private final Clock clock;private final ToolResultCache cache;private final BlockBuilder blocks;private final ExecutionRecorder recorder;
-    private final LogSummarizer summarizer;private final GeneralQueryHelpBuilder help;
+    private final LogSummarizer summarizer;private final GeneralQueryHelpBuilder help;private final EvidenceCoverageEvaluator coverage;private final ReportSections reports=new ReportSections(new UiSchemaValidator());
     public WorkflowExecutor(CapabilityRegistry registry,PlanValidator validator,ToolDispatcher dispatcher,SourceAuthorizationStep authorization,ExpiryCheckpoint expiry,Clock clock,ToolResultCache cache,BlockBuilder blocks,ExecutionRecorder recorder,LogSummarizer summarizer,GeneralQueryHelpBuilder help) {
+        this(registry,validator,dispatcher,authorization,expiry,clock,cache,blocks,recorder,summarizer,help,new EvidenceCoverageEvaluator());
+    }
+    public WorkflowExecutor(CapabilityRegistry registry,PlanValidator validator,ToolDispatcher dispatcher,SourceAuthorizationStep authorization,ExpiryCheckpoint expiry,Clock clock,ToolResultCache cache,BlockBuilder blocks,ExecutionRecorder recorder,LogSummarizer summarizer,GeneralQueryHelpBuilder help,EvidenceCoverageEvaluator coverage) {
         this.registry=registry;this.validator=validator;this.dispatcher=dispatcher;this.authorization=authorization;this.expiry=expiry;this.clock=clock;this.cache=cache;this.blocks=blocks;this.recorder=recorder;
-        this.summarizer=summarizer;this.help=help;
+        this.summarizer=summarizer;this.help=help;this.coverage=Objects.requireNonNull(coverage);
     }
     public WorkflowOutcome run(JobContext job,WorkflowExecutionPlan plan,WorkflowResourceResolver resolver) {
         expiry.assertLive(job.conversationExpiresAt(),job.cancellation());
@@ -34,11 +37,11 @@ public final class WorkflowExecutor {
         if(preparation instanceof PlanValidator.Rejected rejected)return new WorkflowOutcome(List.of(),List.of(),List.of(),emptyDeps(),traces,List.of(),Optional.of(rejected.outcome()));
         if(preparation instanceof PlanValidator.ReadRejected rejected) {
             var denied=new ToolResultEnvelope(null,"resource.lookup",null,null,job.scope().boundSystem(),rejected.status(),null,List.of(),null,null,List.of(),List.of(),null,null,null,null,List.of(),List.of(),List.of(),List.of(),List.of());
-            return new WorkflowOutcome(List.of(new WorkflowOutcome.Stage("resource",denied,false,0)),List.of(),List.of(),emptyDeps(),traces,List.of(),Optional.empty());
+            return withCoverage(plan,new WorkflowOutcome(List.of(new WorkflowOutcome.Stage("resource",denied,false,0)),List.of(),List.of(),emptyDeps(),traces,List.of(),Optional.empty()));
         }
         var prepared=(PlanValidator.Prepared)preparation;
         List<WorkflowOutcome.Stage> stages=new ArrayList<>();List<ResultBlock> ui=new ArrayList<>();List<Evidence> evidence=new ArrayList<>();List<String> refs=new ArrayList<>();
-        Set<String> actualIds=new HashSet<>();var deps=new ResultSourceDepsRecorder();Map<String,StepBinding> bindings=new HashMap<>();
+        Set<String> actualIds=new HashSet<>();var deps=new ResultSourceDepsRecorder();Map<String,StepBinding> bindings=new HashMap<>();var calls=new ToolCallBudget();
         for(var execution:plan.steps()) {
             var definition=execution.definition();
             if(definition.processor()!=null) {
@@ -80,6 +83,8 @@ public final class WorkflowExecutor {
                 } else {result=failure(manifest,decision instanceof SourceAuthorizationStep.StepUnavailable?ResultStatus.SOURCE_UNAVAILABLE:ResultStatus.DENIED);recorder.blocked(job,manifest.capabilityId(),result.status(),Optional.empty());}
             }
             if(result==null) {
+                // 실제 dispatcher 직전 Job Tool 호출 한도(SPEC §28.8: 전체 12·같은 Tool 3·Knowledge search 2).
+                if(!calls.tryAcquire(manifest.capabilityId(),manifest.toolKind())){traces.add(new WorkflowOutcome.Trace(definition.stepId(),WorkflowOutcome.TraceOutcome.TOOL_LIMIT_REACHED));continue;}
                 expiry.assertLive(job.conversationExpiresAt(),job.cancellation());var attempt=prepared.newAttempt(step,job.scope(),StepAttempt.Purpose.DISPATCH);
                 ToolDispatcher.InvocationOutcome invoked;var trace=new java.util.concurrent.atomic.AtomicReference<ExecutionContext.DispatchTrace>();
                 try {
@@ -87,7 +92,7 @@ public final class WorkflowExecutor {
                     else {
                         var decision=authorization.authorizeStep(attempt,job.scope(),resolver.delegatedCall());
                         if(!(decision instanceof SourceAuthorizationStep.StepGrant grant)){result=failure(manifest,decision instanceof SourceAuthorizationStep.StepUnavailable?ResultStatus.SOURCE_UNAVAILABLE:ResultStatus.DENIED);invoked=null;}
-                        else {expiry.assertLive(job.conversationExpiresAt(),job.cancellation());invoked=dispatcher.dispatchCurrent(prepared,attempt,job.scope(),grant,executionContext(prepared,attempt,resolver,bindings,trace::set));}
+                        else {expiry.assertLive(job.conversationExpiresAt(),job.cancellation());invoked=dispatcher.dispatchCurrent(prepared,attempt,job.scope(),grant,executionContext(job,plan,prepared,attempt,resolver,bindings,trace::set));}
                     }
                 } catch(WorkflowResourceResolver.ReadFailure failure){result=failure(manifest,failure.status());invoked=null;}
                 if(invoked==null)recorder.blocked(job,manifest.capabilityId(),result.status(),Optional.empty());
@@ -116,15 +121,38 @@ public final class WorkflowExecutor {
             }
         }
         if(plan.definition().answerSource()==WorkflowDefinition.AnswerSource.REGISTRY_VIEW)ui.addAll(help.build(registry.view(job.scope()),job.scope().perm()));
-        return new WorkflowOutcome(stages,ui,evidence,deps.snapshot(),traces,refs,Optional.empty());
+        return withCoverage(plan,new WorkflowOutcome(stages,ui,evidence,deps.snapshot(),traces,refs,Optional.empty()));
+    }
+    /**
+     * 근거 계획이 있으면 요구 근거별 Coverage 를 결속한다. 상세 요청(D)은 검증된 블록·Evidence 가 하나 이상일 때만 구조화 보고 블록을 더한다 —
+     * 파생 보고 블록이 검증 자료 0개 결과를 자료 있는 결과로 바꾸지 않게 한다(SPEC §5.4 ③ ⓑ).
+     */
+    private WorkflowOutcome withCoverage(WorkflowExecutionPlan plan,WorkflowOutcome outcome) {
+        if(plan.evidence().isEmpty())return outcome;
+        var evidencePlan=plan.evidence().get();var value=coverage.evaluate(evidencePlan,outcome);
+        if(evidencePlan.answerMode()!=AnswerMode.D||outcome.blocks().isEmpty()&&outcome.evidence().isEmpty())return outcome.withCoverage(value);
+        var detailed=new ArrayList<>(outcome.blocks());detailed.add(reports.project(value,plan.definition().ownerSystem()));
+        return new WorkflowOutcome(outcome.stages(),detailed,outcome.evidence(),outcome.sourceDeps(),outcome.trace(),outcome.toolExecutionRefs(),outcome.rejection(),value);
     }
     private ResultSourceDeps emptyDeps(){return new ResultSourceDeps(List.of(),List.of());}
-    private ExecutionContext executionContext(PlanValidator.Prepared prepared,StepAttempt attempt,WorkflowResourceResolver resolver,Map<String,StepBinding> bindings,java.util.function.Consumer<ExecutionContext.DispatchTrace> trace) {
-        if(prepared.manifest(attempt.binding().stepId()).toolKind()!=ToolKind.GIT)return new ExecutionContext(resolver,trace);
+    private ExecutionContext executionContext(JobContext job,WorkflowExecutionPlan plan,PlanValidator.Prepared prepared,StepAttempt attempt,WorkflowResourceResolver resolver,Map<String,StepBinding> bindings,java.util.function.Consumer<ExecutionContext.DispatchTrace> trace) {
+        var kind=prepared.manifest(attempt.binding().stepId()).toolKind();
+        if(kind==ToolKind.KNOWLEDGE)return new ExecutionContext(resolver,trace,Optional.empty(),Optional.of(knowledgeContext(job,plan,prepared,attempt)));
+        if(kind!=ToolKind.GIT)return new ExecutionContext(resolver,trace);
         var step=prepared.plan().plan().stream().filter(value->value.stepId().equals(attempt.binding().stepId())).findFirst().orElseThrow();var ancestors=new HashSet<String>();
         collectToolAncestors(step,prepared.plan(),ancestors);var selected=new LinkedHashMap<String,StepBinding>();
         for(var candidate:prepared.plan().plan())if(ancestors.contains(candidate.stepId())&&prepared.manifest(candidate.stepId()).toolKind()==ToolKind.TRACE&&bindings.containsKey(candidate.stepId()))selected.put(candidate.stepId(),bindings.get(candidate.stepId()));
         return new ExecutionContext(resolver,trace,Optional.of(new ExecutionContext.BoundInputs(attempt,selected)));
+    }
+    /**
+     * Knowledge 입력은 현재 Job·선택 단계·검증된 대상으로만 만든다(Plan §16.3 R1). 정확 q 는 qRef 복원 원문이고 의미 입력의 질문은 현재 Job 의 마스킹 질문이다.
+     * 근거 종류는 서버 결속 evidenceNeeds 이며 결속 값이 없는 F1 경로는 비어 있다.
+     */
+    private com.nori.ai.gateway.core.knowledge.KnowledgeSearchContext knowledgeContext(JobContext job,WorkflowExecutionPlan plan,PlanValidator.Prepared prepared,StepAttempt attempt) {
+        var step=prepared.plan().plan().stream().filter(value->value.stepId().equals(attempt.binding().stepId())).findFirst().orElseThrow();
+        var exact=job.classification().get("q") instanceof String q?Optional.of(q):Optional.<String>empty();
+        var needs=plan.evidence().map(value->value.requirements().stream().map(EvidenceRequirement::need).toList()).orElse(List.of());
+        return new com.nori.ai.gateway.core.knowledge.KnowledgeSearchContext(job.jobId(),step.stepId(),job.scope().boundSystem(),job.requestInput().maskedQuestion(),exact,step.resources(),needs);
     }
     private void collectToolAncestors(PlanStep step,PlanEnvelope plan,Set<String> selected) {
         for(String id:step.dependsOn())if(selected.add(id))collectToolAncestors(plan.plan().stream().filter(value->value.stepId().equals(id)).findFirst().orElseThrow(),plan,selected);

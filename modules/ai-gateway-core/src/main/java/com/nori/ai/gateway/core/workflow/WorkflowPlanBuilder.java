@@ -8,7 +8,11 @@ import java.util.*;
 public final class WorkflowPlanBuilder {
     public static final class Blocked extends RuntimeException { public Blocked() { super("요청 옵션으로 필수 조회가 차단되었습니다"); } }
     private final CapabilityRegistry registry;
-    public WorkflowPlanBuilder(CapabilityRegistry registry) { this.registry=registry; }
+    private final Optional<EvidencePlanBuilder> evidence;
+    /** 근거 프로필 없이 만든 builder 는 분류 wire v3 결속 근거 요구가 있는 Job 을 거부한다(F1 구조화 분류 경로 전용). */
+    public WorkflowPlanBuilder(CapabilityRegistry registry) { this(registry,Optional.empty()); }
+    public WorkflowPlanBuilder(CapabilityRegistry registry,EvidencePlanBuilder evidence) { this(registry,Optional.of(evidence)); }
+    private WorkflowPlanBuilder(CapabilityRegistry registry,Optional<EvidencePlanBuilder> evidence) { this.registry=registry;this.evidence=evidence; }
     public void checkOptions(WorkflowDefinition definition,JobContext context) {
         for(var step:definition.steps()) if(step.capabilityId()!=null&&!step.optional()&&blocked(step,context))throw new Blocked();
     }
@@ -29,13 +33,15 @@ public final class WorkflowPlanBuilder {
         if(definition.ownerSystem()!=job.scope().boundSystem()||view.ownerSystem()!=job.scope().boundSystem()||!job.jobId().equals(job.scope().requestId())
                 ||!Objects.equals(job.classification().get("taskType"),definition.taskType().name()))throw new IllegalArgumentException("실행 소유 범위가 다릅니다");
         checkOptions(definition,job);
+        var evidencePlan=evidencePlan(definition,view,job);
         var resources=resources(job);
         Map<String,WorkflowDefinition.Step> byId=new LinkedHashMap<>();definition.steps().forEach(step->byId.put(step.stepId(),step));
         List<WorkflowExecutionPlan.ExecutionStep> steps=new ArrayList<>();List<PlanStep> tools=new ArrayList<>();Set<String> selected=new LinkedHashSet<>();
         for(var step:definition.steps()) {
             if(step.capabilityId()==null){steps.add(new WorkflowExecutionPlan.ExecutionStep(step,null));selected.add(step.stepId());continue;}
             var manifest=registry.find(step.capabilityId()).orElseThrow();
-            if(step.optional()&&(blocked(step,job)||view.find(step.capabilityId()).isEmpty()))continue;
+            // 분류 wire v3 Job 은 승인 프로필이 고른 선택 단계만 실행한다(필수 단계는 기본 경로로 유지, SPEC §28.2).
+            if(step.optional()&&(blocked(step,job)||view.find(step.capabilityId()).isEmpty()||evidencePlan.isPresent()&&!evidencePlan.get().selectedOptionalSteps().contains(step.stepId())))continue;
             if(step.cacheable()&&(manifest.toolKind()==ToolKind.BUSINESS||manifest.toolKind()==ToolKind.KNOWLEDGE))throw new IllegalArgumentException("캐시 실행 정책이 다릅니다");
             var args=SchemaContracts.JSON.createObjectNode();var props=manifest.inputSchema().get("properties");
             for(var property:props.properties()) {
@@ -54,7 +60,16 @@ public final class WorkflowPlanBuilder {
         // 실행 Tool이 없는 도움말은 선택 입력을 보존하되 업무 리소스 조회를 만들지 않습니다.
         var targets=tools.isEmpty()?List.<ResourceRef>of():resources;
         var envelope=new PlanEnvelope(job.jobId(),job.conversationId(),job.requestInput().maskedQuestion(),targets,definition.taskType(),tools);
-        return new WorkflowExecutionPlan(definition,envelope,steps);
+        return new WorkflowExecutionPlan(definition,envelope,steps,evidencePlan);
+    }
+    /** 서버가 Job 에 결속한 분류 wire v3 근거 요구로만 계획한다. 요청 Context·클라이언트 값은 읽지 않는다. */
+    private Optional<EvidencePlan> evidencePlan(WorkflowDefinition definition,RegistryView view,JobContext job) {
+        var needs=EvidenceNeed.fromJobValue(job.classification().get("evidenceNeeds"));
+        if(needs==null)return Optional.empty();
+        var builder=evidence.orElseThrow(()->new IllegalStateException("근거 프로필이 없습니다"));
+        var added=EvidenceNeed.fromJobValue(job.classification().get("serverAddedNeeds"));
+        if(added==null||!(job.classification().get("answerMode") instanceof String mode))throw new IllegalArgumentException("근거 요구 결속 형식이 잘못되었습니다");
+        return Optional.of(builder.plan(definition,view,needs,Set.copyOf(added),AnswerMode.valueOf(mode)));
     }
     /**
      * 화면 선택 리소스에 질문이 명시한 설비(분류 {@code eqp})를 더한다. 같은 값이면 하나로 두고, 다르면 둘 다 남겨 임의로 하나를 고르지 않는다

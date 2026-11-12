@@ -1,0 +1,218 @@
+{
+  "schema": "evidence-profile-v1",
+  "ownerSystem": "TC",
+  "version": "tc-evidence-profile-v1",
+  "entries": [
+    {
+      "id": "tc.state.snapshot",
+      "need": "S",
+      "capabilityId": "tc.eqp.getOperationalSnapshot",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "설비 운영 상태"
+      ],
+      "unavailableItems": [
+        "Port 목록",
+        "진행 LOT"
+      ]
+    },
+    {
+      "id": "tc.history.commLogs",
+      "need": "H",
+      "capabilityId": "tc.commLogs.search",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "from",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "to",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "설비 통신 기록"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.history.logs",
+      "need": "H",
+      "capabilityId": "tc.logs.search",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "from",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "to",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "애플리케이션 로그"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.history.trace",
+      "need": "H",
+      "capabilityId": "tc.trace.search",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "from",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "to",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "처리 Trace"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.history.dlq",
+      "need": "H",
+      "capabilityId": "tc.dlq.list",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "from",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "to",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "DLQ 기록"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.history.event",
+      "need": "H",
+      "capabilityId": "tc.event.getRecent",
+      "required": false,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "최근 설비 이벤트"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.normal.knowledge",
+      "need": "N",
+      "capabilityId": "tc.knowledge.search",
+      "required": false,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "정상 절차·선행 조건 문서"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.normal.model",
+      "need": "N",
+      "capabilityId": "tc.model.read",
+      "required": false,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "적용 모델 정의"
+      ],
+      "unavailableItems": []
+    },
+    {
+      "id": "tc.impl.git",
+      "need": "I",
+      "capabilityId": "tc.git.searchCode",
+      "required": false,
+      "inputs": [
+        {
+          "name": "q",
+          "source": "STEP_FIELD",
+          "entryId": "tc.history.logs",
+          "fieldPath": "items"
+        }
+      ],
+      "dependsOn": [
+        "tc.history.logs"
+      ],
+      "reportItems": [
+        "당시 구현 코드"
+      ],
+      "unavailableItems": [
+        "당시 배포·설정 버전"
+      ]
+    },
+    {
+      "id": "tc.action.knowledge",
+      "need": "R",
+      "capabilityId": "tc.knowledge.search",
+      "required": false,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "확인·조치 절차 문서"
+      ],
+      "unavailableItems": []
+    }
+  ]
+}

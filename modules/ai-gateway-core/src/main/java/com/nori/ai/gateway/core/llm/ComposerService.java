@@ -35,13 +35,24 @@ public final class ComposerService {
     }
 
     /**
+     * 요구 근거 하나의 서버 수집 상태(SPEC §28.8, Plan §16.3 R4): 근거 코드·상태·근거 단계 ID·현재 READ 가 제공하지 않는 요청 항목. 원문·PII 는 없다.
+     * 근거 계획이 없는 실행은 비어 있으며 그때 data 구획에 coverage 를 싣지 않는다.
+     */
+    public record CoverageDigest(String need, String status, List<String> sources, List<String> missingItems) {
+        public CoverageDigest { Objects.requireNonNull(need); Objects.requireNonNull(status); sources = List.copyOf(sources); missingItems = List.copyOf(missingItems); }
+    }
+
+    /**
      * Composer 입력. 모든 문자열은 호출자가 ContentSanitizer 를 적용한 값이다.
      * @param toolResults 단계 결과(축소 4단계의 필수 필드 투영 포함)
      * @param logSummary 결정론 Log Summarizer 요약(없으면 빈 문자열)
      */
-    public record Input(List<EvidenceDigest> evidence, List<PromptDraft.ToolResult> toolResults, String logSummary, List<String> rawLogLines, String question) {
+    public record Input(List<EvidenceDigest> evidence, List<PromptDraft.ToolResult> toolResults, String logSummary, List<String> rawLogLines, String question, List<CoverageDigest> coverage) {
+        public Input(List<EvidenceDigest> evidence, List<PromptDraft.ToolResult> toolResults, String logSummary, List<String> rawLogLines, String question) {
+            this(evidence, toolResults, logSummary, rawLogLines, question, List.of());
+        }
         public Input {
-            evidence = List.copyOf(evidence); toolResults = List.copyOf(toolResults); rawLogLines = List.copyOf(rawLogLines);
+            evidence = List.copyOf(evidence); toolResults = List.copyOf(toolResults); rawLogLines = List.copyOf(rawLogLines); coverage = List.copyOf(coverage);
             Objects.requireNonNull(logSummary, "logSummary"); Objects.requireNonNull(question, "question");
         }
         @Override public String toString() { return "ComposerInput[보호됨]"; }
@@ -84,7 +95,7 @@ public final class ComposerService {
         expiry.assertLive(job.conversationExpiresAt(), job.cancellation());
         var draft = new PromptDraft(systemPrompt, "boundSystem: " + job.scope().boundSystem().name(), List.of(), List.of(), input.logSummary(),
             input.rawLogLines(), input.toolResults(), input.question());
-        var reduction = reducer.reduce(CallType.COMPOSER, draft, value -> messages(value, input.evidence()));
+        var reduction = reducer.reduce(CallType.COMPOSER, draft, value -> messages(value, input.evidence(), input.coverage()));
         if (!reduction.withinBudget()) return failed(ComposerOutcome.INPUT_BUDGET_EXCEEDED, 0, reduction.steps());
         String data = reduction.messages().getLast().content();
         List<ChatMessage> messages = reduction.messages();
@@ -110,7 +121,9 @@ public final class ComposerService {
     }
 
     /** system = 고정 지시 + boundSystem 제약, user = 질문과 data 구획(canonical JSON). 같은 draft 는 같은 메시지를 만든다. */
-    static List<ChatMessage> messages(PromptDraft draft, List<EvidenceDigest> evidence) {
+    static List<ChatMessage> messages(PromptDraft draft, List<EvidenceDigest> evidence) { return messages(draft, evidence, List.of()); }
+
+    static List<ChatMessage> messages(PromptDraft draft, List<EvidenceDigest> evidence, List<CoverageDigest> coverage) {
         ObjectNode user = SchemaContracts.JSON.createObjectNode();
         user.put("question", draft.currentQuestion());
         ObjectNode data = user.putObject("data");
@@ -127,6 +140,14 @@ public final class ComposerService {
         var lines = data.putArray("rawLogLines"); draft.rawLogLines().forEach(lines::add);
         var tools = data.putArray("toolResults");
         for (var tool : draft.toolResults()) tools.addObject().put("ref", tool.ref()).put("text", tool.text());
+        if (!coverage.isEmpty()) {
+            var needs = data.putArray("coverage");
+            for (var value : coverage) {
+                var item = needs.addObject().put("need", value.need()).put("status", value.status());
+                var sources = item.putArray("sources"); value.sources().forEach(sources::add);
+                var missing = item.putArray("missingItems"); value.missingItems().forEach(missing::add);
+            }
+        }
         return List.of(new ChatMessage(ChatMessage.Role.SYSTEM, draft.systemPrompt() + "\n" + draft.boundSystemConstraint()),
             new ChatMessage(ChatMessage.Role.USER, ClassificationService.canonical(user)));
     }

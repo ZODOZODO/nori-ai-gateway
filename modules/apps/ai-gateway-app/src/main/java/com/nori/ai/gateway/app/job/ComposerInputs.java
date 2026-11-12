@@ -18,7 +18,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Composer 결정론 입력(Plan P20). Source 응답 텍스트는 ContentSanitizer(mask-v1) 적용분만 넣는다 — 이후 PromptReducer·예산 assert 는 ComposerService·Client 몫이다.
- * GENERAL_QUERY 는 Registry view 도움말 표(Manifest 문구)만 넣는다. LOG 단계의 원시 줄은 축소 3단계 대상으로 따로 두고 결정론 요약은 유지한다.
+ * GENERAL_QUERY 는 Registry view 도움말 표(Manifest 문구)만 넣는다. 분류 wire v3 실행은 요구 근거별 Coverage 를 함께 넣는다. LOG 단계의 원시 줄은 축소 3단계 대상으로 따로 두고 결정론 요약은 유지한다.
  */
 final class ComposerInputs {
     private ComposerInputs() {}
@@ -52,7 +52,19 @@ final class ComposerInputs {
             tools.add(new PromptDraft.ToolResult(stage.stepId(), canonical(contents), canonical(required)));
         }
         String summary = lines.isEmpty() ? "" : canonical(SchemaContracts.JSON.valueToTree(summarizer.extract(lines)));
-        return new ComposerService.Input(evidence, tools, summary, lines, job.requestInput().maskedQuestion());
+        return new ComposerService.Input(evidence, tools, summary, lines, job.requestInput().maskedQuestion(), coverage(outcome));
+    }
+
+    /** 요구 근거별 수집 상태(Plan §16.3 R4). 수집하지 못한 근거는 채울 보고 항목 전부, 수집한 근거도 현재 READ 미제공 항목을 누락으로 넘긴다. */
+    private static List<ComposerService.CoverageDigest> coverage(WorkflowOutcome outcome) {
+        List<ComposerService.CoverageDigest> values = new ArrayList<>();
+        for (var value : outcome.coverage()) {
+            List<String> missing = new ArrayList<>();
+            if (!value.collected()) missing.addAll(value.reportItems());
+            missing.addAll(value.unavailableItems());
+            values.add(new ComposerService.CoverageDigest(value.need().name(), value.status().name(), value.sources().stream().map(source -> source.stepId()).toList(), missing));
+        }
+        return List.copyOf(values);
     }
 
     /** 원시 로그 줄은 따로 모으고(축소 3단계) 단계 결과에서는 뺀다. */
