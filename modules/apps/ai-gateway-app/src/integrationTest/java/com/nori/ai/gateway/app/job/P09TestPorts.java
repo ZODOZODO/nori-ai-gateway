@@ -25,8 +25,9 @@ public class P09TestPorts {
             @Override public Object postProcessAfterInitialization(Object bean,String name) {
                 if(!(bean instanceof WorkflowExecutionAdapter adapter))return bean;
                 var actual=org.mockito.Mockito.spy(adapter);
-                org.mockito.Mockito.doAnswer(invocation->{var job=invocation.getArgument(0,JobContext.class);observations.getObject().workflows.add(job);return invocation.callRealMethod();})
-                    .when(actual).execute(org.mockito.ArgumentMatchers.any(JobContext.class));
+                // 실제 실행은 BEFORE_COMPOSER 정지점의 InterruptedException 을 선언하지만 stub 등록은 호출하지 않는다.
+                try{org.mockito.Mockito.doAnswer(invocation->{var job=invocation.getArgument(0,JobContext.class);observations.getObject().workflows.add(job);return invocation.callRealMethod();})
+                    .when(actual).execute(org.mockito.ArgumentMatchers.any(JobContext.class));}catch(InterruptedException impossible){throw new IllegalStateException("관찰 stub 등록이 중단되었습니다",impossible);}
                 return actual;
             }
         };

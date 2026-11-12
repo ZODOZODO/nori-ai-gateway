@@ -7,11 +7,32 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.transaction.support.*;
 
 public final class TestHookRegistry {
-    public record Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer, Optional<SeamRegistry.Directive> seam) {
-        public Scenario { Objects.requireNonNull(taskType);pauseAt=Set.copyOf(pauseAt);seam=Objects.requireNonNull(seam); }
+    /**
+     * {@code llmScript} = 결속 Job 의 추론 호출에 순번대로 돌려줄 고정 응답(LLM_STUB, 하네스 fixture), {@code promptWatch} = Prompt 관찰 sentinel(Plan P20 N10).
+     * 둘 다 이 Job 에만 적용된다.
+     */
+    public record Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer, Optional<SeamRegistry.Directive> seam,
+            List<LlmReply> llmScript, Optional<PromptWatch> promptWatch) {
+        public Scenario { Objects.requireNonNull(taskType);pauseAt=Set.copyOf(pauseAt);seam=Objects.requireNonNull(seam);llmScript=List.copyOf(llmScript);promptWatch=Objects.requireNonNull(promptWatch); }
+        public Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer, Optional<SeamRegistry.Directive> seam) {
+            this(taskType, pauseAt, haltAt, failSanitizer, seam, List.of(), Optional.empty());
+        }
         public Scenario(TaskType taskType, Set<PausePointRegistry.Point> pauseAt, PausePointRegistry.Point haltAt, boolean failSanitizer) {
             this(taskType, pauseAt, haltAt, failSanitizer, Optional.empty());
         }
+    }
+    /** 고정 응답 1건. {@code content} null 은 빈 응답, {@code promptTokens} null 은 실제 Gateway 계수를 usage 로 쓴다. 원문은 toString·로그에 싣지 않는다. */
+    public record LlmReply(com.nori.ai.gateway.core.budget.CallType callType, String content, String finishReason, Integer promptTokens, int completionTokens) {
+        public LlmReply { Objects.requireNonNull(callType);Objects.requireNonNull(finishReason);if(completionTokens<0||promptTokens!=null&&promptTokens<0)throw new IllegalArgumentException("고정 응답 사용량이 잘못되었습니다"); }
+        @Override public String toString(){return "LlmReply["+callType+"]";}
+    }
+    /** sentinel 16개 이하, 각 1~64 코드포인트. */
+    public record PromptWatch(List<String> sentinels) {
+        public PromptWatch {
+            sentinels=List.copyOf(sentinels);
+            if(sentinels.isEmpty()||sentinels.size()>16||sentinels.stream().anyMatch(value->value.isEmpty()||value.codePointCount(0,value.length())>64))throw new IllegalArgumentException("Prompt 관찰 sentinel 이 잘못되었습니다");
+        }
+        @Override public String toString(){return "PromptWatch["+sentinels.size()+"]";}
     }
     private record Key(String actor,String requestKey){}
     private static final class Armed { final Scenario scenario;final Instant expires;String reservation;
@@ -19,6 +40,7 @@ public final class TestHookRegistry {
     private final Map<Key,Armed> arms=new HashMap<>();
     private final Map<String,Scenario> bindings=new HashMap<>();
     private final Set<Key> consumed=new HashSet<>();
+    private final Map<String,Set<String>> requestKeys=new HashMap<>();
     private final Clock clock;
     private final PausePointRegistry pauses;
     private final AtomicInteger reservations=new AtomicInteger();
@@ -45,7 +67,7 @@ public final class TestHookRegistry {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
             @Override public int getOrder(){return Integer.MAX_VALUE-1;}
             @Override public void afterCompletion(int status){synchronized(TestHookRegistry.this){
-                if(status==STATUS_COMMITTED){arms.remove(identity,arm);consumed.add(identity);if(clock instanceof ControllableClock controlled)controlled.admissionCommitted();}
+                if(status==STATUS_COMMITTED){arms.remove(identity,arm);consumed.add(identity);requestKeys.computeIfAbsent(key,k->new LinkedHashSet<>()).add(jobId);if(clock instanceof ControllableClock controlled)controlled.admissionCommitted();}
                 else{bindings.remove(jobId);arm.reservation=null;for(var point:arm.scenario.pauseAt())pauses.release(point,jobId);}
             }}
         });
@@ -58,6 +80,8 @@ public final class TestHookRegistry {
         });
     }
     public synchronized Optional<Scenario> binding(String jobId){return Optional.ofNullable(bindings.get(jobId));}
+    /** 접수 커밋된 무장의 Idempotency-Key 로 결속 Job 을 찾는다(다른 actor 가 같은 키를 쓰면 여러 개). */
+    public synchronized List<String> jobsForRequestKey(String requestKey){return List.copyOf(requestKeys.getOrDefault(requestKey,Set.of()));}
     public int reservationCount(){return reservations.get();}
     public void admissionCommitted(){if(clock instanceof ControllableClock controlled)controlled.admissionCommitted();}
     public synchronized boolean resetIfIdle(java.util.function.BooleanSupplier noActiveJobs){
@@ -68,7 +92,7 @@ public final class TestHookRegistry {
         if(admitting!=0||!noActiveJobs.getAsBoolean())return false;
         resetMock.run();
         idleResetCallbacks.forEach(Runnable::run);
-        arms.clear();bindings.clear();consumed.clear();pauses.reset();reservations.set(0);if(clock instanceof ControllableClock controlled)controlled.reset();return true;
+        arms.clear();bindings.clear();consumed.clear();requestKeys.clear();pauses.reset();reservations.set(0);if(clock instanceof ControllableClock controlled)controlled.reset();return true;
     }
     public synchronized void freezeAt(Instant at,java.util.function.BooleanSupplier noActiveJobs){
         if(!(clock instanceof ControllableClock controlled))throw new IllegalStateException("제어 시계가 필요합니다");

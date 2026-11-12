@@ -28,5 +28,21 @@ public class WorkflowExecutionConfiguration {
     @Bean DirectSourceToolExecutor gitToolExecutor(ObjectProvider<LokiLogConnector> logs,ObjectProvider<TempoTraceConnector> traces,ObjectProvider<GitLabCodeConnector> code,ObjectProvider<DirectSourceToolExecutor.GitExecutionScopes> scopes,Clock clock,LokiProperties properties,DeploymentEvidenceResolver deployments,ObjectProvider<com.nori.ai.gateway.app.hooks.SourceRequestProbe> probe){return new DirectSourceToolExecutor(ToolKind.GIT,logs,traces,code,scopes,clock,properties,deployments,java.util.Optional.ofNullable(probe.getIfAvailable()));}
     @Bean DeploymentEvidenceResolver deploymentEvidenceResolver(ObjectProvider<GitLabPipelineLineageReader> reader){return new DeploymentEvidenceResolver(reader);}
     @Bean SourceRetentionAttributesProvider sourceRetentionAttributesProvider(ObjectProvider<SourceRetentionReader> reader){return new SourceRetentionAttributesProvider(reader);}
-    @Bean WorkflowExecutionAdapter workflowExecutionAdapter(CapabilityRegistry registry,WorkflowPlanBuilder builder,WorkflowExecutor executor,WorkflowResourceResolverFactory resolvers,TimeWindowResolver windows,MessageRepository messages,ExpiryCheckpoint expiry,ContentSanitizer sanitizer,TerminalOutcomeAssembler assembler,ConversationSummaryBuilder summaries,com.nori.ai.gateway.core.evidence.EvidenceAssembler evidence,com.nori.ai.gateway.app.observability.AuditRecorder audit){return new WorkflowExecutionAdapter(registry,builder,executor,resolvers,windows,messages,expiry,sanitizer,assembler,summaries,evidence,audit);}
+    @Bean WorkflowExecutionAdapter workflowExecutionAdapter(CapabilityRegistry registry,WorkflowPlanBuilder builder,WorkflowExecutor executor,WorkflowResourceResolverFactory resolvers,TimeWindowResolver windows,MessageRepository messages,ExpiryCheckpoint expiry,ContentSanitizer sanitizer,TerminalOutcomeAssembler assembler,ConversationSummaryBuilder summaries,com.nori.ai.gateway.core.evidence.EvidenceAssembler evidence,com.nori.ai.gateway.app.observability.AuditRecorder audit,
+            java.util.Optional<com.nori.ai.gateway.core.llm.ComposerService> composer,LogSummarizer logSummarizer,java.util.Optional<com.nori.ai.gateway.app.hooks.PausePointRegistry> pauses){return new WorkflowExecutionAdapter(registry,builder,executor,resolvers,windows,messages,expiry,sanitizer,assembler,summaries,evidence,audit,composer,logSummarizer,pauses);}
+    /**
+     * Response Composer(Plan P20). 추론 비활성에서는 빈 자체가 없다(N7). 프롬프트는 compose-v1 이고 답변 토큰은 pin tokenizer 로 센다.
+     * core 빈 등록 정본인 CoreBeansConfiguration 은 P20 allowed_writes 밖이라 이 Job 실행 설정에서 등록한다.
+     */
+    @Bean @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="enabled")
+    com.nori.ai.gateway.core.llm.ComposerService composerService(InferenceClient inference,com.nori.ai.gateway.core.budget.PromptReducer reducer,com.nori.ai.gateway.core.budget.TokenBudgetPolicy policy,
+            com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter tokenizer,ExpiryCheckpoint expiry,java.util.Optional<com.nori.ai.gateway.core.llm.LlmCallObserver> observer){
+        return new com.nori.ai.gateway.core.llm.ComposerService(inference,reducer,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),prompt("prompts/compose-v1.txt"));
+    }
+    private static String prompt(String path){
+        try(var input=WorkflowExecutionConfiguration.class.getClassLoader().getResourceAsStream(path)){
+            if(input==null)throw new IllegalStateException("프롬프트 자원이 없습니다: "+path);
+            return new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+        }catch(java.io.IOException failure){throw new IllegalStateException("프롬프트 자원을 읽을 수 없습니다: "+path,failure);}
+    }
 }

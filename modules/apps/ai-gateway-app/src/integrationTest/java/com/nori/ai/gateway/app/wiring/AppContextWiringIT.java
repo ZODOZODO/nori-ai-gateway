@@ -397,7 +397,8 @@ class AppContextWiringIT extends StackContextSupport {
             assertThat(context.getEnvironment().getProperty("ai.gateway.inference.baseUrl")).as("baseUrl 없이 기동").isNull();
             for (Class<?> type : INFERENCE_BEANS) assertThat(context.getBeansOfType(type)).as(type.getName()).isEmpty();
             for (Class<?> type : List.of(org.springframework.ai.openai.OpenAiChatModel.class, org.springframework.ai.openai.OpenAiEmbeddingModel.class,
-                    com.nori.ai.gateway.core.port.InferenceClient.class, com.nori.ai.gateway.integration.inference.ChatTransport.class)) assertThat(context.getBeansOfType(type)).as(type.getName()).isEmpty();
+                    com.nori.ai.gateway.core.port.InferenceClient.class, com.nori.ai.gateway.integration.inference.ChatTransport.class,
+                    com.nori.ai.gateway.core.llm.ClassificationService.class, com.nori.ai.gateway.core.llm.ComposerService.class, com.nori.ai.gateway.app.hooks.LlmScriptRegistry.class)) assertThat(context.getBeansOfType(type)).as(type.getName()).isEmpty();
             assertThat(context.getBeansOfType(com.nori.ai.gateway.core.job.InferenceReadiness.class).values()).singleElement().isInstanceOf(com.nori.ai.gateway.app.job.DisabledInferenceReadiness.class);
             context.close(); context = null;
             // 값이 있어도 disabled 는 읽지 않으므로 endpoint 연결 시도 0 이다.
@@ -424,10 +425,14 @@ class AppContextWiringIT extends StackContextSupport {
             assertThat(context.getBeansOfType(com.nori.ai.gateway.app.job.DisabledInferenceReadiness.class)).isEmpty();
             var readiness = context.getBean(com.nori.ai.gateway.integration.inference.InferenceReadinessService.class);
             assertThat(context.getBeansOfType(com.nori.ai.gateway.core.job.InferenceReadiness.class).values()).singleElement().isSameAs(readiness);
-            assertThat(context.getBeanNamesForType(com.nori.ai.gateway.integration.inference.ChatTransport.class)).containsExactly("springAiChatTransport");
+            // 전송 빈 해석(verify·hook 활성): Client 가 받은 전송 = ScriptedChatTransport, 그 위임 = 운영 SpringAiChatTransport(Plan P20 N10).
+            assertThat(context.getBeanNamesForType(com.nori.ai.gateway.integration.inference.ChatTransport.class)).containsExactlyInAnyOrder("springAiChatTransport", "scriptedChatTransport");
             var client = context.getBean(com.nori.ai.gateway.core.port.InferenceClient.class);
             assertThat(client).isSameAs(context.getBean(com.nori.ai.gateway.integration.inference.SpringAiOpenAiInferenceClient.class));
-            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "transport")).isSameAs(context.getBean(com.nori.ai.gateway.integration.inference.SpringAiChatTransport.class));
+            var scripted = context.getBean(com.nori.ai.gateway.app.hooks.ScriptedChatTransport.class);
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "transport")).isSameAs(scripted);
+            assertThat(scripted.delegate()).isSameAs(context.getBean(com.nori.ai.gateway.integration.inference.SpringAiChatTransport.class));
+            assertLlmServicesUseTheRealClientAndAssembler(client);
             assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "budget")).isSameAs(context.getBean(com.nori.ai.gateway.core.budget.PreCallBudgetAssert.class));
             assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "truncation")).isSameAs(context.getBean(com.nori.ai.gateway.core.budget.TruncationDetector.class));
             assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "generation")).isSameAs(context.getBean(com.nori.ai.gateway.core.job.GenerationSemaphore.class));
@@ -440,6 +445,36 @@ class AppContextWiringIT extends StackContextSupport {
                 new com.nori.ai.gateway.core.budget.ChatMessage(com.nori.ai.gateway.core.budget.ChatMessage.Role.USER, "포토 설비의 오늘 상태를 간단히 알려줘."));
             assertThat(client.chat(com.nori.ai.gateway.core.budget.CallType.CLASSIFY, golden, 5_120)).isInstanceOf(com.nori.ai.gateway.core.port.InferenceClient.Completed.class);
             assertThat(stub.count("/v1/chat/completions")).isOne();
+        }
+    }
+
+    /** ClassificationService → JobWorker → WorkflowPlanBuilder, ComposerService → WorkflowExecutionAdapter → TerminalOutcomeAssembler 실제 배선. */
+    private void assertLlmServicesUseTheRealClientAndAssembler(com.nori.ai.gateway.core.port.InferenceClient client) {
+        var classification = context.getBean(com.nori.ai.gateway.core.llm.ClassificationService.class);
+        var composer = context.getBean(com.nori.ai.gateway.core.llm.ComposerService.class);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(classification, "inference")).isSameAs(client);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(composer, "inference")).isSameAs(client);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(composer, "reducer")).isSameAs(context.getBean(com.nori.ai.gateway.core.budget.PromptReducer.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(com.nori.ai.gateway.app.job.JobWorker.class), "classifier")).isEqualTo(java.util.Optional.of(classification));
+        var adapter = context.getBean(com.nori.ai.gateway.app.job.WorkflowExecutionAdapter.class);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(adapter, "composer")).isEqualTo(java.util.Optional.of(composer));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(adapter, "builder")).isSameAs(context.getBean(com.nori.ai.gateway.core.workflow.WorkflowPlanBuilder.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(adapter, "assembler")).isSameAs(context.getBean(com.nori.ai.gateway.core.workflow.TerminalOutcomeAssembler.class));
+    }
+
+    @Test void inferenceEnabledWithoutHooksResolvesTheLiveTransportAndRegistersNoScriptedTransport() throws Exception {
+        try (var stub = new com.nori.ai.gateway.app.inference.OllamaEndpointStub()) {
+            database = new com.nori.ai.gateway.persistence.testing.PgTestDatabase(System.getProperty("aigw.pgTestImage"), java.nio.file.Path.of(System.getProperty("aigw.rootDir"))).start();
+            database.bootstrap(); database.migrate();
+            inferenceProperties = Map.of("ai.gateway.inference.mode", "enabled", "ai.gateway.inference.baseUrl", stub.baseUrl(),
+                "ai.gateway.inference.generationModelDigest", com.nori.ai.gateway.app.inference.OllamaEndpointStub.EXPECTED_DIGEST);
+            startApplication();
+            var client = context.getBean(com.nori.ai.gateway.core.port.InferenceClient.class);
+            assertThat(context.getBeanNamesForType(com.nori.ai.gateway.integration.inference.ChatTransport.class)).containsExactly("springAiChatTransport");
+            assertThat(context.getBeansOfType(com.nori.ai.gateway.app.hooks.ScriptedChatTransport.class)).isEmpty();
+            assertThat(context.getBeansOfType(com.nori.ai.gateway.app.hooks.LlmScriptRegistry.class)).isEmpty();
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(client, "transport")).isSameAs(context.getBean(com.nori.ai.gateway.integration.inference.SpringAiChatTransport.class));
+            assertLlmServicesUseTheRealClientAndAssembler(client);
         }
     }
 

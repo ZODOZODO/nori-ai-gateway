@@ -22,7 +22,7 @@ public final class TestHookController {
     }
     @PostMapping("/arm") public ResponseEntity<Void> arm(@RequestBody JsonNode body){
         fields(body,Set.of("actorSub","requestKey","scenario"));JsonNode scenario=body.required("scenario");
-        fields(scenario,Set.of("taskType","pauseAt","haltAt","failSanitizer","seam"));
+        fields(scenario,Set.of("taskType","pauseAt","haltAt","failSanitizer","seam","llmScript","promptWatch"));
         Optional<SeamRegistry.Directive> directive=Optional.empty();
         if(scenario.has("seam")){
             var seam=scenario.get("seam");fields(seam,Set.of("kind","capabilityId","sourceId","ownerSystem"));
@@ -36,8 +36,29 @@ public final class TestHookController {
         if(scenario.has("pauseAt")){if(!scenario.get("pauseAt").isArray())throw new IllegalArgumentException();for(var p:scenario.get("pauseAt"))points.add(PausePointRegistry.Point.valueOf(p.asString()));}
         var halt=scenario.hasNonNull("haltAt")?PausePointRegistry.Point.valueOf(scenario.get("haltAt").asString()):null;
         registry.arm(body.required("actorSub").asString(),body.required("requestKey").asString(),new TestHookRegistry.Scenario(
-            TaskType.valueOf(scenario.required("taskType").asString()),points,halt,scenario.has("failSanitizer")&&scenario.get("failSanitizer").asBoolean(),directive));
+            TaskType.valueOf(scenario.required("taskType").asString()),points,halt,scenario.has("failSanitizer")&&scenario.get("failSanitizer").asBoolean(),directive,
+            llmScript(scenario),promptWatch(scenario)));
         return ResponseEntity.noContent().build();
+    }
+    private static List<TestHookRegistry.LlmReply> llmScript(JsonNode scenario){
+        if(!scenario.has("llmScript"))return List.of();
+        var array=scenario.get("llmScript");if(!array.isArray()||array.isEmpty())throw new IllegalArgumentException();
+        var replies=new ArrayList<TestHookRegistry.LlmReply>();
+        for(var entry:array){
+            fields(entry,Set.of("callType","content","finishReason","usage"));var usage=entry.required("usage");fields(usage,Set.of("promptTokens","completionTokens"));
+            var content=entry.required("content");var completion=usage.required("completionTokens");var prompt=usage.get("promptTokens");
+            if(!entry.required("callType").isString()||!entry.required("finishReason").isString()||!(content.isNull()||content.isString())
+                ||!completion.isIntegralNumber()||!completion.canConvertToInt()||prompt!=null&&(!prompt.isIntegralNumber()||!prompt.canConvertToInt()))throw new IllegalArgumentException();
+            replies.add(new TestHookRegistry.LlmReply(com.nori.ai.gateway.core.budget.CallType.valueOf(entry.get("callType").asString()),content.isNull()?null:content.asString(),
+                entry.get("finishReason").asString(),prompt==null?null:prompt.asInt(),completion.asInt()));
+        }
+        return List.copyOf(replies);
+    }
+    private static Optional<TestHookRegistry.PromptWatch> promptWatch(JsonNode scenario){
+        if(!scenario.has("promptWatch"))return Optional.empty();
+        var watch=scenario.get("promptWatch");fields(watch,Set.of("sentinels"));var sentinels=watch.required("sentinels");if(!sentinels.isArray())throw new IllegalArgumentException();
+        var values=new ArrayList<String>();for(var sentinel:sentinels){if(!sentinel.isString())throw new IllegalArgumentException();values.add(sentinel.asString());}
+        return Optional.of(new TestHookRegistry.PromptWatch(values));
     }
     @PostMapping("/reset") public ResponseEntity<?> reset(){
         if(!registry.resetIfIdle(this::noActiveJobs,()->{scenarios.select("default");calls.reset();}))return ResponseEntity.status(409).body(Map.of("error","ACTIVE_JOBS"));

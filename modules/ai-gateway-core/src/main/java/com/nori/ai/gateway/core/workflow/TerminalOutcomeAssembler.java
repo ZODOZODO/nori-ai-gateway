@@ -10,7 +10,13 @@ public final class TerminalOutcomeAssembler {
     private static final Set<ResultStatus> DATA=Set.of(ResultStatus.SUCCESS,ResultStatus.EMPTY,ResultStatus.PARTIAL,ResultStatus.STALE,ResultStatus.CONFLICT);
     private static final Set<ResultStatus> ALLOWED=Set.of(ResultStatus.SUCCESS,ResultStatus.EMPTY,ResultStatus.PARTIAL,ResultStatus.OUT_OF_RETENTION,ResultStatus.STALE,ResultStatus.CONFLICT,ResultStatus.DENIED,ResultStatus.SOURCE_UNAVAILABLE,ResultStatus.FAILED);
     public TerminalSpec assemble(WorkflowOutcome outcome,ComposerOutcome composer,InferenceMode inference) {
+        return assemble(outcome,composer,Optional.empty(),inference);
+    }
+    /** Composer 성공 서술은 집계 결과를 바꾸지 않고 payload {@code answer} 에만 싣는다(SPEC §5.4 ③). */
+    public TerminalSpec assemble(WorkflowOutcome outcome,ComposerOutcome composer,Optional<String> narrative,InferenceMode inference) {
         if(inference==InferenceMode.DISABLED&&composer!=ComposerOutcome.NOT_INVOKED)throw new IllegalArgumentException("비활성 서술 상태가 잘못되었습니다");
+        if(narrative.isPresent()!=(composer==ComposerOutcome.COMPOSED))throw new IllegalArgumentException("서술 결과 조합이 잘못되었습니다");
+        if(composer!=ComposerOutcome.NOT_INVOKED&&outcome.rejection().isPresent())throw new IllegalArgumentException("거부된 계획에는 서술을 호출하지 않습니다");
         if(outcome.rejection().isPresent()&&outcome.rejection().get().clarification()!=null) {
             var rejected=outcome.rejection().get();
             return TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,rejected.errorCode(),Map.of("clarification",rejected.clarification()));
@@ -46,6 +52,7 @@ public final class TerminalOutcomeAssembler {
         }
         if(inference==InferenceMode.ENABLED&&composer==ComposerOutcome.INPUT_BUDGET_EXCEEDED){status=ResultStatus.FAILED;error=ErrorCode.INPUT_BUDGET_EXCEEDED;}
         if(inference==InferenceMode.ENABLED&&composer==ComposerOutcome.LLM_UNAVAILABLE){status=outcome.blocks().isEmpty()&&outcome.evidence().isEmpty()?ResultStatus.FAILED:ResultStatus.PARTIAL;error=ErrorCode.LLM_UNAVAILABLE;payload.put("missingFields",List.of("answer"));}
+        narrative.ifPresent(value->payload.put("answer",value));
         payload.put("status",status.name());
         JobStatus job=status==ResultStatus.PARTIAL?JobStatus.PARTIAL:Set.of(ResultStatus.FAILED,ResultStatus.DENIED,ResultStatus.SOURCE_UNAVAILABLE).contains(status)?JobStatus.FAILED:JobStatus.SUCCEEDED;
         String event=job==JobStatus.PARTIAL?"job.partial":job==JobStatus.FAILED?"job.failed":"job.completed";

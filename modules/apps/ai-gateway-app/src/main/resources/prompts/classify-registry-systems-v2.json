@@ -1,0 +1,43 @@
+{
+  "schema": "classify-registry-systems-v2",
+  "source": "eval/golden/tc-registry-fixture-v2.json systems (F0 v2 등록 입력, SPEC §16 1차 시스템 소유 영역)",
+  "systems": [
+    {
+      "system": "TC",
+      "aliases": [
+        "TC"
+      ],
+      "ownedAreas": [
+        "EQP 연결·런타임·상태·최근 통신 오류",
+        "TC 송수신·실패 로그(상대 시스템 이름과 무관)",
+        "TC 자체 정본의 현재 LOT 요약(WM 조회 보충 금지)",
+        "Event·DLQ·Trace",
+        "과거 장애 시점의 Code·배포·설정·문서",
+        "공정·Socket 모델의 읽기 전용 설명",
+        "Capability 도움말"
+      ]
+    },
+    {
+      "system": "WM",
+      "aliases": [
+        "WM"
+      ],
+      "ownedAreas": [
+        "LOT·Workorder 진행 상태·현재 공정·HOLD·이력",
+        "재고(Inventory 정본)",
+        "주문·약속 납기"
+      ]
+    },
+    {
+      "system": "HRM",
+      "aliases": [
+        "HRM"
+      ],
+      "ownedAreas": [
+        "근태",
+        "잔여 연차",
+        "결재 진행·대기 상태"
+      ]
+    }
+  ]
+}

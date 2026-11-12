@@ -27,11 +27,13 @@ public final class JobWorker {
     private final Optional<FaultInjector> faults;
     private final SlotLedger slots;
     private final com.nori.ai.gateway.core.port.JobRequestInputReader inputs;
+    private final Optional<com.nori.ai.gateway.core.llm.ClassificationService> classifier;
     public JobWorker(JobDelegationReader delegations,ScopeAssembler scopes,ConversationExpiryGuard expiry,Clock clock,
             TcSourceAuthorizationPort authorization,WorkflowExecutor workflow,JobTerminalCommitter terminal,JobRepository jobs,
-            InferenceModeProperties inference,Optional<StructuredClassificationHook> classification,Optional<PausePointRegistry> pauses,Optional<FaultInjector> faults,SlotLedger slots,com.nori.ai.gateway.core.port.JobRequestInputReader inputs){
+            InferenceModeProperties inference,Optional<StructuredClassificationHook> classification,Optional<PausePointRegistry> pauses,Optional<FaultInjector> faults,SlotLedger slots,com.nori.ai.gateway.core.port.JobRequestInputReader inputs,
+            Optional<com.nori.ai.gateway.core.llm.ClassificationService> classifier){
         this.delegations=delegations;this.scopes=scopes;this.expiry=expiry;this.clock=clock;this.authorization=authorization;this.workflow=workflow;
-        this.terminal=terminal;this.jobs=jobs;this.inference=inference;this.classification=classification;this.pauses=pauses;this.faults=faults;this.slots=slots;this.inputs=inputs;
+        this.terminal=terminal;this.jobs=jobs;this.inference=inference;this.classification=classification;this.pauses=pauses;this.faults=faults;this.slots=slots;this.inputs=inputs;this.classifier=classifier;
     }
     public void run(JobScopeRecord job,CancellationToken token){
         token.attachWorker(Thread.currentThread());TerminalSpec result;
@@ -64,8 +66,19 @@ public final class JobWorker {
                     });
                     expiry.assertLive(job.conversationExpiresAt(),clock.instant());
                     if(token.reason().isPresent())throw new InterruptedException();
-                    Map<String,Object> classified=classification.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(job.jobId());
-                    result=workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified,input));
+                    if(inference.mode()==InferenceMode.ENABLED){
+                        // 분류는 JobContext 에 결속할 바로 그 접수 입력(maskedQuestion·요청 Context)만 받는다.
+                        var classifiedOutcome=classifier.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(new com.nori.ai.gateway.core.llm.ClassificationService.Request(job.jobId(),job.conversationExpiresAt(),token,input));
+                        result=switch(classifiedOutcome){
+                            case com.nori.ai.gateway.core.llm.ClassificationService.Classified classified->workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified.classification().jobClassification(),input));
+                            case com.nori.ai.gateway.core.llm.ClassificationService.Rejected rejected->TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,rejected.code(),Map.of("clarification",new Clarification(rejected.code(),List.of("q"))));
+                            case com.nori.ai.gateway.core.llm.ClassificationService.Unavailable unavailable->TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,ErrorCode.LLM_UNAVAILABLE,Map.of());
+                            case com.nori.ai.gateway.core.llm.ClassificationService.BudgetExceeded exceeded->TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,ErrorCode.INPUT_BUDGET_EXCEEDED,Map.of());
+                        };
+                    }else{
+                        Map<String,Object> classified=classification.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(job.jobId());
+                        result=workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified,input));
+                    }
                     }
                 }
             }

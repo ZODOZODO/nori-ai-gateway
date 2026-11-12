@@ -29,12 +29,13 @@ public class WorkflowSourceFixture {
         final SimpleMeterRegistry meters=new SimpleMeterRegistry();
         final AtomicInteger logs=new AtomicInteger(),traces=new AtomicInteger(),stopped=new AtomicInteger();
         final List<String> requestDigests=new CopyOnWriteArrayList<>();
-        final List<String> codeRefs=new CopyOnWriteArrayList<>(),pipelines=new CopyOnWriteArrayList<>();
+        final List<String> codeRefs=new CopyOnWriteArrayList<>(),pipelines=new CopyOnWriteArrayList<>(),codeSearches=new CopyOnWriteArrayList<>();
         final AtomicInteger lineageTraces=new AtomicInteger(),commits=new AtomicInteger();
         volatile List<String> traceVersions=List.of();
         volatile String tracePrefix="0".repeat(28);
         volatile List<String> spanIds=List.of();
         volatile String logText="EQP-001 정상 관측";
+        volatile String spanName="equipment";
         volatile int commitStatus=200;
         final AtomicBoolean blockNextStop=new AtomicBoolean();
         volatile CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1),ended=new CountDownLatch(1);
@@ -59,7 +60,7 @@ public class WorkflowSourceFixture {
                 } else if(exchange.getRequestURI().getPath().startsWith("/api/traces/")) {
                     String id=exchange.getRequestURI().getPath().substring("/api/traces/".length());int index=Integer.parseInt(id.substring(28),16)-1;
                     var attributes=List.of(Map.of("key","service.name","value",Map.of("stringValue","tc-gateway")),Map.of("key","service.version","value",Map.of("stringValue",traceVersions.get(index))));
-                    var spans=List.of(Map.of("spanId",spanIds.isEmpty()?"span-"+index:spanIds.get(index),"name","equipment","startTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
+                    var spans=List.of(Map.of("spanId",spanIds.isEmpty()?"span-"+index:spanIds.get(index),"name",spanName,"startTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2700)),"endTimeUnixNano",SourceHttpClient.nanos(P09QueueSupport.NOW.minusSeconds(2699))));
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("batches",List.of(Map.of("resource",Map.of("attributes",attributes),"scopeSpans",List.of(Map.of("spans",spans))))));
                 } else if(exchange.getRequestURI().getPath().contains("/pipelines/")) {
                     String version=exchange.getRequestURI().getPath().split("/")[6];pipelines.add(version);body="[{\"id\":"+(Long.parseLong(version)*10+3)+",\"name\":\"package\",\"status\":\"success\"}]";
@@ -68,7 +69,7 @@ public class WorkflowSourceFixture {
                 } else if(exchange.getRequestURI().getPath().contains("/repository/commits/")) {
                     commits.incrementAndGet();String shortSha=exchange.getRequestURI().getPath().substring(exchange.getRequestURI().getPath().lastIndexOf('/')+1);body="{\"id\":\""+shortSha+"2".repeat(33)+"\"}";
                 } else if(exchange.getRequestURI().getPath().endsWith("/search")) {
-                    String ref=query(exchange.getRequestURI()).get("ref");codeRefs.add(ref);body=SchemaContracts.JSON.writeValueAsString(List.of(Map.of("path","src/main/Equipment.java","data","검증된 코드 "+ref)));
+                    String ref=query(exchange.getRequestURI()).get("ref");codeRefs.add(ref);codeSearches.add(query(exchange.getRequestURI()).get("search"));body=SchemaContracts.JSON.writeValueAsString(List.of(Map.of("path","src/main/Equipment.java","data","검증된 코드 "+ref)));
                 } else throw new AssertionError("등록되지 않은 localhost 시험 경로입니다");
                 byte[] bytes=body.getBytes(StandardCharsets.UTF_8);
                 int status=exchange.getRequestURI().getPath().contains("/repository/commits/")?commitStatus:200;
