@@ -38,10 +38,14 @@ class LlmComposerFailureMappingIT extends LlmStubSupport {
     }
 
     @Test void noVerifiedBlockOrEvidenceWithAComposerFailureIsFailedLlmUnavailable() throws Exception {
-        // 리소스 카탈로그 장애로 Source 조회 단계가 모두 SOURCE_UNAVAILABLE 이고 검증된 블록·Evidence 가 0개다.
-        context.getBean(com.nori.ai.gateway.tcmock.MockScenarioStore.class).select("catalog-down");
+        // 이 Job 의 유일한 Source 단계(snapshot)를 Dispatcher 중앙 Source 검사에서 DENIED 로 만들어 검증된 블록·Evidence 가 0개다.
+        // (catalog-down 은 JobWorker 시작 gate 에서 START_GATE_UNAVAILABLE 로 끝나 분류·Composer 에 닿지 않는다 — R0-3b 실패 원인.)
         var empty = new TestHookRegistry.LlmReply(CallType.COMPOSER, null, "stop", null, 0);
-        var job = admitScripted("composer-no-data", "EQP-001 상태 알려줘", windowOnly(), List.of(classify(wire("LQ", "EQP-001", null, null, null)), empty), Optional.empty(), null);
+        var denied = new com.nori.ai.gateway.app.hooks.SeamRegistry.Directive(com.nori.ai.gateway.app.hooks.SeamRegistry.Kind.SOURCE_ALLOWLIST_REF_OVERRIDE,
+            "tc.eqp.getOperationalSnapshot", null, com.nori.ai.gateway.core.scope.OwnerSystem.WM);
+        hooks().arm("actor", "composer-no-data", new TestHookRegistry.Scenario(com.nori.ai.gateway.core.registry.TaskType.GENERAL_QUERY, java.util.Set.of(), null, false, Optional.of(denied),
+            List.of(classify(wire("LQ", "EQP-001", null, null, null)), empty), Optional.empty()));
+        var job = admitUnarmed("composer-no-data", "EQP-001 상태 알려줘", windowOnly(), null);
         assertThat(terminal(job)).isEqualTo("FAILED");
         assertThat(result(job.jobId())).containsEntry("status", "FAILED").containsEntry("error_code", "LLM_UNAVAILABLE");
         var value = payload(job.jobId());
@@ -49,7 +53,7 @@ class LlmComposerFailureMappingIT extends LlmStubSupport {
         assertThat(value.path("evidence")).isEmpty();
         assertThat(value.has("answer")).isFalse();
         assertThat(scripts().scriptedCalls(job.jobId(), CallType.COMPOSER)).isOne();
-        assertThat(value.path("toolSummary").get(0).path("status").asString()).isIn("DENIED", "SOURCE_UNAVAILABLE");
+        assertThat(value.path("toolSummary").get(0).path("status").asString()).isEqualTo("DENIED");
     }
 
     @Test void overBudgetComposerInputIsFailedInputBudgetExceededWithBlocksAndNoComposerCall() throws Exception {

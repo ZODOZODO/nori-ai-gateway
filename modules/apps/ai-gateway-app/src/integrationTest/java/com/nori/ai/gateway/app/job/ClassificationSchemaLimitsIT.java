@@ -74,7 +74,7 @@ class ClassificationSchemaLimitsIT extends LlmStubSupport {
         var cases = new LinkedHashMap<String,String>();
         cases.put("forged", wire("LQ", "EQP-001", null, null, "Q9"));
         cases.put("null-with-candidate", wire("LQ", "EQP-001", null, null, null));
-        cases.put("raw-q", "{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"q\":\"TIMEOUT\"}");
+        cases.put("raw-q", "{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":\"Q1\",\"n\":[\"S\"],\"a\":\"B\",\"q\":\"TIMEOUT\"}");
         cases.put("impossible-date", wire("LQ", "EQP-001", "2026-02-30T00:00Z", "2026-03-01T00:00Z", "Q1"));
         for (var entry : cases.entrySet()) {
             calls().reset();

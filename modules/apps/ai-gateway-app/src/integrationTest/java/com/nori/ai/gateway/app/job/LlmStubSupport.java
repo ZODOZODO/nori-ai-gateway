@@ -43,9 +43,19 @@ abstract class LlmStubSupport extends P09QueueSupport {
     protected LlmScriptRegistry scripts() { return context.getBean(LlmScriptRegistry.class); }
     protected static TestHookRegistry.LlmReply classify(String wire) { return new TestHookRegistry.LlmReply(CallType.CLASSIFY, wire, "stop", null, 40); }
     protected static TestHookRegistry.LlmReply compose(String text) { return new TestHookRegistry.LlmReply(CallType.COMPOSER, text, "stop", null, 30); }
+    /**
+     * 분류 wire v3 고정 fixture(SPEC §28.3): {@code n} 은 기존 고정 workflow 경로를 그대로 쓰는 근거 — KQ=[N], LQ=[S], INC=[S,H,I](선택 git 단계 포함),
+     * GQ·UNS=[] — 이고 {@code a}=B 다. 다른 근거·표현 길이는 {@link #wire(String,String,String,String,String,java.util.List,String)} 로 명시한다.
+     */
     protected static String wire(String t, String eqp, String from, String to, String qRef) {
+        var needs = switch (t) { case "KQ" -> List.of("N"); case "LQ" -> List.of("S"); case "INC" -> List.of("S", "H", "I"); default -> List.<String>of(); };
+        return wire(t, eqp, from, to, qRef, needs, "B");
+    }
+    protected static String wire(String t, String eqp, String from, String to, String qRef, List<String> n, String a) {
         var node = SchemaContracts.JSON.createObjectNode();
         node.put("t", t); node.put("eqp", eqp); node.put("from", from); node.put("to", to); node.put("qRef", qRef);
+        var needs = node.putArray("n"); n.forEach(needs::add);
+        node.put("a", a);
         return node.toString();
     }
     /** 질문 시간창(Context) 과 화면 선택 리소스 없는 요청 필드. 설비는 분류 출력으로만 들어온다. */

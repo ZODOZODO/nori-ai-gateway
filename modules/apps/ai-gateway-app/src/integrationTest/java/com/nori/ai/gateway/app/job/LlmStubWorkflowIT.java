@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /** 고정 workflow 기본 경로의 LLM_STUB 방어 시험(Plan P20 시험 목록 AC-22·AC-30·AC-32·AC-43·동시 동일대화 입력). */
 class LlmStubWorkflowIT extends LlmStubSupport {
-    private static final String MISSING_KEY = "{\"t\":\"LQ\",\"eqp\":\"EQP-WRONG\",\"from\":null,\"to\":null}";
+    private static final String MISSING_KEY = "{\"t\":\"LQ\",\"eqp\":\"EQP-WRONG\",\"from\":null,\"to\":null,\"n\":[\"S\"],\"a\":\"B\"}";
 
     private void assertNoToolAndNoComposer(JobAdmissionService.Accepted job) {
         assertThat(tools(job.jobId())).as("Tool 실행").isZero();
@@ -62,8 +62,8 @@ class LlmStubWorkflowIT extends LlmStubSupport {
     }
 
     @Test @Tag("AC-22-STUB-TOOL") @Tag("AC-22-STUB-SYSTEM") void unregisteredToolOrForeignSystemFieldsAreRejectedAsPlanInvalidAndBoundSystemStaysTc() throws Exception {
-        var tool = classify("{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":null,\"capabilityId\":\"tc.unknown.tool\"}");
-        var system = classify("{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":null,\"targetSystem\":\"WM\",\"capabilityId\":\"wm.inventory.get\"}");
+        var tool = classify("{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":null,\"n\":[\"S\"],\"a\":\"B\",\"capabilityId\":\"tc.unknown.tool\"}");
+        var system = classify("{\"t\":\"LQ\",\"eqp\":\"EQP-001\",\"from\":null,\"to\":null,\"qRef\":null,\"n\":[\"S\"],\"a\":\"B\",\"targetSystem\":\"WM\",\"capabilityId\":\"wm.inventory.get\"}");
         for (var reply : List.of(tool, system)) {
             calls().reset();
             var job = admitScripted("stub-" + reply.content().length(), "EQP-001 상태 알려줘", windowOnly(), List.of(reply, reply), Optional.empty(), null);

@@ -101,6 +101,10 @@ class AppContextWiringIT extends StackContextSupport {
             assertThat(context.getBeansOfType(type)).hasSize(1);
         for(Class<?> type:List.of(com.nori.ai.gateway.core.workflow.LogSummarizer.class,com.nori.ai.gateway.core.blocks.GeneralQueryHelpBuilder.class,com.nori.ai.gateway.core.evidence.EvidenceAssembler.class,com.nori.ai.gateway.core.workflow.WorkflowExecutor.class,com.nori.ai.gateway.app.job.WorkflowExecutionAdapter.class))assertThat(context.getBeansOfType(type)).hasSize(1);
         assertThat(context.getBeansOfType(com.nori.ai.gateway.core.workflow.ResultSourceDepsRecorder.class)).isEmpty();
+        // Plan §16.4 P20 배선: 승인 근거 프로필 loader·planner(WorkflowExecutionConfiguration)와 순수 Coverage 평가기(CoreBeansConfiguration)는 각각 하나이며 실제 경로에 주입된다.
+        for(Class<?> type:List.of(com.nori.ai.gateway.app.job.EvidenceProfileLoader.class,com.nori.ai.gateway.core.workflow.EvidencePlanBuilder.class,com.nori.ai.gateway.core.workflow.EvidenceCoverageEvaluator.class,com.nori.ai.gateway.core.workflow.WorkflowPlanBuilder.class))assertThat(context.getBeansOfType(type)).as(type.getSimpleName()).hasSize(1);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(com.nori.ai.gateway.core.workflow.WorkflowPlanBuilder.class),"evidence")).isEqualTo(java.util.Optional.of(context.getBean(com.nori.ai.gateway.core.workflow.EvidencePlanBuilder.class)));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(context.getBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.class),"coverage")).isSameAs(context.getBean(com.nori.ai.gateway.core.workflow.EvidenceCoverageEvaluator.class));
         var actual=context.getBean(com.nori.ai.gateway.core.workflow.WorkflowExecutor.class);
         assertThat(org.springframework.test.util.ReflectionTestUtils.getField(actual,"summarizer")).isSameAs(context.getBean(com.nori.ai.gateway.core.workflow.LogSummarizer.class));
         assertThat(org.springframework.test.util.ReflectionTestUtils.getField(actual,"help")).isSameAs(context.getBean(com.nori.ai.gateway.core.blocks.GeneralQueryHelpBuilder.class));
