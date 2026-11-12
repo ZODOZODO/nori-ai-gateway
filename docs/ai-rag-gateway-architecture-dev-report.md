@@ -8422,3 +8422,29 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 - Plan 정리: §12.3 AC-24 행 26 → 24(seq17 누락), §16.8 한정 IT 직후 verifier 를 paired init-script verifier 로 대체(P08 선례; 포함 빌드 nori-common build-logic 때문에 `findProject`+null 검사 형식). 한정 IT 뒤 `-I` 없는 verifier 의 `STALE_TEST_EVIDENCE` 는 지문의 `testFilters` 포함에 따른 의도된 동작이다.
 - 검증(순차, worktree): spec-guard exit 0(`9a6a04b2…`); `build` exit 0 — test 757건 실패·오류·skip 0, 11개 test task `test-evidence verify` `TEST_EVIDENCE_VERIFIED`; db-adapter IT 85건·inference IT 1건 exit 0 + verify `TEST_EVIDENCE_VERIFIED`; app IT 비한정 전체 exit 0(45m 47s) + verify `TEST_EVIDENCE_VERIFIED`(merge 커밋 기준 — 이후 변경은 gateway-eval 시험 1개·문서뿐이라 app 입력 불변); §16.8 한정 app IT 55건 exit 0 + paired verifier `TEST_EVIDENCE_VERIFIED`, 같은 결과에 필터 없는 verifier 는 `STALE_TEST_EVIDENCE`(대조). Testcontainers 잔여 0.
 - 남은 범위는 위 "남은 항목"과 같다(F4·F5a component, ACC:F2 수용 suite, P21). Plan P20 체크박스는 근거 범위에 맞춰 root 가 판단한다.
+
+## P20 완료 표시와 자동 백업 제거 잔존 정리 (2026-11-13, root)
+
+사용자 지시: "남은 작업 마무리해서 P20 완료 시키고, 자동 백업 삭제도 완료 시켜."
+
+### 자동 백업 제거 잔존 정리 (SPEC §12.4 seq17)
+
+- 독립 감사(Opus 5.5 medium, 읽기 전용)로 추적 파일 전체를 SPEC §12.4 기준으로 대조했다. 코드·차트·CI·경보 규칙·runconfig·selftest·AGENTS.md 는 이미 깨끗했고, 아래가 남아 있었다. 수정 뒤 같은 감사자의 재감사에서 지적 전부 해소·새 결함 0.
+- 코드(호출자 0 인 철회 기능 전용 경로): `InstanceEpochRepository.markRestoreCompleted` 와 `ArchitectureRulesTest` 의 그 규칙 행 제거. 설정 키 `ai.gateway.recovery.restore-handler.enabled`(main 코드에서 읽는 곳 0, 철회된 P27 `RestoreRecoveryRunner` 전용)를 `application.yaml`·`StackContextSupport`·`WorkerRestartEpochIT`·`RetentionProbeWiringIT` 에서 제거. kubectl selftest stub 의 cronjob 조회·`create --from=cronjob` 분기 제거(유일 호출자 `aigw-backup-alert-injection.sh` 는 `97fa139` 에서 삭제됨). `PgTestDatabase` 주석의 "백업" 계정 용도 삭제.
+- 유지(SPEC §12.4 "유지"): `gw.backup_run`·V3 Migration, `RecoveryModeRouter` 의 DB 식별자·epoch fail-closed(restore-mode, `RESTORE` 모드는 handler 없으면 `RESTORE_PATH_REQUIRED`), `RestoreRecoveryHandler` SPI(구현 0), `InstanceEpochRepository.find()` 의 `restore_completed_at` 조회.
+- 문서: Plan 의 표기 없던 줄(AuditEventType P27 `RECOVERY_STEP`, G-ALERT·G-RUNTIME-CREDS 행, 승인 B 합류 문장, 저장 계층 호출자 표, N6 복원 handler 격리, U6 결과 bullet, P23 fixture 변형, `S3ObjectLister`, readiness 정의, helper 표, 미증거 수치 행, N6 행, §15 머리)에 "2026-11-12 철회(seq17)/대체(seq17)" 표기를 붙였다. `plan-catalog-contract.txt` AC-41 행을 Plan 원문과 같게(철회된 "백업 표현 제외" 삭제), `docs/gates/f1/postgres-image.md` 재시험 범위에 표기.
+- 클러스터(읽기 전용, `kubectl get` 만): CronJob 은 `longhorn-system/harbor-registry-trim` 하나뿐이고 ai-gateway 계열 Deployment·StatefulSet·CronJob·Job·PVC 0(배포 이력 없음). `hrm` 네임스페이스의 backup Job·PVC 는 다른 프로젝트 자원이라 건드리지 않았다.
+- selftest(임시 도구 이미지 — P06 tools Dockerfile 과 같은 digest 고정 정의, `--network none`, 레포 readonly mount, 실행 뒤 이미지 삭제): stage-gate PASS 28, verify-credentials PASS 31, runtime-credentials PASS 30, runconfig PASS 23, rollback-rehearsal PASS 94, ps-summary `SELFTEST_PASSED`.
+
+### P20 완료 표시
+
+- Plan P20 체크박스를 `[x] 구현 [x] 검증` 으로 표시했다. 범위는 P20 phase(§16.3 R0~R5 코드와 §16.8 로컬 검증)이며 leaf PASS·F2 게이트 판정이 아니다. 남은 것은 다른 phase 몫이다 — ACC:F2(AC-32-NEEDS) 수용 suite·실측 P21, F4 component P26·P29, F5a component·READ 계약 인계 F5a, Knowledge stub origin 부정 시험 P23.
+
+### 검증 (최종 작업 트리, 순차, `--offline --no-daemon`)
+
+- spec-guard exit 0(`specSha` `9a6a04b2…`, LOCAL_FILE).
+- `build :adapter:ai-gateway-db-adapter:compileIntegrationTestJava :apps:ai-gateway-app:compileIntegrationTestJava` `BUILD SUCCESSFUL in 18m 27s` — test 11개 task 757건(eval 283·core 171·app 79·tc-mock 48·inference 43·acceptance 41·loki 38·gitlab 24·db-adapter 12·tempo 10·source-support 8) 실패·오류·skip 0. 11개 task 한 번의 `test-evidence verify` `TEST_EVIDENCE_VERIFIED`.
+- db-adapter IT 85건 통과, verify `TEST_EVIDENCE_VERIFIED`.
+- app IT 비한정 200건 실패·오류·skip 0 `BUILD SUCCESSFUL in 48m 2s`, verify `--require-docker` `TEST_EVIDENCE_VERIFIED`.
+- 실행 사고(기록): 첫 검증 실행을 멈출 때 bash 스크립트가 살아남아 두 번째 실행과 같은 프로젝트에서 동시에 돌았고, 두 번째의 app IT 가 26초 만에 실패했다. 남은 프로세스 트리를 종료하고 app IT 를 단독으로 다시 실행한 결과가 위 200건이다. 최종 판정은 모두 시험 지문 기반 verifier 결과다.
+- 남은 시험 컨테이너 0.
