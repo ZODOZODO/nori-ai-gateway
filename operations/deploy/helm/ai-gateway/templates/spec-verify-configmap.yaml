@@ -11,12 +11,8 @@ metadata:
     aigw.nori/spec-sha256: {{ .Values.specVerify.sha256 | quote }}
 binaryData:
   spec.md.gz: {{ .Values.specVerify.gzipBase64 | quote }}
-{{- if or (eq .Values.acceptance.suite "F4-RESTORE") (hasSuffix "-RUBRIC" .Values.acceptance.suite) }}
+{{- if hasSuffix "-RUBRIC" .Values.acceptance.suite }}
 data:
-  {{- if eq .Values.acceptance.suite "F4-RESTORE" }}
-  prep-manifest.json: {{ .Values.acceptance.prepManifest | quote }}
-  {{- else }}
   rubric-targets.json: {{ .Values.acceptance.rubricTargets | quote }}
-  {{- end }}
 {{- end }}
 {{- end }}

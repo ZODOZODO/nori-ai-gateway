@@ -24,11 +24,11 @@ class EvidenceRepositoryFsTest {
         EvidenceRepositoryFs repository = new EvidenceRepositoryFs(directory);
         List<ObjectNode> records = List.of(f.parent("F1", "p"), f.run("F1", "p", "r", "F1", "COMPLETED", "2026-10-29T00:00:01Z"),
             f.leaf("F1", "p", "r", "AC-36", 0, "PASS", "2026-10-29T00:00:01Z"),
-            f.record(Map.of("kind", "MEASUREMENT", "measurementId", "ops:restore-rto", "stage", "F1", "runId", "m", "parentRunId", "p")));
+            f.record(Map.of("kind", "MEASUREMENT", "measurementId", "f4:job-latency-samples", "stage", "F1", "runId", "m", "parentRunId", "p")));
         Map<Path, byte[]> original = new LinkedHashMap<>();
         for (ObjectNode record : records) { Path path = repository.store(record); original.put(path, Files.readAllBytes(path)); }
         var before = evaluate(f, repository);
-        for (String path : List.of("gates/p06-hba.json", "gates/deploy/nested.json", "ops/parent-manifest.json", "image-digests.json", "backup.json", "AC-36.json")) {
+        for (String path : List.of("gates/p06-hba.json", "gates/deploy/nested.json", "ops/parent-manifest.json", "image-digests.json", "deployment.json", "AC-36.json")) {
             Path artifact = directory.resolve("evidence/F1/" + path); Files.createDirectories(artifact.getParent()); Files.writeString(artifact, "{invalid-operational-json");
         }
         assertThat(repository.readAll("F1")).containsExactlyInAnyOrderElementsOf(records);

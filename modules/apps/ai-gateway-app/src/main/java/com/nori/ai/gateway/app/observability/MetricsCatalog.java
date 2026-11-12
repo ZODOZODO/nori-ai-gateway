@@ -61,7 +61,6 @@ public final class MetricsCatalog {
         spec("aigw.ingest.events", Meter.Type.COUNTER, "outcome", of("INDEXED", "SKIPPED_SAME_KEY", "ACL_UPDATED", "CATALOG_REMOVED", "TOMBSTONED",
             "RECREATED", "STALE_DISCARDED", "SOURCE_INCONSISTENT", "UNSUPPORTED_FORMAT", "FAILED")),
         spec("aigw.ingest.tx", Meter.Type.TIMER),
-        spec("aigw.backup.last.success.timestamp", Meter.Type.GAUGE), spec("aigw.backup.last.run.failed", Meter.Type.GAUGE),
         spec(RETENTION_PURGED_ROWS, Meter.Type.COUNTER, "kind", of("conversation", "audit")),
         // §11.6 AIGW-RETENTION-PURGE-FAILED 판정과 P14 탐침 실패 보고용 무라벨 지표입니다.
         spec(RETENTION_PURGE_FAILURES, Meter.Type.COUNTER),

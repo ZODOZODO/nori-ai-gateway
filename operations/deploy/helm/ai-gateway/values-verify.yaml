@@ -1,4 +1,3 @@
 profile: verify
-restoreMode: false
 testHooks:
   enabled: true

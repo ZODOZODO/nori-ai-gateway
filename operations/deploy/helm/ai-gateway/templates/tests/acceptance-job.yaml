@@ -16,9 +16,6 @@ spec:
       labels:
         app: ai-gateway-acceptance
         app.kubernetes.io/instance: {{ .Release.Name }}
-        {{- if .Values.restoreMode }}
-        aigw.nori/db-target: ai-gateway-db-restore
-        {{- end }}
       annotations:
         checksum/spec-verify: {{ .Values.specVerify.sha256 | quote }}
     spec:
@@ -72,11 +69,6 @@ spec:
             {{- end }}
             {{- if hasSuffix "-RUBRIC" .Values.acceptance.suite }}
             - {name: AIGW_RUBRIC_TARGETS_FILE, value: /run/aigw/spec/rubric-targets.json}
-            {{- end }}
-            {{- if eq .Values.acceptance.suite "F4-RESTORE" }}
-            - {name: AIGW_PREP_MANIFEST_FILE, value: /run/aigw/spec/prep-manifest.json}
-            - {name: AIGW_BACKUP_POINT_AT, value: {{ .Values.recovery.backupPointAt | quote }}}
-            - {name: AIGW_RESTORE_CLOCK_AT, value: {{ .Values.testHooks.clock.initial | quote }}}
             {{- end }}
           volumeMounts:
             - {name: tmp, mountPath: /tmp}

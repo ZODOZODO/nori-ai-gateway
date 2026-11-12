@@ -1,6 +1,8 @@
 # G-BACKUP-DEST
 
-Status: BLOCKED
+Status: WITHDRAWN
+
+2026-11-12 철회(seq17): 자동 백업 없음(SPEC §12.4). 이 게이트는 배포·F1 exit 전제가 아니며 승인 대상이 아니다. 아래 문단은 철회 전(BLOCKED) 기록이며 이력이다.
 
 DB·Longhorn과 동시 손실하지 않는 실제 목적지, 독립성 근거, 사용자 승인, age 수신자 공개키 및 개인키 보관·접근 정책이 없습니다. s3/sftp 중 유형을 임의 선택하지 않았으며 저장 공간·bucket·크기·자격을 만들지 않았습니다.
 

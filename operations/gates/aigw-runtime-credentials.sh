@@ -12,36 +12,12 @@ case "$command" in
   check)
     [[ $# == 2 && $1 == --stage ]] || error ARGUMENT_MISSING
     stage=$2
-    [[ $stage == F1 || $stage == F2 || $stage == F3 || $stage == F4 || $stage == RESTORE ]] || error STAGE_INVALID
-    backup_fields=
-    if [[ $stage != RESTORE ]]; then
-      [[ -n ${AIGW_RUNCONFIG:-} ]] || error RUNCONFIG_MISSING:backup.type
-      backup_fields=$(python3 -B - "$AIGW_RUNCONFIG" <<'PY'
-import sys
-sys.path.insert(0, 'operations/deploy')
-from runconfig import InputError, item, load
-try:
-    data = load(sys.argv[1])
-    if data.get('purpose') != 'deploy':
-        raise InputError('RUNCONFIG_NOT_APPROVED:purpose')
-    if data.get('profile') != 'main':
-        raise InputError('RUNCONFIG_PROFILE_MISMATCH')
-    kind = item(data, 'backup.type', True)
-    if kind not in ('s3', 'sftp'):
-        raise InputError('RUNCONFIG_INVALID:backup.type')
-    print('access-key,secret-key' if kind == 's3' else 'ssh-private-key,known-hosts')
-except (InputError, OSError, ValueError) as error:
-    print(str(error) if isinstance(error, InputError) else 'RUNCONFIG_INVALID', file=sys.stderr)
-    sys.exit(2)
-PY
-      ) || exit 2
-    fi
+    [[ $stage == F1 || $stage == F2 || $stage == F3 || $stage == F4 ]] || error STAGE_INVALID
     tmp=$(mktemp -d); trap 'rm -rf -- "$tmp"' EXIT
-    # DB 설정 파일·단일 계정 두 키·GitLab 읽기 token. SeaweedFS 읽기 키는 F3·F4·RESTORE 행만(§11.9). 서비스 토큰·JWKS·hook 해시는 검증 자격 check 소관.
+    # DB 설정 파일·단일 계정 두 키·GitLab 읽기 token. SeaweedFS 읽기 키는 F3·F4 행만(§11.9). 서비스 토큰·JWKS·hook 해시는 검증 자격 check 소관.
     config='ai-gateway-config:ai-gateway-db.properties,AI_GATEWAY_DB_USER,AI_GATEWAY_DB_PASSWORD,token'
-    [[ $stage != F3 && $stage != F4 && $stage != RESTORE ]] || config+=',access-key,secret-key'
+    [[ $stage != F3 && $stage != F4 ]] || config+=',access-key,secret-key'
     required=("$config")
-    [[ $stage == RESTORE ]] || required+=("ai-gateway-backup-destination:$backup_fields")
     missing=0
     for spec in "${required[@]}"; do
       name=${spec%%:*}; need=${spec#*:}; state=PRESENT

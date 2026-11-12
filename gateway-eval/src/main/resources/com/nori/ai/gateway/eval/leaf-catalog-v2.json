@@ -283,9 +283,7 @@
         "AC-24-RETAIN-JOBEDGE",
         "AC-24-RETAIN-PURGE",
         "AC-24-AUDIT-ALLOW",
-        "AC-24-AUDIT-EXPIRY",
-        "AC-24-RESTORE",
-        "AC-24-BACKUP-ALERT"
+        "AC-24-AUDIT-EXPIRY"
       ],
       "gates": [
         "F4"
@@ -2845,59 +2843,6 @@
             "componentId": "ACC:F4-CLOCK",
             "producer": "ACCEPTANCE",
             "suite": "F4-CLOCK"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-24-RESTORE",
-      "parentIds": [
-        "AC-24"
-      ],
-      "gates": [
-        "F4"
-      ],
-      "gateText": "F4",
-      "labelsByStage": {
-        "F4": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F4": [
-          {
-            "componentId": "ACC:F4-RESTORE",
-            "producer": "ACCEPTANCE",
-            "suite": "F4-RESTORE"
-          },
-          {
-            "componentId": "OP:restore-rto",
-            "producer": "OPS",
-            "measurementId": "ops:restore-rto"
-          }
-        ]
-      }
-    },
-    {
-      "id": "AC-24-BACKUP-ALERT",
-      "parentIds": [
-        "AC-24"
-      ],
-      "gates": [
-        "F4"
-      ],
-      "gateText": "F4",
-      "labelsByStage": {
-        "F4": [
-          "MOCK_API"
-        ]
-      },
-      "components": {
-        "F4": [
-          {
-            "componentId": "OP:backup-alert",
-            "producer": "OPS",
-            "measurementId": "ops:backup-alert"
           }
         ]
       }
@@ -7040,15 +6985,6 @@
       "AC-23-LOAD",
       "AC-24-PERF"
     ],
-    "F4-RESTORE": [
-      "AC-24-RESTORE"
-    ],
-    "ops:restore-rto": [
-      "AC-24-RESTORE"
-    ],
-    "ops:backup-alert": [
-      "AC-24-BACKUP-ALERT"
-    ],
     "f3:index-resources": [
       "AC-23-PERF"
     ]
@@ -7058,8 +6994,6 @@
     "f2:llm-latency-samples",
     "f3:search-latency-samples",
     "f3:index-resources",
-    "f4:job-latency-samples",
-    "ops:restore-rto",
-    "restore-prep-manifest"
+    "f4:job-latency-samples"
   ]
 }

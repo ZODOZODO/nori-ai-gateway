@@ -14,7 +14,7 @@ b64 = lambda raw: base64.b64encode(raw).decode()
 # 운영자가 만든 ai-gateway-config 의 그 밖 키(값은 시험 sentinel). 도구는 이 키들을 읽어도 바꾸거나 출력하지 않는다.
 OPERATOR_KEYS = {'ai-gateway-db.properties': b64(b'spring.datasource.url=jdbc:postgresql://x/y\n'), 'AI_GATEWAY_DB_USER': b64(b'account-name-sentinel'),
                  'AI_GATEWAY_DB_PASSWORD': b64(b'db-password-sentinel-value-0123456789'), 'token': b64(b'gitlab-token-sentinel-value-0123456789')}
-ALLOWED_DELETES = {'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client', 'ai-gateway-acceptance-fixture-writer', 'ai-gateway-acceptance', 'ai-gateway-restore-acceptance'}
+ALLOWED_DELETES = {'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client', 'ai-gateway-acceptance-fixture-writer', 'ai-gateway-acceptance'}
 with tempfile.TemporaryDirectory(prefix='aigw-verify-creds-test-') as temporary:
     work = pathlib.Path(temporary)
     shutil.copytree(root / 'operations', work / 'operations')
@@ -160,7 +160,7 @@ with tempfile.TemporaryDirectory(prefix='aigw-verify-creds-test-') as temporary:
     secret_delete = first(lambda c: c['args'][:2] == ['delete', 'secret'])
     patch = first(lambda c: c['args'][0] == 'patch')
     assert job_stop < secret_delete < patch
-    assert set(deletes(log)) <= ALLOWED_DELETES and {'ai-gateway-acceptance', 'ai-gateway-restore-acceptance'} <= set(deletes(log))
+    assert set(deletes(log)) <= ALLOWED_DELETES and 'ai-gateway-acceptance' in deletes(log)
     assert 'ai-gateway-config' not in deletes(log) and not any(c['args'][0] == 'apply' for c in log)
     final = state()['secrets']
     assert not {'ai-gateway-acceptance-signer', 'ai-gateway-acceptance-client', 'ai-gateway-acceptance-fixture-writer'} & set(final)

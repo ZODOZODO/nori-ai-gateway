@@ -48,7 +48,7 @@ class DbBootstrapOrderIT extends PgIntegrationSupport {
                     assertThat(owners).containsExactly(database.user());
                 }
             }
-            String bootstrap = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql"));
+            String bootstrap = Files.readString(Path.of(System.getProperty("aigw.rootDir"), "operations/postgres/bootstrap.sql"));
             assertThat(bootstrap).doesNotContainPattern("(?i)\\b(?:gw|kn|gw_flyway)\\.");
         }
     }

@@ -23,7 +23,7 @@ public final class GatewayLogReadback {
     public GatewayLogReadback(HttpClient http, URI loki) { this.http = http; this.loki = loki; }
 
     public Count count(String release, Instant start, Instant end, Set<String> sentinels) {
-        if (!Set.of("ai-gateway", "ai-gateway-restore").contains(release) || !start.isBefore(end)) throw new IllegalArgumentException("READBACK_INPUT_INVALID");
+        if (!"ai-gateway".equals(release) || !start.isBefore(end)) throw new IllegalArgumentException("READBACK_INPUT_INVALID");
         String query = "{namespace=\"tc\", app=\"" + release + "\"}";
         URI uri = loki.resolve("/loki/api/v1/query_range?query=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
             + "&start=" + nanos(start) + "&end=" + nanos(end) + "&limit=" + LIMIT + "&direction=forward");

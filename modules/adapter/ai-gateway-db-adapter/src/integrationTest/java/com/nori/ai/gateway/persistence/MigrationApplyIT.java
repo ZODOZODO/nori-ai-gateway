@@ -74,7 +74,7 @@ class MigrationApplyIT extends PgIntegrationSupport {
                     var names=new java.util.ArrayList<String>();int authority=0;
                     while(columns.next()){String name=columns.getString(1);names.add(name);if(java.util.Set.of("request_perm","request_pdg").contains(name)){authority++;assertThat(columns.getString(2)).isEqualTo("NO");assertThat(columns.getString(3)).isNull();}}
                     assertThat(authority).isEqualTo(2);
-                    var backup=new java.util.HashSet<>(java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("aigw.rootDir"),"operations/backup/job-columns-v1.txt")));assertThat(backup).doesNotContain("delegation_id");backup.add("delegation_id");assertThat(names).containsExactlyInAnyOrderElementsOf(backup);
+                    assertThat(names).contains("request_perm", "request_pdg", "request_message_id", "request_input", "delegation_id");
                 }
                 try (var rows = statement.executeQuery("SELECT version, checksum FROM gw_flyway.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank")) {
                     var versions = new java.util.ArrayList<String>();

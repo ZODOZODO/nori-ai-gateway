@@ -37,7 +37,7 @@ tasks.named<Test>("integrationTest") {
     // 시험 Flyway 는 루트 flyway/sql 을 filesystem 위치로 읽는다. 값은 aigw.rootDir 기준 상대 경로다.
     inputs.dir(rootProject.file("flyway/sql"))
     systemProperty("aigw.flyway.sql.dir", "flyway/sql")
-    for ((key, path) in mapOf("pgBootstrapSha256" to "operations/deploy/helm/ai-gateway-db-restore/bootstrap.sql")) {
+    for ((key, path) in mapOf("pgBootstrapSha256" to "operations/postgres/bootstrap.sql")) {
         val source = rootProject.file(path)
         val digest = MessageDigest.getInstance("SHA-256").digest(source.readBytes()).joinToString("") { "%02x".format(it) }
         inputs.file(source)

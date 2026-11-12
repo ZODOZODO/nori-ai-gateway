@@ -65,11 +65,6 @@ spec:
                   name: {{ $config }}
                   key: {{ $key }}
             {{- end }}
-            {{- if .Values.restoreMode }}
-            # 복원 격리(§11.8): OS env 는 import 한 설정 파일보다 우선하므로 Secret 파일 내용과 무관하게 복원 인스턴스로만 붙는다.
-            - name: SPRING_DATASOURCE_URL
-              value: {{ printf "jdbc:postgresql://%s:15432/nori_ai_gateway" (include "aigw.dbHost" .) | quote }}
-            {{- end }}
             - name: AI_GATEWAY_INFERENCE_MODE
               value: {{ ternary "enabled" "disabled" .Values.inference.enabled | quote }}
             - name: AI_GATEWAY_CAPACITY_MAX_RUNNING_JOBS
@@ -82,8 +77,6 @@ spec:
               value: 60s
             - name: AI_GATEWAY_CAPACITY_JOB_LIFETIME_LIMIT
               value: 180s
-            - name: AI_GATEWAY_RECOVERY_RESTORE_MODE
-              value: {{ .Values.restoreMode | quote }}
             - name: AI_GATEWAY_KNOWLEDGE_SOURCE_READ_ENABLED
               value: {{ .Values.knowledgeSource.read.enabled | quote }}
             - name: AI_GATEWAY_INGEST_ENABLED
@@ -123,10 +116,6 @@ spec:
               value: /run/aigw/fixture/catalog.yaml
             - name: AI_GATEWAY_INGEST_FIXTURE_CATALOG_PREFIX
               value: {{ .Values.fixtureCatalog.prefix | quote }}
-            {{- end }}
-            {{- if .Values.restoreMode }}
-            - name: AI_GATEWAY_RECOVERY_BACKUP_POINT_AT
-              value: {{ .Values.recovery.backupPointAt | quote }}
             {{- end }}
             {{- if .Values.testHooks.enabled }}
             - name: AI_GATEWAY_TEST_HOOKS_TOKEN_SHA256_FILE

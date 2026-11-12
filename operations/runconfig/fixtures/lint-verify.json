@@ -11,34 +11,6 @@
       "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
     }
   },
-  "restore": {
-    "pvcSizeGi": {
-      "value": 1,
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    }
-  },
-  "backup": {
-    "type": {
-      "value": "s3",
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    },
-    "destination": {
-      "value": "https://lint-only.invalid/aigw-backup/verify",
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    },
-    "ageRecipient": {
-      "value": "age1lintonly",
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    },
-    "retentionDays": {
-      "value": 7,
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    },
-    "schedule": {
-      "value": "15 3 * * *",
-      "approvalRef": "operations/runconfig/fixtures/LINT-ONLY.md"
-    }
-  },
   "netpol": {
     "targets": {
       "dns": {

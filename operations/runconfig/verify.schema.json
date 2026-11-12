@@ -11,8 +11,7 @@
     },
     "profile": {
       "enum": [
-        "main",
-        "restore"
+        "main"
       ]
     },
     "pgImage": {
@@ -60,144 +59,6 @@
         "tag",
         "digest"
       ]
-    },
-    "restore": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "pvcSizeGi": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        }
-      }
-    },
-    "backup": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "enum": [
-                "s3",
-                "sftp"
-              ]
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "destination": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "string",
-              "minLength": 1
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "ageRecipient": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "string",
-              "minLength": 1
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "retentionDays": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "const": 7
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "schedule": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "string",
-              "minLength": 1
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "enabled": {
-          "type": "object",
-          "required": [
-            "value",
-            "approvalRef"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "value": {
-              "type": "boolean"
-            },
-            "approvalRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        }
-      }
     },
     "seaweed": {
       "type": "object",
@@ -902,31 +763,5 @@
     "purpose",
     "profile",
     "pgImage"
-  ],
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "purpose": {
-            "const": "deploy"
-          },
-          "profile": {
-            "const": "restore"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "restore"
-        ],
-        "properties": {
-          "restore": {
-            "required": [
-              "pvcSizeGi"
-            ]
-          }
-        }
-      }
-    }
   ]
 }
