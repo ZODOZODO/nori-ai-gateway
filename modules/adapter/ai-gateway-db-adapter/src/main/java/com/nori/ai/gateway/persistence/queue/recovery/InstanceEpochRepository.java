@@ -17,8 +17,4 @@ public final class InstanceEpochRepository {
         jdbc.sql("INSERT INTO gw.instance_epoch(id,db_system_identifier,recorded_at) VALUES (1,:id,:now) ON CONFLICT (id) DO NOTHING")
             .param("id",identifier).param("now",Timestamp.from(now)).update();
     }
-    public void markRestoreCompleted(String identifier,Instant now,Instant backupPointAt) {
-        jdbc.sql("UPDATE gw.instance_epoch SET db_system_identifier=:id,recorded_at=:now,restore_completed_at=:now,restored_backup_point_at=:point WHERE id=1")
-            .param("id",identifier).param("now",Timestamp.from(now)).param("point",Timestamp.from(backupPointAt)).update();
-    }
 }

@@ -38,5 +38,3 @@ ai:
         enabled: false
     recovery:
       restore-mode: false
-      restore-handler:
-        enabled: true

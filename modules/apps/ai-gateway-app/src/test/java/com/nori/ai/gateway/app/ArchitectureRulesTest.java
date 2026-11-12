@@ -61,7 +61,6 @@ class ArchitectureRulesTest {
         for(String method:List.of("beforeCommit","afterCommit"))rules.put("queue.TerminalCommitObserver."+method+"(java.lang.String)",Set.of("persistence.queue.JobTerminalCommitter"));
         rules.put("queue.recovery.InstanceEpochRepository.find()",Set.of("app.job.recovery.RecoveryModeRouter"));
         rules.put("queue.recovery.InstanceEpochRepository.insertIfAbsent(java.lang.String,java.time.Instant)",Set.of("app.job.recovery.RecoveryModeRouter"));
-        rules.put("queue.recovery.InstanceEpochRepository.markRestoreCompleted(java.lang.String,java.time.Instant,java.time.Instant)",Set.of());
         rules.put("queue.recovery.CacheInvalidationRepository.deleteAllCacheEntries()",Set.of("app.job.recovery.StartupRecoveryRunner"));
         rules.put("queue.recovery.DbSystemIdentifierReader.read()",Set.of("app.job.recovery.RecoveryModeRouter"));
         rules.put("queue.recovery.DatabaseEmptinessProbe.isEmpty()",Set.of("app.job.recovery.RecoveryModeRouter"));

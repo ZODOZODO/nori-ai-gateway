@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """operations/gates selftest 전용 kubectl stub(실제 클러스터 호출 0). 상태 = STUB_STATE JSON, 호출 기록 = STUB_LOG jsonl.
 
-state 키: secrets{name:{key:b64}}, present{kind:[names]}, fail{"<동작>:<대상>": rc}, cronjobs{name: obj}, jobs{name: obj},
+state 키: secrets{name:{key:b64}}, present{kind:[names]}, fail{"<동작>:<대상>": rc}, jobs{name: obj},
 job_conditions{name: Complete|Failed}, pods[[pod...] 호출 순서별 목록], selector_pods{"<-l selector>": [pod...]}(있으면 그 selector 조회에 고정 응답 — 시퀀스 소비 0).
 `patch secret <name> --type merge --patch-file /dev/stdin` 은 data 키를 병합한다(값 null = 키 삭제, 없는 Secret 은 실패).
 `get secret <name> -o 'go-template={{index .data "<키>" | base64decode}}'` 는 그 키 값 하나를 출력한다.
@@ -47,14 +47,9 @@ if verb == 'get':
             sys.stdout.write(base64.b64decode(data[single.group(1)]).decode() if single.group(1) in data else '')
         elif data is not None:
             print('\n'.join(sorted(data)))
-    elif kind in ('statefulset', 'deployment', 'cronjob') and '-o' in args and args[args.index('-o') + 1] == 'name':
+    elif kind in ('statefulset', 'deployment') and '-o' in args and args[args.index('-o') + 1] == 'name':
         if name in state.get('present', {}).get(kind, []):
             print(f'{kind}.apps/{name}')
-    elif kind == 'cronjob':
-        obj = state.get('cronjobs', {}).get(name)
-        if obj is None:
-            sys.exit(1)
-        print(json.dumps(obj))
     elif kind == 'job':
         obj = state.get('jobs', {}).get(name)
         if obj is None:
@@ -68,13 +63,6 @@ if verb == 'get':
         save()
     else:
         sys.exit(1)
-elif verb == 'create' and any(a.startswith('--from=cronjob/') for a in args):
-    failed('create-from-cronjob')
-    source = next(a for a in args if a.startswith('--from=cronjob/')).split('/', 1)[1]
-    cron = state.get('cronjobs', {}).get(source)
-    if cron is None:
-        sys.exit(1)
-    print(json.dumps({'apiVersion': 'batch/v1', 'kind': 'Job', 'metadata': {'name': next(a for a in args[2:] if not a.startswith('-'))}, 'spec': json.loads(json.dumps(cron['spec']['jobTemplate']['spec']))}))
 elif verb in ('apply', 'create'):
     failed(verb)
     obj = json.loads(stdin)

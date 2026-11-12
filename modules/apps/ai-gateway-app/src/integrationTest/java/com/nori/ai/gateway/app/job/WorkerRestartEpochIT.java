@@ -15,7 +15,7 @@ class WorkerRestartEpochIT extends P09QueueSupport {
     private boolean restoreMode;
     private boolean handler;
     static int lateCalls,restoreCalls;
-    @Override protected Map<String,Object> extraApplicationProperties(){var p=new HashMap<>(super.extraApplicationProperties());p.put("ai.gateway.recovery.restore-mode",restoreMode);p.put("ai.gateway.recovery.restore-handler.enabled",false);return p;}
+    @Override protected Map<String,Object> extraApplicationProperties(){var p=new HashMap<>(super.extraApplicationProperties());p.put("ai.gateway.recovery.restore-mode",restoreMode);return p;}
     @Override protected Class<?>[] extraSources(){return handler?new Class<?>[]{HarnessObservationsEndpoint.class,Late.class,Handler.class}:new Class<?>[]{HarnessObservationsEndpoint.class,Late.class};}
     @TestConfiguration(proxyBeanMethods=false) static class Late{
         @Bean ReadinessPrecondition lateCondition(PausePointRegistry pauses){return new ReadinessPrecondition(){public int order(){return 100;}public void run(){lateCalls++;pauses.hold(PausePointRegistry.Point.DISPATCH_HOLD,"*");}};}

@@ -79,11 +79,6 @@ class RetentionProbeWiringIT extends P09QueueSupport {
         @Bean SourceConnectorConfiguration.ProbeWindowInput probeWindowInput(Windows windows) { return new SourceConnectorConfiguration.ProbeWindowInput(windows::window); }
     }
     @Override protected Class<?>[] extraSources() { return new Class<?>[]{HarnessObservationsEndpoint.class, ProbeInputs.class}; }
-    @Override protected Map<String,Object> extraApplicationProperties() {
-        var properties = new HashMap<>(super.extraApplicationProperties());
-        properties.put("ai.gateway.recovery.restore-handler.enabled", false);
-        return properties;
-    }
     private Map<String,Instant[]> rows() {
         var rows = new TreeMap<String,Instant[]>();
         jdbc().sql("SELECT source_id, verified_oldest_at, probe_limit_at, probed_at FROM gw.source_retention_probe").query(rs -> {

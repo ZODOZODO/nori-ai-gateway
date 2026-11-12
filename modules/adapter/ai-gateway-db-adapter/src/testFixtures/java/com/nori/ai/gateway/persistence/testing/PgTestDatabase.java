@@ -87,7 +87,7 @@ public final class PgTestDatabase implements AutoCloseable {
             .defaultSchema("gw_flyway").createSchemas(true).locations("filesystem:" + root.resolve(directory));
     }
     public void migrate() { flywayConfiguration().load().migrate(); }
-    /** 단일 계정 이름(앱·migration·백업·수용 oracle 이 함께 쓴다). */
+    /** 단일 계정 이름(앱·migration·수용 oracle 이 함께 쓴다). */
     public String user() { return account; }
     public Connection connection(String role) throws SQLException { return DriverManager.getConnection(jdbcUrl(), role, passwordFor(role)); }
     public String jdbcUrl() { return container.getJdbcUrl(); }

@@ -42,7 +42,7 @@
 | AC-38 | 부모: F0, F2, F4 | F0, F2, F4 | — | P03, P21, P29 | — | 이번 **v4.1 대체(2026-11-05):** AC-38-F0만 F5a로 이동하고 F2/F4는 유지한다. 상위 집계는 F5a 실행 전 NOT_RUN이다. |
 | AC-39 | 부모: 299, 300, 301 | F5a | — | — | TC_LIVE | 후속 |
 | AC-40 | 원자(AC-25 공유 하위) | F5a | — | — | TC_LIVE | 후속 |
-| AC-41 | 원자 | F1, F5a | P07, P09, P14 | P16 | M, L0(`delegation_id` terminal NULL·백업 표현 제외 포함) | 이번(F1) / 후속(F5a) |
+| AC-41 | 원자 | F1, F5a | P07, P09, P14 | P16 | M, L0(`delegation_id` terminal NULL 포함) | 이번(F1) / 후속(F5a) |
 | AC-42 | 부모: READ, AUTHZ | F5a | — | — | TC_LIVE | 후속 |
 | AC-43 | 부모: CLS, COMP | F2 | — | P21 집계 | — | 이번 |
 | AC-44 | 원자 | F2, F4 | P19 | P21, P29 | readiness stub 무응답(`LS`, 추론 서버 무접촉 — 2026-11-09 대체, 이력: 실제 Ollama 중지(사용자 실행)), M | 이번 |

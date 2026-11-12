@@ -67,7 +67,6 @@ public abstract class StackContextSupport {
         var arguments = new java.util.ArrayList<>(List.of(
                 "--spring.flyway.enabled=false",
                 "--ai.gateway.recovery.restore-mode=" + properties.getOrDefault("ai.gateway.recovery.restore-mode",false),
-                "--ai.gateway.recovery.restore-handler.enabled=" + properties.getOrDefault("ai.gateway.recovery.restore-handler.enabled",true),
                 "--spring.kafka.bootstrap-servers=127.0.0.1:1",
                 "--spring.kafka.listener.auto-startup=false",
                 "--nori.storage.s3.enabled=true", "--nori.storage.s3.endpoint=http://127.0.0.1:1",

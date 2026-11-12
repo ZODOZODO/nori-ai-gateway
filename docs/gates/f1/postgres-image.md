@@ -6,7 +6,7 @@ Status: BLOCKED
 
 2026-11-06 승인 B는 P06 로컬 HBA 결과의 부모 검증 이후 P07→P15 순서의 코드 구현·격리 로컬 시험만 운영 입력 대기와 분리합니다. 이번 범위는 P06이며 P07 착수·완료를 기록하지 않습니다. 실제 Source 연결·운영 수용은 NOT_RUN입니다.
 
-로컬 candidate는 공개 `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`입니다. PostgreSQL 18.6/vector 0.8.7이며 pg_trgm은 가용·미설치·미사용입니다. 네트워크 없는 일회용 Docker 시험용이고 Harbor 승인값이 아닙니다. 승인 배포 digest 확보 후 bootstrap/HBA·migrate/권한·저장·백업/복원 관련 시험을 동일 digest로 재실행하고 부모 검증하기 전 운영 증거로 승격하지 않습니다. 기존 scratch와 P06 JSON 증거는 그대로 보존합니다.
+로컬 candidate는 공개 `pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`입니다. PostgreSQL 18.6/vector 0.8.7이며 pg_trgm은 가용·미설치·미사용입니다. 네트워크 없는 일회용 Docker 시험용이고 Harbor 승인값이 아닙니다. 승인 배포 digest 확보 후 bootstrap/HBA·migrate/권한·저장 관련 시험을 동일 digest로 재실행하고(2026-11-12 대체(seq17), SPEC §12.4 — 이력: 저장·백업/복원 관련 시험) 부모 검증하기 전 운영 증거로 승격하지 않습니다. 기존 scratch와 P06 JSON 증거는 그대로 보존합니다.
 
 2026-11-06 승인 A는 기존 `pg_read_all_data` 부여를 유지하고 검증 역할의 타 DB TCP/Unix socket **연결/유효 접근 0**을 HBA로 강제합니다. literal 타 DB SQL ACL 0을 주장하지 않습니다. `default_transaction_read_only=on`은 방어층이며 off 후 실제 쓰기 권한 거부(SQLSTATE 42501)를 별도 검사합니다. 기존 bootstrap SQL의 역할·확장·DB 권한 정책과 다른 DB PUBLIC ACL은 유지합니다.
 
