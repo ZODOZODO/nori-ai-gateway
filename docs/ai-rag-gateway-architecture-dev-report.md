@@ -8217,3 +8217,136 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 
 - `chartDigest`(U6 도입, `operations/deploy/aigw-helm.sh:115,277` = `helm package` 산출물 `sha256sum`)는 차트 파일 mtime 에 따라 달라진다(⑧ 재현). 배포 증거의 `chartDigest` 는 그 배포를 실행한 checkout 의 값이며, 같은 commit 이라도 다른 checkout 에서 다시 계산하면 같지 않을 수 있다. 차트 내용 동일성은 `chartRepoSha`(HEAD) 로 판정해야 한다. 이 값을 다른 checkout 에서 재계산해 대조하는 절차가 생기면 그때 문제가 된다.
 - 환경: `docker ps -a --filter label=org.testcontainers=true -q` 빈 출력. 실행 전후 `docker images`·`docker ps -a` 목록이 같다(새 이미지·컨테이너 0, 삭제 0). pgvector·ryuk·`aigw-p06-tools:local`·다른 프로젝트 자원은 건드리지 않았다. nori-common clean.
+
+
+## P20 재개 — R0~R5 구현과 로컬 검증 (2026-11-12, seq16, 독립 에이전트)
+
+- 사용자 지시: P20 재개와 독립 에이전트 구현. 정본 = Plan §16.3 R0-3b → R0-3c(②·③) → R1 → R2 → R3 → R4 → R5, 검증 = Plan §16.8. 작업 위치 = worktree `C:/workspace_nori/.aigw-worktrees/p20-ai`, 브랜치 `aigw/f2-p20`. main 레포 쓰기·push·force·reset·stash 0, 모델·원격 서버(192.168.0.160/.150/.203)·k8s 접속 0, 기존 `evidence/**` 수정 0.
+- 환경: Git Bash, `JAVA_HOME`=Temurin 21.0.10, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값(`pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895…4bcd2`), Gradle 은 모두 `--offline --no-daemon -p <worktree>`, 각 명령 별도 실행·exit 확인.
+
+### R0-1/R0-2 상태·HEAD·diff 대조
+
+- worktree `git status --short` = 깨끗함, HEAD = `3994de1387e54cce39388d26eea0db86933e9f1f`(root R0-3a WIP 보존 커밋), merge-base(main) = `9b13bf6`, main HEAD = `73f4681`(seq16 문서 커밋).
+- WIP 커밋 diff(`9b13bf6..3994de1`) = 45 파일 2,403 추가·29 삭제. Plan §16.3 R5 "그 밖의 WIP 시험 지원·계약 파일"(P09TestPorts·WorkflowSourceFixture·LlmStubSupport·LlmScriptedTransportIT·ScriptedChatTransportTest·LlmPromptResourceTest·test-hooks-v1.md)이 모두 포함됨을 확인했다.
+- main 의 seq16 차이(`9b13bf6..73f4681`) = 문서 4 파일(Spec·Plan·`docs/gates/spec-baseline.md`·`docs/gates/spec-approvals/16.md`)뿐이다. main 작업 트리의 미커밋 변경은 WIP 45 파일과 겹치지 않는 다른 작업이며 읽기만 했다.
+
+### R0-3b 미검증 출발점(v2 WIP) — WIP SHA `3994de1`, 분류 wire v2, 문서 합류 전
+
+| 명령 | exit | tests | failures | errors | skipped | 직후 `test-evidence verify` |
+|---|---|---|---|---|---|---|
+| `:ai-gateway-core:test` | 0 | 142 | 0 | 0 | 0 | exit 0 `TEST_EVIDENCE_VERIFIED` |
+| `:apps:ai-gateway-app:test` | 0 | 75 | 0 | 0 | 0 | exit 0 `TEST_EVIDENCE_VERIFIED` |
+| 한정 IT(`*ClassificationSchemaLimitsIT`·`*Llm*IT`·`*AppContextWiringIT`) | 1 | 42 | 1 | 0 | 0 | exit 1(`STALE_TEST_EVIDENCE` — `--tests` 한정 실행의 지문 불일치, 아래 §16.8 ⑨ 와 같은 원인) |
+
+- 실패 FQCN: `com.nori.ai.gateway.app.job.LlmComposerFailureMappingIT#noVerifiedBlockOrEvidenceWithAComposerFailureIsFailedLlmUnavailable()`.
+- 원인 분류(이 단계에서 고치지 않음): 시험 fixture 결함. `catalog-down` 시나리오는 Mock 인가 API 를 Unavailable 로 만들어 JobWorker 시작 gate(`authorize(…, Set.of())`)에서 `START_GATE_UNAVAILABLE`(결과 `SOURCE_UNAVAILABLE`, errorCode 없음)로 끝나므로 분류·Composer 에 닿지 않는다(R5 재실행 XML 메시지 `{"error_code"=null, "status"="SOURCE_UNAVAILABLE"}`, JobQueueIT 의 같은 시나리오 단언과 일치). 제품의 L-5 ⓑ 매핑 결함이 아니다.
+- 클래스별(한정 IT): ClassificationSchemaLimitsIT 5/0, LlmComposerFailureMappingIT 5/1, LlmExpiryRaceIT 1/0, LlmIncOptionalStepIT 1/0, LlmScriptedTransportIT 4/0, LlmStubWorkflowIT 8/0, P09AppContextWiringIT 3/0, P11AppContextWiringIT 1/0, WebAppContextWiringIT 2/0, AppContextWiringIT 12/0(tests/failures).
+- WIP 재사용 조건(§16.3): 위에서 실행·통과한 WIP 클래스(QRefContext·ClassificationService·ComposerService·ClassifiedArgumentsWorkflow·ScriptedChatTransport·LlmPromptResource 단위, 실패 1건을 뺀 Llm*IT·ClassificationSchemaLimitsIT·AppContextWiringIT)만 출발점으로 썼다. 이 결과는 P20 완료·분류 wire v3 PASS·leaf 증거가 아니다.
+
+### R0-3c 문서 합류
+
+- ① main 로컬 커밋 = root 수행(`73f4681`).
+- ② `git merge main` → 커밋 `dc0a7b7`(ort, 충돌 0, 변경 = 문서 4 파일). 제품 코드 충돌 없음.
+- ③ `spec-guard` exit 0, specSha `7831c76984893fb3e82fc18bf232d11de4c65bb79fde493e066b3c50984b727a`(`FILE_HASHED`, `LOCAL_FILE`). 기준선 파일 되돌림 0.
+
+### R1~R5 변경
+
+| 커밋 | 내용 |
+|---|---|
+| `dc0a7b7` | R0-3c 문서 합류 merge(문서 4 파일, 제품 코드 0) |
+| `fc3c805` | R1/R2 분류 wire v3 — n·a 판정·정규화·보완, CLASSIFY 3,072/256/4,864, classify-v3 프롬프트, 관련 단위 시험 |
+| `05a200f` | R1 leaf-catalog-v2 seq16(222), plan-catalog-contract.txt, LeafCatalogTest |
+| `a6bde81` | R1/R3/R4 승인 근거 프로필·조건부 단계 선택·Coverage·KnowledgeSearchContext·ReportSections·Composer coverage, 배선, 단위 시험 |
+| `869aa14` | R5 IT fixture wire v3·LlmClassificationNeedsIT·EvidenceWorkflowContractIT·ReportSectionsContractIT·ⓑ fixture 수정·AppContextWiringIT·ci 등록·hook 계약 |
+
+**R1 — 타입·예산·프로필·catalog**
+- `core.workflow.EvidenceNeed`(S,H,N,I,C,R)·`AnswerMode`(B,D) 신설(시스템 독립). `core.llm.Classification` 에 evidenceNeeds·serverAdded·answerMode·wireVersion(`classify-wire-v3`) 추가, `jobClassification()` 투영(`evidenceNeeds`·`serverAddedNeeds`·`answerMode`·`wireVersion`).
+- `core.llm.ClassificationNeeds`: SPEC §28.3 ① 신규 필드 검사(타입 → enum → 형식, 요지 코드는 기존 TYPE_INVALID·ENUM_INVALID·FORMAT_INVALID 만), ② 정규화, ③ 단계 A(KQ→N, LQ→S, INC→H)·단계 B(C→N·I / S, R→N) 추가만, ④ 결속. `ClassificationService` WIRE_KEYS 를 일곱 키로 바꾸고 기존 검사(답변 상한·finish·usage → JSON → 키 집합 → t → qRef → eqp/from/to) 뒤에 n·a 검사를 둔다. v2 다섯 키 응답은 기본값 보충 없이 SCHEMA_KEYS_INVALID.
+- `TokenBudgetPolicy.current()` CLASSIFY 3,072/256/4,864(요청 5,120). COMPOSER 2,816/128/5,120(5,248)·PLAN 불변. PreCallBudgetAssert·AnswerCheck·ScriptedChatTransport 는 정책 값만 읽어 코드 변경 0(ClassificationServiceTest "answer over 256", InferenceRequestContractIT 의 3,072+5,120 경계는 그대로).
+- `EvidencePlanProfile`·`EvidenceRequirement`·`EvidencePlan`·`EvidencePlanBuilder`·`EvidenceCoverage`·`EvidenceCoverageEvaluator`·`ToolCallBudget`(core.workflow), `core.knowledge.KnowledgeSearchContext`, `core.dispatch.ExecutionContext` 에 `Optional<KnowledgeSearchContext>` 추가(기존 2·3인자 생성자 empty 위임).
+- app `job/EvidenceProfileLoader` + `resources/workflows/tc/evidence-profile-v1.json`(index.json 과 분리). 닫힌 키, owner = 대상 시스템, need ∈ S/H/N/I/R(C 원천 금지), Registry 존재·타 owner·Mutation(operation READ·sideEffects NONE), argument 이름 = 입력 schema 속성, STEP_FIELD 경로 = 선행 근거 Capability 출력 schema 속성, 선행 근거는 앞선 항목만(중복·순환 0).
+- gateway-eval `leaf-catalog-v2.json`(파일명 유지): version 3·revision seq16·sourcePlanSha256 = seq16 Plan, 신규 8 leaf·부모 링크·단계 component(Plan §12.4 seq16 행), ISO-06-H 2개 F3/F4 `ACC` 필수, 기존 214 leaf·producerIndex 순서 보존(추가만). `plan-catalog-contract.txt` = seq16 Plan §12 사본. `LeafCatalogTest` 222/23/61·AC-23 30·AC-24 26·AC-32 4·신규 component·F5a component 0.
+
+**R2 — 질문 이해·서버 입력 결속**
+- `prompts/classify-v3.txt` 신설(SHA-256 `13aa84c8c909a2e22ad5cf3c17f5c702667e07c33c209b8a162d132ebcf56115`), 운영 `classify-v2.txt` 제거. `classify-registry-systems-v2.json` 은 내용 불변이라 그대로 쓴다. JobConfiguration 이 v3 를 적재.
+- `LlmPromptResourceTest` = `CLASSIFY_V3_SHA256` 고정·운영 classpath 의 v2 부재 확인. `ClassificationF0ContractRegressionTest` → `ClassificationV3MessageContractTest`(고정 입력 41개 조립 결과 ↔ core 시험 자원 `llm/classify-wire-v3-messages.json` messagesSha256, 재시도 요지 = F0 공통 10개).
+- QRefContext·JobWorker(scoped reader 로 복원한 같은 JobRequestInput 을 분류·계획·Composer 에 전달)는 WIP 그대로 재사용. Knowledge 단계는 WorkflowExecutor 가 현재 Job·선택 단계·검증 대상·결속 근거 종류로 만든 KnowledgeSearchContext 만 받는다(정확 q 와 의미 입력 분리, toString 보호).
+
+**R3 — 조건부 수집**
+- `WorkflowPlanBuilder`: JobContext 에 서버 결속 evidenceNeeds 가 있으면 EvidencePlanBuilder 로 계획하고 승인 프로필이 고른 선택 단계만 포함(필수 단계는 기본 경로 유지). 결속 값이 없는 F1 구조화 분류 경로는 기존 동작. 프로필 없는 builder 에 v3 Job 이 오면 거부.
+- `WorkflowExecutor`: dispatcher 직전 `ToolCallBudget`(전체 12·같은 Tool 3·Knowledge search 2) 검사(초과 단계는 `TOOL_LIMIT_REACHED` trace), Coverage 결속(`WorkflowOutcome.coverage`, 공용 payload 최상위 필드 추가 0).
+- 승인 프로필의 workflow 밖 항목(예: LQ 의 N = model/knowledge, H 의 event)은 실행하지 않고 Coverage `UNSUPPORTED` 로 남긴다. F3 Knowledge 는 PLANNED 그대로이며 IMPLEMENTED 등록 0.
+
+**R4 — 보고와 Composer**
+- `ReportSections`(core.workflow): D 요청이고 검증 블록·Evidence 가 하나 이상일 때만 기존 `table` 블록 1개(구역·근거·상태·근거 단계·최근 관측 시각·누락 항목·serverAdded)를 더한다. UiSchemaValidator 검증, 새 블록 타입 0, 가설·조치 창작 0, 미수집 근거는 `미확인`.
+- `ComposerService.Input.coverage`(근거 계획 있을 때만 `data.coverage`)·`ComposerInputs` 연결. Composer 128 요약·L-5 매핑·think 표지 재시도·만료 guard 는 WIP 그대로.
+
+**R5 — 시험·배선**
+- 신규 단위: ClassificationNeedsV3Test, EvidencePlanBuilderTest, EvidenceCoverageEvaluatorTest, KnowledgeSearchContextTest(core), EvidenceProfileLoaderTest, ClassificationWireV3TokenBudgetTest(app — ⓞ pin tokenizer 실제 계수).
+- 신규 IT: LlmClassificationNeedsIT(`@Tag("AC-32-NEEDS")`, ⓐ~ⓝ 실제 Job 경로), EvidenceWorkflowContractIT, ReportSectionsContractIT — `ci/integration-required.txt` 등록.
+- 수정: LlmStubSupport `wire` 를 분류 wire v3 고정 fixture 로(n·a 명시 overload), v2 결속 리터럴 보정, LlmComposerFailureMappingIT ⓑ fixture 교체(Dispatcher Source 검사 DENIED seam), AppContextWiringIT 배선 단언, test-hooks-v1.md llm-script 분류 응답 형식.
+
+### 추가·제거한 ModuleConfiguration·@Bean
+
+- 새 `@Component` 계열 0, `*ModuleConfiguration` `@Import` 추가·제거 0(모두 기존 설정의 `@Bean`).
+- `CoreBeansConfiguration`: `EvidenceCoverageEvaluator` @Bean 추가, `workflowPlanBuilder` 가 `Optional<EvidencePlanBuilder>` 를 받도록 변경, `coreWorkflowExecutor` 에 evaluator 주입.
+- `WorkflowExecutionConfiguration`: `EvidenceProfileLoader`·`EvidencePlanBuilder` @Bean 추가.
+
+### 결정과 근거
+
+1. **근거 계획은 기존 workflow 단계만 고른다.** Plan §16.3 R3 "기존 taskType별 Manifest는 기본 경로·필수 의존성의 자료로 재사용", §16.3 R1 "두 번째 실행 엔진/Job 큐를 만들지 않는다"를 따랐다. 필수 단계는 항상 실행하고(SPEC §28.2 "기존 mandatory 단계가 요청 의도상 필요한 경우 사용자 옵션으로 생략하지 못한다"), 선택 단계(INC 의 git·knowledge)만 근거 요구로 고른다. 프로필에 있으나 workflow 밖인 항목은 실행하지 않고 Coverage `UNSUPPORTED`(사유 `NOT_IN_WORKFLOW`/`CAPABILITY_INACTIVE`)로 남긴다.
+2. **F1 경로 호환.** JobContext 분류 맵에 `evidenceNeeds` 가 없으면(추론 비활성의 구조화 분류 hook) 기존 고정 workflow 를 그대로 쓴다. 근거 요구가 결속됐는데 planner 가 없으면 거부한다(조용한 기본값 0).
+3. **C 는 판정하지 않는다.** v1 프로필에 승인 비교 조건이 없으므로 양쪽 근거가 있어도 `NO_APPROVED_CONDITION`, 한쪽이 없으면 `COMPARISON_SIDE_MISSING` 이다(SPEC §28.2·§28.8 "문자열 다름=고장 확정 금지").
+4. **D 보고 블록 조건.** 검증 블록·Evidence 가 0개면 보고 블록을 더하지 않는다 — 파생 블록이 SPEC §5.4 ③ ⓑ(자료 0 → `FAILED`/`LLM_UNAVAILABLE`)를 `PARTIAL` 로 바꾸지 않게 하기 위함이다.
+5. **LeafCatalogTest 의 F0 행.** seq16 Plan §12.4 에는 `| F0 |` 행이 없고 AC-37·AC-38-F0 는 `F5a (이관·후속)` 행이며 같은 칸에 "종전 권위 producer 이력: 단계 F0, producer F0R(+SPR)"을 적고 "catalog 코드는 변경하지 않는다"(§12.4 머리말)고 했다. catalog 의 기존 F0 component 를 보존하고, 시험은 그 이력 문구를 파싱해 대조한다(사본은 Plan §12 그대로).
+6. **measurementIds 미등록.** AC-23-QUALITY 의 PF component 는 measurementIds 3개를 참조하지만 catalog 최상위 `measurementIds` 등록은 Plan §16.9 상 P22 책임이라 추가하지 않았다(producerIndex 키만 추가).
+7. **v3 golden 위치.** core 시험 classpath 는 앱 계약 자원(`manifests/**`·`workflows/**`)만 포함하도록 build 스크립트가 거르므로(core build.gradle.kts, P20 allowed_writes 밖) golden 은 `modules/ai-gateway-core/src/test/resources/llm/` 에 두고 저장소 경로로 읽는다(기존 F0 회귀가 `eval/` 를 저장소 경로로 읽던 방식과 같음).
+8. **ⓑ fixture.** WIP 의 `catalog-down` 은 시작 gate 에서 끝나 L-5 ⓑ 를 재현하지 못한다. 기존 verify seam `SOURCE_ALLOWLIST_REF_OVERRIDE`(SourceAuthzNegativeSeamIT 가 쓰는 같은 hook)로 이 Job 의 snapshot 만 Dispatcher 에서 DENIED 로 만들었다 — Plan P20 시험 문구 "ⓑ모든 Source `DENIED`·블록 0 + Composer 실패"와 일치.
+9. **IT fixture 기본 근거.** LlmStubSupport `wire(t,…)` 는 KQ=[N], LQ=[S], INC=[S,H,I], GQ·UNS=[], a=B 를 명시 고정한다(INC 의 I 는 기존 시험이 기대한 선택 git 단계 유지 목적). 다른 근거는 overload 로 시험마다 명시한다.
+
+### 검증(Plan §16.8)
+
+- 실행 환경 보정(제품·시험 변경 아님): 첫 시도에서 `:gateway-eval:test` 의 `F0InputBindingFunctionalTest#everyReadInputByteChangeForcesRerunAndStaleVerifyUntilRerun`(TestKit 중첩 빌드)가 형제 `../nori-common/build-logic` 의 `compileKotlin` 실패(`Unresolved reference 'OWNED_INVENTORY_PROPERTY'` 등, 출력 `w: Detected multiple Kotlin daemon sessions`)로 FAIL 했고, 같은 세션의 이후 명령도 build-logic 컴파일에서 멈췄다. 원인은 다른 세션이 띄운 공유 Kotlin compile daemon(오늘 08:15 시작) 상태였다 — nori-common 소스는 `ae6791e`(2026-10-19) 그대로·`git status` 깨끗. 조치: ignored 빌드 산출물인 `nori-common/build-logic/build/kotlin`(Kotlin 증분 캐시)만 지우고, 모든 Gradle 명령을 `ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy=in-process` 환경변수로 실행해 공유 daemon 을 쓰지 않게 했다(다른 세션의 daemon·프로세스는 건드리지 않음). 이 값은 test 입력 지문(`build.gradle.kts` `aigwInputComponents`)에 들어가지 않는다. 같은 시험은 이 설정에서 PASS 했다. 아래 표는 이 설정의 두 번째 시도 결과다.
+
+| # | 명령 | exit | 결과 |
+|---|---|---|---|
+| ① | `:gateway-eval:run --args="spec-guard --spec <worktree SPEC> --baseline docs/gates/spec-baseline.md"` | 0 | specSha `7831c76984893fb3e82fc18bf232d11de4c65bb79fde493e066b3c50984b727a`(`FILE_HASHED`, `LOCAL_FILE`) |
+| ② | `:gateway-eval:test` | 0 | `BUILD SUCCESSFUL in 8m 20s`, 283건 실패·오류·skip 0 |
+| ③ | `:gateway-eval:run --args="test-evidence verify --tasks :gateway-eval:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ④ | `:ai-gateway-core:test` | 0 | `UP-TO-DATE`(같은 입력의 직전 실행 재사용), 162건 실패·오류·skip 0(R0-3b 142 + 신규 20) |
+| ⑤ | `test-evidence verify --tasks :ai-gateway-core:test` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ⑥ | `:apps:ai-gateway-app:test` | 0 | `UP-TO-DATE`(같은 입력의 직전 실행 재사용), 79건 실패·오류·skip 0(R0-3b 75 + 신규 4) |
+| ⑦ | `test-evidence verify --tasks :apps:ai-gateway-app:test` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ⑧ | 한정 IT(`*ClassificationSchemaLimitsIT`·`*Llm*IT`·`*EvidenceWorkflowContractIT`·`*ReportSectionsContractIT`·`*AppContextWiringIT`) | 0 | `BUILD SUCCESSFUL in 12m 56s`, 52건 실패·오류·skip 0 |
+| ⑨ | `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --tasks :apps:ai-gateway-app:integrationTest --require-docker"` | 1 | `STALE_TEST_EVIDENCE` — 아래 설명 |
+
+- ⑧ 클래스별(tests/skipped/failures/errors): ClassificationSchemaLimitsIT 5/0/0/0, EvidenceWorkflowContractIT 4/0/0/0, LlmClassificationNeedsIT 3/0/0/0, LlmComposerFailureMappingIT 5/0/0/0, LlmExpiryRaceIT 1/0/0/0, LlmIncOptionalStepIT 1/0/0/0, LlmScriptedTransportIT 4/0/0/0, LlmStubWorkflowIT 8/0/0/0, P09AppContextWiringIT 3/0/0/0, P11AppContextWiringIT 1/0/0/0, ReportSectionsContractIT 3/0/0/0, WebAppContextWiringIT 2/0/0/0, AppContextWiringIT 12/0/0/0.
+- ⑨ 원인: 시험 입력 지문에 `testFilters`(명령행 `--tests` 패턴)가 들어가므로(`build.gradle.kts:82`) `--tests` 로 한정한 실행의 run-binding 지문(`67d74deb…`)과 필터 없는 verify 호출이 계산한 지문(`d198105f…`)이 다르다. 한정 실행 결과로 전체 IT 를 인증하지 않는다는 Plan §16.8 문장과 같은 결과이며, 시험 실패가 아니다. Plan §16.8 명령표의 한정 IT 직후 verify 는 이 하네스에서 항상 STALE 이 되므로 root 확인이 필요하다(R0-3b 한정 IT verify 의 STALE 도 같은 원인이 겹친다). 인증은 아래 비한정 실행으로 했다.
+
+**전체 회귀(비한정, 같은 환경 설정)** — U8 기준선 test 694·IT 253(db 85·inference 1·app 167).
+
+| # | 명령 | exit | 결과 |
+|---|---|---|---|
+| ⑩ | `:apps:ai-gateway-app:integrationTest -Paigw.requireDocker=true` | 0 | `BUILD SUCCESSFUL in 1h 4m 37s`, XML 53·202건 실패·오류·skip 0(U8 167 + WIP·P20 신규 35) |
+| ⑪ | `:gateway-eval:run -Paigw.requireDocker=true --args="test-evidence verify --tasks :apps:ai-gateway-app:integrationTest --require-docker"` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 30s` |
+| ⑫ | `:adapter:ai-gateway-db-adapter:integrationTest -Paigw.requireDocker=true` | 0 | `BUILD SUCCESSFUL in 4m 6s`, 85건 실패·오류·skip 0(U8 과 같음) |
+| ⑬ | `test-evidence verify --tasks :adapter:ai-gateway-db-adapter:integrationTest --require-docker` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 22s` |
+| ⑭ | `build` | 0 | `BUILD SUCCESSFUL in 2m 34s`(`114 actionable tasks: 72 executed, 42 up-to-date`), test 11개 task 748건 실패·오류·skip 0 |
+| ⑮ | `-q :gateway-eval:run --args="test-evidence verify --tasks <test 11개 쉼표 목록>"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| ⑯ | `:adapter:ai-gateway-inference-adapter:integrationTest -Paigw.requireDocker=true` | 0 | `BUILD SUCCESSFUL in 1m 11s`, 1건 실패·오류·skip 0 |
+| ⑰ | `test-evidence verify --tasks :adapter:ai-gateway-inference-adapter:integrationTest --require-docker` | 0 | `TEST_EVIDENCE_VERIFIED`, `BUILD SUCCESSFUL in 21s` |
+
+- ⑭ test task 별(XML/tests, 실패·오류·skip 모두 0): gateway-eval 57/283, core 46/162, db-adapter 3/12, inference-adapter 11/43, source-support 3/8, loki 7/38, tempo 2/10, gitlab 4/24, tc-mock 7/48, app 25/79, acceptance-app 12/41. 합 748 = U8 694 + core 45 + app 9(증가분은 WIP 3994de1 와 P20 신규 시험). 기존 시험 실패·skip 0.
+- IT 합 288 = db 85 + inference 1 + app 202. 기존 IT 실패·skip 0.
+- 각 Docker 실행 직후 `docker ps -a --filter label=org.testcontainers=true -q` 0줄. 다른 프로젝트 컨테이너·이미지는 건드리지 않았다.
+
+### 남은 항목(미구현·미실행·사용자/root 결정)
+
+- **보완 round 실행 연결 미구현(결정 필요).** `EvidenceCoverageEvaluator.supplement` 는 후보 판단(NO_DATA·NOT_EXECUTED, 활성·미실행·입력 준비, round 1·호출 한도)까지 구현·단위 시험했지만, WorkflowExecutor 가 후보를 실제로 dispatch 하는 경로는 연결하지 않았다. 현재 후보가 될 수 있는 READ 는 모두 기존 workflow 밖 항목(예: H 의 `tc.event.getRecent`, N 의 `tc.model.read`)이라, 실행하려면 workflow 정의 밖 단계를 조합해 두 번째 PlanValidator 준비·dispatch 를 하는 경로가 필요하다. 이는 Plan §16.3 R1 "같은 역할의 두 번째 실행 엔진을 만들지 않는다"와 R3 "1회 보완 round" 사이의 설계 해석이 필요한 지점이라 SPEC/Plan 을 고치지 않고 보고한다. 그때까지 프로필 workflow 밖 항목은 실행 0·Coverage `UNSUPPORTED` 로만 드러난다.
+- **AC-24-EVIDENCEFLOW·AC-24-REPORT·AC-32-NEEDS F4 component, F5a component** — P26/P29·P30 몫, 미실행.
+- **ACC:F2(AC-32-NEEDS)** — 수용 suite 구현은 P21 몫, 미실행. 이번 IT 결과는 IT component 의 로컬 실행일 뿐 leaf PASS·F2 게이트 판정이 아니다.
+- **Knowledge stub 의 IMPLEMENTED/verify origin 구분 부정 시험** — 이번 P20 시험은 시험 전용 Knowledge stub 을 쓰지 않아(F3 PLANNED 유지) 해당 사례가 없다. P23 에서 실제 Knowledge 등록과 함께 다룬다.
+- **원격 spec-input publish·보호 변수·CI·push** — 지시 범위 밖, 0.
+- **Plan §16.8 한정 IT 직후 verify(root 확인 필요).** 지문의 `testFilters` 때문에 한정 실행 뒤 verify 는 항상 `STALE_TEST_EVIDENCE` 다. 명령표를 비한정 실행 뒤 verify 로 읽을지, 하네스가 한정 실행용 verify 형식을 둘지는 Plan·하네스(`build.gradle.kts`, P20 allowed_writes 밖) 소유자 결정이다.
+- **실행 환경.** 공유 Kotlin compile daemon(다른 세션) 상태 때문에 in-process 컴파일 환경변수를 썼다. CI·다른 세션 재현 시 같은 증상이 나오면 daemon 재시작 또는 같은 설정이 필요하다.
+- **Plan 체크박스.** P20 `구현`·`검증` 체크박스는 위 보완 round 실행 연결 미구현과 ⑨ 해석 미결정 때문에 갱신하지 않았다.
