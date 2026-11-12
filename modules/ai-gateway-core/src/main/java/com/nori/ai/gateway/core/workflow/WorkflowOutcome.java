@@ -8,7 +8,8 @@ import java.util.*;
 public record WorkflowOutcome(List<Stage> stages,List<ResultBlock> blocks,List<Evidence> evidence,ResultSourceDeps sourceDeps,
         List<Trace> trace,List<String> toolExecutionRefs,Optional<ValidationOutcome> rejection,List<EvidenceCoverage> coverage) {
     public record Stage(String stepId,ToolResultEnvelope result,boolean observed,int count) {}
-    public enum TraceOutcome { OPTIONAL_STEP_OMITTED, SKIPPED_NO_INPUT, TOOL_LIMIT_REACHED }
+    /** SUPPLEMENT_REJECTED = 근거 보완 round 계획이 PlanValidator 준비를 통과하지 못해 그 후보를 실행하지 않음. */
+    public enum TraceOutcome { OPTIONAL_STEP_OMITTED, SKIPPED_NO_INPUT, TOOL_LIMIT_REACHED, SUPPLEMENT_REJECTED }
     public record Trace(String stepId,TraceOutcome outcome) {}
     public WorkflowOutcome(List<Stage> stages,List<ResultBlock> blocks,List<Evidence> evidence,ResultSourceDeps sourceDeps,
             List<Trace> trace,List<String> toolExecutionRefs,Optional<ValidationOutcome> rejection) {

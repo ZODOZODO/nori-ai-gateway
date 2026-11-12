@@ -84,7 +84,13 @@ public final class EvidenceProfileLoader {
         String source = string(input, "source"), name = string(input, "name");
         if (!manifest.inputSchema().path("properties").has(name)) throw new InvalidProfile("승인되지 않은 argument 이름(" + id + ")");
         switch (source) {
-            case "ARGUMENT" -> { keys(input, ARGUMENT_KEYS, "입력 바인딩"); return new EvidencePlanProfile.Input(name, EvidencePlanProfile.InputSource.ARGUMENT, null, null); }
+            case "ARGUMENT" -> {
+                keys(input, ARGUMENT_KEYS, "입력 바인딩");
+                // 리소스 argument 는 PlanValidator ⑧ 이 Capability 의 resourceTypes 로 다시 검사하므로, 받지 않는 종류를 결속하는 항목은 계획 전체를 거절시킨다.
+                JsonNode type = manifest.inputSchema().path("properties").path(name).get("x-resourceType");
+                if (type != null && type.isString() && !manifest.resourceTypes().contains(type.asString())) throw new InvalidProfile("Capability 가 받지 않는 리소스 argument(" + id + ")");
+                return new EvidencePlanProfile.Input(name, EvidencePlanProfile.InputSource.ARGUMENT, null, null);
+            }
             case "STEP_FIELD" -> {
                 keys(input, FIELD_KEYS, "입력 바인딩");
                 String entry = string(input, "entryId"), field = string(input, "fieldPath");

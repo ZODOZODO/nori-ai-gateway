@@ -53,7 +53,9 @@ public class WorkflowSourceFixture {
                     String app=TcSourcePolicy.APPS.stream().filter(value->selector.contains("app=\""+value+"\"")).findFirst().orElseThrow();
                     try{requestDigests.add(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest((app+"\n"+"tc"+"\n"+query.get("start")+"\n"+query.get("end")).getBytes(java.nio.charset.StandardCharsets.UTF_8))));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
                     // 실제 전달된 나노초 창의 첫 instant만 응답하므로 서버 fixture가 창을 축소하지 않습니다.
-                    body=SchemaContracts.JSON.writeValueAsString(Map.of("status","success","data",Map.of("resultType","streams","result",List.of(Map.of("stream",Map.of("app",app,"namespace","tc"),"values",List.of(List.of(query.get("start"),logText)))))));
+                    // logText 가 null 이면 관측 행 0(빈 로그 이력 fixture).
+                    var streams=logText==null?List.of():List.of(Map.of("stream",Map.of("app",app,"namespace","tc"),"values",List.of(List.of(query.get("start"),logText))));
+                    body=SchemaContracts.JSON.writeValueAsString(Map.of("status","success","data",Map.of("resultType","streams","result",streams)));
                 } else if(exchange.getRequestURI().getPath().equals("/api/search")) {
                     traces.incrementAndGet();boolean selected=query(exchange.getRequestURI()).get("q").contains("tc-gateway");var hits=new ArrayList<Map<String,String>>();if(selected)for(int i=0;i<traceVersions.size();i++)hits.add(Map.of("traceID",traceId(i)));
                     body=SchemaContracts.JSON.writeValueAsString(Map.of("traces",hits));

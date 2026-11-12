@@ -12,6 +12,8 @@ import static org.assertj.core.api.Assertions.*;
  * L-5 실패 매핑을 바꾸지 않는다. AC-24-REPORT 의 F4 판정 component 가 아니다.
  */
 class ReportSectionsContractIT extends LlmStubSupport {
+    /** 수집된 근거와 미지원 근거가 한 보고에 함께 있도록 모델 READ 권한을 빼서 N 의 승인 제공자를 모두 비활성으로 둔다(S 는 수집). */
+    { perms = PERMS.stream().filter(permission -> !permission.equals("MODEL_READ")).collect(java.util.stream.Collectors.toUnmodifiableSet()); }
     private JobAdmissionService.Accepted run(String key, String a, List<TestHookRegistry.LlmReply> tail, Optional<TestHookRegistry.PromptWatch> watch) throws Exception {
         var script = new ArrayList<TestHookRegistry.LlmReply>(); script.add(classify(wire("LQ", "EQP-001", null, null, null, List.of("N"), a))); script.addAll(tail);
         var job = admitScripted(key, "EQP-001 상태랑 정상 조건 보고서로 줘", windowOnly(), script, watch, null);

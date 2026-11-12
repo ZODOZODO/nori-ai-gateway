@@ -43,6 +43,8 @@ class EvidenceProfileLoaderTest {
         assertThat(profile.entriesFor(EvidenceNeed.S).getFirst().unavailableItems()).as("현재 EqpSnapshot 에 없는 Port·진행 LOT 는 누락으로 선언").containsExactly("Port 목록", "진행 LOT");
         assertThat(profile.entriesFor(EvidenceNeed.C)).isEmpty();
         assertThat(profile.entry("tc.impl.git").dependsOn()).containsExactly("tc.history.logs");
+        assertThat(profile.entries()).filteredOn(entry -> !entry.required()).as("보완 round 후보(선택 항목)").extracting(entry -> entry.id())
+            .containsExactly("tc.history.trace", "tc.history.dlq", "tc.history.event");
         for (var entry : profile.entries()) assertThat(registry.find(entry.capabilityId()).orElseThrow().ownerSystem()).isEqualTo(OwnerSystem.TC);
     }
 
@@ -58,6 +60,7 @@ class EvidenceProfileLoaderTest {
         cases.put("Registry 밖 Capability", mutate(root -> entry(root, "tc.state.snapshot").put("capabilityId", "tc.fake.read")));
         cases.put("타 owner Capability", mutate(root -> entry(root, "tc.state.snapshot").put("capabilityId", "wm.inventory.get")));
         cases.put("승인되지 않은 argument", mutate(root -> ((ObjectNode) entry(root, "tc.state.snapshot").get("inputs").get(0)).put("name", "semanticQuery")));
+        cases.put("Capability 가 받지 않는 리소스 argument", mutate(root -> entry(root, "tc.normal.model").putArray("inputs").addObject().put("name", "eqp").put("source", "ARGUMENT")));
         cases.put("argument 에 경로", mutate(root -> ((ObjectNode) entry(root, "tc.state.snapshot").get("inputs").get(0)).put("fieldPath", "items")));
         cases.put("등록되지 않은 출력 경로", mutate(root -> ((ObjectNode) entry(root, "tc.impl.git").get("inputs").get(0)).put("fieldPath", "rows")));
         cases.put("선행 근거 아닌 바인딩", mutate(root -> ((ObjectNode) entry(root, "tc.impl.git").get("inputs").get(0)).put("entryId", "tc.history.dlq")));

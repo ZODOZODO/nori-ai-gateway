@@ -1,6 +1,7 @@
 package com.nori.ai.gateway.core;
 
 import com.nori.ai.gateway.core.blocks.UiSchemaValidator;
+import com.nori.ai.gateway.core.plan.PlanStep;
 import com.nori.ai.gateway.core.registry.ToolKind;
 import com.nori.ai.gateway.core.result.ResultSourceDeps;
 import com.nori.ai.gateway.core.result.ResultStatus;
@@ -21,7 +22,9 @@ class EvidenceCoverageEvaluatorTest {
     }
     private static EvidenceRequirement comparison(){return new EvidenceRequirement(C,false,List.of(),List.of(),List.of(N,I,S,H),List.of(),List.of());}
     private static WorkflowOutcome outcome(WorkflowOutcome.Stage... stages){return new WorkflowOutcome(List.of(stages),List.of(),List.of(),new ResultSourceDeps(List.of(),List.of()),List.of(),List.of(),Optional.empty());}
-    private static EvidencePlan plan(EvidenceRequirement... requirements){return new EvidencePlan("v",AnswerMode.D,List.of(requirements),Set.of());}
+    private static EvidencePlan plan(EvidenceRequirement... requirements){return new EvidencePlan("v",AnswerMode.D,List.of(requirements),Set.of(),List.of(),List.of());}
+    private static EvidencePlan.ProfileStep candidate(EvidenceNeed need,String entry,String capability){return new EvidencePlan.ProfileStep(need,entry,new PlanStep(entry,capability,List.of(),List.of(),null));}
+    private static List<EvidenceCoverage> coverage(EvidenceNeed need,EvidenceCoverage.Status status){return List.of(new EvidenceCoverage(need,status,false,List.of(),List.of(),List.of()));}
     private static Map<EvidenceNeed,EvidenceCoverage.Status> statuses(List<EvidenceCoverage> coverage){Map<EvidenceNeed,EvidenceCoverage.Status> map=new EnumMap<>(EvidenceNeed.class);coverage.forEach(c->map.put(c.need(),c.status()));return map;}
 
     @Test void eachStageOutcomeMapsToExactlyOneDistinguishableStatus() {
@@ -39,6 +42,8 @@ class EvidenceCoverageEvaluatorTest {
             .containsEntry(S,EvidenceCoverage.Status.SOURCE_UNAVAILABLE);
         assertThat(statuses(evaluator.evaluate(plan(requirement(H,false,"logs")),outcome(stage("logs","cap.logs",ResultStatus.OUT_OF_RETENTION,false,0)))))
             .containsEntry(H,EvidenceCoverage.Status.OUT_OF_RETENTION);
+        assertThat(statuses(evaluator.evaluate(plan(requirement(H,false,"commLogs")),outcome(stage("commLogs","cap.commLogs",ResultStatus.EMPTY,true,2)))))
+            .as("출처별 빈 행을 돌려준 EMPTY 도 자료 없음").containsEntry(H,EvidenceCoverage.Status.NO_DATA);
     }
 
     @Test void comparisonNeverClaimsAResultWithoutBothSidesAndAnApprovedCondition() {
@@ -53,20 +58,31 @@ class EvidenceCoverageEvaluatorTest {
         assertThat(statuses(emptyActual)).as("기록 없음을 관측으로 비교하지 않는다").containsEntry(C,EvidenceCoverage.Status.COMPARISON_SIDE_MISSING);
     }
 
-    @Test void supplementRoundOnlyForEmptyNeedsWithAnActiveUnexecutedReadyEntryAndAtMostOnce() {
-        var profile=tcProfile();
-        var empty=List.of(new EvidenceCoverage(H,EvidenceCoverage.Status.NO_DATA,false,List.of(),List.of(),List.of()));
+    @Test void supplementRoundOnlyForEmptyNeedsWithPreparedCandidatesNotYetPlannedAndAtMostOnce() {
+        var trace=candidate(H,"tc.history.trace","tc.trace.search");var dlq=candidate(H,"tc.history.dlq","tc.dlq.list");var model=candidate(N,"tc.normal.model","tc.model.read");
+        var plan=new EvidencePlan("v",AnswerMode.B,List.of(requirement(H,false,"logs"),requirement(N,false)),Set.of(),List.of(),List.of(trace,dlq,model));
         var budget=new ToolCallBudget();
-        var executed=Set.of("tc.commLogs.search","tc.logs.search","tc.trace.search","tc.dlq.list");
-        var round=evaluator.supplement(profile,empty,capability->true,executed,entry->true,budget);
-        assertThat(round).extracting(EvidencePlanProfile.Entry::capabilityId).containsExactly("tc.event.getRecent");
-        assertThat(evaluator.supplement(profile,empty,capability->true,executed,entry->true,budget)).as("round 1회 한도").isEmpty();
-        var fresh=new ToolCallBudget();
-        assertThat(evaluator.supplement(profile,empty,capability->false,executed,entry->true,fresh)).as("비활성").isEmpty();
-        assertThat(evaluator.supplement(profile,empty,capability->true,executed,entry->false,fresh)).as("입력 미준비").isEmpty();
-        var denied=List.of(new EvidenceCoverage(H,EvidenceCoverage.Status.DENIED,false,List.of(),List.of(),List.of()));
-        assertThat(evaluator.supplement(profile,denied,capability->true,Set.of(),entry->true,fresh)).as("인가 거부를 재검색으로 숨기지 않음").isEmpty();
-        assertThat(fresh.tryStartSupplementRound()).as("후보가 없으면 round 를 쓰지 않는다").isTrue();
+        assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NO_DATA),Set.of("tc.logs.search"),budget)).as("비어 있는 근거의 후보만").containsExactly(trace,dlq);
+        assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NO_DATA),Set.of("tc.logs.search"),budget)).as("round 1회 한도 — 2회째 없음").isEmpty();
+        assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NO_DATA),Set.of("tc.trace.search"),new ToolCallBudget())).as("1차에 계획된 동일 조회 반복 0").containsExactly(dlq);
+        assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NOT_EXECUTED),Set.of(),new ToolCallBudget())).containsExactly(trace,dlq);
+        assertThat(evaluator.supplement(plan,coverage(N,EvidenceCoverage.Status.UNSUPPORTED),Set.of(),new ToolCallBudget())).containsExactly(model);
+        for(var status:List.of(EvidenceCoverage.Status.DENIED,EvidenceCoverage.Status.SOURCE_UNAVAILABLE,EvidenceCoverage.Status.OUT_OF_RETENTION,EvidenceCoverage.Status.COLLECTED)) {
+            var unused=new ToolCallBudget();
+            assertThat(evaluator.supplement(plan,coverage(H,status),Set.of(),unused)).as("실패·인가 거부·보존 부족을 재검색으로 숨기지 않음: "+status).isEmpty();
+            assertThat(unused.tryStartSupplementRound()).as("후보가 없으면 round 를 쓰지 않는다").isTrue();
+        }
+        var merged=plan.withSupplement(List.of(trace));
+        assertThat(merged.requirements().getFirst().providers()).extracting(EvidenceRequirement.Provider::stepId).containsExactly("logs","tc.history.trace");
+        assertThat(merged.requirements().get(1).providers()).isEmpty();
+    }
+
+    @Test void explicitLimitsBoundTheSameCountersAndRejectNegativeValues() {
+        var budget=new ToolCallBudget(1,1,1,0);
+        assertThat(budget.tryAcquire("tc.logs.search",ToolKind.LOG)).isTrue();
+        assertThat(budget.tryAcquire("tc.trace.search",ToolKind.TRACE)).as("전체 한도").isFalse();
+        assertThat(budget.tryStartSupplementRound()).as("round 한도 0").isFalse();
+        assertThatThrownBy(()->new ToolCallBudget(-1,3,2,1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test void toolCallBudgetEnforcesTotalSameToolAndKnowledgeSearchLimits() {

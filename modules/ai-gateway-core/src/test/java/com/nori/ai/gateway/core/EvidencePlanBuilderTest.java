@@ -1,6 +1,8 @@
 package com.nori.ai.gateway.core;
 
 import com.nori.ai.gateway.core.job.*;
+import com.nori.ai.gateway.core.plan.PlanStep;
+import com.nori.ai.gateway.core.plan.ResourceRef;
 import com.nori.ai.gateway.core.registry.*;
 import com.nori.ai.gateway.core.scope.OwnerSystem;
 import com.nori.ai.gateway.core.workflow.*;
@@ -11,49 +13,115 @@ import static com.nori.ai.gateway.core.EvidenceFixtures.*;
 import static com.nori.ai.gateway.core.workflow.EvidenceNeed.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** 승인 프로필·Registry view·기존 workflow 로 근거 계획을 조합하는 결정론 규칙(Plan §16.3 R1·R3)과 프로필 구조 불변식. */
+/**
+ * 승인 프로필·Registry view·Manifest 기본 경로로 근거 계획을 조합하는 결정론 규칙(Plan §16.3 R1·R3, SPEC §28.2)과 프로필 구조 불변식.
+ * 각 사례는 정상 입력에 결함 하나만 둔다.
+ */
 class EvidencePlanBuilderTest {
     private final CapabilityRegistry registry=new CapabilityRegistry(new ManifestLoader().loadClasspath("manifests/tc/index.json"),workflows(),Set.of(ImplementationPhase.PHASE_1),new ContractVersionPolicy());
     private final EvidencePlanBuilder builder=new EvidencePlanBuilder(tcProfile());
+    private static final Map<String,String> SERVER_VALUES=Map.of("eqp","EQP_001","from","2026-11-04T00:00Z","to","2026-11-04T01:00Z");
     private WorkflowDefinition workflow(TaskType task){return workflows().stream().filter(w->w.taskType()==task).findFirst().orElseThrow();}
     private RegistryView view(){return registry.view(scope());}
-    private static List<String> providers(EvidencePlan plan,EvidenceNeed need){return plan.requirements().stream().filter(r->r.need()==need).findFirst().orElseThrow().providers().stream().map(EvidenceRequirement.Provider::stepId).toList();}
+    private static List<String> providers(EvidencePlan plan,EvidenceNeed need){return requirement(plan,need).providers().stream().map(EvidenceRequirement.Provider::stepId).toList();}
     private static EvidenceRequirement requirement(EvidencePlan plan,EvidenceNeed need){return plan.requirements().stream().filter(r->r.need()==need).findFirst().orElseThrow();}
+    private static List<String> stepIds(List<EvidencePlan.ProfileStep> steps){return steps.stream().map(step->step.step().stepId()).toList();}
 
-    @Test void incidentStateAndHistoryKeepTheMandatoryDefaultPathAndSelectNoOptionalStep() {
-        var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(S,H),Set.of(),AnswerMode.D);
+    /** 시험용 StepFactory: 프로필 argument 이름을 고정 서버 값으로만 채우고, 값이 없는 이름이 하나라도 있으면 입력 부족이다. */
+    private static EvidencePlanBuilder.StepFactory factory(Map<String,String> values,boolean blocked){
+        return new EvidencePlanBuilder.StepFactory(){
+            @Override public boolean blocked(CapabilityManifest manifest){return blocked;}
+            @Override public Optional<PlanStep> create(String stepId,EvidencePlanProfile.Entry entry,CapabilityManifest manifest,List<String> dependsOn){
+                var args=SchemaContracts.JSON.createObjectNode();
+                for(var input:entry.inputs()){if(!values.containsKey(input.name()))return Optional.empty();args.put(input.name(),values.get(input.name()));}
+                return Optional.of(new PlanStep(stepId,manifest.capabilityId(),dependsOn,List.of(),args));
+            }
+        };
+    }
+    private EvidencePlan plan(TaskType task,RegistryView view,List<EvidenceNeed> needs,Set<EvidenceNeed> added,EvidencePlanBuilder.StepFactory steps){
+        return builder.plan(workflow(task),view,needs,added,AnswerMode.B,steps);
+    }
+
+    @Test void incidentStateAndHistoryKeepTheMandatoryDefaultPathAndAddNoStep() {
+        var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(S,H),Set.of(),AnswerMode.D,factory(SERVER_VALUES,false));
         assertThat(plan.selectedOptionalSteps()).isEmpty();
         assertThat(providers(plan,S)).containsExactly("snapshot");
-        assertThat(providers(plan,H)).containsExactly("commLogs","logs","trace","dlq");
+        assertThat(providers(plan,H)).as("Manifest 필수 단계가 H 제공자").containsExactly("commLogs","logs","trace","dlq");
         assertThat(requirement(plan,H).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason)
-            .containsExactly(tuple("tc.event.getRecent",EvidenceRequirement.UnavailableReason.NOT_IN_WORKFLOW));
+            .as("권한 선언이 없는 최근 이벤트는 Registry view 에 없다").containsExactly(tuple("tc.event.getRecent",EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE));
+        assertThat(plan.addedSteps()).isEmpty();
+        assertThat(plan.supplementSteps()).as("workflow 단계인 선택 항목은 보완 후보가 아니다").isEmpty();
         assertThat(requirement(plan,S).unavailableItems()).containsExactly("Port 목록","진행 LOT");
         assertThat(plan.answerMode()).isEqualTo(AnswerMode.D);
         assertThat(plan.profileVersion()).isEqualTo("tc-evidence-profile-v1");
     }
 
-    @Test void implementationNeedSelectsGitAndPlannedKnowledgeIsReportedInactiveNotFaked() {
-        var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(H,N,I,C),Set.of(H,N,I),AnswerMode.B);
+    @Test void outsideWorkflowRequiredEntriesBecomeFirstRoundStepsAndOptionalOnesWaitForTheSupplementRound() {
+        var plan=plan(TaskType.LIVE_QUERY,view(),List.of(S,H),Set.of(),factory(SERVER_VALUES,false));
+        assertThat(stepIds(plan.addedSteps())).as("LQ Manifest 밖 승인 READ 를 1차 계획에 더한다").containsExactly("tc.history.commLogs","tc.history.logs");
+        assertThat(providers(plan,H)).containsExactly("tc.history.commLogs","tc.history.logs");
+        assertThat(plan.addedSteps().getFirst().step().arguments().toString()).isEqualTo("{\"eqp\":\"EQP_001\",\"from\":\"2026-11-04T00:00Z\",\"to\":\"2026-11-04T01:00Z\"}");
+        assertThat(stepIds(plan.supplementSteps())).as("선택 항목은 근거가 비었을 때만").containsExactly("tc.history.trace","tc.history.dlq");
+        assertThat(providers(plan,S)).containsExactly("snapshot");
+        var normal=plan(TaskType.LIVE_QUERY,view(),List.of(S,N),Set.of(),factory(SERVER_VALUES,false));
+        assertThat(stepIds(normal.addedSteps())).containsExactly("tc.normal.model");
+        assertThat(normal.addedSteps().getFirst().step().arguments().toString()).as("모델 READ 는 승인 argument 가 없다").isEqualTo("{}");
+        assertThat(requirement(normal,N).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason)
+            .as("F3 PLANNED Knowledge 는 실행·성공으로 꾸미지 않는다").containsExactly(tuple("tc.knowledge.search",EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE));
+    }
+
+    @Test void implementationNeedSelectsTheWorkflowGitStepAndComparisonOnlyDependsOnBothSides() {
+        var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(H,N,I,C),Set.of(H,N,I),AnswerMode.B,factory(SERVER_VALUES,false));
         assertThat(plan.selectedOptionalSteps()).containsExactly("git");
-        assertThat(providers(plan,N)).as("F3 PLANNED Knowledge 는 제공자가 아니다").isEmpty();
-        assertThat(requirement(plan,N).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason)
-            .containsExactly(tuple("tc.knowledge.search",EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE),tuple("tc.model.read",EvidenceRequirement.UnavailableReason.NOT_IN_WORKFLOW));
+        assertThat(providers(plan,I)).containsExactly("git");
+        assertThat(providers(plan,N)).containsExactly("tc.normal.model");
         assertThat(requirement(plan,C).providers()).isEmpty();
         assertThat(requirement(plan,C).dependsOn()).containsExactly(N,I,S,H);
         assertThat(requirement(plan,H).serverAdded()).isTrue();
         assertThat(requirement(plan,C).serverAdded()).isFalse();
     }
 
+    @Test void inactiveCapabilityMissingInputOptionBlockAndUnboundStepFieldNeverBecomeSteps() {
+        var withoutModelPermission=registry.view(scope(OwnerSystem.TC,Set.of("EQP_READ")));
+        var inactive=plan(TaskType.LIVE_QUERY,withoutModelPermission,List.of(S,N),Set.of(),factory(SERVER_VALUES,false));
+        assertThat(inactive.addedSteps()).as("Registry 비활성 → 단계 0").isEmpty();
+        assertThat(requirement(inactive,N).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).containsOnly(EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE);
+        var noWindow=plan(TaskType.LIVE_QUERY,view(),List.of(S,H),Set.of(),factory(Map.of("eqp","EQP_001"),false));
+        assertThat(noWindow.addedSteps()).as("결속할 시간창이 없으면 단계 0").isEmpty();
+        assertThat(noWindow.supplementSteps()).isEmpty();
+        assertThat(requirement(noWindow,H).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason).contains(
+            tuple("tc.commLogs.search",EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE),tuple("tc.logs.search",EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE));
+        var blocked=plan(TaskType.LIVE_QUERY,view(),List.of(S,H),Set.of(),factory(SERVER_VALUES,true));
+        assertThat(blocked.addedSteps()).isEmpty();
+        assertThat(requirement(blocked,H).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).contains(EvidenceRequirement.UnavailableReason.OPTION_BLOCKED);
+        var git=plan(TaskType.LIVE_QUERY,view(),List.of(S,I),Set.of(),factory(SERVER_VALUES,false));
+        assertThat(git.addedSteps()).as("선행 근거 결과 필드를 받는 workflow 밖 항목은 바인딩 단계가 없어 입력 부족").isEmpty();
+        assertThat(requirement(git,I).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).containsExactly(EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE);
+        var evaluator=new EvidenceCoverageEvaluator();var empty=new WorkflowOutcome(List.of(),List.of(),List.of(),new com.nori.ai.gateway.core.result.ResultSourceDeps(List.of(),List.of()),List.of(),List.of(),Optional.empty());
+        assertThat(evaluator.evaluate(inactive,empty)).filteredOn(c->c.need()==N).extracting(EvidenceCoverage::status).containsExactly(EvidenceCoverage.Status.UNSUPPORTED);
+        assertThat(evaluator.evaluate(noWindow,empty)).filteredOn(c->c.need()==H).extracting(EvidenceCoverage::status).as("입력 부족은 미실행").containsExactly(EvidenceCoverage.Status.NOT_EXECUTED);
+    }
+
+    @Test void mutationCapabilitiesAreRejectedAndOtherOwnerEntriesAreNeverPlanned() {
+        var model=registry.find("tc.model.read").orElseThrow();
+        var writable=new RegistryView(OwnerSystem.TC,List.of(modify(model,"sideEffects","SYSTEM_WRITE")));
+        assertThatThrownBy(()->plan(TaskType.LIVE_QUERY,writable,List.of(N),Set.of(),factory(SERVER_VALUES,false))).isInstanceOf(IllegalStateException.class);
+        var foreign=new EvidencePlanBuilder(new EvidencePlanProfile(OwnerSystem.TC,"v",List.of(entry("x",N,"wm.inventory.get",true,List.of(),List.of(),List.of(),List.of()))));
+        var plan=foreign.plan(workflow(TaskType.LIVE_QUERY),view(),List.of(N),Set.of(),AnswerMode.B,factory(SERVER_VALUES,false));
+        assertThat(plan.addedSteps()).isEmpty();
+        assertThat(requirement(plan,N).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).containsExactly(EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE);
+    }
+
     @Test void theSameInputAlwaysYieldsTheSamePlanAndGeneralQueryHasNoRequirement() {
-        var first=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(S,H,I),Set.of(),AnswerMode.B);
-        for(int i=0;i<3;i++)assertThat(builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(S,H,I),Set.of(),AnswerMode.B)).isEqualTo(first);
-        assertThat(builder.plan(workflow(TaskType.GENERAL_QUERY),view(),List.of(),Set.of(),AnswerMode.B).requirements()).isEmpty();
+        var first=plan(TaskType.LIVE_QUERY,view(),List.of(S,H,N),Set.of(),factory(SERVER_VALUES,false));
+        for(int i=0;i<3;i++)assertThat(plan(TaskType.LIVE_QUERY,view(),List.of(S,H,N),Set.of(),factory(SERVER_VALUES,false))).isEqualTo(first);
+        assertThat(plan(TaskType.GENERAL_QUERY,view(),List.of(),Set.of(),factory(SERVER_VALUES,false)).requirements()).isEmpty();
     }
 
     @Test void otherOwnerViewsAndUnboundServerCodesAreRejected() {
         var wm=new RegistryView(OwnerSystem.WM,List.of());
-        assertThatThrownBy(()->builder.plan(workflow(TaskType.LIVE_QUERY),wm,List.of(S),Set.of(),AnswerMode.B)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(()->builder.plan(workflow(TaskType.LIVE_QUERY),view(),List.of(S),Set.of(H),AnswerMode.B)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->plan(TaskType.LIVE_QUERY,wm,List.of(S),Set.of(),factory(SERVER_VALUES,false))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->plan(TaskType.LIVE_QUERY,view(),List.of(S),Set.of(H),factory(SERVER_VALUES,false))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test void profileStructureRejectsDuplicatesCyclesDirectComparisonAndUndeclaredBindingSources() {
@@ -69,7 +137,7 @@ class EvidencePlanBuilderTest {
         assertThatThrownBy(()->new EvidencePlanProfile(OwnerSystem.TC,"v",List.of())).isInstanceOf(IllegalArgumentException.class);
     }
 
-    private JobContext job(TaskType task,Map<String,Object> classification){
+    private JobContext job(Map<String,Object> classification){
         return new JobContext("request","conversation",scope(),"delegation",NOW.plusSeconds(1000),new CancellationToken(),InferenceMode.ENABLED,classification,
             new JobRequestInput("message",1,"질문",Map.of("resourceRefs",List.of(Map.of("type","EQP","ref","EQP_001")))));
     }
@@ -80,18 +148,33 @@ class EvidencePlanBuilderTest {
     @Test void workflowPlanBuilderUsesOnlyTheServerBoundNeedsAndKeepsTheLegacyPathWithoutThem() {
         var planner=new WorkflowPlanBuilder(registry,builder);
         var window=Map.<String,Object>of("from","2026-11-04T00:00Z","to","2026-11-04T01:00Z");
-        var withoutI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(TaskType.INCIDENT_ANALYSIS,v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H"),List.of(),"B")),window);
+        var withoutI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H"),List.of(),"B")),window);
         assertThat(withoutI.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","dlq","summary");
         assertThat(withoutI.evidence()).isPresent();
-        var withI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(TaskType.INCIDENT_ANALYSIS,v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H","I"),List.of(),"B")),window);
+        var withI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H","I"),List.of(),"B")),window);
         assertThat(withI.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","dlq","summary","git");
-        var legacy=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(TaskType.INCIDENT_ANALYSIS,Map.of("taskType","INCIDENT_ANALYSIS")),window);
+        var legacy=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(Map.of("taskType","INCIDENT_ANALYSIS")),window);
         assertThat(legacy.evidence()).isEmpty();
         assertThat(legacy.steps()).extracting(step->step.definition().stepId()).contains("git");
         var withoutProfile=new WorkflowPlanBuilder(registry);
-        assertThatThrownBy(()->withoutProfile.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(TaskType.INCIDENT_ANALYSIS,v3(TaskType.INCIDENT_ANALYSIS,List.of("H"),List.of(),"B")),window))
+        assertThatThrownBy(()->withoutProfile.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("H"),List.of(),"B")),window))
             .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(()->planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(TaskType.INCIDENT_ANALYSIS,Map.of("taskType","INCIDENT_ANALYSIS","evidenceNeeds",List.of("H","H"),"serverAddedNeeds",List.of(),"answerMode","B")),window))
+        assertThatThrownBy(()->planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(Map.of("taskType","INCIDENT_ANALYSIS","evidenceNeeds",List.of("H","H"),"serverAddedNeeds",List.of(),"answerMode","B")),window))
             .as("결속 형식 위반").isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void workflowPlanBuilderAppendsProfileStepsToTheSameValidatedPlanWithServerBoundArguments() {
+        var planner=new WorkflowPlanBuilder(registry,builder);
+        var window=Map.<String,Object>of("from","2026-11-04T00:00Z","to","2026-11-04T01:00Z");
+        var live=planner.build(workflow(TaskType.LIVE_QUERY),view(),job(v3(TaskType.LIVE_QUERY,List.of("S","H","N"),List.of(),"B")),window);
+        assertThat(live.steps()).extracting(step->step.definition().stepId()).as("Manifest 기본 경로 뒤에 1차 프로필 단계").containsExactly("snapshot","tc.history.commLogs","tc.history.logs","tc.normal.model");
+        assertThat(live.toolPlan().plan()).extracting(PlanStep::capabilityId).containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search","tc.logs.search","tc.model.read");
+        var logs=live.toolPlan().plan().get(2);
+        assertThat(logs.arguments().toString()).isEqualTo("{\"eqp\":\"EQP_001\",\"from\":\"2026-11-04T00:00Z\",\"to\":\"2026-11-04T01:00Z\"}");
+        assertThat(logs.resources()).containsExactly(new ResourceRef("EQP","EQP_001"));
+        assertThat(live.toolPlan().plan().get(3).resources()).as("모델 READ 는 EQP 리소스를 받지 않는다").isEmpty();
+        assertThat(live.evidence().orElseThrow().supplementSteps()).extracting(step->step.step().capabilityId()).containsExactly("tc.trace.search","tc.dlq.list");
+        var noWindow=planner.build(workflow(TaskType.LIVE_QUERY),view(),job(v3(TaskType.LIVE_QUERY,List.of("S","H"),List.of(),"B")),Map.of());
+        assertThat(noWindow.steps()).extracting(step->step.definition().stepId()).as("시간창 없음 → 입력 부족, 단계 0").containsExactly("snapshot");
     }
 }

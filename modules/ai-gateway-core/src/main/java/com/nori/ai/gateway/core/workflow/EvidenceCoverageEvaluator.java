@@ -3,17 +3,19 @@ package com.nori.ai.gateway.core.workflow;
 import com.nori.ai.gateway.core.result.ResultStatus;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * 실행 결과로 요구 근거별 Coverage 를 만들고(SPEC §28.8), 근거 보완 round 후보를 판단한다(§28.8 추가 조회 ①~③, Plan §16.3 R3).
  * Coverage 는 서버 단계 결과만으로 정하며 LLM 판단·관측값 생성은 없다. C 는 승인 비교 조건이 없으면 판정하지 않는다.
  */
 public final class EvidenceCoverageEvaluator {
+    private static final Set<EvidenceCoverage.Status> SUPPLEMENTABLE = EnumSet.of(EvidenceCoverage.Status.NO_DATA, EvidenceCoverage.Status.NOT_EXECUTED, EvidenceCoverage.Status.UNSUPPORTED);
     private static final Set<ResultStatus> OBSERVED = Set.of(ResultStatus.SUCCESS, ResultStatus.EMPTY, ResultStatus.PARTIAL, ResultStatus.STALE, ResultStatus.CONFLICT);
 
     public List<EvidenceCoverage> evaluate(EvidencePlan plan, WorkflowOutcome outcome) {
@@ -38,7 +40,8 @@ public final class EvidenceCoverageEvaluator {
                 if (!stage.stepId().equals(provider.stepId())) continue;
                 var status = stage.result().status();
                 if (stage.observed() && OBSERVED.contains(status)) {
-                    if (stage.count() > 0) sources.add(new EvidenceCoverage.Source(stage.stepId(), provider.capabilityId(), stage.result().observedAt(), stage.count()));
+                    // EMPTY 는 행 수와 무관하게 자료 없음이다(출처별 행을 돌려주는 통신 로그처럼 빈 관측도 행을 가질 수 있음).
+                    if (status != ResultStatus.EMPTY && stage.count() > 0) sources.add(new EvidenceCoverage.Source(stage.stepId(), provider.capabilityId(), stage.result().observedAt(), stage.count()));
                     else observedEmpty = true;
                 }
                 else if (status == ResultStatus.DENIED) denied = true;
@@ -49,7 +52,8 @@ public final class EvidenceCoverageEvaluator {
         EvidenceCoverage.Status status;
         if (!sources.isEmpty()) status = EvidenceCoverage.Status.COLLECTED;
         else if (observedEmpty) status = EvidenceCoverage.Status.NO_DATA;
-        else if (requirement.providers().isEmpty()) status = EvidenceCoverage.Status.UNSUPPORTED;
+        else if (requirement.providers().isEmpty()) status = requirement.unavailable().stream().allMatch(value -> value.reason() == EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE)
+            ? EvidenceCoverage.Status.UNSUPPORTED : EvidenceCoverage.Status.NOT_EXECUTED;
         else if (denied) status = EvidenceCoverage.Status.DENIED;
         else if (unavailable) status = EvidenceCoverage.Status.SOURCE_UNAVAILABLE;
         else if (retention) status = EvidenceCoverage.Status.OUT_OF_RETENTION;
@@ -71,19 +75,18 @@ public final class EvidenceCoverageEvaluator {
     }
 
     /**
-     * 근거 보완 round 후보(SPEC §28.8 ①): 요구 근거가 비었고(NO_DATA·NOT_EXECUTED) 승인 프로필의 같은 근거 항목 중 활성·미실행이며 입력이 모두 준비된 READ 만.
-     * 실패·인가 거부·보존 부족은 재검색으로 숨기지 않으므로 후보가 아니다. round 한도(1)와 호출 한도는 {@link ToolCallBudget} 가 함께 막는다.
-     * 반환 목록이 비면 보완 round 를 만들지 않는다.
+     * 근거 보완 round 후보(SPEC §28.8 ①): 요구 근거가 비었고(NO_DATA·NOT_EXECUTED·UNSUPPORTED) 근거 계획이 미리 준비한 승인 보완 후보(Registry 활성·READ·입력 결속 완료) 중
+     * 아직 계획되지 않은 Capability 만. 같은 실행 입력의 동일 조회를 반복하지 않는다. 실패·인가 거부·보존 부족은 재검색으로 숨기지 않으므로 후보가 아니다.
+     * round 한도(1)는 {@link ToolCallBudget} 로 세며, 후보가 없으면 round 를 쓰지 않는다. 호출 한도는 실제 dispatcher 직전에 같은 budget 으로 검사한다.
      */
-    public List<EvidencePlanProfile.Entry> supplement(EvidencePlanProfile profile, List<EvidenceCoverage> coverage, Predicate<String> activeCapability,
-            Set<String> executedCapabilities, Predicate<EvidencePlanProfile.Entry> inputsReady, ToolCallBudget budget) {
-        List<EvidencePlanProfile.Entry> candidates = new ArrayList<>();
-        for (EvidenceCoverage value : coverage) {
-            if (value.status() != EvidenceCoverage.Status.NO_DATA && value.status() != EvidenceCoverage.Status.NOT_EXECUTED) continue;
-            for (var entry : profile.entriesFor(value.need()))
-                if (activeCapability.test(entry.capabilityId()) && !executedCapabilities.contains(entry.capabilityId()) && inputsReady.test(entry) && !candidates.contains(entry))
-                    candidates.add(entry);
-        }
+    public List<EvidencePlan.ProfileStep> supplement(EvidencePlan plan, List<EvidenceCoverage> coverage, Set<String> plannedCapabilities, ToolCallBudget budget) {
+        Objects.requireNonNull(plan); Objects.requireNonNull(coverage); Objects.requireNonNull(plannedCapabilities); Objects.requireNonNull(budget);
+        Set<EvidenceNeed> empty = EnumSet.noneOf(EvidenceNeed.class);
+        for (EvidenceCoverage value : coverage) if (SUPPLEMENTABLE.contains(value.status())) empty.add(value.need());
+        List<EvidencePlan.ProfileStep> candidates = new ArrayList<>();
+        Set<String> chosen = new HashSet<>();
+        for (var step : plan.supplementSteps())
+            if (empty.contains(step.need()) && !plannedCapabilities.contains(step.step().capabilityId()) && chosen.add(step.step().capabilityId())) candidates.add(step);
         if (candidates.isEmpty() || !budget.tryStartSupplementRound()) return List.of();
         return List.copyOf(candidates);
     }
