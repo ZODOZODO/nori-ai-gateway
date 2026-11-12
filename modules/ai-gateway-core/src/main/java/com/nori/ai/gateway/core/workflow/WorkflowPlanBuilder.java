@@ -37,13 +37,13 @@ public final class WorkflowPlanBuilder {
         checkOptions(definition,job);
         var resources=resources(job);
         var evidencePlan=evidencePlan(definition,view,job,resources,resolvedWindow);
-        Map<String,WorkflowDefinition.Step> byId=new LinkedHashMap<>();definition.steps().forEach(step->byId.put(step.stepId(),step));
+        var base=evidencePlan.map(plan->withoutDeselectedMandatorySteps(definition,plan)).orElse(definition);
+        Map<String,WorkflowDefinition.Step> byId=new LinkedHashMap<>();base.steps().forEach(step->byId.put(step.stepId(),step));
         List<WorkflowExecutionPlan.ExecutionStep> steps=new ArrayList<>();List<PlanStep> tools=new ArrayList<>();Set<String> selected=new LinkedHashSet<>();
-        for(var step:definition.steps()) {
+        for(var step:base.steps()) {
             if(step.capabilityId()==null){steps.add(new WorkflowExecutionPlan.ExecutionStep(step,null));selected.add(step.stepId());continue;}
             var manifest=registry.find(step.capabilityId()).orElseThrow();
-            // 분류 wire v3 Job 은 승인 프로필이 고른 선택 단계만 실행한다(필수 단계는 기본 경로로 유지, SPEC §28.2).
-            if(step.optional()&&(blocked(step,job)||view.find(step.capabilityId()).isEmpty()||evidencePlan.isPresent()&&!evidencePlan.get().selectedOptionalSteps().contains(step.stepId())))continue;
+            if(step.optional()&&(blocked(step,job)||view.find(step.capabilityId()).isEmpty()||evidencePlan.isPresent()&&evidencePlan.get().deselected(step.stepId())))continue;
             if(step.cacheable()&&(manifest.toolKind()==ToolKind.BUSINESS||manifest.toolKind()==ToolKind.KNOWLEDGE))throw new IllegalArgumentException("캐시 실행 정책이 다릅니다");
             var args=SchemaContracts.JSON.createObjectNode();var props=manifest.inputSchema().get("properties");
             for(var property:props.properties()) {
@@ -60,9 +60,9 @@ public final class WorkflowPlanBuilder {
             tools.add(tool);steps.add(new WorkflowExecutionPlan.ExecutionStep(step,tool));selected.add(step.stepId());
         }
         // 승인 프로필의 workflow 밖 1차 단계는 Manifest 기본 경로 뒤에 같은 계획의 필수 단계로 붙인다(선행 근거는 앞 단계만 가리킨다).
-        var effective=definition;
+        var effective=base;
         if(evidencePlan.isPresent()&&!evidencePlan.get().addedSteps().isEmpty()) {
-            List<WorkflowDefinition.Step> all=new ArrayList<>(definition.steps());
+            List<WorkflowDefinition.Step> all=new ArrayList<>(base.steps());
             for(var added:evidencePlan.get().addedSteps()) {
                 var tool=added.step();var step=new WorkflowDefinition.Step(tool.stepId(),tool.capabilityId(),null,tool.dependsOn(),false,List.of(),false);
                 all.add(step);tools.add(tool);steps.add(new WorkflowExecutionPlan.ExecutionStep(step,tool));
@@ -71,8 +71,24 @@ public final class WorkflowPlanBuilder {
         }
         // 실행 Tool이 없는 도움말은 선택 입력을 보존하되 업무 리소스 조회를 만들지 않습니다.
         var targets=tools.isEmpty()?List.<ResourceRef>of():resources;
+        // 분류 wire v3 계획은 프로필이 단계를 고르므로 남은 단계가 받지 않는 리소스 종류(예: 모델 READ 만 남은 KQ 의 EQP)는 계획 대상에서 뺀다(PlanValidator ⑧ 이 거절하지 않게).
+        if(evidencePlan.isPresent()){Set<String> accepted=new HashSet<>();tools.forEach(tool->accepted.addAll(registry.find(tool.capabilityId()).orElseThrow().resourceTypes()));targets=targets.stream().filter(ref->accepted.contains(ref.type())).toList();}
         var envelope=new PlanEnvelope(job.jobId(),job.conversationId(),job.requestInput().maskedQuestion(),targets,definition.taskType(),tools);
         return new WorkflowExecutionPlan(effective,envelope,steps,evidencePlan);
+    }
+    /**
+     * 분류 wire v3 계획의 Manifest: 프로필에 매핑됐지만 고르지 않은 필수 단계를 빼고, 그 단계를 가리키던 선행 관계는 그 단계의 선행으로 잇는다(SPEC §28.2, Plan §16.3 R3 —
+     * Manifest 는 기본 경로·필수 의존성 자료). 선택 단계는 남겨 생략 trace 를 그대로 남기고, 프로필에 매핑되지 않은 필수 단계·처리 단계는 그대로다. F1 경로는 이 변환을 쓰지 않는다.
+     */
+    private static WorkflowDefinition withoutDeselectedMandatorySteps(WorkflowDefinition definition,EvidencePlan plan) {
+        Map<String,List<String>> replaced=new HashMap<>();List<WorkflowDefinition.Step> kept=new ArrayList<>();
+        for(var step:definition.steps()) {
+            LinkedHashSet<String> dependsOn=new LinkedHashSet<>();
+            for(String dependency:step.dependsOn())dependsOn.addAll(replaced.getOrDefault(dependency,List.of(dependency)));
+            if(!step.optional()&&plan.deselected(step.stepId())){replaced.put(step.stepId(),List.copyOf(dependsOn));continue;}
+            kept.add(new WorkflowDefinition.Step(step.stepId(),step.capabilityId(),step.processor(),List.copyOf(dependsOn),step.optional(),step.includeWhen(),step.cacheable()));
+        }
+        return new WorkflowDefinition(definition.ownerSystem(),definition.taskType(),kept,definition.answerSource(),definition.defaultWindowLength());
     }
     /** 서버가 Job 에 결속한 분류 wire v3 근거 요구로만 계획한다. 요청 Context·클라이언트 값은 읽지 않는다. */
     private Optional<EvidencePlan> evidencePlan(WorkflowDefinition definition,RegistryView view,JobContext job,List<ResourceRef> resources,Map<String,Object> resolvedWindow) {

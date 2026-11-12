@@ -38,6 +38,7 @@ final class EvidenceFixtures {
             entry("tc.normal.knowledge", EvidenceNeed.N, "tc.knowledge.search", true, List.of("eqp"), List.of(), List.of("정상 절차·선행 조건 문서"), List.of()),
             entry("tc.normal.model", EvidenceNeed.N, "tc.model.read", true, List.of(), List.of(), List.of("적용 모델 정의"), List.of()),
             entry("tc.impl.git", EvidenceNeed.I, "tc.git.searchCode", true, List.of(), List.of("tc.history.logs"), List.of("당시 구현 코드"), List.of("당시 배포·설정 버전")),
+            entry("tc.impl.deployTrace", EvidenceNeed.I, "tc.trace.search", true, WINDOW, List.of(), List.of("당시 배포 서비스 버전"), List.of()),
             entry("tc.action.knowledge", EvidenceNeed.R, "tc.knowledge.search", true, List.of("eqp"), List.of(), List.of("확인·조치 절차 문서"), List.of())));
     }
 

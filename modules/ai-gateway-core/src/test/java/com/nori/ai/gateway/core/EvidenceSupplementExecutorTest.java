@@ -62,11 +62,12 @@ class EvidenceSupplementExecutorTest {
         return new WorkflowExecutor(registry,validator,dispatcher,authorization,expiry,CLOCK,cache,new BlockBuilder(new UiSchemaValidator()),new WorkflowExecutorTest.Recording(new ArrayList<>()),
             new LogSummarizer(),new GeneralQueryHelpBuilder(),new EvidenceCoverageEvaluator(),budgets);
     }
-    private WorkflowExecutionPlan plan(List<String> needs) {
+    private WorkflowExecutionPlan plan(List<String> needs) { return plan(TaskType.LIVE_QUERY,needs); }
+    private WorkflowExecutionPlan plan(TaskType task,List<String> needs) {
         var fields=Map.<String,Object>of("context",Map.of("timezone","UTC","referenceTime",NOW.toString(),"timeWindow",Map.of("from",NOW.minusSeconds(60).toString(),"to",NOW.toString())),"resourceRefs",List.of(Map.of("type","EQP","ref","EQP_001")));
-        var classification=Map.<String,Object>of("taskType","LIVE_QUERY","evidenceNeeds",needs,"serverAddedNeeds",List.of(),"answerMode","B","wireVersion","classify-wire-v3");
+        var classification=Map.<String,Object>of("taskType",task.name(),"evidenceNeeds",needs,"serverAddedNeeds",List.of(),"answerMode","B","wireVersion","classify-wire-v3");
         job=job(classification,fields);
-        return new WorkflowPlanBuilder(registry,new EvidencePlanBuilder(EvidenceFixtures.tcProfile())).build(registry.workflow(scope,TaskType.LIVE_QUERY).orElseThrow(),registry.view(scope),job);
+        return new WorkflowPlanBuilder(registry,new EvidencePlanBuilder(EvidenceFixtures.tcProfile())).build(registry.workflow(scope,task).orElseThrow(),registry.view(scope),job);
     }
     private JobContext job(Map<String,Object> classification,Map<String,Object> fields){
         return new JobContext("request","conversation",scope,"d".repeat(22),NOW.plusSeconds(600),new CancellationToken(),InferenceMode.ENABLED,classification,new JobRequestInput("message",1,"질문",fields));
@@ -105,5 +106,15 @@ class EvidenceSupplementExecutorTest {
         dispatched.clear();
         run(executor(()->new ToolCallBudget(12,3,2,0)),plan(List.of("S","H")));
         assertThat(dispatched).as("보완 round 한도 0").containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search","tc.logs.search");
+    }
+
+    @Test void incidentTraceAndDlqAreProfileChoicesNotManifestMandatesInTheBoundNeedsPath() {
+        logRows=2;
+        run(executor(ToolCallBudget::new),plan(TaskType.INCIDENT_ANALYSIS,List.of("S","H")));
+        assertThat(dispatched).as("v3 INC, H 수집됨 → Trace·DLQ 0").containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search","tc.logs.search");
+        dispatched.clear();logRows=0;
+        var empty=run(executor(ToolCallBudget::new),plan(TaskType.INCIDENT_ANALYSIS,List.of("S","H")));
+        assertThat(dispatched).as("v3 INC, 1차 H 가 비면 보완 round 로 Trace·DLQ 각 1회").containsExactly("tc.eqp.getOperationalSnapshot","tc.commLogs.search","tc.logs.search","tc.trace.search","tc.dlq.list");
+        assertThat(empty.stages()).extracting(WorkflowOutcome.Stage::stepId).containsExactly("snapshot","commLogs","logs","tc.history.trace","tc.history.dlq");
     }
 }

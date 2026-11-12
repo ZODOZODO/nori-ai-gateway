@@ -193,6 +193,31 @@
       ]
     },
     {
+      "id": "tc.impl.deployTrace",
+      "need": "I",
+      "capabilityId": "tc.trace.search",
+      "required": true,
+      "inputs": [
+        {
+          "name": "eqp",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "from",
+          "source": "ARGUMENT"
+        },
+        {
+          "name": "to",
+          "source": "ARGUMENT"
+        }
+      ],
+      "dependsOn": [],
+      "reportItems": [
+        "당시 배포 서비스 버전"
+      ],
+      "unavailableItems": []
+    },
+    {
       "id": "tc.action.knowledge",
       "need": "R",
       "capabilityId": "tc.knowledge.search",

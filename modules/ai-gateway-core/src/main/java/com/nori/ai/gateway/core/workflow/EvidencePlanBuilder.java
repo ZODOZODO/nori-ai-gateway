@@ -6,7 +6,9 @@ import com.nori.ai.gateway.core.registry.RegistryView;
 import com.nori.ai.gateway.core.registry.SideEffects;
 import com.nori.ai.gateway.core.registry.WorkflowDefinition;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +20,8 @@ import java.util.Set;
  * 결속된 근거 요구를 승인 프로필·Registry view·기존 workflow 로 조합한다(SPEC §28.2 "실행 단계는 서버가 승인한 시스템별 근거 프로필과 Registry로 선택",
  * Plan §16.3 R1·R3). taskType Manifest 는 기본 경로·필수 의존성의 자료이고 선택 단계의 상한이 아니다.
  * <ul>
- * <li>Manifest 의 필수 단계는 그대로 유지한다. 프로필 항목의 Capability 가 workflow 단계면 그 단계를 제공자로 쓰고, 선택 단계면 실행 대상으로 고른다.</li>
+ * <li>Capability 가 프로필 항목에 있는 Manifest 단계는 필수 여부와 무관하게 프로필이 실행을 정한다(SPEC §28.2 "모든 INC에서 Trace·DLQ·Git을 무조건 조회하지 않는다"):
+ *     결속 근거의 필수 항목이면 1차에 실행하고, 선택 항목이면 보완 후보이며, 결속되지 않았으면 실행하지 않는다. 프로필에 매핑되지 않은 Manifest 필수 단계(처리 단계 포함)는 그대로 필수다.</li>
  * <li>workflow 밖 항목은 Registry view 활성·READ·승인 argument 결속·선행 근거가 모두 갖춰질 때만 단계로 만든다. 프로필 {@code required}=true 는 1차 계획,
  *     false 는 근거가 비었을 때만 쓰는 보완 round 후보다. 선행 근거 결과 필드를 입력으로 받는 workflow 밖 항목은 그 바인딩을 만드는 workflow 단계가 없으므로 입력 부족이다.</li>
  * <li>실행할 수 없는 항목은 단계를 만들지 않고 사유(비활성·입력 부족·옵션 차단)로 남긴다. LLM 출력은 도구를 고르지 않는다.</li>
@@ -42,49 +45,66 @@ public final class EvidencePlanBuilder {
         Objects.requireNonNull(definition); Objects.requireNonNull(view); Objects.requireNonNull(answerMode); Objects.requireNonNull(steps);
         if (definition.ownerSystem() != profile.ownerSystem() || view.ownerSystem() != profile.ownerSystem()) throw new IllegalArgumentException("근거 프로필 소유 범위가 다릅니다");
         if (!needs.containsAll(serverAdded)) throw new IllegalArgumentException("서버 보완 코드가 요구 근거에 없습니다");
-        List<EvidenceRequirement> requirements = new ArrayList<>();
+        Set<String> profileCapabilities = new HashSet<>();
+        profile.entries().forEach(entry -> profileCapabilities.add(entry.capabilityId()));
+        Set<String> mapped = new LinkedHashSet<>();
+        for (var step : definition.steps()) if (step.capabilityId() != null && profileCapabilities.contains(step.capabilityId())) mapped.add(step.stepId());
+        Map<EvidenceNeed,List<EvidenceRequirement.Provider>> providers = new EnumMap<>(EvidenceNeed.class);
+        Map<EvidenceNeed,List<EvidenceRequirement.Unavailable>> unavailable = new EnumMap<>(EvidenceNeed.class);
+        Map<EvidenceNeed,List<EvidencePlanProfile.Entry>> optional = new EnumMap<>(EvidenceNeed.class);
         Set<String> selected = new LinkedHashSet<>();
         Map<String,String> plannedByCapability = new HashMap<>(), stepByEntry = new HashMap<>();
         List<EvidencePlan.ProfileStep> added = new ArrayList<>(), supplement = new ArrayList<>();
+        for (EvidenceNeed need : needs) {
+            if (need == EvidenceNeed.C) continue;
+            var needProviders = providers.computeIfAbsent(need, ignored -> new ArrayList<>());
+            var needUnavailable = unavailable.computeIfAbsent(need, ignored -> new ArrayList<>());
+            for (var entry : profile.entriesFor(need)) {
+                var manifest = view.find(entry.capabilityId());
+                if (manifest.isEmpty()) { needUnavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE)); continue; }
+                requireRead(manifest.get());
+                String planned = plannedByCapability.get(entry.capabilityId());
+                if (planned != null) { needProviders.add(new EvidenceRequirement.Provider(entry.id(), planned, entry.capabilityId())); stepByEntry.put(entry.id(), planned); continue; }
+                var workflowStep = definition.steps().stream().filter(value -> entry.capabilityId().equals(value.capabilityId())).findFirst();
+                if (entry.required() && workflowStep.isPresent()) {
+                    String stepId = workflowStep.get().stepId();
+                    needProviders.add(new EvidenceRequirement.Provider(entry.id(), stepId, entry.capabilityId()));
+                    selected.add(stepId); plannedByCapability.put(entry.capabilityId(), stepId); stepByEntry.put(entry.id(), stepId);
+                    continue;
+                }
+                if (!entry.required()) optional.computeIfAbsent(need, ignored -> new ArrayList<>()).add(entry);
+                if (steps.blocked(manifest.get())) { needUnavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.OPTION_BLOCKED)); continue; }
+                var step = predecessors(entry, stepByEntry).flatMap(dependsOn -> steps.create(entry.id(), entry, manifest.get(), dependsOn));
+                if (step.isEmpty()) { needUnavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE)); continue; }
+                var profileStep = new EvidencePlan.ProfileStep(need, entry.id(), step.get());
+                if (entry.required()) {
+                    added.add(profileStep); needProviders.add(profileStep.provider());
+                    plannedByCapability.put(entry.capabilityId(), entry.id()); stepByEntry.put(entry.id(), entry.id());
+                } else supplement.add(profileStep);
+            }
+        }
+        // 다른 근거의 필수 항목으로 이미 계획된 Capability 는 선택 항목의 근거에도 제공자로 센다(같은 조회를 두 번 만들지 않는다).
+        optional.forEach((need, entries) -> {
+            for (var entry : entries) {
+                String planned = plannedByCapability.get(entry.capabilityId());
+                if (planned != null) providers.get(need).add(new EvidenceRequirement.Provider(entry.id(), planned, entry.capabilityId()));
+            }
+        });
+        List<EvidenceRequirement> requirements = new ArrayList<>();
         for (EvidenceNeed need : needs) {
             if (need == EvidenceNeed.C) {
                 requirements.add(new EvidenceRequirement(need, serverAdded.contains(need), List.of(), List.of(), List.of(EvidenceNeed.N, EvidenceNeed.I, EvidenceNeed.S, EvidenceNeed.H), List.of(), List.of()));
                 continue;
             }
-            List<EvidenceRequirement.Provider> providers = new ArrayList<>();
-            List<EvidenceRequirement.Unavailable> unavailable = new ArrayList<>();
             List<String> report = new ArrayList<>(), missing = new ArrayList<>();
-            for (var entry : profile.entriesFor(need)) {
-                report.addAll(entry.reportItems()); missing.addAll(entry.unavailableItems());
-                var manifest = view.find(entry.capabilityId());
-                if (manifest.isEmpty()) { unavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE)); continue; }
-                requireRead(manifest.get());
-                var workflowStep = definition.steps().stream().filter(value -> entry.capabilityId().equals(value.capabilityId())).findFirst();
-                if (workflowStep.isPresent()) {
-                    providers.add(new EvidenceRequirement.Provider(entry.id(), workflowStep.get().stepId(), entry.capabilityId()));
-                    if (workflowStep.get().optional()) selected.add(workflowStep.get().stepId());
-                    stepByEntry.put(entry.id(), workflowStep.get().stepId());
-                    continue;
-                }
-                String planned = plannedByCapability.get(entry.capabilityId());
-                if (planned != null) { providers.add(new EvidenceRequirement.Provider(entry.id(), planned, entry.capabilityId())); stepByEntry.put(entry.id(), planned); continue; }
-                if (steps.blocked(manifest.get())) { unavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.OPTION_BLOCKED)); continue; }
-                var step = predecessors(entry, stepByEntry).flatMap(dependsOn -> steps.create(entry.id(), entry, manifest.get(), dependsOn));
-                if (step.isEmpty()) { unavailable.add(unavailable(entry, EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE)); continue; }
-                var profileStep = new EvidencePlan.ProfileStep(need, entry.id(), step.get());
-                if (entry.required()) {
-                    added.add(profileStep); providers.add(profileStep.provider());
-                    plannedByCapability.put(entry.capabilityId(), entry.id()); stepByEntry.put(entry.id(), entry.id());
-                } else supplement.add(profileStep);
-            }
-            requirements.add(new EvidenceRequirement(need, serverAdded.contains(need), providers, unavailable, List.of(), distinct(report), distinct(missing)));
+            for (var entry : profile.entriesFor(need)) { report.addAll(entry.reportItems()); missing.addAll(entry.unavailableItems()); }
+            requirements.add(new EvidenceRequirement(need, serverAdded.contains(need), providers.get(need), unavailable.get(need), List.of(), distinct(report), distinct(missing)));
         }
-        // 같은 조회를 두 번 만들지 않는다: 1차에 계획된 Capability 와 이미 고른 후보는 보완 후보에서 뺀다.
         Set<String> candidates = new LinkedHashSet<>();
         List<EvidencePlan.ProfileStep> distinctSupplement = new ArrayList<>();
         for (var step : supplement)
             if (!plannedByCapability.containsKey(step.step().capabilityId()) && candidates.add(step.step().capabilityId())) distinctSupplement.add(step);
-        return new EvidencePlan(profile.version(), answerMode, requirements, selected, added, distinctSupplement);
+        return new EvidencePlan(profile.version(), answerMode, requirements, mapped, selected, added, distinctSupplement);
     }
 
     /**

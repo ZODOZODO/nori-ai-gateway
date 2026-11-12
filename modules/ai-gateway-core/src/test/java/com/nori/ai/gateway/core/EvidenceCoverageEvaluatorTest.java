@@ -22,7 +22,7 @@ class EvidenceCoverageEvaluatorTest {
     }
     private static EvidenceRequirement comparison(){return new EvidenceRequirement(C,false,List.of(),List.of(),List.of(N,I,S,H),List.of(),List.of());}
     private static WorkflowOutcome outcome(WorkflowOutcome.Stage... stages){return new WorkflowOutcome(List.of(stages),List.of(),List.of(),new ResultSourceDeps(List.of(),List.of()),List.of(),List.of(),Optional.empty());}
-    private static EvidencePlan plan(EvidenceRequirement... requirements){return new EvidencePlan("v",AnswerMode.D,List.of(requirements),Set.of(),List.of(),List.of());}
+    private static EvidencePlan plan(EvidenceRequirement... requirements){return new EvidencePlan("v",AnswerMode.D,List.of(requirements),Set.of(),Set.of(),List.of(),List.of());}
     private static EvidencePlan.ProfileStep candidate(EvidenceNeed need,String entry,String capability){return new EvidencePlan.ProfileStep(need,entry,new PlanStep(entry,capability,List.of(),List.of(),null));}
     private static List<EvidenceCoverage> coverage(EvidenceNeed need,EvidenceCoverage.Status status){return List.of(new EvidenceCoverage(need,status,false,List.of(),List.of(),List.of()));}
     private static Map<EvidenceNeed,EvidenceCoverage.Status> statuses(List<EvidenceCoverage> coverage){Map<EvidenceNeed,EvidenceCoverage.Status> map=new EnumMap<>(EvidenceNeed.class);coverage.forEach(c->map.put(c.need(),c.status()));return map;}
@@ -60,7 +60,7 @@ class EvidenceCoverageEvaluatorTest {
 
     @Test void supplementRoundOnlyForEmptyNeedsWithPreparedCandidatesNotYetPlannedAndAtMostOnce() {
         var trace=candidate(H,"tc.history.trace","tc.trace.search");var dlq=candidate(H,"tc.history.dlq","tc.dlq.list");var model=candidate(N,"tc.normal.model","tc.model.read");
-        var plan=new EvidencePlan("v",AnswerMode.B,List.of(requirement(H,false,"logs"),requirement(N,false)),Set.of(),List.of(),List.of(trace,dlq,model));
+        var plan=new EvidencePlan("v",AnswerMode.B,List.of(requirement(H,false,"logs"),requirement(N,false)),Set.of(),Set.of(),List.of(),List.of(trace,dlq,model));
         var budget=new ToolCallBudget();
         assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NO_DATA),Set.of("tc.logs.search"),budget)).as("비어 있는 근거의 후보만").containsExactly(trace,dlq);
         assertThat(evaluator.supplement(plan,coverage(H,EvidenceCoverage.Status.NO_DATA),Set.of("tc.logs.search"),budget)).as("round 1회 한도 — 2회째 없음").isEmpty();

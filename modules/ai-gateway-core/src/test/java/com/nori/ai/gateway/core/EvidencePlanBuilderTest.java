@@ -42,15 +42,17 @@ class EvidencePlanBuilderTest {
         return builder.plan(workflow(task),view,needs,added,AnswerMode.B,steps);
     }
 
-    @Test void incidentStateAndHistoryKeepTheMandatoryDefaultPathAndAddNoStep() {
+    @Test void profileMappedManifestStepsRunOnlyWhenARequiredEntryOfABoundNeedSelectsThem() {
         var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(S,H),Set.of(),AnswerMode.D,factory(SERVER_VALUES,false));
-        assertThat(plan.selectedOptionalSteps()).isEmpty();
+        assertThat(plan.profileMappedSteps()).containsExactlyInAnyOrder("snapshot","commLogs","logs","trace","dlq","git","knowledge");
+        assertThat(plan.selectedWorkflowSteps()).as("H 필수 = 통신 로그·로그, Trace·DLQ 는 Manifest 필수여도 고르지 않는다").containsExactlyInAnyOrder("snapshot","commLogs","logs");
+        assertThat(plan.deselected("trace")).isTrue();assertThat(plan.deselected("dlq")).isTrue();
         assertThat(providers(plan,S)).containsExactly("snapshot");
-        assertThat(providers(plan,H)).as("Manifest 필수 단계가 H 제공자").containsExactly("commLogs","logs","trace","dlq");
+        assertThat(providers(plan,H)).containsExactly("commLogs","logs");
+        assertThat(stepIds(plan.supplementSteps())).as("선택 항목 Trace·DLQ 는 H 가 비었을 때만").containsExactly("tc.history.trace","tc.history.dlq");
         assertThat(requirement(plan,H).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason)
             .as("권한 선언이 없는 최근 이벤트는 Registry view 에 없다").containsExactly(tuple("tc.event.getRecent",EvidenceRequirement.UnavailableReason.CAPABILITY_INACTIVE));
         assertThat(plan.addedSteps()).isEmpty();
-        assertThat(plan.supplementSteps()).as("workflow 단계인 선택 항목은 보완 후보가 아니다").isEmpty();
         assertThat(requirement(plan,S).unavailableItems()).containsExactly("Port 목록","진행 LOT");
         assertThat(plan.answerMode()).isEqualTo(AnswerMode.D);
         assertThat(plan.profileVersion()).isEqualTo("tc-evidence-profile-v1");
@@ -72,8 +74,10 @@ class EvidencePlanBuilderTest {
 
     @Test void implementationNeedSelectsTheWorkflowGitStepAndComparisonOnlyDependsOnBothSides() {
         var plan=builder.plan(workflow(TaskType.INCIDENT_ANALYSIS),view(),List.of(H,N,I,C),Set.of(H,N,I),AnswerMode.B,factory(SERVER_VALUES,false));
-        assertThat(plan.selectedOptionalSteps()).containsExactly("git");
-        assertThat(providers(plan,I)).containsExactly("git");
+        assertThat(plan.selectedWorkflowSteps()).containsExactlyInAnyOrder("commLogs","logs","git","trace");
+        assertThat(providers(plan,I)).as("I = Git + 당시 배포 Trace").containsExactly("git","trace");
+        assertThat(providers(plan,H)).as("I 로 이미 계획된 Trace 는 H 에도 제공자로 센다").containsExactly("commLogs","logs","trace");
+        assertThat(stepIds(plan.supplementSteps())).as("같은 조회 반복 0: Trace 는 보완 후보에서 빠진다").containsExactly("tc.history.dlq");
         assertThat(providers(plan,N)).containsExactly("tc.normal.model");
         assertThat(requirement(plan,C).providers()).isEmpty();
         assertThat(requirement(plan,C).dependsOn()).containsExactly(N,I,S,H);
@@ -95,8 +99,9 @@ class EvidencePlanBuilderTest {
         assertThat(blocked.addedSteps()).isEmpty();
         assertThat(requirement(blocked,H).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).contains(EvidenceRequirement.UnavailableReason.OPTION_BLOCKED);
         var git=plan(TaskType.LIVE_QUERY,view(),List.of(S,I),Set.of(),factory(SERVER_VALUES,false));
-        assertThat(git.addedSteps()).as("선행 근거 결과 필드를 받는 workflow 밖 항목은 바인딩 단계가 없어 입력 부족").isEmpty();
-        assertThat(requirement(git,I).unavailable()).extracting(EvidenceRequirement.Unavailable::reason).containsExactly(EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE);
+        assertThat(stepIds(git.addedSteps())).as("선행 근거 결과 필드를 받는 workflow 밖 Git 은 바인딩 단계가 없어 입력 부족, 당시 배포 Trace 만 1차").containsExactly("tc.impl.deployTrace");
+        assertThat(requirement(git,I).unavailable()).extracting(EvidenceRequirement.Unavailable::capabilityId,EvidenceRequirement.Unavailable::reason)
+            .containsExactly(tuple("tc.git.searchCode",EvidenceRequirement.UnavailableReason.INPUT_UNAVAILABLE));
         var evaluator=new EvidenceCoverageEvaluator();var empty=new WorkflowOutcome(List.of(),List.of(),List.of(),new com.nori.ai.gateway.core.result.ResultSourceDeps(List.of(),List.of()),List.of(),List.of(),Optional.empty());
         assertThat(evaluator.evaluate(inactive,empty)).filteredOn(c->c.need()==N).extracting(EvidenceCoverage::status).containsExactly(EvidenceCoverage.Status.UNSUPPORTED);
         assertThat(evaluator.evaluate(noWindow,empty)).filteredOn(c->c.need()==H).extracting(EvidenceCoverage::status).as("입력 부족은 미실행").containsExactly(EvidenceCoverage.Status.NOT_EXECUTED);
@@ -149,13 +154,18 @@ class EvidencePlanBuilderTest {
         var planner=new WorkflowPlanBuilder(registry,builder);
         var window=Map.<String,Object>of("from","2026-11-04T00:00Z","to","2026-11-04T01:00Z");
         var withoutI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H"),List.of(),"B")),window);
-        assertThat(withoutI.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","dlq","summary");
+        assertThat(withoutI.steps()).extracting(step->step.definition().stepId()).as("v3 INC: 프로필이 고르지 않은 Manifest 필수 Trace·DLQ 제외").containsExactly("snapshot","commLogs","logs","summary");
+        assertThat(withoutI.definition().steps()).filteredOn(step->step.stepId().equals("summary")).singleElement().satisfies(step->assertThat(step.dependsOn()).as("빠진 단계의 선행으로 잇는다").containsExactly("logs"));
         assertThat(withoutI.evidence()).isPresent();
+        var historyOnly=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("H"),List.of(),"B")),window);
+        assertThat(historyOnly.steps()).extracting(step->step.definition().stepId()).as("S 미결속 → snapshot 도 프로필 매핑 단계라 제외").containsExactly("commLogs","logs","summary");
         var withI=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("S","H","I"),List.of(),"B")),window);
-        assertThat(withI.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","dlq","summary","git");
+        assertThat(withI.steps()).extracting(step->step.definition().stepId()).containsExactly("snapshot","commLogs","logs","trace","summary","git");
+        assertThat(withI.toolPlan().plan()).filteredOn(step->step.stepId().equals("git")).singleElement().satisfies(step->assertThat(step.dependsOn()).as("Git 은 당시 배포 Trace 결과를 선행으로 받는다").containsExactly("trace"));
         var legacy=planner.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(Map.of("taskType","INCIDENT_ANALYSIS")),window);
         assertThat(legacy.evidence()).isEmpty();
-        assertThat(legacy.steps()).extracting(step->step.definition().stepId()).contains("git");
+        assertThat(legacy.steps()).extracting(step->step.definition().stepId()).as("F1 고정 workflow 그대로").containsExactly("snapshot","commLogs","logs","trace","dlq","summary","git");
+        assertThat(legacy.definition()).isEqualTo(workflow(TaskType.INCIDENT_ANALYSIS));
         var withoutProfile=new WorkflowPlanBuilder(registry);
         assertThatThrownBy(()->withoutProfile.build(workflow(TaskType.INCIDENT_ANALYSIS),view(),job(v3(TaskType.INCIDENT_ANALYSIS,List.of("H"),List.of(),"B")),window))
             .isInstanceOf(IllegalStateException.class);
@@ -174,6 +184,9 @@ class EvidencePlanBuilderTest {
         assertThat(logs.resources()).containsExactly(new ResourceRef("EQP","EQP_001"));
         assertThat(live.toolPlan().plan().get(3).resources()).as("모델 READ 는 EQP 리소스를 받지 않는다").isEmpty();
         assertThat(live.evidence().orElseThrow().supplementSteps()).extracting(step->step.step().capabilityId()).containsExactly("tc.trace.search","tc.dlq.list");
+        var knowledge=planner.build(workflow(TaskType.KNOWLEDGE_QUERY),view(),job(v3(TaskType.KNOWLEDGE_QUERY,List.of("N"),List.of(),"B")),window);
+        assertThat(knowledge.steps()).extracting(step->step.definition().stepId()).as("PLANNED Knowledge 는 프로필이 고르지 않아 빠지고 승인 모델 READ 만").containsExactly("tc.normal.model");
+        assertThat(knowledge.toolPlan().targetResources()).as("남은 단계가 받지 않는 EQP 는 계획 대상에서 뺀다").isEmpty();
         var noWindow=planner.build(workflow(TaskType.LIVE_QUERY),view(),job(v3(TaskType.LIVE_QUERY,List.of("S","H"),List.of(),"B")),Map.of());
         assertThat(noWindow.steps()).extracting(step->step.definition().stepId()).as("시간창 없음 → 입력 부족, 단계 0").containsExactly("snapshot");
     }
