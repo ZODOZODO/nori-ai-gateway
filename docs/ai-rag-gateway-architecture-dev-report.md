@@ -8556,3 +8556,40 @@ AC-32-NEEDS 사례: ⓐ~ⓔ·ⓝ 는 `a=D` 로 무장해 상세 보고 표(Repor
 4. GateEvaluator RUBRIC component 는 leaf 당 최신 1건만 고른다(`GateEvaluator.java` 64·71·74-82행). AC-22-LIVE 골든셋은 fixture 3개라 세 판정의 AND 가 gate 에 반영되지 않는다 — eval 보정 또는 단일 fixture 로 축소 결정 필요(RubricViewMode 는 전 대상 PASS 일 때만 exit 0).
 5. 배포 뒤 실행: Plan P21 실행 순서(① F2 → ⓐ F2-RUBRIC → ⓑ F2-OUTAGE STOPPED → ⓒ LOADING → ⓔ gate), P17 runbook (a) 읽기 전용 확인, 지연 p50/p95 는 `perf report` nearest-rank, GPU/메모리·토큰 사용량 기록.
 6. 수용 pod 의 DJL native 적재(readOnlyRootFilesystem, `/tmp` 64Mi) 가 실패하면 ⓞ 만 NOT_RUN 이 된다 — 배포 첫 회차에서 확인.
+
+### 후속 보완 (2026-11-13, root 후속 지시 — 위 "결정 필요" 4건은 SPEC 이 이미 정한 사항)
+
+코드 commit `36f1b14`(worktree `aigw/f2-p21`). migration 0(`gw.audit_event` 의 `token_usage`·`versions`·`reduction` jsonb 열 기존, `event_type` CHECK 없음).
+
+**바뀐 것**
+
+- AC-31 — LLM 호출 시도 감사 `AuditEventType.LLM_CALL` 추가. core 포트 `LlmCallAudit`(ClassificationService.java 112행·ComposerService.java 114행에서 시도마다 기록) → 앱 `LlmCallAuditRecorder` → 기존 `AuditRecorder.writeForJob` → `AuditWriter`(token_usage·versions·reduction 열, AuditWriter.java 34-43행). 두 번째 writer 없음. 허용 목록은 `AuditFieldAllowlist` 의 `LLM_CALL` 분기(53행): callType·sent·입력 계수·요청 max_tokens·usage(있을 때만)·결과/고정 코드·모델/Prompt 버전·축소 단계 `[{stage,beforeTokens,afterTokens}]` 만 받고 원문 필드는 없다. 요청·trace ID 는 같은 Job 의 JOB_ACCEPTED 에서 파생한다. 빈은 `JobConfiguration` 66행 `@Bean`(추론 사용 시)으로 명시 등록했고, `ArchitectureRulesTest` 의 일반 감사 호출자 목록에 `LlmCallAuditRecorder` 를 추가했다. 수용 판정은 `OracleQueries.LLM_CALLS`(고정 SELECT, 40행)로만 읽는다 — `F2JobChecks.composerReductionLive`(124행, LLM_LIVE, llmScript 없는 무장 + prompt-watch 질문 sentinel).
+- AC-43-CLS·COMP — 같은 감사로 "보낸 분류 0(sent=false 1행)"·"Composer 시도 0 + 분류는 상한 안 전송"을 추가 확인한다(F2JobChecks.java 238·254행).
+- AC-43-COMP fixture — tc-mock `composer-oversize`(contractVersion 1.0, default 와 같고 `models` 만 320개) + index 등록. `tc.model.read` 는 시간창 필터가 없고 outputSchema 필수 필드가 `items` 전체라 축소 4단계 뒤에도 그대로 남는다. 그래서 수용 고정 분류를 LQ `[S,N]` 으로 바꿨다(F2JobChecks.java 246행).
+- AC-35-EGRESS — `EgressProbeHook` 에 GET `/__test/egress-probe` 를 추가했다(파일 순서 `[{id, expect}]` 만, 주소·연결 0, EgressProbeHook.java 37행). 계약은 `docs/contracts/test-hooks-v1.md` P15 표에 적었다. 수용 판정은 이 목록만 쓰고 `AIGW_EGRESS_PROBE_TARGETS_JSON` env 의존을 제거했다. 차트·§11.9 변경은 0이다.
+- RUBRIC — `GateEvaluator.rubric`(82행): 같은 자동 suite 최신 COMPLETED 회차가 그 leaf 에 남긴 대상 `{leafId, fixtureId, answerSha256}` 마다 결속 RUBRIC 기록(같은 대상 중 최신)에 기존 기준선·identity·라벨 확인을 적용하고 AND 로 모은다. 결속 기록이 하나라도 없으면 NOT_RUN(`RUBRIC_TARGET_MISMATCH`), 하나라도 FAIL 이면 FAIL 이다. 단일 대상 F1 시험(`requiresRubricForLatestAutomaticAnswer…`)은 그대로 통과한다.
+
+**결정과 근거**
+
+- 감사 단위: SPEC §14.5(아키텍처 문서 1230행) "실제 LLM 호출(재시도 포함)을 보내기 직전에 … assert … 하나라도 어기면 그 호출을 보내지 않는다. 적용한 축소 단계 번호와 단계별 전후 입력 토큰 수를 그 호출의 Audit 에 기록". 따라서 단위는 호출 직전 assert 에 도달한 `InferenceClient.chat` 1회다. assert 로 막힌 시도는 `sent=false`·`INPUT_BUDGET_EXCEEDED` 로 1행을 남긴다. Composer 축소기가 4단계 뒤에도 초과로 판정해 chat 을 부르지 않는 경로(ComposerService.java 102행)는 호출 시도가 아니므로 행이 없다.
+- AC-31 판정(SPEC 1986행): 보낸 호출 중 유형별 상한·`입력+max_tokens ≤ 8192` 위반이 하나라도 있으면 FAIL, Composer 시도 1건 아니면 FAIL, 단계 번호 증가·단계 사이 계수 연속·첫 단계 전 > 2,816·마지막 단계 뒤 = 호출 직전 계수가 아니면 FAIL, 현재 질문 sentinel 이 축소 뒤 Composer Prompt 에 없으면 FAIL, `usage.prompt_tokens ≠ 계수` 면 FAIL 이다. Plan 1274행은 G-USAGE 일치일 때만 이 판정을 하도록 하는데, Plan 300행 2026-11-05 대체가 일치를 확인했으므로 불일치를 FAIL 로 둔다. 축소가 일어나지 않았거나 축소로도 들지 않았거나 Composer 에 닿지 않았거나 usage 가 없으면 전제 미충족 NOT_RUN 이다.
+- egress 양성 대조 식별: SPEC 2155행은 양성 제어를 추론 endpoint·DB 로 정한다. 응답에 주소를 싣지 않으므로 id 로만 식별할 수 있는데, Plan(1006행)·차트(`_helpers.tpl` 31행)는 개수(ALLOWED ≥ 2, BLOCKED ≥ 2)만 강제하고 id 를 정하지 않는다. 그래서 레포 runconfig fixture(`operations/runconfig/fixtures/lint-verify.json` 103·109행)의 id `db-main`·`inference-endpoint` 를 판정 규칙으로 쓰고 hook 계약 문서에 적었다. 두 id 가 ALLOWED 로 없거나 BLOCKED 가 0이면 NOT_RUN(fail closed), ALLOWED 미연결은 NOT_RUN, BLOCKED 연결은 FAIL 이다. Plan §4.5 H-2(262행: 주소 반환 0, 목록 밖 id 404)·M-5·§11.9 와 충돌하지 않는다. 남은 위험: 승인 runconfig 가 다른 id 를 쓰면 NOT_RUN 이다.
+
+**실행 결과(순차, worktree)**
+
+| # | 명령 | exit | 결과 |
+|---|---|---|---|
+| 1 | spec-guard | 0 | specSha `9a6a04b24d6ccccf46ef0c72f712ea2ae3b2e7364cc7b2ecea35972379e94a5a`(FILE_HASHED, LOCAL_FILE) |
+| 2 | `build` + db·inference·app `compileIntegrationTestJava` + 수용 `installDist` | 0 | `BUILD SUCCESSFUL in 3m 48s`. test 11개 task 792건 실패·오류·skip 0(eval 287·core 174·app 79·acceptance 68·tc-mock 49·inference 43·loki 38·gitlab 24·db-adapter 12·tempo 10·source-support 8) |
+| 3 | `test-evidence verify --tasks <11개 쉼표 목록>` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| 4 | installDist `lib/*` 발견 | 0 | suite-F2 23·F2-OUTAGE 2·STOPPED 1·LOADING 1 |
+| 5 | `:adapter:ai-gateway-db-adapter:integrationTest -Paigw.requireDocker=true` | 0 | 85건 실패·오류·skip 0, `BUILD SUCCESSFUL in 4m 33s` |
+| 6 | `:adapter:ai-gateway-inference-adapter:integrationTest -Paigw.requireDocker=true` | 0 | 1건, `BUILD SUCCESSFUL in 1m 20s` |
+| 7 | `:apps:ai-gateway-app:integrationTest -Paigw.requireDocker=true`(필터 없음) | 0 | 204건 실패·오류·skip 0(신규 `LlmCallAuditIT` 3·`EgressProbeHookIT` +1), `BUILD SUCCESSFUL in 51m 43s` |
+| 8 | 위 3개 IT 각각 `test-evidence verify --tasks <task> --require-docker` | 0 | 셋 다 `TEST_EVIDENCE_VERIFIED` |
+| 9 | `docker ps -a --filter label=org.testcontainers=true -q` | — | 0건 |
+
+- 8번 첫 시도는 Gradle 호출에 `-Paigw.requireDocker=true` 를 빠뜨려 `STALE_TEST_EVIDENCE`(exit 4)였다. fingerprint 가 그 system property 를 포함하기 때문이다(build.gradle.kts 73·83행). 같은 속성을 붙여 IT 재실행 없이 verify 만 다시 했다.
+- `ci/integration-required.txt` 에 `com.nori.ai.gateway.app.job.LlmCallAuditIT` 를 등록했다.
+
+**남은 항목**: 위 "실환경 F2 수용 전 남은 항목" 1~4 는 이 보완으로 닫혔다. 5·6(배포 뒤 실행, DJL native 적재 확인)은 남는다. AC-31 은 배포 Loki 원시 로그가 적어 축소가 일어나지 않으면 `AC31_REDUCTION_NOT_EXERCISED` NOT_RUN 이 된다(배포 첫 회차에서 확인).
