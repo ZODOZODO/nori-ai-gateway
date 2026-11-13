@@ -1,6 +1,8 @@
 # AI Gateway 아키텍처 v4.1 — NORI 공용 AI 업무 오케스트레이션 플랫폼 (단일 시스템 완전 격리 / 3단계 구축)
 
-> **현재 개정(2026-11-12, seq17):** 자동 백업 없음(사용자 결정). 자동 백업·필수 백업/복원 리허설 요구와 수용 leaf AC-24-RESTORE·AC-24-BACKUP-ALERT 철회는 §12.4가 정본이며, 유효 leaf 수는 §28.9를 따른다. 이전 문구는 날짜별 이력으로 보존한다.
+> **현재 개정(2026-11-13, seq18):** 최초 RAG 수집은 Gateway 프로세스 기동 때만 실행한다(사용자 결정). 승인 SeaweedFS 문서를 읽어 최초 색인을 생성하고 재기동 시 변경분·삭제·손상 색인을 반영한다. Kafka 토픽·notification·이벤트 소비, 주기/야간 백필, 채팅/API 갱신 명령은 최초 범위에서 제외하며 Kafka 자동 감지는 후속 구현이다. 현재 수집·기동·실패·수용 계약은 §8.3.1이 정본이고 이전 Kafka 전제보다 우선한다. 이번 개정은 Spec과 기준선에만 반영하며 Plan 정합·P22~P25 구현·실환경 실행 완료를 뜻하지 않는다.
+
+> **직전 개정(2026-11-12, seq17):** 자동 백업 없음(사용자 결정). 자동 백업·필수 백업/복원 리허설 요구와 수용 leaf AC-24-RESTORE·AC-24-BACKUP-ALERT 철회는 §12.4가 정본이며, 유효 leaf 수는 §28.9를 따른다. 이전 문구는 날짜별 이력으로 보존한다.
 
 > **직전 개정(2026-11-11, seq16):** 근거 요구에 따른 결정론적 조건부 실행, 분류 wire v3, F3 Hybrid Search·Cross-encoder Reranking 필수화, 구조 문맥·상세 보고·신규 leaf 8개는 §28이 정본이다. 이전 문구는 날짜별 이력으로 보존한다. P20 중단 작업을 대조한 문서 개정이며 구현·게이트 PASS를 뜻하지 않는다.
 
@@ -93,7 +95,7 @@
 | D43 | WM/HRM 횡전개로 공용 Core의 대규모 재작성이 필요하거나 Core 복제가 생기면 온보딩을 중단하고 추상화/경계 결함을 재검토한다 | 확장성 게이트 확정 | 단순성·유지보수성 확보 |
 | D44 | 추론 장비·런타임·모델 = LLM 노트북 서버(192.168.0.160, GTX 1660 Ti 6GiB) + Ollama 0.40.13(systemd override: `OLLAMA_HOST=0.0.0.0:11434`, `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=24h`, `OLLAMA_CONTEXT_LENGTH=8192`) + 생성 `qwen3:4b`(Qwen3-4B-Thinking-2507, Q4_K_M, ID 359d7dd4bcda) + 임베딩 `bge-m3`(ID 790764642607), 2모델 상주(F0 는 서버 설정 `OLLAMA_KEEP_ALIVE=24h` 그대로 측정 전후 상주·digest 확인, F2 착수 전 `OLLAMA_KEEP_ALIVE=-1` 명시 — §14.2·§16) | v4.1 대체(2026-11-04 사용자 결정·같은 날 읽기 전용 실측). 이력: 2026-07-02 실측 결정·2026-10-19 재확인 = Jetson Orin Nano 8GB + Ollama 0.31.1(`OLLAMA_KEEP_ALIVE=-1`) + `qwen3:4b-instruct`(Q4_K_M) + `bge-m3`(F16) | 교체 사유: Jetson 이 GPU 부하 중 WiFi(RTL8822CE) PCIe AER 오류 폭주로 2회 정지(2026-11-03 15:23 57,533건, 2026-11-04 07:34 47,478건, 해당 구간 OOM 0건). 모델: 사용자 결정(공식 벤치마크상 Thinking-2507 이 대부분 항목 우위, instruct 로 바꾸지 않음). 2026-07-02 배제 근거(하이브리드 `qwen3:4b` 의 think=false 사고문 content 유출·700tok/43s 무응답)는 Jetson·0.31.1 실측 이력으로 유지하며, 같은 종류의 위험(사고문의 content 혼입·장시간 사고·무응답)은 F0 에서 새 런타임으로 측정한다(재현돼도 모델 자동 교체 없음 — 사용자 보고, §16 F0). 상세 §4.1 **v4.1 대체(2026-11-05):** F0 추가 실측은 중단한다. 관측된 사고 분리·계수는 §14.5, 미확인 위험의 실모델 재검증은 F5a로 이관한다. F2 상주 설정·보안 게이트는 유지한다. **2026-11-09 대체(임차 원칙):** F2 착수 전 `OLLAMA_KEEP_ALIVE=-1` 명시와 F2 상주 설정·서버 보안 게이트는 폐기한다. 서버 설정은 소유자 설정 그대로 쓴다(2026-11-09 읽기 전용 관측 `OLLAMA_KEEP_ALIVE=24h`·`OLLAMA_CONTEXT_LENGTH=8192`). 미상주 시 운영자 모델 적재 절차는 §14.6, 경계는 §26.1 이다. |
 | D45 | Vector backend = AI Gateway 전용 PostgreSQL + pgvector 확장. Conversation/Job/Evidence/Audit/Cache 저장소(D48)와 같은 인스턴스·DB 를 공유하고 Knowledge chunk·metadata·embedding·ingest ledger 는 논리 테이블 또는 스키마로 분리한다. 업무 `nori_tc` 인스턴스와는 분리. 초기 벡터 검색 = 인가 조건을 모두 적용한 정확 top-k, 한국어 본문 키워드 = 정규화 텍스트의 리터럴 부분 문자열(pg_trgm 가속 가능). 엔진 교체는 실측 근거의 명시적 작업 | 2026-10-27 사용자 확정(v4.1 대체: 2026-07-02 독립 Qdrant pod·`multilingual` tokenizer 결정) — 확장 가용성은 F1 실행 게이트 | 새 DB 서비스·API key·전용 PVC·egress 대상을 늘리지 않고 ingest ledger·tombstone 을 같은 DB 트랜잭션으로 묶는다. 2026-07-02 실측 4건(nori_tc 의 pgvector 미설치·`simple` 한국어 무력·pg_bigm/pgroonga 미가용·인터넷 노출 이력)은 사실로 유지하나 새 전용 PostgreSQL 에서 pgvector 를 쓸 수 없다는 근거는 아니다. 상세 §8.4 **2026-11-10 대체(DB 배치, 사용자 결정):** "같은 인스턴스·DB" 는 공유 서버 192.168.0.150 의 AI 전용 DB `nori_ai_gateway` 하나로 읽는다. 그 인스턴스는 업무 `nori_tc`·`nori_wm` DB 와 공유한다. "업무 `nori_tc` 인스턴스와는 분리" 와 실측 4 의 인스턴스 분리 근거는 이력이며 남는 위험은 §26.1 위험 수용이다. pgvector 0.8.7 은 서버 담당자가 그 DB 에 생성했다(F1 은 읽기 전용 기록, §8.4) |
-| D46 | 문서 원천 = 기존 SeaweedFS `nori-tc` 버킷(ai-gateway 전용 Read/List identity) + filer `notification.kafka` → 기존 Kafka(Strimzi `mes-cluster`) → ai-gateway 구독(구독측 `/buckets/nori-tc/` 경로 필터) | v4.1 확정(2026-07-02 실측 결정 복원) | 2026-07-02 실측: identity 읽기 허용·쓰기 거부 확인, Kafka 백엔드에는 발행측 경로 필터 옵션 없음. 상세 §8.3 |
+| D46 | **2026-11-13 대체(seq18):** 기존 SeaweedFS `nori-tc` 승인 문서를 Gateway 기동 때 Read/List로 읽어 색인 동기화(§8.3.1). Kafka 자동 감지는 후속 구현. 이력: 문서 원천 = 기존 SeaweedFS `nori-tc` 버킷(ai-gateway 전용 Read/List identity) + filer `notification.kafka` → 기존 Kafka(Strimzi `mes-cluster`) → ai-gateway 구독(구독측 `/buckets/nori-tc/` 경로 필터) | 최초 기동 수집 확정(2026-11-13 사용자 결정), 이전 v4.1 확정은 이력 | 2026-07-02 실측: identity 읽기 허용·쓰기 거부 확인, Kafka 백엔드에는 발행측 경로 필터 옵션 없음. 상세 §8.3·§8.3.1 |
 | D47 | Log/Trace backend = Loki(`monitoring/loki:3100`)/Tempo. Log Source 는 Loki `app` 라벨 allowlist 로만 정의하고 namespace 단위 Source 를 금지한다 | v4.1 확정 | 2026-10-19 실측: Loki `namespace="tc"` 의 `app` 값에 `wm-ui-backend`·`wm-ui-front` 공존. 상세 §7.6 |
 | D48 | 구현 기반 = Java 21 + Spring Boot 4 + Spring AI 2.0, 신규 레포 `nori-ai-gateway`(운영 GitLab `gitlab.noricloud.org/norisystem/nori-tc` 그룹. gitlab.com `norilab/tc-mes` 는 source mirror 전용 — 2026-10-26 대체), k8s namespace `tc`, helm `nori-tc-exec/deploy/helm/ai-gateway/`, 자체 호스팅 러너 tag, Conversation/Job/Evidence/Audit 저장소 = 전용 PostgreSQL(Knowledge chunk·embedding·ingest ledger 도 같은 인스턴스·DB, D45) | **권장**(반대 결정 없으면 확정) — F1 착수 게이트 | 사내 TC 레포 전부 Boot 4.0.x. 레포·그룹은 2026-07-02 사용자 확정(`norilab/tc-mes`) 이력을 유지하되, 2026-10-26 정적 확인으로 그 사본이 nori-msa 러너·사설 Harbor 가 없는 source mirror 임이 드러나 운영 그룹으로 대체 권장. 상세 §16 "1차 구현 기반" **2026-11-10 대체(DB 배치·구조 정렬, 사용자 결정):** helm 위치 = 이 레포 `operations/deploy/helm/ai-gateway/`(`nori-tc-exec/deploy/helm/ai-gateway/` 는 이력). Conversation/Job/Evidence/Audit 저장소 = 공유 서버 192.168.0.150:15432 의 AI 전용 DB `nori_ai_gateway`(계정 1개, 이름은 환경변수로만 주입). 스키마 migration 은 레포 루트 `flyway/sql/` 을 CI 단계에서 적용한다. 상세 §16 "1차 구현 기반"·§8.4 |
 | D49 | 대화 이력(Conversation/Message/Context)은 AI Gateway 가 소유·저장한다. TC Backend 는 대화 원문을 저장하지 않는다 | v4.1 확정(2026-07-02 결정(대화 이력은 backend 책임 권장)을 뒤집음) | ①비동기 Job(D29)·Evidence·Audit 와 같은 저장소에서 ownerSystem 필터를 한 번에 강제(D59) ②F1~F4 는 TC 코드 변경 금지(D42)라 Backend 소유면 다중 턴을 F5a 전까지 검증할 수 없음 ③R1/R2 에서 각 Backend 가 대화 저장을 중복 구현하지 않음 |
@@ -647,6 +649,8 @@ Knowledge Tool:
 
 ### 8.3 최소 ingestion pipeline
 
+**2026-11-13 대체(seq18):** 최초 구현의 실행 계기는 §8.3.1의 기동 동기화다. 아래 notification·Kafka·온라인 이벤트·야간 백필·offset/ack 문구는 후속 자동 감지의 이력/재사용 근거로 보존하며 최초 필수 조건이 아니다. 원천·소유권·마스킹·유효 처리 키·문서 단위 원자성·canonical/ledger/tombstone 보존 계약은 유지한다.
+
 문서 원천(D46, 2026-07-02 실측 결정 복원): 기존 SeaweedFS(호스트 `seaweed` 192.168.0.203, `chrislusf/seaweedfs:4.35` mini 모드)의 `nori-tc` 버킷을 원천으로 쓰고, ai-gateway 는 `nori-tc` 에 Read/List 만 가진 전용 identity 로 읽는다(쓰기 거부 2026-07-02 검증). 변경 감지는 filer `notification.kafka` → 기존 Kafka(Strimzi `mes-cluster`) 토픽 → ai-gateway 구독이다. Kafka 백엔드에는 발행측 경로 필터가 없으므로 **구독측에서 `/buckets/nori-tc/` 경로로 필터**하고, 이벤트는 SeaweedFS protobuf(`EventNotification`)라 변환 계층이 필요하다. `notification.toml` 은 2026-07-02 기준 부재 — F3 착수 시 추가하고 SeaweedFS 컨테이너를 재시작한다(F3 산출물). 온라인 이벤트 처리 + 야간 백필(ingest ledger·DB checkpoint 로 재개 가능, ledger·checkpoint 는 같은 AI 전용 PostgreSQL 의 논리 테이블, §8.4. v4.1 대체(2026-10-27): 2026-07-02 결정은 Qdrant 별도 collection)로 운영한다.
 
     Source Document (SeaweedFS nori-tc)
@@ -680,6 +684,55 @@ Knowledge Tool:
 - 원문 정본은 SeaweedFS 그대로다. DB 의 chunk 텍스트는 검색·인용용 사본이다. sourceRef·revision/sourceDigest·chunkerVersion·embedding profile·ownerSystem·requiredPermission·삭제 상태를 엔진과 무관한 형태로 보존해 다른 저장소로 옮길 수 있게 한다(§8.4 "향후 교체 계약"). 문서 원본 전체를 LLM 입력·로그·감사에 싣지 않는다(LLM 에는 §14.5 예산 안의 검색 chunk 만).
 - **시크릿·불필요 PII 제거(2026-10-27, §12.3):** normalize 단계에서 시크릿·불필요 PII 를 제거·마스킹한 뒤에만 chunk·embedding·저장·인용한다. `revision/sourceDigest` 는 원문 기준 값을 그대로 두고, 제거 규칙의 버전은 기존 `chunkerVersion`(정규화·제거·chunk 규칙 묶음의 버전)에 포함해 구분한다 — 새 필드·플랫폼을 두지 않는다. 그래서 같은 원문이라도 제거 규칙이 바뀌면 `chunkerVersion` 차이로 재처리·재구축 대상이 된다(위 유효 처리 키, §8.4 재구축). 제거 적용 여부를 확인하지 못한 문서는 색인하지 않는다.
 - **canonical metadata 는 필수 상태다.** 문서별 ownerSystem·sourceRef·`requiredPermission`(ACL)·revision/sourceDigest·chunkerVersion·embedding profile·삭제 상태(tombstone 여부·시각)와 ingest ledger·checkpoint 는 파생 데이터인 chunk 텍스트·embedding 과 별개로 같은 AI 전용 PostgreSQL 에 보존한다(§8.4 "자원·장애". 2026-11-12 대체(seq17) — 이력: 보존하고 백업한다(§8.4 "자원·장애", §12.4)). chunk·embedding 을 지우거나 재구축해도 canonical metadata 는 지우지 않으며, 삭제 문서의 tombstone 기록을 남겨 재처리·재구축으로 다시 노출되지 않게 한다. 이 상태의 보존은 대화 30일과 별개다 — 원천 승인·권한·삭제 반영 계약을 따르고 tombstone·ledger 는 재노출 방지에 필요한 동안 유지하며 별도 보존 기간을 두지 않는다(§12.2).
+
+### 8.3.1 최초 수집 정본 — Gateway 기동 동기화 (2026-11-13 사용자 결정, seq18)
+
+**확정 요구사항과 범위**
+
+- 사용자 결정 원문: "그럼 지금은 싹 다 뺴고, 초기 nori-ai-gateway 가 구동될때만 rag 를 업데이트해서 벡터 db 를 만들도록하자. 그리고 그 이후에 kafka topic 만들고 자동으로 seaweedfs 변경 생기면 업데이트 하도록하는 로직 만들면 되겠다."
+- 최초 릴리스에서는 RAG가 활성화된 Gateway 프로세스의 최초 기동과 이후 재기동마다 승인 문서 동기화 한 회차만 실행한다. 최초 설치 시 한 번 실행하고 영구히 생략하는 방식이 아니다. 완료 뒤 같은 프로세스가 서비스 중인 동안 추가 수집·색인 갱신은 실행하지 않는다.
+- 최초 기동은 승인 문서의 색인을 생성하고, 재기동은 신규·내용/규칙/profile 변경·삭제·손상 색인을 반영한다. PostgreSQL `nori_ai_gateway`의 `kn` 영역을 사용하며 기동마다 DB/schema를 삭제·재생성하지 않는다. migration은 기존 CI/Flyway 책임이고 앱 기동 수집은 이미 적용된 스키마에 대한 데이터 동기화다.
+- 최초 범위에서 Kafka 토픽/ACL·접속값·consumer group·protobuf 이벤트·offset/ack·SeaweedFS notification 설정/재시작, 주기/야간 백필, 채팅/공개 API 갱신 명령을 요구하거나 구현하지 않는다. 이전 대화의 수동 채팅 갱신안은 채택하지 않는다. 운영 중 원본 변경은 다음 Gateway 재기동 때 색인에 반영되며 즉시 반영을 보장하지 않는다.
+- 원천은 기존 SeaweedFS의 승인 목록에 있는 TC 문서다. Source 소유권·승인 경로·지원 형식·권한·revision 조사/확정은 여전히 필요하다. Gateway는 전용 Read/List identity만 사용하며 SeaweedFS 원본을 쓰거나 서버 설정을 바꾸지 않는다. 버킷 전체를 임의로 승인하거나 미등록 문서를 색인하지 않는다.
+
+**기동·저장·실패 정책**
+
+- 기존 단일 인스턴스/DB 식별자·epoch 검사, 스키마 검증, 캐시 무효화와 소유권/profile 검증을 통과한 뒤 기동 동기화를 실행한다. 거부된 DB·스키마·소유 범위에는 수집 쓰기를 시작하지 않는다. RAG 활성 모드의 readiness는 필수 문서 동기화가 성공한 뒤에만 연다. F1/F2·embedding-only/reranker-only 측정 모드는 기존 모드 계약을 유지하며 새 수집이나 SeaweedFS 자격을 강제하지 않는다.
+- 기동 수집은 서버가 검증한 catalog owner 범위에 결속된 내부 작업이다. 사용자 질문/LLM Tool로 실행하지 않으며 사용자 actor 단언·delegationId를 만들거나 재사용하지 않는다. 검색·원문·기존 답변 조회의 현재 사용자 인가와 단일 시스템 격리는 그대로 유지한다.
+- 승인 목록의 각 문서에 대해 HEAD/원문 읽기 → 형식별 구조 추출·마스킹·정규화·chunk·임베딩 → HEAD 재확인 → 문서 단위 커밋을 수행한다. 외부 I/O는 DB 트랜잭션 밖에 두고, observation fence·동일성 확인·유효 처리 키·커밋 시 catalog/ACL 재확인을 유지한다. 전체 문서를 한 긴 DB 트랜잭션으로 묶지 않는다.
+- canonical metadata·chunk/embedding·ledger와 필요한 기동 진행 상태는 같은 문서 커밋 경계로 보존한다. 최초 구현의 진행 상태는 Kafka offset을 필요로 하지 않는다. 이미 완료한 처리 키와 파생 색인이 모두 정상인 문서는 재임베딩·중복 쓰기 없이 유지한다. 같은 키의 chunk/embedding이 손상·누락됐으면 ledger 존재만으로 생략하지 않고 기동 회차에서 복구한다.
+- 재기동마다 현재 승인 목록 전체의 상태를 다시 확인한다. 이전 회차 완료 커서 때문에 기존 문서의 변경을 영구히 건너뛰지 않는다. 중단 후 다음 기동에서는 완료한 문서를 멱등 확인하고 미완료 문서를 재처리한다. 문서별 commit은 유지되므로 프로세스 중단 시 전체 회차가 일괄 rollback된다고 보장하지 않는다.
+- HEAD로 원본 부재가 확인되거나 승인 목록에서 제거된 문서는 tombstone으로 검색·원문·인용에서 제외한다. 네트워크 오류·403·파싱/마스킹/임베딩 실패를 원본 삭제로 간주하지 않는다. 기존 tombstone을 손상 복구라는 이유로 되살리지 않는다. 같은 key에 원본이 실제 재생성된 경우만 새 관측·기존 소유권 규칙에 따라 반영한다.
+- 필수 문서 처리·정합 검증에 실패하면 성공/빈 corpus로 보고하지 않고 readiness를 열지 않는다. 이미 커밋된 정상 자료를 지우지 않으며 실패 원인을 정규화해 남긴다. 동일 기동 안의 재시도/전체 대기와 Kubernetes startup probe 한도는 Plan에서 유계로 정합하고 무한 재시도나 liveness 재시작 반복을 정상으로 취급하지 않는다. 다음 기동은 미완료 상태를 다시 점검한다.
+- 원문 형식 미지원은 기존 기본 거부·명시적 제외 정책을 유지한다. 승인 목록이 비었을 때의 owner 선언은 여전히 필수이며, 실제 읽기 실패를 문서 0건으로 변환하지 않는다. 문서/질문 원문·벡터·자격 값은 로그·감사·측정 레코드에 출력하지 않는다.
+- 운영 중 원본과 색인의 차이를 즉시 알아낸다고 주장하지 않는다. 기존 조회 시 원문 revision·현재 권한 검증은 유지하고, 삭제/버전 불일치를 확인한 근거는 기존 stale/unknown 규칙으로 노출을 제한한다. 조회 경로에서 자동 재색인을 시작하지 않는다. 마지막 성공 기동 동기화 시각과 성공/실패·처리 집계는 원문 없이 확인할 수 있어야 한다.
+
+**기존 수용 ID의 최초 기동 기준 대체**
+
+아래 표는 §27.2의 같은 ID에 대한 실행 계기·기대값을 대체한다. ID를 새로 만들거나 기존 결과를 덮어쓰지 않는다. 검색/Hybrid/Reranker/격리의 기존 판정은 유지한다.
+
+| 기존 leaf | 최초 구현의 입력·합격 조건 |
+|---|---|
+| AC-23-ING-IDEM | 같은 승인 원본으로 두 번 기동 → 정상 처리 키의 canonical·chunk·ledger 중복/변화 0, 두 번째 임베딩 0, 검색 중복 0. 최초 기동 성공 뒤에는 원본을 바꾸거나 채팅 명령을 보내거나 시간이 지나도 같은 프로세스에서 추가 색인 실행 0, Kafka/notification 의존 0. |
+| AC-23-ING-PRECOMMIT | 기동 중 문서 커밋 직전 중단 → 그 문서 canonical·chunk·ledger·진행 상태의 선행 반영 0, 다음 기동 완료 결과 = 정상 1회 결과, revision 혼재 노출 0. |
+| AC-23-ING-POSTCOMMIT | 문서 tx 커밋 직후·회차 완료/readiness 전 중단 → 다음 기동의 정상 문서 canonical·chunk·ledger 변화/중복 0, 미완료 문서는 처리, readiness는 전체 필수 동기화 성공 뒤에만 상승. Kafka ack 판정 없음. |
+| AC-23-ING-DELETE | 색인 문서 원본을 서비스 중 삭제 → 같은 프로세스의 자동 재색인 0, 다음 기동에서 HEAD 부재 확인 뒤 tombstone·ledger 삭제 반영은 같은 tx, 검색·getSource·인용 노출 0. 통신 실패/403은 삭제로 오판하지 않음. |
+| AC-23-ING-ACL | 같은 원본의 승인 catalog 권한을 바꿔 재기동 → 새 ACL 반영, 이전 권한 actor의 검색/원문 0, 새 권한 actor는 허용, 불필요 chunk 재생성·임베딩 0. 현재 사용자 재인가는 별도로 계속 적용. |
+| AC-23-ING-SANITIZE | 기동 입력의 sentinel 제거와 정상 마스킹 후 색인만 허용. 제거 확인 실패는 색인 0·readiness 미상승. |
+| AC-23-ING-RULEVER | 같은 원문에서 마스킹/분할 규칙 버전을 바꿔 재기동 → 새 유효 처리 키로 재처리, 이전 완료 이력 불변, 새 규칙 미반영 자료를 준비 완료로 노출하지 않음. |
+| AC-23-REBUILD | 기동 전에 정상 문서의 파생 chunk/embedding만 손상 → 다음 기동에서 복구, canonical 키·기존 완료 ledger 불변, 삭제 문서는 복구 대상에서 제외. |
+| AC-23-PERF | 승인 corpus의 기동 색인 시간·DB/인덱스 크기·CPU/메모리를 측정하고, 동기화 성공/readiness 뒤 기존 정확 검색·keyword 지연을 승인 기준으로 판정. 실제 시험 전 G-PERF-F3 확정은 유지. |
+| AC-23-LOAD | 서비스 중 백필과 질문의 동시 실행은 최초에 없으므로 후속 자동 감지/온라인 색인 단계로 이관. 최초 F3/F4 필수 집합에서 제외하고 후속 미실행으로 남김. 기존 유효 ID/총 leaf 수는 유지하며 최초 F4를 이 leaf의 NOT_RUN으로 차단하지 않음. |
+
+추가로 기동 중 원본 변경·규칙/profile 변경·읽기/임베딩 실패·DB 식별자 거부·수집 비활성 모드의 외부 호출 0·readiness 전 요청 거부와 다음 기동 재처리를 위 ID의 독립 사례로 검증한다. 기존 유효 leaf 수 220은 그대로이며 최초 필수 stage/component 배정만 위 계약에 맞게 Plan/catalog/suite에서 정합한다. Kafka 기반 기존 fixture를 이 회차의 통과 증거로 재사용하지 않는다.
+
+**단계·배포·후속 전환**
+
+- P22의 문서 승인/형식·embedding/retrieval/chunker/reranker profile·품질/성능 기준 준비는 유지한다. G-SEAWEED-NOTIFY에서 notification·토픽·consumer group·Kafka ACL/실연결 의존은 최초에서 제외한다. SeaweedFS Read/List 자격과 verify 전용 fixture prefix/쓰기 identity 분리는 여전히 필요하며 Kafka 없이 확보·검증한다.
+- P23의 Knowledge 스키마·검색·Hybrid/RRF·필수 Reranker·문맥은 유지한다. P24는 기동 실행 계기와 문서 동기화·멱등·삭제·손상 복구를 구현한다. P25의 실제 Source suite는 fixture를 먼저 배치한 뒤 Gateway를 기동해 색인하며, ACL/규칙 변경·원본 삭제·손상은 제어된 다음 기동에서 검증한다. 시험 hook/API로 서비스 중 수집을 실행해 기동 계약을 대신하지 않는다.
+- F4 코드/허용 로컬 검증 완료 뒤 최초 배포 및 F1→F4 실환경 수용이라는 §16의 승인 실행 순서는 유지한다. 현재는 Spec 개정이며 P22~P25 구현·실환경 수집/DB 쓰기·서버 재시작·배포를 실행하지 않는다. Plan 개정은 이 Spec을 기준으로 별도 단계에서 수행한다.
+- 후속 단계에서 Kafka 토픽/권한·SeaweedFS notification·이벤트 소비자를 별도로 설계·승인·구현한다. 문서 읽기/빌드/원자 쓰기 정책은 재사용하되 미래 자동 감지를 위해 현재 미사용 소비자나 토픽을 미리 만들지 않는다. 온라인 처리와 기동 동기화 간 순서·부하·실패/재전달·ACK 계약 및 AC-23-LOAD는 그 단계에서 다시 확정·검증한다.
+- 배포 활성화는 호환 schema·앱·catalog·모델/profile·SeaweedFS 읽기 자격을 함께 검증한 뒤 한다. rollback은 이전 호환 이미지/설정으로 명시 수행하며 자동 Kafka 전환·색인 전량 삭제·이미 적용된 migration 수정은 하지 않는다. profile/구조 불일치가 남으면 준비 완료로 취급하지 않는다.
 
 ### 8.4 Vector backend (2026-10-27 확정, D45)
 
@@ -1285,6 +1338,8 @@ Jetson 기준(2026-11-02 계산 이력) 상한 크기 기본 추론 ≈30s(분�
 
 ### 14.7 동시성·큐 (v4.1, D56)
 
+**2026-11-13 대체(seq18):** 최초 문서 색인은 §8.3.1의 기동 전제이며 일반 질문 Job의 180s 수명·사용자 delegation으로 실행하지 않는다. 아래 서비스 중 야간 백필·질문과의 경쟁 부하는 후속 온라인 색인 단계의 이력이다. 현재 질문 큐/생성 동시성은 바꾸지 않으며 최초 기동 수집의 유계 실행·probe 예산은 Plan에서 별도로 정합한다.
+
 - 추론 서버는 `OLLAMA_NUM_PARALLEL=1` 이라 생성 요청을 직렬 처리하도록 설정돼 있다(2026-11-04 설정 실측. **v4.1 대체(2026-11-06):** LLM 노트북 서버의 생성 runner `llamacpp` 와 관측한 `llama-server` 자식 프로세스 1개의 `-np 1`을 확인했다 — 아래 모델별 runner 관측 참조). 이 직렬화는 NORI 밖 소비자의 요청과도 공유되므로 Gateway 의 생성 호출은 다른 소비자 요청 뒤에서 기다릴 수 있다. Gateway 는 두 단위를 구분해 둔다(v4.1 대체(2026-10-26): 직전 문구는 큐 단위인 Job 과 생성 호출 단위를 구분하지 않았다). ①**Job 실행 슬롯(`maxRunningJobs`, 초기 1)** — 초기 프로필은 RUNNING Job 을 동시에 1개만 둔다. Job 은 RUNNING 전이 때 슬롯을 얻어 분류 → Tool → Composer → terminal 커밋까지 보유하고 terminal 커밋 뒤에만 반납한다. 그래서 한 Job 의 후속 Composer 가 다른 Job 의 분류 뒤로 밀리지 않는다(Job 단위 FIFO). ②**생성 호출 세마포어(`generationConcurrency`, 초기 1)** — 추론 서버로 가는 생성 호출(재시도 포함)의 동시 수를 제한하는 별도 보호다. 슬롯 1 아래에서는 Job 사이 경합이 없지만, 같은 Job 의 재시도·취소 경합에서도 Gateway 자신의 호출에 한해 대기가 추론 서버 내부 대기열에 숨지 않게 유지한다(NORI 밖 소비자 요청 뒤의 서버 내부 대기는 이 세마포어로 막을 수 없다). **v4.1 대체(2026-11-05):** 서버 내부 슬롯 추가 실측은 F5a로 연기한다. 설정값1과 Gateway 생성 세마포어·Job 용량 프로필을 유지한다.
 - **생성 직렬화와 Job 직렬화는 다른 선택이다(2026-10-27):** 서버 직렬 처리(`OLLAMA_NUM_PARALLEL=1`, 2026-11-06 관측한 생성 runner 의 `-np 1`)가 직접 요구하는 것은 ②생성 호출 동시 1뿐이다. ①Job 실행 슬롯 1은 서버 직렬 처리에서 필연적으로 나오지 않는다 — Job 은 Tool I/O(TC API·Loki·Tempo·GitLab·RAG) 동안 추론 서버를 쓰지 않으므로, 생성 호출을 1로 직렬화한 채 여러 Job 을 RUNNING 으로 둘 수 있다. 초기 프로필이 Job 1을 고르는 이유는 Job 순서·취소·재기동 복구를 단순하게 하기 위한 **초기 제한**이며, 그 대가로 Tool I/O 대기 동안 다른 Job 이 진행하지 못한다. 실제 생성 병렬성(`generationConcurrency`)은 HW·runtime 실측으로 정하고 GPU 1대의 한도를 실측 없이 올리지 않는다. Gateway replica 1·`Recreate`(§16 배포)는 그대로 두며, Job 병렬화를 위해 replica 를 반드시 늘릴 필요는 없다(같은 프로세스 안의 `maxRunningJobs`).
 - **용량 프로필(2026-10-27):** `maxRunningJobs` 와 `generationConcurrency` 는 서로 독립인 배포 설정이며, QUEUED 깊이·대기 한도·Job 수명 한도와 함께 **용량 프로필 한 곳**에서 관리한다(코드 상수·여러 설정 중복 금지). 현 장비(D44, 2026-11-04 새 서버)의 **초기 용량 프로필** = `maxRunningJobs=1`·`generationConcurrency=1`·QUEUED 깊이 4·대기 60s·Job 180s(§5.4). 2026-11-04 장비 교체 때 값은 바꾸지 않았다(아래 확장 게이트 트리거 ⓐ 비해당). 두 동시 한도는 양의 정수만 유효하며, 값이 없거나 0·음수·정수가 아니면 Gateway 는 기동을 거부한다(fail-closed, 기본값으로 대체하지 않음). 아래 디스패치의 RUNNING 슬롯 조건과 허용 수는 이 프로필 값에 종속되고, 최초 배포(F4~F5b) 게이트는 값 1로 고정해 시험한다(AC-28 F 단계 하위). 이 값은 TC 단일 시스템 전체 수명의 영구 불변식이 아니라 현 장비의 초기 제한이며, 1~2명이 사용해도 실측 전에는 성능을 보장하지 않는다. 다중 worker·새 플랫폼·구체 코드 설계는 이 문서에서 정하지 않는다.
@@ -1384,6 +1439,8 @@ Front → 자신이 속한 System Backend → AI Gateway 흐름만 허용한다.
 
 
 ## 16. 단계별 구축 범위 및 수용 게이트 (v4 합의안, v4.1 갱신)
+
+**2026-11-13 대체(seq18):** F3 수집은 §8.3.1의 기동 동기화이며 Kafka/notification·야간 백필·채팅 갱신 명령은 최초 범위 밖이다. 아래 F3/F4 표의 이전 자동 수집·ack·백필 경쟁 조건은 이력으로 읽는다. 검색·Hybrid/Reranker·Source 승인/형식·성능/품질 기준은 유지하고 AC-23-LOAD만 최초 F4 필수에서 후속으로 이관한다. 코드/로컬 선행 후 최초 배포·F1→F4 수용 순서는 유지한다.
 
 **개발 완료와 실환경 수용의 분리(2026-11-09 사용자 확정).** 사용자는 “실제 k8s 에 올리는건 F4 까지 모두 다 진행하고, 그 다음에 올려서 정상 확인”한다고 명시했다. F1→F2→F3→F4의 기능 구현, 시험 코드·fixture·하네스 준비와 허용된 로컬 단위/격리 통합 검증을 먼저 수행한다. 이 구간의 최초 Kubernetes 배포는 하지 않는다. 기존 문서의 F1/F2/F3 exit PASS·배포/운영 입력을 다음 단계의 **코드 구현·로컬 검증** 선행으로 해석한 조건은 이 결정으로 대체한다. 코드 단계 간 실제 타입·wiring·구현 의존과 로컬 검증은 그대로 따른다.
 
@@ -1514,7 +1571,7 @@ TC에서 WM LOT·재고·문서 검색을 요청하거나 WM에서 TC EQP/Git/�
 | O4 | embedding 모델 — **해소(v4.1)** **v4.1 대체(2026-11-06):**: `bge-m3`(D44. 새 서버 ID 790764642607 — F3 embedding profile 의 digest 는 이 서버 값으로 기록) |
 | O5 | Vector DB — **해소(2026-10-27 사용자 결정)**: AI Gateway 전용 PostgreSQL(Job 저장소와 같은 인스턴스·DB) + pgvector, 초기 정확 top-k, 한국어 본문 keyword = 정규화 리터럴 부분 문자열(D45, §8.4). 확장 가용성은 F1 실행 게이트, 교체는 F3/F4 실측 근거의 명시적 작업. 이력: v4.1 해소(2026-07-02 실측 4건) 당시 결정 = 독립 Qdrant pod·`multilingual` tokenizer, 이 결정으로 대체 |
 | O6 | 1차 RAG 소스 문서 범위 — 부분 해소(v4.1): 원천 = SeaweedFS `nori-tc` 버킷, 대상 유형 = §8.2. 2026-10-27 사용자 승인: 승인 단위 = 명시 경로/문서 목록(prefix 전체 아님, 자동 온보딩 없음, §7.6), 지원 형식은 승인 corpus 조사 후 확정(§8.2). 남은 증거: 실제 문서 목록·소유자 승인·형식 조사(F3 설치 전 산출물) |
-| O7 | Object Storage 도입 / Git 기반 문서 source — **해소(v4.1)**: 기존 SeaweedFS 재사용 + Kafka notification(D46). 코드는 색인하지 않고 GitLab 라이브 조회(§8.2) |
+| O7 | Object Storage 도입 / Git 기반 문서 source — **2026-11-13 대체(seq18):** 기존 SeaweedFS 승인 문서를 기동 때 동기화(D46·§8.3.1), Kafka notification은 후속. 이력: **해소(v4.1)** 기존 SeaweedFS 재사용 + Kafka notification(D46). 코드는 색인하지 않고 GitLab 라이브 조회(§8.2) |
 | O8 | Log / Trace backend 종류와 Tool 계약 — **해소(v4.1)**: Loki(`monitoring/loki:3100`)/Tempo, Log Source = `app` 라벨 allowlist(D47, §7.6) |
 | O9 | Git read 범위 및 권한 — 부분 해소(v4.1): GitLab TC 레포 allowlist(§7.6). 2026-10-27 사용자 승인: 허용 Repo + 읽기 범위 명시 목록, 미등록 기본 거부. 승인 레포 목록·소유자 승인·읽기 토큰은 F1 산출물 |
 | O10 | 시스템별 1차 Tool 최소 목록 — TC 해소(v4.1): §7.3 TC 7종(2026-10-26 `tc.dlq.list` 추가·`tc.model.read` 1차 이동). WM/HRM 은 R1/R2 온보딩에서 확정 |
@@ -1951,6 +2008,8 @@ v4 의 신뢰 경계에는 이 구간이 없었다. 추론 서버는 Prompt 에 
 
 ### 27.2 단계별 기존 수용 시나리오
 
+**2026-11-13 대체(seq18):** 수집의 최초 실행 계기·실패·재기동 기대값은 §8.3.1의 같은 leaf ID 대체 표가 정본이다. 아래 Kafka 이벤트/ack·서비스 중 백필 표현은 후속 이력이며 최초 필수 조건이 아니다. AC-23-LOAD는 유효 ID를 보존하되 최초 F3/F4 필수 집합에서 제외한다. 다른 검색/격리·인가·품질 기준은 유지한다.
+
 | ID | 단계 | 시나리오 | 기대 결과 |
 |---|---|---|---|
 | AC-01 | 1차 | TC EQP 현재 상태 | TC 상태·연결·최근 오류를 TC 정본과 observedAt로 표시. WM Workorder 결합 금지 |
@@ -2189,6 +2248,8 @@ AC-41 검사 규칙: 원문 문자열 일치만으로 판정하지 않는다. �
 
 #### 단계 게이트 매핑 (단일 정본, 2026-10-26)
 
+**2026-11-13 대체(seq18):** 아래 최초 F4 required에서 AC-23-LOAD를 제외한다(후속 온라인 색인 단계). F3 수집 leaf는 ID를 유지한 채 §8.3.1의 기동/재기동 판정으로 대체한다. Kafka 실연결이 없다는 이유로 최초 F3/F4를 차단하지 않으며 SeaweedFS·DB·embedding 실측과 다른 필수 leaf를 생략하지 않는다.
+
 v4.1 대체: 직전 문서는 §16 각 단계 통과 조건에 일부 AC 만 나열해 F4 의 AC-29·AC-30·AC-33·AC-36·AC-44·AC-45·AC-46 과 F5a·F5b 의 AC-28 `TC_LIVE` 재실행이 게이트에서 빠졌다. 규칙: ①아래 표가 F0~F5b·R1·R2·용량 확장 게이트 필수 시험 목록의 단일 정본이며 §16 통과 조건 열은 이 표를 가리킨다. ②AC/ISO 의 단계 열이나 하위 정의에 어떤 단계가 적힌 leaf 는 그 단계 게이트의 필수 항목이다. 하위가 없는 원자 AC 가 여러 단계를 가지면 단계마다 다시 실행하고 `AC-29@F2[MOCK_API·LLM_LIVE]` 처럼 단계·라벨을 붙여 따로 보고한다. 한 단계의 PASS 로 다른 단계를 대신하지 않는다. ③단계가 "1차"·"전 단계" 로만 적힌 AC 는 이 표의 배정을 따른다. ④후속 단계 leaf 의 NOT_RUN 은 현재 단계 게이트·다음 단계 착수를 막지 않는다(위 집계 규칙). ⑤공유 하위도 단계별 실행·보고는 따로 한다. **v4.1 대체(2026-11-05):** 아래 F0 행은 비게이트 진단 이력으로 대체하며 F5a 행에 옮긴5 leaf가 필수 정본이다. 후속 NOT_RUN은 F1~F4 착수를 막지 않는다.
 
 | 게이트 | 필수 leaf·원자 AC/ISO(그 단계 실행분) | 라벨 |
@@ -2309,6 +2370,8 @@ ISO-15 하위는 실제 Loki Source를 쓰며, 하네스가 같은 시간창에 
 
 ### 27.4 단계별 설계·구현 산출물 — 실제 개발 순서
 
+**2026-11-13 대체(seq18):** 아래 F3의 SeaweedFS notification 원천/이벤트 수집은 최초에 §8.3.1의 기동 동기화로 대체한다. Kafka 토픽·연결·consumer는 후속 구현이고, 문서 수집·검색·인가·품질 검증은 유지한다. 이 문서 개정으로 기존 Plan/catalog/suite 정합이나 P22 구현이 완료되었다고 보지 않는다.
+
 **2026-11-09 실행 시점 정정:** 아래 F1~F4 산출물의 구현·허용 로컬 검증을 먼저 끝낸다. Kubernetes 설치·실배포·실환경 검증 증거는 F4 구현 뒤 §16의 순서로 확보한다. 각 단계의 실제 수용 조건은 그대로이며 산출물 준비만으로 운영 PASS를 표시하지 않는다.
 
 1. **F0 추론 실측:** TC 골든셋 하네스, (A) LLM 계획 vs (B) 고정 workflow 비교 측정표(§14.5 기록), D50 확정 또는 (A) F0 잠정 후보 기록(F4 후보 실행·F4 최종 승격은 AC-24-PERF). **v4.1 대체(2026-11-05):** F0 추가 연습·정식 측정은 중단한다. 납품물은 §14.5 진단 기준선이며 비교·경계 수용과 A 승격은 F5a로 이관한다.
@@ -2323,8 +2386,11 @@ ISO-15 하위는 실제 Loki Source를 쓰며, 하네스가 같은 시간창에 
 
 ### 27.5 v3 → v4 → v4.1 변경 추적 및 완료 조건
 
+**2026-11-13 변경(seq18):** 최초 수집 계기를 Gateway 기동으로 한정한 사용자 결정을 header·§0 D46(대체 정본 §8.3.1)·§8.3/§8.3.1·§16·§27.2·§27.4·§28.9에 반영했다. Kafka notification·온라인 이벤트·주기/야간 백필·채팅 갱신은 최초 범위에서 제외하고 후속 자동 감지로 이관한다. 수집 leaf ID/총수 220은 보존하되 입력·기대값과 최초 F4 필수 집합(AC-23-LOAD 후속)을 바꾼다. 기존 문구·실행 결과·기준선은 이력으로 보존한다. Spec/기준선 개정만 수행하며 Plan/catalog/suite 정합·P22~P25 구현·수집/배포/실환경 판정은 미실행이다.
+
 | 위치 | v4 변경 요약 |
 |---|---|
+| **2026-11-13 seq18** header·§0 D46·§8.3/§8.3.1·§14.7·§16·§19 O7·§27.2·§27.4·§27.5·§28.9 | 최초 RAG는 기동/재기동 때 승인 문서만 동기화. Kafka/notification·주기/야간·채팅 갱신은 후속/제외. 문서 단위 멱등·삭제·손상 복구·readiness 선행 및 기존 수집 ID 대체; AC-23-LOAD는 최초 required에서 후속 이관. Spec/기준선만 개정, Plan·구현·실환경 미실행. |
 | §0 D12/D19/D22/D34~D36 | Cross-System 조사 허용 → 단일 시스템 영구 귀속; 3단계 구현 |
 | §1~3 / §5 | 인증된 서비스 기반 Scope 고정·같은 시스템 내에만 Agent 계획 |
 | §7~9 | Tool.ownerSystem/toolKind 분리, 시스템별 Connector/RAG/Source Allowlist, Cross-System 위임 제거 |
@@ -2506,6 +2572,8 @@ Cross-encoder는 질의와 후보 본문을 함께 평가하는 필수 단계다
 Composer는 짧은 요약을 담당한다. 128토큰으로 상세 보고 전체를 작성한다고 약속하지 않는다. 상세 블록을 만들 구조화 근거가 부족하면 해당 내용을 누락으로 표시한다. 향후 긴 자유 서술은 별도 예산·근거 검증·실측 계약을 승인한 뒤 도입한다. 현재 질문이 요구한 핵심 항목을 요약에서 생략하더라도 상세 블록의 누락 여부는 보존한다. Source·권한·삭제·revision 의존성은 파생 비교·조치 블록에도 상속한다.
 
 ### 28.9 신규 수용 leaf와 단계 정합
+
+**2026-11-13 대체(seq18):** 유효 ID/총 leaf 220은 유지한다. 수집 component는 §8.3.1의 기동 기준으로 대체하고 AC-23-LOAD는 최초 F4 required에서 후속으로 이관한다. 아래 seq16/17 집계는 유효 ID 수의 이력이며 최초 stage 필수 집합과 동일하다고 해석하지 않는다. QUERYINPUT·HYBRID·RERANK·CONTEXT·QUALITY와 격리 회귀는 유지한다.
 
 아래 **8개를 유효 leaf 에 추가**한다. 기존 leaf ID·원시 결과는 변경하지 않는다. RG-xx는 요구 ID이고 leaf가 아니다. Hybrid가 필수이므로 기존 ISO-06-H-MISSING/TAMPER 2개는 F3·F4 필수로 이동하며 다시 더하지 않는다. §27.2의 “후속 Hybrid” 제외와 Plan의 같은 제외는 이 계약으로 대체한다. **2026-11-12 대체(seq17):** 유효 leaf = seq15 기준 214 − §12.4 철회 2(AC-24-RESTORE·AC-24-BACKUP-ALERT) + 신규 8 = **220**(AC 하위 159·ISO 하위 61, 원자 23·상위 61 유지, AC-24 하위 24). 이력: "기존 유효 leaf 214개에 아래 8개를 추가해 222개로 한다", "222개에 재가산하지 않는다".
 
