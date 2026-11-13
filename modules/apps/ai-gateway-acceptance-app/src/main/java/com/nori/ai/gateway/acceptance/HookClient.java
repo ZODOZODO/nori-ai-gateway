@@ -11,7 +11,9 @@ import java.util.Map;
 /** Gateway verify hook 호출(§4.5). 토큰은 헤더로만 보내고 오류에는 경로·상태 코드만 담는다. */
 public final class HookClient {
     public static final class HookFailure extends RuntimeException {
-        HookFailure(String path, int status) { super("HOOK_FAILED:" + path + ":" + status); }
+        private final int status;
+        HookFailure(String path, int status) { super("HOOK_FAILED:" + path + ":" + status); this.status = status; }
+        public int status() { return status; }
     }
     private final HttpClient http;
     private final URI base;
@@ -29,6 +31,11 @@ public final class HookClient {
     public JsonNode clock(Map<String,Object> operation) { return call("POST", "/__test/clock", operation, 200); }
     public JsonNode post(String path, Map<String,Object> body, int expected) { return call("POST", path, body, expected); }
     public JsonNode get(String path) { return call("GET", path, null, 200); }
+    /** 404 만 관측 없음(빈 값)으로 돌려주고 다른 실패는 그대로 던진다. */
+    public java.util.Optional<JsonNode> find(String path) {
+        try { return java.util.Optional.of(call("GET", path, null, 200)); }
+        catch (HookFailure failure) { if (failure.status() == 404) return java.util.Optional.empty(); throw failure; }
+    }
 
     private JsonNode call(String method, String path, Object body, int expected) {
         try {

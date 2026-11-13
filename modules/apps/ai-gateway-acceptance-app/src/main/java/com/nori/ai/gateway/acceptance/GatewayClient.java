@@ -62,6 +62,10 @@ public final class GatewayClient {
         return new Submission(send(request, path),Set.of(dlg,serviceToken,assertion));
     }
     public HttpResponse<String> get(String path, Map<String,Object> claims) { return send(authorized(path, claims).GET().build(), path); }
+    /** Job 을 만들지 않는 POST(대화 생성 등). 위임 등록·{@code dlg} 없이 같은 Gateway 시계로 서명한다. */
+    public HttpResponse<String> post(String path, Map<String,Object> claims, String jsonBody) {
+        return send(authorized(path, claims).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8)).build(), path);
+    }
 
     /** 인입 음성 시험은 헤더를 정확히 하나씩 깨뜨려야 하므로 자동 보정 없이 전송합니다. */
     public HttpResponse<String> request(String path, String assertion, String token, String body) {

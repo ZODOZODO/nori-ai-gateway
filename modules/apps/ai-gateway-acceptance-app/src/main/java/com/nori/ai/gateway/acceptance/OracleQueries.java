@@ -34,6 +34,9 @@ public final class OracleQueries {
         FLYWAY_LATEST("SELECT version FROM gw_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"),
         RETENTION_PROBE("SELECT verified_oldest_at, probe_limit_at, probed_at FROM gw.source_retention_probe WHERE source_id = ?"),
         JOB_TIMINGS("SELECT id, status, created_at, started_at, terminal_at FROM gw.job WHERE id = ANY (?) ORDER BY id"),
+        TOOL_STATUS("SELECT capability_id, status FROM gw.tool_execution WHERE job_id = ? ORDER BY created_at, id"),
+        JOB_OWNER("SELECT owner_system FROM gw.job WHERE id = ?"),
+        CLASSIFIED_TASK_TYPE("SELECT task_type FROM gw.audit_event WHERE job_id = ? AND event_type = 'JOB_CLASSIFIED' ORDER BY id"),
         RESIDUE_CONVERSATION("SELECT 'conversation:' || id, row_to_json(t)::text FROM gw.conversation t"),
         RESIDUE_MESSAGE("SELECT 'message:' || id, row_to_json(t)::text FROM gw.message t"),
         RESIDUE_JOB("SELECT 'job:' || id, row_to_json(t)::text FROM gw.job t"),
@@ -49,6 +52,8 @@ public final class OracleQueries {
     public record RetentionProbe(Optional<Instant> verifiedOldestAt, Optional<Instant> probeLimitAt, Instant probedAt) {}
     public record JobTiming(String jobId, String status, Instant createdAt, Optional<Instant> startedAt, Optional<Instant> terminalAt) {}
     public record Range(Instant from, Instant to) {}
+    /** Tool 실행 행의 Capability ID·저장 상태만(본문 0). */
+    public record ToolRow(String capabilityId, String status) {}
     public record CommSource(String source, String status, int itemCount, Set<String> warnings, List<Range> missing, List<Range> unverified,
             long count, long maximum, Optional<Instant> oldest, long retentionHours, boolean applied, boolean deletionPathsExcluded) {}
     public record ToolObservation(String status, String errorCode, int itemCount, Set<String> warnings, Set<String> apps, Set<String> namespaces,
@@ -105,6 +110,15 @@ public final class OracleQueries {
     }
     private static Set<String> strings(com.fasterxml.jackson.databind.JsonNode values){var result=new TreeSet<String>();values.forEach(value->result.add(value.asText()));return Set.copyOf(result);}
     private static List<Range> ranges(com.fasterxml.jackson.databind.JsonNode values){var result=new ArrayList<Range>();for(var value:values){String from=value.path("from").asText(value.path("startAt").asText());String to=value.path("to").asText(value.path("endAt").asText());result.add(new Range(Instant.parse(from),Instant.parse(to)));}return List.copyOf(result);}
+    /** 같은 Job 의 Tool 실행 행(실행 순서). 본문은 읽지 않는다. */
+    public List<ToolRow> toolRows(String job) {
+        return query(Query.TOOL_STATUS, rows -> { var values = new ArrayList<ToolRow>(); while (rows.next()) values.add(new ToolRow(rows.getString(1), rows.getString(2))); return List.copyOf(values); }, id(job));
+    }
+    public Optional<String> jobOwner(String job) { return query(Query.JOB_OWNER, rows -> rows.next() ? Optional.of(rows.getString(1)) : Optional.<String>empty(), id(job)); }
+    /** JOB_CLASSIFIED 감사의 taskType 값(감사 행마다 하나). */
+    public List<String> classifiedTaskTypes(String job) {
+        return query(Query.CLASSIFIED_TASK_TYPE, rows -> { var values = new ArrayList<String>(); while (rows.next()) values.add(rows.getString(1)); return List.copyOf(values); }, id(job));
+    }
     public long authRejectionCount(String requestId, String decision, int status) {
         if (decision == null || !decision.matches("[A-Z_]{1,64}") || status < 400 || status > 599) throw new IllegalArgumentException("AUTH_REJECTION_INVALID");
         return count(Query.AUTH_REJECTION, id(requestId), decision, Integer.toString(status));

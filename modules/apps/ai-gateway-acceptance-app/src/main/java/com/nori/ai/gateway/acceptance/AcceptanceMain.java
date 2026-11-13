@@ -14,12 +14,13 @@ import static org.junit.platform.engine.discovery.DiscoverySelectors.selectPacka
 /**
  * 배포 수용 Job 진입점. 첫 단계는 {@link SpecInputVerifier} 이고 실패하면 시험을 하나도 실행하지 않고 RUN ABORTED 1건·exit 3 이다.
  * 일치하면 {@code aigw.acceptance.suite} 의 시험만 JUnit Platform Launcher 로 순차 실행하고, OTR 은 tmpfs 에만 쓴 뒤 정제 레코드만 블록으로 낸다.
+ * {@code -OUTAGE} suite 는 {@code AIGW_OUTAGE_PHASE}(STOPPED·LOADING) 의 {@code outage-<phase>} 태그 시험만 실행하고 모든 레코드에 {@code outagePhase} 를 싣는다(gate 의 component 단계 대조).
  * 종료 코드: 0 실행 시험 전부 성공(skip·abort 0), 1 실패·skip·abort·하네스 오류, 2 입력 오류, 3 SPEC 입력 실패, 4 실행 시험 0.
  * 프로세스 stdout 은 증거 블록 전용이다: 시험·라이브러리가 System.out/err 에 쓰는 내용과 예외 원문은 버린다.
  */
 public final class AcceptanceMain {
     public static final String SUITE_PACKAGE = "com.nori.ai.gateway.acceptance.suite";
-    /** JUnit Platform Launcher 경계. suite 태그 시험을 실행해 OTR 을 그 디렉터리에 쓴다. */
+    /** JUnit Platform Launcher 경계. suite 태그 시험(-OUTAGE 는 그 단계 태그까지)을 실행해 OTR 을 그 디렉터리에 쓴다. */
     @FunctionalInterface public interface SuiteRunner { void run(String suite, Path otrDirectory); }
 
     private final AcceptanceConfig config;
@@ -39,7 +40,7 @@ public final class AcceptanceMain {
             System.getProperties().stringPropertyNames().stream().filter(name -> name.startsWith("aigw.")).forEach(name -> properties.put(name, System.getProperty(name)));
             var config = new AcceptanceConfig(System.getenv(), properties);
             Path temporary = Path.of(System.getProperty("java.io.tmpdir"));
-            if (args.length == 0) return new AcceptanceMain(config, evidence, AcceptanceMain::launch, temporary).runSuite();
+            if (args.length == 0) return new AcceptanceMain(config, evidence, (suite, otr) -> launch(tags(suite, config.outagePhase()), otr), temporary).runSuite();
             if (args.length == 2 && args[0].equals("--mode") && args[1].equals("rubric-view")) return RubricViewMode.run(config, evidence);
             return 2;
         });
@@ -68,23 +69,25 @@ public final class AcceptanceMain {
         String runId = UUID.randomUUID().toString();
         String parent = config.parentRunId().orElse(null);
         JsonNode identity = config.buildIdentity().orElse(null);
+        boolean outage = suite != null && suite.endsWith("-OUTAGE");
+        String phase = outage ? config.outagePhase().orElse(null) : null;
         String specSha;
         try { specSha = SpecInputVerifier.verify(config.specGzipFile().orElse(null), config.expectedSpecSha256().orElse(null)); }
         catch (SpecInputVerifier.Failure failure) {
             var context = new EvidenceBlockWriter.Context(stage, suite, runId, parent, null, identity);
-            EvidenceBlockWriter.write(out, List.of(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", failure.code()))));
+            EvidenceBlockWriter.write(out, List.of(phased(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", failure.code())), phase)));
             return 3;
         }
         var context = new EvidenceBlockWriter.Context(stage, suite, runId, parent, specSha, identity);
-        if (suite == null || parent == null || identity == null) {
-            EvidenceBlockWriter.write(out, List.of(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", "ACCEPTANCE_INPUT_INVALID"))));
+        if (suite == null || parent == null || identity == null || outage && phase == null) {
+            EvidenceBlockWriter.write(out, List.of(phased(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", "ACCEPTANCE_INPUT_INVALID")), phase)));
             return 2;
         }
-        EvidenceBlockWriter.write(out, List.of(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "STARTED"))));
+        EvidenceBlockWriter.write(out, List.of(phased(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "STARTED")), phase)));
         Path otr;
         try { otr = Files.createTempDirectory(temporary, "aigw-otr-"); } catch (IOException e) { throw new IllegalStateException("OTR_DIRECTORY"); }
         try {
-            F1RubricTargets.clear(); AcceptanceMeasurements.clear();
+            F1RubricTargets.clear(); F2RubricTargets.clear(); F2LiveSamples.clear(); AcceptanceMeasurements.clear();
             EvidenceBlockWriter.Extraction extraction;
             try {
                 runner.run(suite, otr);
@@ -92,35 +95,48 @@ public final class AcceptanceMain {
             } catch (IllegalStateException invalid) {
                 // OTR 결손·무효(중복 finished·미완 결과 등)는 성공으로 덮지 않는다. 사유는 고정 코드만.
                 String reason = invalid.getMessage() != null && invalid.getMessage().matches("OTR_[A-Z_]{1,40}") ? invalid.getMessage() : "LAUNCHER_FAILED";
-                EvidenceBlockWriter.write(out, List.of(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", reason))));
+                EvidenceBlockWriter.write(out, List.of(phased(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", reason)), phase)));
                 return 1;
             }
             if (extraction.executed() == 0) {
-                EvidenceBlockWriter.write(out, List.of(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", "NO_TESTS_EXECUTED"))));
+                EvidenceBlockWriter.write(out, List.of(phased(EvidenceBlockWriter.record(context, Map.of("kind", "RUN", "status", "ABORTED", "reasonCode", "NO_TESTS_EXECUTED")), phase)));
                 return 4;
             }
-            var records = new ArrayList<ObjectNode>(extraction.leaves());
+            var records = new ArrayList<ObjectNode>();
+            for (var leaf : extraction.leaves()) records.add(phased(leaf, phase));
             // 측정 시험(F3-PROBE 등)이 모은 정제 값만 MEASUREMENT 레코드로 낸다(leaf·벡터 0).
             for (var measurement : AcceptanceMeasurements.snapshot()) {
                 var fields = new LinkedHashMap<String,Object>();
                 fields.put("kind", "MEASUREMENT"); fields.put("measurementId", measurement.measurementId()); fields.put("values", measurement.values());
-                records.add(EvidenceBlockWriter.record(context, fields));
+                records.add(phased(EvidenceBlockWriter.record(context, fields), phase));
             }
             var completed = new LinkedHashMap<String,Object>();
             completed.put("kind", "RUN"); completed.put("status", "COMPLETED"); completed.put("executedTestCount", extraction.executed());
             completed.put("values", Map.of("leafRecordCount", extraction.leaves().size(), "passed", extraction.passed(), "failed", extraction.failed(), "skipped", extraction.skipped(), "aborted", extraction.aborted()));
             if (suite.equals("F1")) completed.put("rubricTargets", F1RubricTargets.snapshot());
-            records.add(EvidenceBlockWriter.record(context, completed));
+            if (suite.equals("F2")) completed.put("rubricTargets", F2RubricTargets.snapshot());
+            records.add(phased(EvidenceBlockWriter.record(context, completed), phase));
             EvidenceBlockWriter.write(out, records);
             // skip·abort 만 있는 실행도 성공이 아니다(leaf 는 NOT_RUN 으로 남는다).
             return extraction.failed() == 0 && extraction.aborted() == 0 && extraction.skipped() == 0 ? 0 : 1;
-        } finally { F1RubricTargets.clear(); AcceptanceMeasurements.clear(); delete(otr); }
+        } finally { F1RubricTargets.clear(); F2RubricTargets.clear(); F2LiveSamples.clear(); AcceptanceMeasurements.clear(); delete(otr); }
     }
 
-    static void launch(String suite, Path otrDirectory) {
+    /** -OUTAGE 회차 레코드에 단계를 싣고 다시 봉인한다. 단계가 없으면 그대로다. */
+    static ObjectNode phased(ObjectNode record, String phase) {
+        if (phase == null) return record;
+        var copy = record.deepCopy(); copy.put("outagePhase", phase);
+        return CanonicalJson.seal(copy);
+    }
+    /** launcher 태그 식: suite 태그, -OUTAGE 는 그 단계 태그와의 AND. */
+    static String tags(String suite, Optional<String> phase) {
+        return suite.endsWith("-OUTAGE") ? "suite-" + suite + " & outage-" + phase.orElseThrow(() -> new IllegalStateException("OUTAGE_PHASE_MISSING")) : "suite-" + suite;
+    }
+
+    static void launch(String tagExpression, Path otrDirectory) {
         var request = LauncherDiscoveryRequestBuilder.request()
             .selectors(selectPackage(SUITE_PACKAGE))
-            .filters(TagFilter.includeTags("suite-" + suite))
+            .filters(TagFilter.includeTags(tagExpression))
             .configurationParameter("junit.jupiter.execution.parallel.enabled", "false")
             .configurationParameter("junit.platform.reporting.open.xml.enabled", "true")
             .configurationParameter("junit.platform.reporting.output.dir", otrDirectory.toString())

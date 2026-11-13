@@ -29,6 +29,8 @@ public record AcceptanceConfig(Map<String,String> env, Map<String,String> proper
         catch (java.nio.file.InvalidPathException e) { return Optional.empty(); }
     }
     public Optional<String> expectedSpecSha256() { return Optional.ofNullable(env.get("AIGW_EXPECTED_SPEC_SHA256")); }
+    /** -OUTAGE suite 회차의 단계(stage gate --outage-phase → 차트 acceptance.outagePhase). 닫힌 두 값 밖이면 빈 값이다. */
+    public Optional<String> outagePhase() { return Optional.ofNullable(env.get("AIGW_OUTAGE_PHASE")).filter(phase -> phase.equals("STOPPED") || phase.equals("LOADING")); }
     public Optional<String> gatewayBaseUrl() { return Optional.ofNullable(env.get("AIGW_GATEWAY_BASE_URL")); }
 
     /** {@code image-digests.json} 의 digest·빌드 신원과 렌더 SHA(비밀 아님). 형식 위반이면 빈 값이다. */
