@@ -26,9 +26,9 @@ public interface InferenceClient {
 
     /**
      * 정상 응답. {@code content} 는 답변(message.content)만이며 사고문은 담지 않는다(SPEC §14.5 방법 (b)).
-     * {@code finishReason} 은 OpenAI wire 값의 소문자(예: {@code stop}, {@code length})다.
+     * {@code finishReason} 은 OpenAI wire 값의 소문자(예: {@code stop}, {@code length})다. {@code inputTokens} 는 호출 직전 assert 의 Gateway 입력 계수다.
      */
-    record Completed(String content, String finishReason, int promptTokens, int completionTokens, Duration latency) implements ChatOutcome {
+    record Completed(String content, String finishReason, int promptTokens, int completionTokens, Duration latency, int inputTokens) implements ChatOutcome {
         public Completed {
             Objects.requireNonNull(content, "content");
             Objects.requireNonNull(finishReason, "finishReason");
@@ -40,8 +40,8 @@ public interface InferenceClient {
     /** 호출 직전 예산 초과. HTTP 전송은 0 이며 호출자는 {@code INPUT_BUDGET_EXCEEDED} 로 매핑한다. */
     record BudgetExceeded(int count) implements ChatOutcome {}
 
-    /** 전송·응답 실패. {@code errorClass} 는 원인 예외의 클래스명(없으면 null)뿐이다. */
-    record CallFailed(FailureReason reason, String errorClass, Duration latency) implements ChatOutcome {
+    /** 전송·응답 실패. {@code errorClass} 는 원인 예외의 클래스명(없으면 null)뿐이다. {@code inputTokens} 는 호출 직전 assert 의 Gateway 입력 계수다. */
+    record CallFailed(FailureReason reason, String errorClass, Duration latency, int inputTokens) implements ChatOutcome {
         public CallFailed {
             Objects.requireNonNull(reason, "reason");
             Objects.requireNonNull(latency, "latency");

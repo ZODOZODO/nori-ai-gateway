@@ -39,18 +39,18 @@ public final class SpringAiOpenAiInferenceClient implements InferenceClient {
         if (checked instanceof PreCallBudgetAssert.Exceeded exceeded) return ChatOutcome.budgetExceeded(exceeded.count());
         long started = System.nanoTime();
         try { generation.acquire(); }
-        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return failed(FailureReason.INTERRUPTED, null, started); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return failed(FailureReason.INTERRUPTED, null, started, checked.count()); }
         final ChatTransport.Response response;
         try { response = transport.send(type, List.copyOf(messages), maxTokens); }
-        catch (RuntimeException failure) { return failed(FailureReason.TRANSPORT, failure.getClass().getName(), started); }
+        catch (RuntimeException failure) { return failed(FailureReason.TRANSPORT, failure.getClass().getName(), started, checked.count()); }
         finally { generation.release(); }
         Duration latency = Duration.ofNanos(System.nanoTime() - started);
-        if (response == null || response.content() == null || response.finishReason() == null) return new CallFailed(FailureReason.EMPTY_RESPONSE, null, latency);
+        if (response == null || response.content() == null || response.finishReason() == null) return new CallFailed(FailureReason.EMPTY_RESPONSE, null, latency, checked.count());
         // usage 가 없으면 잘림을 배제할 수 없으므로 잘림과 같이 실패로 본다.
         if (response.promptTokens() == null || response.completionTokens() == null
             || truncation.check(checked.count(), response.promptTokens()) == TruncationDetector.Result.TRUNCATED)
-            return new CallFailed(FailureReason.TRUNCATED, null, latency);
-        return new Completed(response.content(), response.finishReason(), response.promptTokens(), response.completionTokens(), latency);
+            return new CallFailed(FailureReason.TRUNCATED, null, latency, checked.count());
+        return new Completed(response.content(), response.finishReason(), response.promptTokens(), response.completionTokens(), latency, checked.count());
     }
 
     @Override public List<float[]> embed(List<String> inputs) {
@@ -63,7 +63,7 @@ public final class SpringAiOpenAiInferenceClient implements InferenceClient {
         return List.copyOf(vectors);
     }
 
-    private static CallFailed failed(FailureReason reason, String errorClass, long started) {
-        return new CallFailed(reason, errorClass, Duration.ofNanos(System.nanoTime() - started));
+    private static CallFailed failed(FailureReason reason, String errorClass, long started, int inputTokens) {
+        return new CallFailed(reason, errorClass, Duration.ofNanos(System.nanoTime() - started), inputTokens);
     }
 }

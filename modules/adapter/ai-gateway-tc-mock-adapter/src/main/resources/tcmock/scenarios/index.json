@@ -15,5 +15,6 @@
   "comm-down",
   "empty",
   "dlq-scoped",
-  "dlq-scoped-other-snapshot"
+  "dlq-scoped-other-snapshot",
+  "composer-oversize"
 ]

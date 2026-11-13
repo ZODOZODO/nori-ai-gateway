@@ -72,7 +72,7 @@ class ClassificationV3MessageContractTest {
 
     /** 고정 입력 전체의 실제 조립 결과(id → messagesSha256). */
     static Map<String,String> assembled() throws Exception {
-        var service = new ClassificationService(new ScriptedClient(), TokenBudgetPolicy.current(), CODEPOINTS, expiry(new MutableClock()), LlmCallObserver.NONE,
+        var service = new ClassificationService(new ScriptedClient(), TokenBudgetPolicy.current(), CODEPOINTS, expiry(new MutableClock()), LlmCallObserver.NONE, attempt -> {},
             Files.readString(PROMPT, StandardCharsets.UTF_8), registry(json(ROOT.resolve("eval/golden/tc-registry-fixture-v2.json"))));
         Map<String,String> actual = new LinkedHashMap<>();
         for (JsonNode golden : jsonl(ROOT.resolve("eval/golden/tc-f0-v2.jsonl"))) {

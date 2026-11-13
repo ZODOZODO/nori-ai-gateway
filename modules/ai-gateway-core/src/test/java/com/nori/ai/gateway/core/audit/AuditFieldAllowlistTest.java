@@ -68,4 +68,23 @@ class AuditFieldAllowlistTest {
         assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.toolBlocked(scope, conversation, job, null, null, null, RejectReason.DENIED))).hasMessageContaining("status");
         assertThatThrownBy(() -> new AuditEvent(null, AuditEventType.API_REQUEST, TRACE, null, null, null, null, null, null, null, null, null)).isInstanceOf(NullPointerException.class);
     }
+
+    private static AuditEvent.LlmCall call(boolean sent, Integer prompt, java.util.List<com.nori.ai.gateway.core.budget.PromptReducer.Step> steps, String model) {
+        return new AuditEvent.LlmCall(com.nori.ai.gateway.core.budget.CallType.COMPOSER, sent, 2_700, 5_248, prompt, prompt == null ? null : 40, steps, model, "compose-v1");
+    }
+    /** LLM_CALL 은 Job 결속·상태·지연·토큰/버전/축소 단계만 받고, 다른 종류는 LLM 값을 싣지 못한다. */
+    @Test void llmCallAcceptsOnlyTokenVersionAndOrderedReductionValues() {
+        var steps = java.util.List.of(new com.nori.ai.gateway.core.budget.PromptReducer.Step(1, 4_000, 3_200), new com.nori.ai.gateway.core.budget.PromptReducer.Step(3, 3_200, 2_700));
+        assertThatCode(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, null, 900, call(true, 2_700, steps, "qwen3:4b")))).doesNotThrowAnyException();
+        assertThatCode(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.FAILED, ErrorCode.INPUT_BUDGET_EXCEEDED, 0, call(false, null, steps, "qwen3:4b")))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.FAILED, ErrorCode.INPUT_BUDGET_EXCEEDED, 0, call(false, 10, steps, "qwen3:4b")))).hasMessageContaining("sent");
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, null, 1, call(true, 1, java.util.List.of(steps.get(1), steps.get(0)), "qwen3:4b")))).hasMessageContaining("reduction");
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, null, 1, call(true, 1, java.util.List.of(new com.nori.ai.gateway.core.budget.PromptReducer.Step(5, 9, 1)), "qwen3:4b")))).hasMessageContaining("reduction");
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, null, 1, call(true, 1, java.util.List.of(), "모델 \"원문\"")))).hasMessageContaining("versions");
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, ErrorCode.LLM_UNAVAILABLE, 1, call(true, 1, java.util.List.of(), "qwen3:4b")))).hasMessageContaining("status");
+        assertThatThrownBy(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job, ResultStatus.SUCCESS, null, -1, call(true, 1, java.util.List.of(), "qwen3:4b")))).hasMessageContaining("latencyMs");
+        assertThatThrownBy(() -> allowlist.requireGeneral(new AuditEvent(scope, AuditEventType.JOB_CLASSIFIED, null, conversation, job, null, null, TaskType.LIVE_QUERY, null, null, null, null, call(true, 1, java.util.List.of(), "qwen3:4b"))))
+            .hasMessageContaining("llmCall");
+        assertThatThrownBy(() -> allowlist.requireGeneral(new AuditEvent(scope, AuditEventType.LLM_CALL, null, conversation, job, null, null, null, ResultStatus.SUCCESS, null, null, 1L, null))).hasMessageContaining("llmCall");
+    }
 }

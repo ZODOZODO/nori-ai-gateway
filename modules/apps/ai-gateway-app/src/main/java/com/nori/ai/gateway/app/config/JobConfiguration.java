@@ -50,14 +50,25 @@ public class JobConfiguration {
     @Bean @ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="enabled")
     com.nori.ai.gateway.core.llm.ClassificationService classificationService(com.nori.ai.gateway.core.port.InferenceClient inference,com.nori.ai.gateway.core.budget.TokenBudgetPolicy policy,
             com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter tokenizer,com.nori.ai.gateway.core.expiry.ExpiryCheckpoint expiry,Optional<com.nori.ai.gateway.core.llm.LlmCallObserver> observer,
-            com.nori.ai.gateway.core.registry.ManifestLoader loader,com.nori.ai.gateway.core.registry.CapabilityRegistry registry){
+            com.nori.ai.gateway.core.llm.LlmCallAudit audit,com.nori.ai.gateway.core.registry.ManifestLoader loader,com.nori.ai.gateway.core.registry.CapabilityRegistry registry){
         var systems=new ArrayList<com.nori.ai.gateway.core.llm.ClassificationRegistryText.SystemArea>();
         for(var system:com.nori.ai.gateway.core.registry.SchemaContracts.JSON.readTree(resource("prompts/classify-registry-systems-v2.json")).required("systems"))
             systems.add(new com.nori.ai.gateway.core.llm.ClassificationRegistryText.SystemArea(system.required("system").asString(),texts(system.required("aliases")),texts(system.required("ownedAreas"))));
         var lines=com.nori.ai.gateway.core.llm.ClassificationRegistryText.lines(com.nori.ai.gateway.core.scope.OwnerSystem.TC,loader.loadClasspath("manifests/tc/index.json"),registry::phaseActive);
         String reference=com.nori.ai.gateway.core.llm.ClassificationRegistryText.render(com.nori.ai.gateway.core.scope.OwnerSystem.TC,systems,lines);
-        return new com.nori.ai.gateway.core.llm.ClassificationService(inference,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),resource("prompts/classify-v3.txt"),reference);
+        return new com.nori.ai.gateway.core.llm.ClassificationService(inference,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),audit,resource(CLASSIFY_PROMPT),reference);
     }
+    static final String CLASSIFY_PROMPT="prompts/classify-v3.txt";
+    /**
+     * LLM 호출 시도 감사(SPEC §14.5·§12.3). 분류·Composer 가 같은 빈을 쓰고, 버전 값은 생성 모델 이름과 각 서비스가 읽는 Prompt 자원 이름이다.
+     */
+    @Bean @ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="enabled")
+    com.nori.ai.gateway.core.llm.LlmCallAudit llmCallAudit(com.nori.ai.gateway.app.observability.AuditRecorder audit){
+        return new com.nori.ai.gateway.app.job.LlmCallAuditRecorder(audit,com.nori.ai.gateway.integration.inference.InferenceEndpointConfig.GENERATION_MODEL,
+            java.util.Map.of(com.nori.ai.gateway.core.budget.CallType.CLASSIFY,version(CLASSIFY_PROMPT),com.nori.ai.gateway.core.budget.CallType.COMPOSER,version(com.nori.ai.gateway.app.job.WorkflowExecutionConfiguration.COMPOSE_PROMPT)));
+    }
+    /** "prompts/classify-v3.txt" → "classify-v3". */
+    static String version(String path){return path.substring(path.lastIndexOf('/')+1,path.lastIndexOf('.'));}
     static String resource(String path){
         try(var input=JobConfiguration.class.getClassLoader().getResourceAsStream(path)){
             if(input==null)throw new IllegalStateException("프롬프트 자원이 없습니다: "+path);

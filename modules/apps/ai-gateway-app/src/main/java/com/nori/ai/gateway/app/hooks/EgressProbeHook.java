@@ -15,7 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Pod 안 egress 확인용 hook(Plan §4.5 H-2·M-5). 대상은 차트가 렌더한 고정 목록 파일의 id 로만 고르며,
- * 요청에서 호스트·포트·URL 을 받지 않고 TCP connect 1회만 한다(본문 송신·HTTP 요청 0).
+ * 요청에서 호스트·포트·URL 을 받지 않고 TCP connect 1회만 한다(본문 송신·HTTP 요청 0). 목록 조회는 id·expect 만 돌려준다(주소 반환 0).
  */
 @RestController
 @RequestMapping("/__test")
@@ -26,11 +26,19 @@ import tools.jackson.databind.json.JsonMapper;
 public final class EgressProbeHook {
     static final int CONNECT_TIMEOUT_MILLIS = 3000;
     private static final Set<String> TARGET_FIELDS = Set.of("id", "host", "port", "expect");
-    record Target(String host, int port) {}
+    record Target(String host, int port, String expect) {}
     private final Map<String,Target> targets;
 
     public EgressProbeHook(Environment environment) {
         this.targets = load(environment.getRequiredProperty("ai.gateway.test-hooks.egress-targets-file"));
+    }
+
+    /** 수용 판정(AC-35-EGRESS)이 대상 목록을 env 없이 읽는 경로. 파일 순서 그대로 {@code [{id, expect}]} 만 돌려준다. */
+    @GetMapping("/egress-probe")
+    public List<Map<String,String>> targets() {
+        var listed = new ArrayList<Map<String,String>>();
+        targets.forEach((id, target) -> listed.add(Map.of("id", id, "expect", target.expect())));
+        return List.copyOf(listed);
     }
 
     @PostMapping("/egress-probe")
@@ -67,9 +75,9 @@ public final class EgressProbeHook {
                 String id = node.get("id").asString(), host = node.get("host").asString(), expect = node.get("expect").asString();
                 JsonNode port = node.get("port");
                 if (!id.matches("[A-Za-z0-9_.-]{1,64}") || host.isBlank() || !port.isIntegralNumber() || port.asInt() < 1 || port.asInt() > 65535
-                    || !Set.of("ALLOWED", "BLOCKED").contains(expect) || loaded.putIfAbsent(id, new Target(host, port.asInt())) != null) throw new IllegalArgumentException();
+                    || !Set.of("ALLOWED", "BLOCKED").contains(expect) || loaded.putIfAbsent(id, new Target(host, port.asInt(), expect)) != null) throw new IllegalArgumentException();
             }
-            return Map.copyOf(loaded);
+            return Collections.unmodifiableMap(loaded);
         } catch (RuntimeException | IOException failure) { throw new IllegalStateException("egress probe 대상 목록이 잘못되었습니다"); }
     }
 }

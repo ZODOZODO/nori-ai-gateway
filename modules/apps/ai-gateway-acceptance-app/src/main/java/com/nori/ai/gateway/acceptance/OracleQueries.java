@@ -37,6 +37,7 @@ public final class OracleQueries {
         TOOL_STATUS("SELECT capability_id, status FROM gw.tool_execution WHERE job_id = ? ORDER BY created_at, id"),
         JOB_OWNER("SELECT owner_system FROM gw.job WHERE id = ?"),
         CLASSIFIED_TASK_TYPE("SELECT task_type FROM gw.audit_event WHERE job_id = ? AND event_type = 'JOB_CLASSIFIED' ORDER BY id"),
+        LLM_CALLS("SELECT token_usage::text, reduction::text, status, error_code FROM gw.audit_event WHERE job_id = ? AND event_type = 'LLM_CALL' ORDER BY id"),
         RESIDUE_CONVERSATION("SELECT 'conversation:' || id, row_to_json(t)::text FROM gw.conversation t"),
         RESIDUE_MESSAGE("SELECT 'message:' || id, row_to_json(t)::text FROM gw.message t"),
         RESIDUE_JOB("SELECT 'job:' || id, row_to_json(t)::text FROM gw.job t"),
@@ -54,6 +55,9 @@ public final class OracleQueries {
     public record Range(Instant from, Instant to) {}
     /** Tool 실행 행의 Capability ID·저장 상태만(본문 0). */
     public record ToolRow(String capabilityId, String status) {}
+    /** LLM 호출 시도 감사(LLM_CALL) 1행의 토큰·축소 값(SPEC §14.5·§12.3, 원문 0). {@code promptTokens} 는 응답 usage 가 있을 때만이다. */
+    public record LlmCall(String callType, boolean sent, int inputTokens, int maxTokens, Optional<Integer> promptTokens, List<ReductionStep> reduction, String status, Optional<String> errorCode) {}
+    public record ReductionStep(int stage, int beforeTokens, int afterTokens) {}
     public record CommSource(String source, String status, int itemCount, Set<String> warnings, List<Range> missing, List<Range> unverified,
             long count, long maximum, Optional<Instant> oldest, long retentionHours, boolean applied, boolean deletionPathsExcluded) {}
     public record ToolObservation(String status, String errorCode, int itemCount, Set<String> warnings, Set<String> apps, Set<String> namespaces,
@@ -118,6 +122,22 @@ public final class OracleQueries {
     /** JOB_CLASSIFIED 감사의 taskType 값(감사 행마다 하나). */
     public List<String> classifiedTaskTypes(String job) {
         return query(Query.CLASSIFIED_TASK_TYPE, rows -> { var values = new ArrayList<String>(); while (rows.next()) values.add(rows.getString(1)); return List.copyOf(values); }, id(job));
+    }
+    /** 같은 Job 의 LLM 호출 시도 감사(시도 순서). 토큰 수·축소 단계·결과 코드만 읽는다. */
+    public List<LlmCall> llmCalls(String job) {
+        return query(Query.LLM_CALLS, rows -> {
+            var values = new ArrayList<LlmCall>();
+            while (rows.next()) {
+                try {
+                    var tokens = CanonicalJson.MAPPER.readTree(rows.getString(1)); var steps = new ArrayList<ReductionStep>();
+                    for (var step : CanonicalJson.MAPPER.readTree(rows.getString(2))) steps.add(new ReductionStep(step.path("stage").asInt(), step.path("beforeTokens").asInt(), step.path("afterTokens").asInt()));
+                    var prompt = tokens.path("promptTokens");
+                    values.add(new LlmCall(tokens.path("callType").asText(), tokens.path("sent").asBoolean(), tokens.path("inputTokens").asInt(), tokens.path("maxTokens").asInt(),
+                        prompt.isIntegralNumber() ? Optional.of(prompt.asInt()) : Optional.empty(), List.copyOf(steps), rows.getString(3), Optional.ofNullable(rows.getString(4))));
+                } catch (java.io.IOException invalid) { throw new IllegalStateException("ORACLE_LLM_CALL_INVALID"); }
+            }
+            return List.copyOf(values);
+        }, id(job));
     }
     public long authRejectionCount(String requestId, String decision, int status) {
         if (decision == null || !decision.matches("[A-Z_]{1,64}") || status < 400 || status > 599) throw new IllegalArgumentException("AUTH_REJECTION_INVALID");

@@ -1,0 +1,2051 @@
+{
+  "id": "composer-oversize",
+  "contractVersion": "1.0",
+  "authorizationUnavailable": false,
+  "delegationInvalid": false,
+  "catalogAvailable": true,
+  "catalogRevision": "mock-v1",
+  "grantedPermissions": [
+    "EQP_READ",
+    "COMM_LOG_READ",
+    "DLQ_READ",
+    "MODEL_READ",
+    "AI_WORKLOT_READ",
+    "AI_EVENT_READ",
+    "AI_LOG_READ",
+    "AI_TRACE_READ",
+    "AI_CODE_READ",
+    "AI_DOC_READ"
+  ],
+  "eqpSnapshot": {
+    "eqpId": "EQP-001",
+    "connectionState": "CONNECTED",
+    "controlState": "REMOTE",
+    "processState": "RUNNING",
+    "equipmentState": "NORMAL"
+  },
+  "workLots": {
+    "state": "ACTIVE",
+    "activeLots": [
+      {
+        "workId": "WORK-001",
+        "pjId": "PJ-001",
+        "lotId": "LOT-001"
+      }
+    ],
+    "currentLot": "LOT-001"
+  },
+  "events": [
+    {
+      "eventId": "EVENT-001",
+      "occurredAt": "2026-11-06T00:00:00Z",
+      "eventType": "STATE_CHANGED"
+    }
+  ],
+  "dlqs": {
+    "gateway": {
+      "items": [
+        {
+          "entryRef": "entry-001",
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "messageType": "EVENT",
+          "eqpId": "EQP-001"
+        }
+      ],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 1,
+        "loadedEntries": 1,
+        "decodeFailures": 0
+      }
+    },
+    "business": {
+      "items": [
+        {
+          "entryRef": "entry-001",
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "messageType": "EVENT",
+          "eqpId": "EQP-001"
+        }
+      ],
+      "completeness": {
+        "scanSucceeded": true,
+        "scannedKeys": 1,
+        "loadedEntries": 1,
+        "decodeFailures": 0
+      }
+    }
+  },
+  "commLogs": {
+    "gateway": {
+      "items": [
+        {
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "direction": "IN",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "available": true,
+        "count": 1,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": "2026-11-05T23:50:00Z",
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    },
+    "business": {
+      "items": [
+        {
+          "occurredAt": "2026-11-06T00:00:00Z",
+          "direction": "IN",
+          "messageType": "EVENT"
+        }
+      ],
+      "completeness": {
+        "available": true,
+        "count": 1,
+        "maxEntriesPerKey": 5000,
+        "oldestRetainedAt": "2026-11-05T23:50:00Z",
+        "retentionHours": 1,
+        "appliedValuesVerified": false,
+        "otherDeletionPathsExcluded": false,
+        "truncatedRanges": []
+      }
+    }
+  },
+  "models": [
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-001",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-002",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-003",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-004",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-005",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-006",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-007",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-008",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-009",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-010",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-011",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-012",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-013",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-014",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-015",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-016",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-017",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-018",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-019",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-020",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-021",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-022",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-023",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-024",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-025",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-026",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-027",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-028",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-029",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-030",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-031",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-032",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-033",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-034",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-035",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-036",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-037",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-038",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-039",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-040",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-041",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-042",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-043",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-044",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-045",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-046",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-047",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-048",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-049",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-050",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-051",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-052",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-053",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-054",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-055",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-056",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-057",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-058",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-059",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-060",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-061",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-062",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-063",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-064",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-065",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-066",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-067",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-068",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-069",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-070",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-071",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-072",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-073",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-074",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-075",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-076",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-077",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-078",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-079",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-080",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-081",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-082",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-083",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-084",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-085",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-086",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-087",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-088",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-089",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-090",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-091",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-092",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-093",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-094",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-095",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-096",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-097",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-098",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-099",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-100",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-101",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-102",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-103",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-104",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-105",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-106",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-107",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-108",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-109",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-110",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-111",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-112",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-113",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-114",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-115",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-116",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-117",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-118",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-119",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-120",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-121",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-122",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-123",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-124",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-125",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-126",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-127",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-128",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-129",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-130",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-131",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-132",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-133",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-134",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-135",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-136",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-137",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-138",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-139",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-140",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-141",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-142",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-143",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-144",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-145",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-146",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-147",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-148",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-149",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-150",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-151",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-152",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-153",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-154",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-155",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-156",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-157",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-158",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-159",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-160",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-161",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-162",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-163",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-164",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-165",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-166",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-167",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-168",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-169",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-170",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-171",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-172",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-173",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-174",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-175",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-176",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-177",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-178",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-179",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-180",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-181",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-182",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-183",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-184",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-185",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-186",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-187",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-188",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-189",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-190",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-191",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-192",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-193",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-194",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-195",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-196",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-197",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-198",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-199",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-200",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-201",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-202",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-203",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-204",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-205",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-206",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-207",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-208",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-209",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-210",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-211",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-212",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-213",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-214",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-215",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-216",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-217",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-218",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-219",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-220",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-221",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-222",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-223",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-224",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-225",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-226",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-227",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-228",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-229",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-230",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-231",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-232",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-233",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-234",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-235",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-236",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-237",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-238",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-239",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-240",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-241",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-242",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-243",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-244",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-245",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-246",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-247",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-248",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-249",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-250",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-251",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-252",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-253",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-254",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-255",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-256",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-257",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-258",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-259",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-260",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-261",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-262",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-263",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-264",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-265",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-266",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-267",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-268",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-269",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-270",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-271",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-272",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-273",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-274",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-275",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-276",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-277",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-278",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-279",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-280",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-281",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-282",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-283",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-284",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-285",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-286",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-287",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-288",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-289",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-290",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-291",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-292",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-293",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-294",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-295",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-296",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-297",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-298",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-299",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-300",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-301",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-302",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-303",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-304",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-305",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-306",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-307",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-308",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-309",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-310",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-311",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-312",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-313",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-314",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-315",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-316",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-317",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-318",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-319",
+      "nodeType": "STEP",
+      "children": []
+    },
+    {
+      "modelId": "MODEL-001",
+      "nodeId": "STEP-320",
+      "nodeType": "STEP",
+      "children": []
+    }
+  ],
+  "resources": [
+    {
+      "type": "EQP",
+      "ref": "EQP-001"
+    },
+    {
+      "type": "MODEL",
+      "ref": "MODEL-001"
+    }
+  ]
+}

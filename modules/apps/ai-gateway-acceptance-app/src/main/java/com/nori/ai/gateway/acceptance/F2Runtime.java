@@ -26,8 +26,7 @@ public final class F2Runtime {
             return;
         }
         Optional<LokiDirectQuery> loki = readback ? Optional.of(new LokiDirectQuery(new SourceHttpClient(URI.create(url), LokiSourcePolicy.SOURCE_REF, SourceObservability.noop()))) : Optional.empty();
-        Optional<String> egress = Optional.ofNullable(config.env().get("AIGW_EGRESS_PROBE_TARGETS_JSON")).filter(value -> !value.isBlank());
-        new F2JobChecks(clients.gateway(), clients.hooks(), clients.oracle(), loki, egress, F2Runtime::countTokens).run(leaf);
+        new F2JobChecks(clients.gateway(), clients.hooks(), clients.oracle(), loki, F2Runtime::countTokens).run(leaf);
     }
 
     /** 같은 회차 LLM_LIVE leaf Job 의 원시 지연 표본을 MEASUREMENT 로 남긴다. 모은 Job 이 없으면 측정은 NOT_RUN 이다. */

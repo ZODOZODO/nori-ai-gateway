@@ -31,6 +31,8 @@ public final class F2JobChecks {
     static final Map<String,String> NEED_LABELS = Map.of("S", "현재 상태", "H", "실제 발생 이력", "N", "정상 절차·선행 조건", "I", "구현·적용 버전", "C", "기대와 실제 비교", "R", "확인·조치 절차");
     static final List<String> BUSINESS_READS = List.of("getEqpSnapshot", "getActiveWorkLots", "getRecentEvents", "listDlq", "getCommLogs", "readModel", "resolveResource");
     static final String COMPOSER_OVERSIZE_SCENARIO = "composer-oversize";
+    /** AC-35-EGRESS 양성 대조 대상 id(추론 endpoint·주 DB, SPEC §27.2). runconfig 목록에 ALLOWED 로 있어야 판정한다(test-hooks-v1). */
+    static final Set<String> EGRESS_POSITIVE_CONTROLS = Set.of("inference-endpoint", "db-main");
     /** Tool 실패로 기록하는 저장 상태(ResultStatus 중 Source·실행 실패). */
     static final Set<String> TOOL_FAILURES = Set.of("FAILED", "TIMEOUT", "SOURCE_UNAVAILABLE", "DENIED");
     private static final Duration STUB_TIMEOUT = Duration.ofSeconds(200), LIVE_TIMEOUT = Duration.ofSeconds(600);
@@ -41,12 +43,12 @@ public final class F2JobChecks {
         @Override public String toString() { return "F2Job[" + id + "]"; }
     }
     private final GatewayClient gateway; private final HookClient hooks; private final OracleQueries oracle;
-    private final Optional<LokiDirectQuery> loki; private final Optional<String> egressTargets;
+    private final Optional<LokiDirectQuery> loki;
     /** pin tokenizer 텍스트 계수. 하네스에서 tokenizer 를 쓸 수 없으면 빈 값이다. */
     private final Function<String,Optional<Integer>> tokenCount;
 
-    public F2JobChecks(GatewayClient gateway, HookClient hooks, OracleQueries oracle, Optional<LokiDirectQuery> loki, Optional<String> egressTargets, Function<String,Optional<Integer>> tokenCount) {
-        this.gateway = gateway; this.hooks = hooks; this.oracle = oracle; this.loki = loki; this.egressTargets = egressTargets; this.tokenCount = tokenCount;
+    public F2JobChecks(GatewayClient gateway, HookClient hooks, OracleQueries oracle, Optional<LokiDirectQuery> loki, Function<String,Optional<Integer>> tokenCount) {
+        this.gateway = gateway; this.hooks = hooks; this.oracle = oracle; this.loki = loki; this.tokenCount = tokenCount;
     }
 
     public void run(String leaf) {
@@ -55,7 +57,7 @@ public final class F2JobChecks {
             case "AC-22-LIVE" -> live();
             case "AC-29" -> foreignSystemLive();
             case "AC-38-F2" -> incidentLogsLive();
-            case "AC-31" -> throw new TestAbortedException("COMPOSER_BUDGET_OBSERVATION_UNAVAILABLE");
+            case "AC-31" -> composerReductionLive();
             case "AC-22-STUB-TOOL", "AC-22-STUB-SYSTEM" -> planRejected(leaf);
             case "AC-22-GQ-HELP" -> generalHelp();
             case "AC-22-GQ-BYPASS-DATA", "AC-22-GQ-BYPASS-XSYS" -> generalBypass(leaf);
@@ -113,6 +115,45 @@ public final class F2JobChecks {
         JsonNode observation;
         try { observation = hooks.get("/__test/source-observations/" + job.id()); } catch (HookClient.HookFailure unavailable) { throw new TestAbortedException("SOURCE_REQUEST_OBSERVATION_UNAVAILABLE"); }
         F1SourceChecks.verify(observation, job.id(), F1SourceChecks.expected(boundaries, from, to, new LokiProperties().splitInterval()), false);
+    }
+    /**
+     * SPEC §27.2 AC-31: 실제 Composer 호출 1건이 호출 직전 assert(입력 ≤ 2,816, 입력 + 요청 max_tokens ≤ 8192)를 통과하고, 적용한 축소 단계와 단계별 전후 입력 토큰 수가
+     * 그 호출의 감사(LLM_CALL)에 남고, 축소 금지 항목인 현재 질문이 축소 뒤 Prompt 에 남고(prompt-watch), usage.prompt_tokens 가 호출 직전 계수와 같다.
+     * 감사는 고정 SELECT 로만 읽는다. 축소가 일어나지 않았거나 축소로도 상한 안에 들지 않은 실행은 시험 전제 미충족이라 NOT_RUN 이다.
+     */
+    private void composerReductionLive() {
+        String sentinel = "PW" + letters(10);
+        // llmScript 없는 무장은 운영 전송으로 가며(test-hooks-v1 P20) prompt-watch 관찰만 붙는다. 추론 사용 시 무장 taskType 은 분류에 쓰이지 않는다.
+        var scenario = CanonicalJson.MAPPER.createObjectNode().put("taskType", "GENERAL_QUERY");
+        scenario.putObject("promptWatch").putArray("sentinels").add(sentinel);
+        var job = submit("ac-31", sentinel + " EQP-001 에서 발생한 오류 로그를 모두 보고 장애 원인을 분석해 줘", window(Duration.ofHours(1), true), scenario, LIVE_TIMEOUT, sentinel);
+        sample("AC-31", "ac-31", job, oracle.toolRows(job.id()), Map.of());
+        var calls = oracle.llmCalls(job.id());
+        require(calls.stream().filter(OracleQueries.LlmCall::sent).allMatch(F2JobChecks::withinBudget), "F2_AC31_OVER_BUDGET_SENT");
+        var composer = calls.stream().filter(call -> call.callType().equals("COMPOSER")).toList();
+        if (composer.isEmpty()) throw new TestAbortedException("AC31_COMPOSER_NOT_REACHED");
+        var call = composer.getFirst();
+        if (call.reduction().isEmpty()) throw new TestAbortedException("AC31_REDUCTION_NOT_EXERCISED");
+        if (!call.sent()) throw new TestAbortedException("AC31_REDUCTION_INSUFFICIENT");
+        require(composer.size() == 1, "F2_AC31_COMPOSER_CALLS");
+        require(call.maxTokens() == 5_248 && call.inputTokens() <= 2_816 && call.inputTokens() + call.maxTokens() <= TokenBudgetPolicy.CONTEXT_TOKENS, "F2_AC31_PRE_CALL_ASSERT");
+        require(reductionRecorded(call.reduction(), 2_816, call.inputTokens()), "F2_AC31_REDUCTION_RECORD");
+        require(watch(job, "COMPOSER", QUESTION) == 1, "F2_AC31_QUESTION_REDUCED");
+        int prompt = call.promptTokens().orElseThrow(() -> new TestAbortedException("AC31_USAGE_MISSING"));
+        require(prompt == call.inputTokens(), "F2_AC31_SERVER_TRUNCATION");
+    }
+    /** 보낸 호출의 유형별 입력 상한·num_ctx 총합(SPEC §14.5). */
+    static boolean withinBudget(OracleQueries.LlmCall call) {
+        return TokenBudgetPolicy.current().violations(CallType.valueOf(call.callType()), call.inputTokens(), call.maxTokens()).isEmpty();
+    }
+    /** 단계 번호는 §14.5 순서(1~4)로 증가하고 단계 사이 계수가 이어지며, 첫 단계 전은 상한 초과·마지막 단계 뒤는 호출 직전 계수다. */
+    static boolean reductionRecorded(List<OracleQueries.ReductionStep> steps, int inputLimit, int inputTokens) {
+        int previousStage = 0, previousAfter = steps.getFirst().beforeTokens();
+        for (var step : steps) {
+            if (step.stage() <= previousStage || step.stage() > 4 || step.beforeTokens() != previousAfter || step.afterTokens() > step.beforeTokens()) return false;
+            previousStage = step.stage(); previousAfter = step.afterTokens();
+        }
+        return steps.getFirst().beforeTokens() > inputLimit && previousAfter == inputTokens;
     }
     private void sample(String leaf, String fixture, Job job, List<OracleQueries.ToolRow> rows, Map<String,Object> extra) {
         var values = new LinkedHashMap<String,Object>();
@@ -191,17 +232,26 @@ public final class F2JobChecks {
         require(!payload(job).has("clarification"), "F2_CLS_BUDGET_CLARIFICATION");
         require(watch(job, "CLASSIFY", QUESTION) == 1 && watch(job, "COMPOSER", QUESTION) == 0, "F2_CLS_BUDGET_CALLS");
         require(oracle.toolRows(job.id()).isEmpty() && businessReads() == 0, "F2_CLS_BUDGET_TOOL");
+        // 호출 직전 assert 로 막힌 시도도 감사에 남는다(sent=false). 보낸 분류 호출은 0 이다.
+        var calls = oracle.llmCalls(job.id());
+        require(calls.size() == 1 && calls.getFirst().callType().equals("CLASSIFY") && !calls.getFirst().sent() && calls.getFirst().inputTokens() > 3_072
+            && calls.getFirst().errorCode().equals(Optional.of("INPUT_BUDGET_EXCEEDED")), "F2_CLS_BUDGET_AUDIT");
     }
     private void composerOverBudget() {
         try { hooks.post("/__test/tcmock/scenario", Map.of("id", COMPOSER_OVERSIZE_SCENARIO), 204); }
         catch (HookClient.HookFailure failure) { if (failure.status() == 400) throw new TestAbortedException("COMPOSER_OVERSIZE_FIXTURE_UNAVAILABLE"); throw failure; }
         String fallback = "FALLBACK" + letters(8);
-        var job = scripted("AC-43-COMP", "EQP-001 장애 원인 찾아줘", window(Duration.ofMinutes(30), false),
-            List.of(classify(wire("INC", "EQP-001", List.of("S", "H", "I"), "B")), compose("대체 서술 " + fallback)), List.of());
+        // 시간창과 무관한 모델 조회(N)가 fixture 의 대량 항목을 그대로 넘기도록 분류를 LQ [S,N] 으로 고정한다.
+        var job = scripted("AC-43-COMP", "EQP-001 상태와 적용 모델 정의 알려줘", window(Duration.ofMinutes(30), false),
+            List.of(classify(wire("LQ", "EQP-001", List.of("S", "N"), "B")), compose("대체 서술 " + fallback)), List.of());
         failed(job, "INPUT_BUDGET_EXCEEDED");
         require(watch(job, "CLASSIFY", QUESTION) == 1 && watch(job, "COMPOSER", QUESTION) == 0, "F2_COMP_BUDGET_CALLS");
         require(!payload(job).has("answer") && !job.response().toString().contains(fallback), "F2_COMP_BUDGET_FALLBACK_TEXT");
         require(!payload(job).path("blocks").isEmpty(), "F2_COMP_BUDGET_BLOCKS_DROPPED");
+        // 축소 1~4 뒤에도 초과면 Composer 호출 시도 자체가 없다(감사 0). 같은 Job 의 분류는 상한 안에서 보냈다.
+        var calls = oracle.llmCalls(job.id());
+        require(calls.stream().noneMatch(call -> call.callType().equals("COMPOSER")), "F2_COMP_BUDGET_COMPOSER_AUDITED");
+        require(!calls.isEmpty() && calls.stream().allMatch(call -> call.callType().equals("CLASSIFY") && call.sent() && withinBudget(call)), "F2_COMP_BUDGET_CLASSIFY_AUDIT");
     }
 
     /** SPEC §27.2 AC-32-NEEDS ⓐ~ⓞ. 실패는 즉시 FAIL, 배포 관측이 없는 사례가 하나라도 있으면 끝에 NOT_RUN 이다. */
@@ -267,18 +317,20 @@ public final class F2JobChecks {
     }
 
     // ── AC-35-EGRESS ─────────────────────────────────────────────────────────────────────────────
+    /**
+     * SPEC §27.2 AC-35-EGRESS: 대상 목록은 Gateway hook(GET /__test/egress-probe, id·expect 만)에서 읽는다. BLOCKED 가 없거나 양성 대조(추론 endpoint·주 DB)가
+     * ALLOWED 로 없으면 판정 근거가 없어 NOT_RUN, ALLOWED 가 연결되지 않으면 NOT_RUN, BLOCKED 가 하나라도 연결되면 FAIL 이다.
+     */
     private void egress() {
-        String raw = egressTargets.orElseThrow(() -> new TestAbortedException("EGRESS_TARGETS_INPUT_MISSING"));
-        JsonNode targets;
-        try { targets = CanonicalJson.MAPPER.readTree(raw); } catch (java.io.IOException e) { throw new TestAbortedException("EGRESS_TARGETS_INPUT_INVALID"); }
+        var targets = hooks.find("/__test/egress-probe").orElseThrow(() -> new TestAbortedException("EGRESS_TARGETS_UNAVAILABLE"));
+        require(targets.isArray(), "F2_EGRESS_TARGETS_INVALID");
         var allowed = new ArrayList<String>(); var blocked = new ArrayList<String>();
-        if (!targets.isArray()) throw new TestAbortedException("EGRESS_TARGETS_INPUT_INVALID");
         for (var target : targets) {
             String id = target.path("id").asText(), expect = target.path("expect").asText();
-            if (!id.matches("[A-Za-z0-9_.-]{1,64}") || target.size() != 2) throw new TestAbortedException("EGRESS_TARGETS_INPUT_INVALID");
-            if (expect.equals("ALLOWED")) allowed.add(id); else if (expect.equals("BLOCKED")) blocked.add(id); else throw new TestAbortedException("EGRESS_TARGETS_INPUT_INVALID");
+            require(target.size() == 2 && id.matches("[A-Za-z0-9_.-]{1,64}") && Set.of("ALLOWED", "BLOCKED").contains(expect), "F2_EGRESS_TARGETS_INVALID");
+            (expect.equals("ALLOWED") ? allowed : blocked).add(id);
         }
-        if (allowed.size() < 2 || blocked.size() < 2) throw new TestAbortedException("EGRESS_TARGETS_INPUT_INVALID");
+        if (blocked.isEmpty() || !allowed.containsAll(EGRESS_POSITIVE_CONTROLS)) throw new TestAbortedException("EGRESS_TARGETS_INCOMPLETE");
         var probe = new EgressProbeClient(hooks);
         for (String id : allowed) { var outcome = probe.probe(id); require(outcome.targetId().equals(id), "F2_EGRESS_TARGET_MISMATCH"); if (!outcome.connected()) throw new TestAbortedException("EGRESS_POSITIVE_CONTROL_FAILED"); }
         for (String id : blocked) { var outcome = probe.probe(id); require(outcome.targetId().equals(id), "F2_EGRESS_TARGET_MISMATCH"); require(!outcome.connected(), "F2_EGRESS_BLOCKED_CONNECTED"); }

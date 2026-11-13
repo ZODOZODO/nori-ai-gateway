@@ -43,9 +43,10 @@ public final class ClassificationService {
     private static final JsonMapper STRICT = JsonMapper.builder().build();
 
     /** 분류 요청. {@code input} 은 JobContext 에 결속한 바로 그 접수 입력이다. */
-    public record Request(String jobId, Instant conversationExpiresAt, CancellationToken cancellation, JobRequestInput input) {
+    /** {@code scope}·{@code conversationId} 는 호출 시도 감사(LLM_CALL)의 Job 결속에만 쓴다. */
+    public record Request(com.nori.ai.gateway.core.scope.VerifiedSystemScope scope, String conversationId, String jobId, Instant conversationExpiresAt, CancellationToken cancellation, JobRequestInput input) {
         public Request {
-            Objects.requireNonNull(jobId, "jobId"); Objects.requireNonNull(conversationExpiresAt, "conversationExpiresAt");
+            Objects.requireNonNull(scope, "scope"); Objects.requireNonNull(conversationId, "conversationId"); Objects.requireNonNull(jobId, "jobId"); Objects.requireNonNull(conversationExpiresAt, "conversationExpiresAt");
             Objects.requireNonNull(cancellation, "cancellation"); Objects.requireNonNull(input, "input");
         }
     }
@@ -69,16 +70,18 @@ public final class ClassificationService {
     private final AnswerTokenCounting answers;
     private final ExpiryCheckpoint expiry;
     private final LlmCallObserver observer;
+    private final LlmCallAudit audit;
     private final String systemPrompt;
 
     /** @param registryReference 프롬프트 {@code {{REGISTRY}}} 에 넣을 참고 정보({@link ClassificationRegistryText#render}) */
     public ClassificationService(InferenceClient inference, TokenBudgetPolicy policy, AnswerTokenCounting answers, ExpiryCheckpoint expiry,
-            LlmCallObserver observer, String promptTemplate, String registryReference) {
+            LlmCallObserver observer, LlmCallAudit audit, String promptTemplate, String registryReference) {
         this.inference = Objects.requireNonNull(inference, "inference");
         this.budget = Objects.requireNonNull(policy, "policy").budget(CallType.CLASSIFY);
         this.answers = Objects.requireNonNull(answers, "answers");
         this.expiry = Objects.requireNonNull(expiry, "expiry");
         this.observer = Objects.requireNonNull(observer, "observer");
+        this.audit = Objects.requireNonNull(audit, "audit");
         Objects.requireNonNull(promptTemplate, "promptTemplate"); Objects.requireNonNull(registryReference, "registryReference");
         int at = promptTemplate.indexOf("{{REGISTRY}}");
         if (promptTemplate.indexOf('\r') >= 0 || at < 0 || at != promptTemplate.lastIndexOf("{{REGISTRY}}")) throw new IllegalArgumentException("분류 프롬프트 형식이 잘못되었습니다");
@@ -104,12 +107,15 @@ public final class ClassificationService {
             try (var scope = observer.open(request.jobId(), CallType.CLASSIFY, messages)) {
                 outcome = inference.chat(CallType.CLASSIFY, messages, budget.requestMaxTokens());
             }
+            Verdict verdict = outcome instanceof InferenceClient.Completed completed ? judge(completed, references, zone) : null;
+            // 보낸 호출은 만료·취소와 무관하게 그 시도의 감사를 먼저 남긴다(분류는 축소 단계가 없다).
+            audit.record(LlmCallAudit.attempt(request.scope(), request.conversationId(), request.jobId(), CallType.CLASSIFY, budget.requestMaxTokens(), outcome,
+                verdict == null || verdict.failure() == null ? null : ErrorCode.PLAN_INVALID, List.of()));
             // 진행 중 만료·취소가 되면 받은 응답을 결과에 쓰지 않는다.
             expiry.assertLive(request.conversationExpiresAt(), request.cancellation());
             if (outcome instanceof InferenceClient.BudgetExceeded) return new BudgetExceeded(calls);
             calls++;
             if (outcome instanceof InferenceClient.CallFailed) return new Unavailable(calls);
-            Verdict verdict = judge((InferenceClient.Completed) outcome, references, zone);
             if (verdict.failure() == null) return new Classified(verdict.value(), calls);
             messages = retry(original, AnswerCheck.retryCode(verdict.failure()));
         }

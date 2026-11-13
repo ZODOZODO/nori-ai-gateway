@@ -31,7 +31,7 @@ class F2NeedsAndReadinessTest {
     @Test void needsCasesCheckBoundEvidenceAndServerAddedThroughTheDetailedReportAndLeaveUnobservableCasesNotRun() throws Exception {
         try (var fixture = new F2LocalFixture()) {
             fixture.responder = entry -> needs(entry, false);
-            assertThatThrownBy(() -> fixture.checks(Optional.empty(), Optional.of(120)).run("AC-32-NEEDS")).isInstanceOf(TestAbortedException.class).hasMessage("NEEDS_CASE_UNOBSERVED_d");
+            assertThatThrownBy(() -> fixture.checks(Optional.of(120)).run("AC-32-NEEDS")).isInstanceOf(TestAbortedException.class).hasMessage("NEEDS_CASE_UNOBSERVED_d");
             assertThat(fixture.jobs).as("ⓐ~ⓞ 사례마다 새 Job").isEqualTo(15);
             var scenarios = new ArrayList<>(fixture.armed.values());
             assertThat(scenarios.get(0).path("llmScript").get(0).path("content").asText()).contains("\"n\":[\"S\",\"H\"]", "\"a\":\"D\"");
@@ -39,10 +39,10 @@ class F2NeedsAndReadinessTest {
             var maximum = scenarios.getLast().path("llmScript").get(0);
             assertThat(maximum.path("usage").path("completionTokens").asInt()).as("ⓞ 하네스 tokenizer 계수를 그대로 무장").isEqualTo(120);
             assertThat(fixture.questions.getLast()).contains("\"" + "검".repeat(256) + "\"");
-            assertThatThrownBy(() -> fixture.checks(Optional.empty(), Optional.empty()).run("AC-32-NEEDS")).hasMessage("NEEDS_CASE_UNOBSERVED_do");
-            assertThatThrownBy(() -> fixture.checks(Optional.empty(), Optional.of(257)).run("AC-32-NEEDS")).isInstanceOf(AssertionError.class).hasMessage("F2_NEEDS_MAX_WIRE_BUDGET");
+            assertThatThrownBy(() -> fixture.checks(Optional.empty()).run("AC-32-NEEDS")).hasMessage("NEEDS_CASE_UNOBSERVED_do");
+            assertThatThrownBy(() -> fixture.checks(Optional.of(257)).run("AC-32-NEEDS")).isInstanceOf(AssertionError.class).hasMessage("F2_NEEDS_MAX_WIRE_BUDGET");
             fixture.responder = entry -> needs(entry, true);
-            assertThatThrownBy(() -> fixture.checks(Optional.empty(), Optional.of(120)).run("AC-32-NEEDS")).isInstanceOf(AssertionError.class).hasMessage("F2_NEEDS_SERVER_ADDED_c");
+            assertThatThrownBy(() -> fixture.checks(Optional.of(120)).run("AC-32-NEEDS")).isInstanceOf(AssertionError.class).hasMessage("F2_NEEDS_SERVER_ADDED_c");
         }
     }
 

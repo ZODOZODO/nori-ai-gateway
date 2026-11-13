@@ -68,7 +68,7 @@ public final class JobWorker {
                     if(token.reason().isPresent())throw new InterruptedException();
                     if(inference.mode()==InferenceMode.ENABLED){
                         // 분류는 JobContext 에 결속할 바로 그 접수 입력(maskedQuestion·요청 Context)만 받는다.
-                        var classifiedOutcome=classifier.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(new com.nori.ai.gateway.core.llm.ClassificationService.Request(job.jobId(),job.conversationExpiresAt(),token,input));
+                        var classifiedOutcome=classifier.orElseThrow(()->new IllegalStateException("분류 구현이 없습니다")).classify(new com.nori.ai.gateway.core.llm.ClassificationService.Request(scope,job.conversationId(),job.jobId(),job.conversationExpiresAt(),token,input));
                         result=switch(classifiedOutcome){
                             case com.nori.ai.gateway.core.llm.ClassificationService.Classified classified->workflow.execute(new JobContext(job.jobId(),job.conversationId(),scope,delegation,job.conversationExpiresAt(),token,inference.mode(),classified.classification().jobClassification(),input));
                             case com.nori.ai.gateway.core.llm.ClassificationService.Rejected rejected->TerminalSpec.outcome(JobStatus.FAILED,ResultStatus.FAILED,rejected.code(),Map.of("clarification",new Clarification(rejected.code(),List.of("q"))));

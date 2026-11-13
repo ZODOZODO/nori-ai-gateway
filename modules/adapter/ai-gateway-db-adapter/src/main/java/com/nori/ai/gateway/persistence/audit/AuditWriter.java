@@ -31,7 +31,24 @@ public final class AuditWriter {
     private static AuditRepository.Event row(AuditEvent event, String requestId) {
         return new AuditRepository.Event(requestId, event.conversationId(), event.jobId(), event.traceId(), event.eventType().name(),
             event.toolId(), event.sourceRef(), name(event.decision()), name(event.status()), name(event.errorCode()),
-            event.latencyMs() == null ? null : "{\"latencyMs\":" + event.latencyMs() + "}", null, null, null, name(event.taskType()));
+            event.latencyMs() == null ? null : "{\"latencyMs\":" + event.latencyMs() + "}", tokens(event.llmCall()), versions(event.llmCall()), reduction(event.llmCall()), name(event.taskType()));
+    }
+    /** LLM_CALL 의 token_usage. 값은 허용 목록이 검사한 정수·enum·불리언뿐이라 그대로 직렬화한다. */
+    static String tokens(AuditEvent.LlmCall call) {
+        if (call == null) return null;
+        return "{\"callType\":\"" + call.callType().name() + "\",\"sent\":" + call.sent() + ",\"inputTokens\":" + call.inputTokens() + ",\"maxTokens\":" + call.maxTokens()
+            + ",\"promptTokens\":" + call.promptTokens() + ",\"completionTokens\":" + call.completionTokens() + "}";
+    }
+    /** LLM_CALL 의 versions. 모델·Prompt 식별자는 허용 목록의 닫힌 형식(따옴표·역슬래시 없음)이다. */
+    static String versions(AuditEvent.LlmCall call) {
+        return call == null ? null : "{\"model\":\"" + call.model() + "\",\"prompt\":\"" + call.promptVersion() + "\"}";
+    }
+    /** LLM_CALL 의 reduction: 적용한 축소 단계 번호와 단계별 전후 입력 토큰 수(원문 없음). 단계가 없으면 빈 배열이다. */
+    static String reduction(AuditEvent.LlmCall call) {
+        if (call == null) return null;
+        var steps = new java.util.StringJoiner(",", "[", "]");
+        for (var step : call.reduction()) steps.add("{\"stage\":" + step.stage() + ",\"beforeTokens\":" + step.beforeTokens() + ",\"afterTokens\":" + step.afterTokens() + "}");
+        return steps.toString();
     }
     private static String name(Enum<?> value) { return value == null ? null : value.name(); }
 }

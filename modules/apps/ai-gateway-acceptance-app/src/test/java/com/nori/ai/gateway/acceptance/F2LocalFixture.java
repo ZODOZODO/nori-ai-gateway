@@ -23,6 +23,12 @@ final class F2LocalFixture implements AutoCloseable {
         String jobStatus = "SUCCEEDED", status = "SUCCESS", errorCode = null; Map<String,Object> payload = new LinkedHashMap<>(Map.of("blocks", List.of()));
         final List<Map<String,Object>> watch = new ArrayList<>(); final List<Object[]> tools = new ArrayList<>(); final Map<String,Object> calls = new TreeMap<>();
         List<String> taskTypes = List.of(); String owner = "TC";
+        /** LLM_CALL 감사 행: {token_usage, reduction, status, error_code}. */
+        final List<Object[]> llmCalls = new ArrayList<>();
+        Outcome llmCall(String type, boolean sent, int input, int maxTokens, Integer prompt, String reduction, String code) {
+            var tokens = new LinkedHashMap<String,Object>(); tokens.put("callType", type); tokens.put("sent", sent); tokens.put("inputTokens", input); tokens.put("maxTokens", maxTokens); tokens.put("promptTokens", prompt);
+            llmCalls.add(new Object[]{F1SecurityChecks.json(tokens), reduction, code == null ? "SUCCESS" : "FAILED", code}); return this;
+        }
         Outcome watch(String type, int index, int count) { watch.add(Map.of("callType", type, "sentinelIndex", index, "matchCount", count)); return this; }
         Outcome failed(String code) { jobStatus = "FAILED"; status = "FAILED"; errorCode = code; return this; }
         Outcome clarification(String reason, List<String> fields) { payload = new LinkedHashMap<>(Map.of("clarification", Map.of("reason", reason, "fields", fields))); return this; }
@@ -33,6 +39,8 @@ final class F2LocalFixture implements AutoCloseable {
     Function<Map.Entry<JsonNode,String>,Outcome> responder = entry -> new Outcome();
     final Map<String,JsonNode> armed = new LinkedHashMap<>(); final List<String> questions = new ArrayList<>(); final List<String> clockOps = new ArrayList<>();
     final Map<String,Outcome> outcomes = new HashMap<>(); final Map<String,String> keyToJob = new HashMap<>(); final Map<String,Boolean> egress = new LinkedHashMap<>();
+    /** GET /__test/egress-probe 가 돌려줄 {id, expect} 목록. null 이면 hook 부재(404). */
+    List<Map<String,String>> egressTargets = null;
     final Set<String> scenarios = new HashSet<>(Set.of("default")); String readiness = "READY", restoredState = "READY"; boolean retryAfter = true; long jobs;
     Outcome last;
 
@@ -42,7 +50,7 @@ final class F2LocalFixture implements AutoCloseable {
         hooks = new HookClient(http, base, "f2-hook"); gateway = new GatewayClient(http, base, "f2-local-service-token", StubAssertionSigner.ephemeral("test-eph-f2-local"), hooks);
         oracle = new OracleQueries(this::connect);
     }
-    F2JobChecks checks(Optional<String> egressTargets, Optional<Integer> tokens) { return new F2JobChecks(gateway, hooks, oracle, Optional.empty(), egressTargets, text -> tokens); }
+    F2JobChecks checks(Optional<Integer> tokens) { return new F2JobChecks(gateway, hooks, oracle, Optional.empty(), text -> tokens); }
 
     private void handle(HttpExchange exchange) throws java.io.IOException {
         try (exchange) {
@@ -55,6 +63,7 @@ final class F2LocalFixture implements AutoCloseable {
             else if (path.equals("/__test/tcmock/scenario")) status = scenarios.contains(body.path("id").asText()) ? 204 : 400;
             else if (path.startsWith("/__test/prompt-watch/")) { var job = keyToJob.get(path.substring(path.lastIndexOf('/') + 1)); var rows = job == null ? null : outcomes.get(job).watch; if (rows == null || rows.isEmpty()) status = 404; else result = rows; }
             else if (path.equals("/__test/readiness-stub")) { String kind = body.path("kind").asText(); readiness = kind.equals("OFF") ? restoredState : kind; result = Map.of("state", readiness); }
+            else if (path.equals("/__test/egress-probe") && method.equals("GET")) { if (egressTargets == null) status = 404; else result = egressTargets; }
             else if (path.equals("/__test/egress-probe")) { String id = body.path("targetId").asText(); result = new LinkedHashMap<>(Map.of("targetId", id, "connected", egress.getOrDefault(id, false))); }
             else if (path.equals("/v1/conversations") && method.equals("POST")) { status = 201; result = Map.of("id", "22222222-2222-2222-2222-222222222222"); }
             else if (path.startsWith("/v1/conversations/")) result = Map.of("messages", List.of());
@@ -86,6 +95,7 @@ final class F2LocalFixture implements AutoCloseable {
                 if (sql.startsWith("SELECT capability_id, status")) rows = outcome == null ? List.of() : outcome.tools;
                 else if (sql.startsWith("SELECT owner_system")) rows = List.<Object[]>of(new Object[]{outcome.owner});
                 else if (sql.startsWith("SELECT task_type")) rows = outcome.taskTypes.stream().map(type -> new Object[]{type}).toList();
+                else if (sql.startsWith("SELECT token_usage")) rows = outcome == null ? List.of() : outcome.llmCalls;
                 else if (sql.startsWith("SELECT payload")) rows = outcome == null ? List.of() : outcome.tools.stream().filter(row -> row[0].equals(args.get(1))).map(row -> new Object[]{F1SecurityChecks.json(Map.of("status", row[1], "result", Map.of("blocks", List.of())))}).toList();
                 else if (sql.contains("row_to_json") || sql.contains("verified_oldest_at")) rows = List.of();
                 else rows = List.<Object[]>of(new Object[]{sql.contains("status IN") ? 0L : sql.equals("SELECT count(*) FROM gw.job") ? jobs : 1L});

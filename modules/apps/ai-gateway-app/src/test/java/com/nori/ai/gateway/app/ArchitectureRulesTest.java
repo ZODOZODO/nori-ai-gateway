@@ -93,7 +93,7 @@ class ArchitectureRulesTest {
         rules.put("persistence.audit.AuditWriter.write",Set.of("app.observability.AuditRecorder"));
         rules.put("persistence.audit.AuditWriter.writeForJob",Set.of("app.observability.AuditRecorder"));
         rules.put("app.observability.AuditRecorder.write",Set.of("app.security.ServiceTokenAuthFilter","app.job.JobAdmissionService"));
-        rules.put("app.observability.AuditRecorder.writeForJob",Set.of("app.job.WorkflowExecutionRecords","app.job.WorkflowExecutionAdapter"));
+        rules.put("app.observability.AuditRecorder.writeForJob",Set.of("app.job.WorkflowExecutionRecords","app.job.WorkflowExecutionAdapter","app.job.LlmCallAuditRecorder"));
         rules.put("persistence.repository.AuditRepository.insert",Set.of("persistence.audit.AuditWriter"));
         rules.put("persistence.repository.AuditRepository.insertForJob",Set.of("persistence.audit.AuditWriter"));
         rules.put("core.workflow.WorkflowExecutor$ExecutionRecorder.blocked",Set.of("core.workflow.WorkflowExecutor"));

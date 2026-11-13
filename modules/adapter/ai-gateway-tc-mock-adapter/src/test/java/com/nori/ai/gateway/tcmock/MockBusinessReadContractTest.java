@@ -24,6 +24,18 @@ class MockBusinessReadContractTest {
     private final MockTcBusinessReadAdapter adapter = new MockTcBusinessReadAdapter(scenarios, authorization, clock, calls, manifests);
     private final TimeWindow window = new TimeWindow(now.minusSeconds(3000), now.plusSeconds(1));
     @BeforeEach void register() { registry.register(call.sub(), call.dlg()); }
+    /** AC-43-COMP fixture: 시간창과 무관한 모델 조회가 대량 항목을 돌려주고, 나머지 읽기는 default 와 같다(Composer 축소 뒤 초과 판정은 앱 IT 몫). */
+    @Test void composerOversizeLoadsUnderTheSameContractAndReturnsALargeModelListOutsideAnyTimeWindow() {
+        assertThat(scenarios.ids()).contains("composer-oversize");
+        scenarios.select("composer-oversize");
+        var models = adapter.readModel(call, Optional.empty());
+        assertThat(models.status()).isEqualTo(ResultStatus.SUCCESS);
+        assertThat(models.data()).hasSize(320).allSatisfy(node -> { assertThat(node.modelId()).isEqualTo("MODEL-001"); assertThat(node.children()).isEmpty(); });
+        assertThat(adapter.getEqpSnapshot(call, "EQP-001").data().eqpId()).isEqualTo("EQP-001");
+        assertThat(scenarios.current().contractVersion()).isEqualTo("1.0");
+        scenarios.select("default");
+        assertThat(adapter.readModel(call, Optional.empty()).data()).hasSize(1);
+    }
     @Test void scopedDlqFiltersAuthoritativeEquipmentAndNanoHalfOpenBeforeLegacyProjection() {
         var exact=new TimeWindow(Instant.parse("2026-11-05T23:00:00.123456789Z"),Instant.parse("2026-11-05T23:30:00.987654321Z"));
         for(String id:List.of("dlq-scoped","dlq-scoped-other-snapshot")) {

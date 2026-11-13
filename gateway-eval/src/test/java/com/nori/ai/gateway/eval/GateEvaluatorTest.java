@@ -77,6 +77,44 @@ class GateEvaluatorTest {
         rubric.put("answerSha256","b".repeat(64)); EvidenceRecord.seal(rubric);
         assertThat(result(evaluate("F1","p",p,first,next,acc,rubric),"AC-46-EMPTY")).isEqualTo("PASS");
     }
+    /** F2 AC-22-LIVE 처럼 한 leaf 에 rubric 대상이 여럿이면 현재 자동 회차의 대상마다 결속 RUBRIC 기록이 있어야 하고 판정은 AND 다. */
+    ObjectNode[] multiTarget(String staleFixture) {
+        ObjectNode p=f.parent("F2","p"), run=f.run("F2","p","r","F2","COMPLETED","2026-10-29T00:00:01Z");
+        var targets=new ArrayList<Map<String,String>>();
+        for (String fixture : List.of("live-a","live-b","live-c")) targets.add(Map.of("leafId","AC-22-LIVE","fixtureId",fixture,"answerSha256",(fixture.equals(staleFixture)?"e":fixture.substring(5)).repeat(64)));
+        targets.add(Map.of("leafId","AC-22-GQ-BYPASS-DATA","fixtureId","other","answerSha256","d".repeat(64)));
+        run.set("rubricTargets",Json.MAPPER.valueToTree(targets)); EvidenceRecord.seal(run);
+        return new ObjectNode[]{p, run, f.leaf("F2","p","r","AC-22-LIVE",0,"PASS","2026-10-29T00:00:01Z")};
+    }
+    ObjectNode judged(String fixture, String verdict, String time) {
+        ObjectNode rubric=f.leaf("F2","p","rubric-"+fixture,"AC-22-LIVE",1,verdict,time);
+        rubric.put("fixtureId",fixture); rubric.put("answerSha256",fixture.substring(5).repeat(64)); EvidenceRecord.seal(rubric); return rubric;
+    }
+    String rubricComponent(GateEvaluator.GateReport report) {
+        return report.leaves().stream().filter(l -> l.leafId().equals("AC-22-LIVE")).findFirst().orElseThrow().components().stream().filter(c -> c.componentId().equals("RB:F2-RUBRIC")).findFirst().orElseThrow().result();
+    }
+    @Test void multiTargetRubricPassesOnlyWhenEveryCurrentTargetHasItsOwnPassingRecord() {
+        var base=multiTarget("none");
+        var report=evaluate("F2","p",base[0],base[1],base[2],judged("live-a","PASS","2026-10-29T00:00:02Z"),judged("live-b","PASS","2026-10-29T00:00:03Z"),judged("live-c","PASS","2026-10-29T00:00:04Z"));
+        assertThat(rubricComponent(report)).isEqualTo("PASS");
+    }
+    @Test void multiTargetRubricIsNotRunWhenOneCurrentTargetHasNoRecordEvenIfTheLatestRecordPasses() {
+        var base=multiTarget("none");
+        var report=evaluate("F2","p",base[0],base[1],base[2],judged("live-a","PASS","2026-10-29T00:00:02Z"),judged("live-c","PASS","2026-10-29T00:00:04Z"));
+        assertThat(rubricComponent(report)).isEqualTo("NOT_RUN");
+        assertThat(report.leaves().stream().filter(l -> l.leafId().equals("AC-22-LIVE")).findFirst().orElseThrow().components()).filteredOn(c -> c.componentId().equals("RB:F2-RUBRIC")).singleElement().extracting(GateEvaluator.ComponentVerdict::reasonCode).isEqualTo("RUBRIC_TARGET_MISMATCH");
+    }
+    @Test void multiTargetRubricFailsWhenAnyTargetFailsEvenIfTheLatestRecordPasses() {
+        var base=multiTarget("none");
+        var report=evaluate("F2","p",base[0],base[1],base[2],judged("live-a","PASS","2026-10-29T00:00:02Z"),judged("live-b","FAIL","2026-10-29T00:00:03Z"),judged("live-c","PASS","2026-10-29T00:00:04Z"));
+        assertThat(rubricComponent(report)).isEqualTo("FAIL");
+        assertThat(result(report,"AC-22-LIVE")).isEqualTo("FAIL");
+    }
+    @Test void multiTargetRubricIsNotRunWhenARecordJudgedAnOlderAnswerOfTheSameFixture() {
+        var base=multiTarget("live-c");
+        var report=evaluate("F2","p",base[0],base[1],base[2],judged("live-a","PASS","2026-10-29T00:00:02Z"),judged("live-b","PASS","2026-10-29T00:00:03Z"),judged("live-c","PASS","2026-10-29T00:00:04Z"));
+        assertThat(rubricComponent(report)).as("현재 회차 answerSha 가 바뀐 대상의 PASS 는 결속되지 않는다").isEqualTo("NOT_RUN");
+    }
     @Test void measurementRecordsCannotSatisfyLeafAndSharedChildrenPropagateToBothParents() {
         ObjectNode p=f.parent("F4","p"), done=f.run("F4","p","r","F4","COMPLETED","2026-10-29T00:00:01Z"), leaf=f.leaf("F4","p","r","AC-03-RES",0,"FAIL","2026-10-29T00:00:01Z");
         var report=evaluate("F4","p",p,done,leaf); assertThat(report.stageParents().get("AC-03")).isEqualTo("FAIL"); assertThat(report.stageParents().get("AC-24")).isEqualTo("FAIL");

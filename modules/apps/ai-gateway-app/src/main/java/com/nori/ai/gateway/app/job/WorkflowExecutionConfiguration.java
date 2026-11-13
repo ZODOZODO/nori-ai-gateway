@@ -39,9 +39,11 @@ public class WorkflowExecutionConfiguration {
      */
     @Bean @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="ai.gateway.inference.mode",havingValue="enabled")
     com.nori.ai.gateway.core.llm.ComposerService composerService(InferenceClient inference,com.nori.ai.gateway.core.budget.PromptReducer reducer,com.nori.ai.gateway.core.budget.TokenBudgetPolicy policy,
-            com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter tokenizer,ExpiryCheckpoint expiry,java.util.Optional<com.nori.ai.gateway.core.llm.LlmCallObserver> observer){
-        return new com.nori.ai.gateway.core.llm.ComposerService(inference,reducer,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),prompt("prompts/compose-v1.txt"));
+            com.nori.ai.gateway.integration.tokenizer.HfTokenizerCounter tokenizer,ExpiryCheckpoint expiry,java.util.Optional<com.nori.ai.gateway.core.llm.LlmCallObserver> observer,
+            com.nori.ai.gateway.core.llm.LlmCallAudit audit){
+        return new com.nori.ai.gateway.core.llm.ComposerService(inference,reducer,policy,tokenizer::countText,expiry,observer.orElse(com.nori.ai.gateway.core.llm.LlmCallObserver.NONE),audit,prompt(COMPOSE_PROMPT));
     }
+    public static final String COMPOSE_PROMPT="prompts/compose-v1.txt";
     private static String prompt(String path){
         try(var input=WorkflowExecutionConfiguration.class.getClassLoader().getResourceAsStream(path)){
             if(input==null)throw new IllegalStateException("프롬프트 자원이 없습니다: "+path);

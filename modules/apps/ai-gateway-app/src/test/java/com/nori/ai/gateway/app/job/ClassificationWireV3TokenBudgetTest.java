@@ -72,14 +72,15 @@ class ClassificationWireV3TokenBudgetTest {
             InferenceClient client = new InferenceClient() {
                 @Override public ChatOutcome chat(CallType type, List<ChatMessage> messages, int maxTokens) {
                     sent.add(messages); assertThat(maxTokens).isEqualTo(5_120);
-                    return new Completed(content, "stop", 100, answer, Duration.ofMillis(1));
+                    return new Completed(content, "stop", 100, answer, Duration.ofMillis(1), 100);
                 }
                 @Override public List<float[]> embed(List<String> inputs) { throw new UnsupportedOperationException(); }
             };
             var service = new ClassificationService(client, policy, tokenizer::countText, new ExpiryCheckpoint(new ConversationExpiryGuard(), Clock.fixed(NOW, ZoneOffset.UTC)),
-                LlmCallObserver.NONE, resource("prompts/classify-v3.txt"), registryReference());
+                LlmCallObserver.NONE, attempt -> {}, resource("prompts/classify-v3.txt"), registryReference());
             var context = Map.<String,Object>of("context", Map.of("timezone", "+09:00", "referenceTime", "2026-10-20T10:00:00+09:00"));
-            var result = service.classify(new ClassificationService.Request("job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, question, context)));
+            var result = service.classify(new ClassificationService.Request(new com.nori.ai.gateway.core.scope.VerifiedSystemScope(OwnerSystem.TC, "svc", new com.nori.ai.gateway.core.scope.ActorRef("actor"), "actor",
+                java.util.Set.of("EQP_READ"), "a".repeat(64), NOW.minusSeconds(1), NOW.plusSeconds(60), "job-1"), "conversation", "job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, question, context)));
             assertThat(result).as("최대 wire 는 절삭 없이 통과").isInstanceOf(ClassificationService.Classified.class);
             var classified = ((ClassificationService.Classified) result).classification();
             assertThat(classified.eqp()).isEqualTo(eqp);

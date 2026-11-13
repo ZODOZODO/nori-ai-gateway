@@ -9,6 +9,7 @@ import com.nori.ai.gateway.core.expiry.ExpiryCheckpoint;
 import com.nori.ai.gateway.core.job.JobContext;
 import com.nori.ai.gateway.core.port.InferenceClient;
 import com.nori.ai.gateway.core.registry.SchemaContracts;
+import com.nori.ai.gateway.core.result.ErrorCode;
 import com.nori.ai.gateway.core.workflow.ComposerOutcome;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,16 +77,18 @@ public final class ComposerService {
     private final AnswerTokenCounting answers;
     private final ExpiryCheckpoint expiry;
     private final LlmCallObserver observer;
+    private final LlmCallAudit audit;
     private final String systemPrompt;
 
     public ComposerService(InferenceClient inference, PromptReducer reducer, TokenBudgetPolicy policy, AnswerTokenCounting answers, ExpiryCheckpoint expiry,
-            LlmCallObserver observer, String systemPrompt) {
+            LlmCallObserver observer, LlmCallAudit audit, String systemPrompt) {
         this.inference = Objects.requireNonNull(inference, "inference");
         this.reducer = Objects.requireNonNull(reducer, "reducer");
         this.budget = Objects.requireNonNull(policy, "policy").budget(CallType.COMPOSER);
         this.answers = Objects.requireNonNull(answers, "answers");
         this.expiry = Objects.requireNonNull(expiry, "expiry");
         this.observer = Objects.requireNonNull(observer, "observer");
+        this.audit = Objects.requireNonNull(audit, "audit");
         this.systemPrompt = Objects.requireNonNull(systemPrompt, "systemPrompt");
         if (systemPrompt.isBlank() || systemPrompt.indexOf('\r') >= 0) throw new IllegalArgumentException("서술 프롬프트 형식이 잘못되었습니다");
     }
@@ -106,12 +109,15 @@ public final class ComposerService {
             try (var scope = observer.open(job.jobId(), CallType.COMPOSER, messages)) {
                 outcome = inference.chat(CallType.COMPOSER, messages, budget.requestMaxTokens());
             }
+            String failure = outcome instanceof InferenceClient.Completed answered ? AnswerCheck.failure(answered, budget, answers) : null;
+            // 시도마다 같은 축소 단계(첫 조립 기준)를 함께 남긴다. 재시도 입력 계수는 Client 의 호출 직전 계수다.
+            audit.record(LlmCallAudit.attempt(job.scope(), job.conversationId(), job.jobId(), CallType.COMPOSER, budget.requestMaxTokens(), outcome,
+                failure == null ? null : ErrorCode.LLM_UNAVAILABLE, reduction.steps()));
             expiry.assertLive(job.conversationExpiresAt(), job.cancellation());
             if (outcome instanceof InferenceClient.BudgetExceeded) return failed(ComposerOutcome.INPUT_BUDGET_EXCEEDED, calls, reduction.steps());
             calls++;
             if (outcome instanceof InferenceClient.CallFailed) return failed(ComposerOutcome.LLM_UNAVAILABLE, calls, reduction.steps());
             var completed = (InferenceClient.Completed) outcome;
-            String failure = AnswerCheck.failure(completed, budget, answers);
             if (failure == null) return composed(completed.content(), input.evidence().size(), data, calls, reduction.steps());
             List<ChatMessage> retry = new ArrayList<>(reduction.messages());
             retry.add(new ChatMessage(ChatMessage.Role.USER, RETRY_PREFIX + AnswerCheck.retryCode(failure) + RETRY_SUFFIX));

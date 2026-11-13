@@ -25,10 +25,10 @@ class ClassificationNeedsV3Test {
     private static final Map<String,Object> CONTEXT = Map.of("context", Map.of("timezone", "+09:00", "referenceTime", "2026-10-20T10:00:00+09:00"));
 
     private static ClassificationService service(ScriptedClient client) {
-        return new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(new MutableClock()), LlmCallObserver.NONE, "분류 지시\n{{REGISTRY}}", "r\n");
+        return new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(new MutableClock()), LlmCallObserver.NONE, attempt -> {}, "분류 지시\n{{REGISTRY}}", "r\n");
     }
     private static ClassificationService.Result classify(ScriptedClient client, Map<String,Object> fields) {
-        return service(client).classify(new ClassificationService.Request("job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, "설비 진행이 멈췄어", fields)));
+        return service(client).classify(new ClassificationService.Request(SCOPE, "conversation", "job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, "설비 진행이 멈췄어", fields)));
     }
     private static String wire(String t, String n, String a) {
         return "{\"t\":\"" + t + "\",\"eqp\":null,\"from\":null,\"to\":null,\"qRef\":null,\"n\":" + n + ",\"a\":" + a + "}";

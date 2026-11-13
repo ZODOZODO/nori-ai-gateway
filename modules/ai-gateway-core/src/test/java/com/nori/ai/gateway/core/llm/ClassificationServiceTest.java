@@ -24,13 +24,14 @@ class ClassificationServiceTest {
     private static final Map<String,Object> CONTEXT = Map.of("context", Map.of("timezone", "+09:00", "referenceTime", "2026-10-20T10:00:00+09:00"));
     private final MutableClock clock = new MutableClock();
     private final List<List<ChatMessage>> observed = new ArrayList<>();
+    private final List<LlmCallAudit.Attempt> audits = new ArrayList<>();
     private final LlmCallObserver observer = (job, type, messages) -> { assertThat(type).isEqualTo(CallType.CLASSIFY); observed.add(messages); return () -> {}; };
 
     private ClassificationService service(ScriptedClient client) {
-        return new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(clock), observer, PROMPT, "boundSystem: X\n");
+        return new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(clock), observer, audits::add, PROMPT, "boundSystem: X\n");
     }
     private ClassificationService.Request request(String question, Map<String,Object> fields) {
-        return new ClassificationService.Request("job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, question, fields));
+        return new ClassificationService.Request(SCOPE, "conversation", "job-1", NOW.plusSeconds(600), new CancellationToken(), new JobRequestInput("message", 1, question, fields));
     }
     /** 분류 wire v3 고정 fixture: n 은 상위 작업 최소 근거(KQ=N, LQ=S, INC=H, GQ·UNS=[]), a=B. 다른 값은 {@link #wire(String,String,String,String,String,String,String)}. */
     private static String wire(String t, String eqp, String from, String to, String qRef) {
@@ -113,13 +114,40 @@ class ClassificationServiceTest {
     }
 
     @Test void callFailureIsUnavailableWithoutRetryAndBudgetExceededIsNeverSent() {
-        var failed = new ScriptedClient(new InferenceClient.CallFailed(InferenceClient.FailureReason.TRANSPORT, "java.io.IOException", Duration.ZERO));
+        var failed = new ScriptedClient(new InferenceClient.CallFailed(InferenceClient.FailureReason.TRANSPORT, "java.io.IOException", Duration.ZERO, 100));
         assertThat(service(failed).classify(request("질문", CONTEXT))).isEqualTo(new ClassificationService.Unavailable(1));
         assertThat(failed.sent).hasSize(1);
         var budget = new ScriptedClient(InferenceClient.ChatOutcome.budgetExceeded(6_000));
         assertThat(service(budget).classify(request("질문", CONTEXT))).isEqualTo(new ClassificationService.BudgetExceeded(0));
         var retryBudget = new ScriptedClient(reply("x"), InferenceClient.ChatOutcome.budgetExceeded(3_100));
         assertThat(service(retryBudget).classify(request("질문", CONTEXT))).isEqualTo(new ClassificationService.BudgetExceeded(1));
+    }
+
+    /** SPEC §14.5: 호출 직전 assert 에 도달한 시도(재시도 포함)마다 감사 1건, 보내지 않은 시도는 sent=false·usage 없음, 원문 0. */
+    @Test void everyAttemptIncludingRetriesFailuresAndBudgetStopsLeavesExactlyOneTextFreeAudit() {
+        var retried = new ScriptedClient(reply("{\"t\":\"LQ\",\"eqp\":\"FIRST-SECRET\",\"from\":null,\"to\":null,\"n\":[\"S\"],\"a\":\"B\"}"), reply(wire("LQ", "SECOND", null, null, null)));
+        service(retried).classify(request("질문", CONTEXT));
+        assertThat(audits).hasSize(2).allSatisfy(audit -> {
+            assertThat(audit.callType()).isEqualTo(CallType.CLASSIFY); assertThat(audit.sent()).isTrue(); assertThat(audit.inputTokens()).isEqualTo(100);
+            assertThat(audit.maxTokens()).isEqualTo(5_120); assertThat(audit.promptTokens()).isEqualTo(100); assertThat(audit.completionTokens()).isEqualTo(50);
+            assertThat(audit.reduction()).isEmpty(); assertThat(audit.jobId()).isEqualTo("job-1"); assertThat(audit.conversationId()).isEqualTo("conversation"); assertThat(audit.scope()).isSameAs(SCOPE);
+        });
+        assertThat(audits.get(0).status()).isEqualTo(com.nori.ai.gateway.core.result.ResultStatus.FAILED); assertThat(audits.get(0).errorCode()).isEqualTo(com.nori.ai.gateway.core.result.ErrorCode.PLAN_INVALID);
+        assertThat(audits.get(1).status()).isEqualTo(com.nori.ai.gateway.core.result.ResultStatus.SUCCESS); assertThat(audits.get(1).errorCode()).isNull();
+        assertThat(audits.toString()).doesNotContain("FIRST-SECRET", "SECOND", "질문");
+        audits.clear();
+        service(new ScriptedClient(InferenceClient.ChatOutcome.budgetExceeded(6_000))).classify(request("질문", CONTEXT));
+        assertThat(audits).singleElement().satisfies(audit -> {
+            assertThat(audit.sent()).isFalse(); assertThat(audit.inputTokens()).isEqualTo(6_000); assertThat(audit.promptTokens()).isNull(); assertThat(audit.completionTokens()).isNull();
+            assertThat(audit.errorCode()).isEqualTo(com.nori.ai.gateway.core.result.ErrorCode.INPUT_BUDGET_EXCEEDED);
+        });
+        audits.clear();
+        service(new ScriptedClient(new InferenceClient.CallFailed(InferenceClient.FailureReason.TRANSPORT, "java.io.IOException", Duration.ofMillis(7), 120))).classify(request("질문", CONTEXT));
+        assertThat(audits).singleElement().satisfies(audit -> { assertThat(audit.sent()).isTrue(); assertThat(audit.inputTokens()).isEqualTo(120); assertThat(audit.latencyMs()).isEqualTo(7);
+            assertThat(audit.promptTokens()).isNull(); assertThat(audit.errorCode()).isEqualTo(com.nori.ai.gateway.core.result.ErrorCode.LLM_UNAVAILABLE); });
+        audits.clear();
+        assertThat(service(new ScriptedClient()).classify(request("\"" + "x".repeat(257) + "\"", CONTEXT))).isInstanceOf(ClassificationService.Rejected.class);
+        assertThat(audits).as("호출 전 거부는 호출 시도가 아니다").isEmpty();
     }
 
     @Test void localTimeWithoutAContextTimezoneCannotBeResolvedAndIsAFormatFailure() {
@@ -143,7 +171,7 @@ class ClassificationServiceTest {
         clock.now = NOW;
         var cancelled = new ScriptedClient(reply(wire("GQ", null, null, null, null)));
         var token = new CancellationToken(); token.signal(CancellationToken.Reason.CANCELLED);
-        assertThatThrownBy(() -> service(cancelled).classify(new ClassificationService.Request("job-1", NOW.plusSeconds(600), token, new JobRequestInput("message", 1, "질문", CONTEXT))))
+        assertThatThrownBy(() -> service(cancelled).classify(new ClassificationService.Request(SCOPE, "conversation", "job-1", NOW.plusSeconds(600), token, new JobRequestInput("message", 1, "질문", CONTEXT))))
             .isInstanceOf(IllegalStateException.class);
         assertThat(cancelled.sent).isEmpty();
     }
@@ -161,6 +189,6 @@ class ClassificationServiceTest {
     @Test void templateMustHaveExactlyOneRegistrySlotAndNoLeftoverPlaceholder() {
         var client = new ScriptedClient();
         for (String bad : List.of("no slot", "{{REGISTRY}} {{REGISTRY}}", "a\r\n{{REGISTRY}}", "{{REGISTRY}} {{TOOLS}}"))
-            assertThatThrownBy(() -> new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(clock), observer, bad, "r")).as(bad).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new ClassificationService(client, TokenBudgetPolicy.current(), CODEPOINTS, expiry(clock), observer, audits::add, bad, "r")).as(bad).isInstanceOf(IllegalArgumentException.class);
     }
 }

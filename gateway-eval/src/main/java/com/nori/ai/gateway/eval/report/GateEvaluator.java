@@ -61,24 +61,41 @@ public final class GateEvaluator {
             List<JsonNode> sourceRecords = new ArrayList<>(); original.path("records").forEach(sourceRecords::add);
             for (JsonNode n : sourceRecords) EvidenceRecord.validate(n, catalog);
             selected = latest(sourceRecords.stream().filter(n -> n.path("leafId").asText().equals(leaf) && n.path("runId").equals(reference.path("runId"))).toList());
-        } else selected = latest(records.stream().filter(n -> authority(n, leaf, component) && labelsMatch(n, catalog.leaf(leaf).path("labelsByStage").path(stage))).toList());
+        } else if (producer.equals("RUBRIC")) return rubric(stage, leaf, component, records, parent, chain, catalog);
+        else selected = latest(records.stream().filter(n -> authority(n, leaf, component) && labelsMatch(n, catalog.leaf(leaf).path("labelsByStage").path(stage))).toList());
         if (selected == null) return missing(componentId, "COMPONENT_MISSING", "");
+        return verdict(stage, leaf, componentId, producer, selected, parent, chain, catalog);
+    }
+    /** 고른 기록 하나의 기준선·이미지 identity·라벨 확인 뒤 그 기록의 판정. */
+    private ComponentVerdict verdict(String stage, String leaf, String componentId, String producer, JsonNode selected, JsonNode parent, SpecBaseline chain, LeafCatalog catalog) {
         String run = selected.path("runId").asText();
         if (!chain.eligible(selected.path("specSha").asText(), leaf)) return missing(componentId, "SPEC_BASELINE_STALE", run);
         if (!BuildIdentity.matches(parent.path("buildIdentity"), selected.path("buildIdentity"), producer, stage)) return missing(componentId, "IDENTITY_MISMATCH", run);
         Set<String> labels = new HashSet<>(); selected.path("labels").forEach(n -> labels.add(n.asText()));
         for (JsonNode expected : catalog.leaf(leaf).path("labelsByStage").path(stage)) if (!labels.contains(expected.asText())) return missing(componentId, "LABEL_MISMATCH", run);
-        if (producer.equals("RUBRIC") && !rubricBound(records, selected)) return missing(componentId, "RUBRIC_TARGET_MISMATCH", run);
         return new ComponentVerdict(componentId, selected.path("result").asText(), run, selected.path("reasonCode").asText(""));
     }
-    private boolean rubricBound(List<JsonNode> records, JsonNode rubric) {
-        String automaticSuite = rubric.path("suite").asText().replace("-RUBRIC", "");
+    /**
+     * RUBRIC 구성 요소: 같은 자동 suite 의 최신 회차(COMPLETED)가 이 leaf 에 남긴 rubric 대상 {leafId, fixtureId, answerSha256} 마다 그 fixture·답변 SHA 에 결속된
+     * RUBRIC 기록(같은 대상 중 최신)이 있어야 한다. 대상별 판정은 AND 다 — 하나라도 결속 기록이 없으면 NOT_RUN, 하나라도 FAIL 이면 FAIL.
+     */
+    private ComponentVerdict rubric(String stage, String leaf, JsonNode component, List<JsonNode> records, JsonNode parent, SpecBaseline chain, LeafCatalog catalog) {
+        String componentId = component.path("componentId").asText();
+        List<JsonNode> judged = records.stream().filter(n -> authority(n, leaf, component) && labelsMatch(n, catalog.leaf(leaf).path("labelsByStage").path(stage))).toList();
+        if (judged.isEmpty()) return missing(componentId, "COMPONENT_MISSING", "");
+        String judgedRun = latest(judged).path("runId").asText();
+        String automaticSuite = component.path("suite").asText().replace("-RUBRIC", "");
         JsonNode current = latest(records.stream().filter(n -> n.path("kind").asText().equals("RUN") && n.path("suite").asText().equals(automaticSuite)).toList());
-        if (current == null || !current.path("status").asText().equals("COMPLETED")) return false;
+        if (current == null || !current.path("status").asText().equals("COMPLETED")) return missing(componentId, "RUBRIC_TARGET_MISMATCH", judgedRun);
+        List<ComponentVerdict> targets = new ArrayList<>();
         for (JsonNode target : current.path("rubricTargets")) {
-            if (target.path("leafId").equals(rubric.path("leafId")) && target.path("fixtureId").equals(rubric.path("fixtureId")) && target.path("answerSha256").equals(rubric.path("answerSha256")) && rubric.path("answerSha256").asText().matches("[0-9a-f]{64}")) return true;
+            if (!target.path("leafId").asText().equals(leaf)) continue;
+            JsonNode bound = latest(judged.stream().filter(n -> n.path("fixtureId").equals(target.path("fixtureId")) && n.path("answerSha256").equals(target.path("answerSha256")) && n.path("answerSha256").asText().matches("[0-9a-f]{64}")).toList());
+            targets.add(bound == null ? missing(componentId, "RUBRIC_TARGET_MISMATCH", judgedRun) : verdict(stage, leaf, componentId, "RUBRIC", bound, parent, chain, catalog));
         }
-        return false;
+        if (targets.isEmpty()) return missing(componentId, "RUBRIC_TARGET_MISMATCH", judgedRun);
+        String result = and(targets.stream().map(ComponentVerdict::result).toList());
+        return targets.stream().filter(target -> target.result().equals(result)).findFirst().orElseThrow();
     }
     private static boolean authority(JsonNode n, String leaf, JsonNode component) {
         return n.path("kind").asText().equals("LEAF") && n.path("leafId").asText().equals(leaf) && n.path("producer").equals(component.path("producer")) && n.path("componentId").equals(component.path("componentId")) && (!component.has("suite") || n.path("suite").equals(component.path("suite"))) && phaseMatches(component, n);

@@ -15,6 +15,7 @@ public final class AuditFieldAllowlist {
     private static final Pattern UUID = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final Pattern TRACE = Pattern.compile("[0-9a-f]{32}");
     private static final Pattern SERVICE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9:._-]{0,63}");
+    private static final Pattern VERSION = Pattern.compile("[A-Za-z0-9][A-Za-z0-9:._-]{0,63}");
     private final ContentSanitizer sanitizer;
     private final CapabilityRegistry registry;
 
@@ -26,6 +27,7 @@ public final class AuditFieldAllowlist {
     public void requireGeneral(AuditEvent event) {
         Objects.requireNonNull(event);
         String service = event.scope().authenticatedServiceRef();
+        if (event.eventType() != AuditEventType.LLM_CALL && event.llmCall() != null) throw rejected("llmCall");
         switch (event.eventType()) {
             case API_REQUEST -> {
                 requireService(service); requireUuid("requestId", event.scope().requestId()); requireTrace(event.traceId());
@@ -48,8 +50,32 @@ public final class AuditFieldAllowlist {
                 requireJob(event); if (event.toolId() != null) requireTool(event, false); present("status", event.status());
                 absent(event.traceId(), event.sourceRef(), event.taskType(), event.latencyMs());
             }
+            case LLM_CALL -> {
+                requireJob(event); present("status", event.status()); present("latencyMs", event.latencyMs()); present("llmCall", event.llmCall());
+                if (event.latencyMs() < 0) throw rejected("latencyMs");
+                absent(event.traceId(), event.toolId(), event.sourceRef(), event.taskType(), event.decision());
+                requireLlmCall(event);
+            }
             case AUTH_REJECTED, JOB_TERMINAL -> throw rejected("eventType");
         }
+    }
+    /**
+     * 토큰 수는 0 이상, 요청 max_tokens 는 1 이상이다. 보내지 않은 시도는 usage 가 없고 INPUT_BUDGET_EXCEEDED 다.
+     * 축소 단계는 SPEC §14.5 순서 1~4 의 오름차순, 각 단계는 입력을 늘리지 않는다. 버전 값은 닫힌 식별자 형식만 받는다.
+     */
+    private static void requireLlmCall(AuditEvent event) {
+        var call = event.llmCall();
+        if (call.inputTokens() < 0 || call.maxTokens() < 1) throw rejected("tokens");
+        if (call.promptTokens() != null && call.promptTokens() < 0 || call.completionTokens() != null && call.completionTokens() < 0) throw rejected("usage");
+        if (!call.sent() && (call.promptTokens() != null || call.completionTokens() != null || event.errorCode() != com.nori.ai.gateway.core.result.ErrorCode.INPUT_BUDGET_EXCEEDED)) throw rejected("sent");
+        if ((event.status() == com.nori.ai.gateway.core.result.ResultStatus.SUCCESS) != (event.errorCode() == null)
+            || event.status() != com.nori.ai.gateway.core.result.ResultStatus.SUCCESS && event.status() != com.nori.ai.gateway.core.result.ResultStatus.FAILED) throw rejected("status");
+        int previous = 0;
+        for (var step : call.reduction()) {
+            if (step.stage() <= previous || step.stage() > 4 || step.afterTokens() < 0 || step.afterTokens() > step.beforeTokens()) throw rejected("reduction");
+            previous = step.stage();
+        }
+        if (call.model() == null || !VERSION.matcher(call.model()).matches() || call.promptVersion() == null || !VERSION.matcher(call.promptVersion()).matches()) throw rejected("versions");
     }
     private void requireJob(AuditEvent event) {
         requireUuid("conversationId", event.conversationId()); requireUuid("jobId", event.jobId());

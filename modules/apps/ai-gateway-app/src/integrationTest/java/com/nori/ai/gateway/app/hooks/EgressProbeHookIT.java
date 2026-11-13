@@ -51,4 +51,17 @@ class EgressProbeHookIT extends P09QueueSupport {
         assertThat(hook("/__test/egress-probe", "POST", "{\"targetId\":\"allowed-local\"}", null).statusCode()).isEqualTo(404);
         assertThat(hook("/__test/egress-probe", "POST", "{\"targetId\":\"allowed-local\"}", "wrong").statusCode()).isEqualTo(404);
     }
+
+    @Test void listsOnlyTargetIdsAndExpectationsInFileOrderBehindTheHookToken() throws Exception {
+        var listed = hook("/__test/egress-probe", "GET", null, hookToken);
+        assertThat(listed.statusCode()).isEqualTo(200);
+        JsonNode body = json.readTree(listed.body());
+        assertThat(body.isArray()).isTrue();
+        assertThat(body).hasSize(2).allSatisfy(target -> assertThat(target.propertyNames()).containsExactlyInAnyOrder("id", "expect"));
+        assertThat(body.get(0).get("id").asString()).isEqualTo("allowed-local"); assertThat(body.get(0).get("expect").asString()).isEqualTo("ALLOWED");
+        assertThat(body.get(1).get("id").asString()).isEqualTo("blocked-local"); assertThat(body.get(1).get("expect").asString()).isEqualTo("BLOCKED");
+        assertThat(listed.body()).doesNotContain("127.0.0.1", "host", "port", String.valueOf(closedPort), String.valueOf(listening.getLocalPort()));
+        assertThat(hook("/__test/egress-probe", "GET", null, null).statusCode()).isEqualTo(404);
+        assertThat(hook("/__test/egress-probe", "GET", null, "wrong").statusCode()).isEqualTo(404);
+    }
 }
