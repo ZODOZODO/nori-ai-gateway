@@ -60,14 +60,16 @@ public final class AuditFieldAllowlist {
         }
     }
     /**
-     * 토큰 수는 0 이상, 요청 max_tokens 는 1 이상이다. 보내지 않은 시도는 usage 가 없고 INPUT_BUDGET_EXCEEDED 다.
+     * 토큰 수는 0 이상, 요청 max_tokens 는 1 이상이다. 보내지 않은 시도는 usage 가 없으며 예산 초과 또는 전송 전 중단 실패다.
      * 축소 단계는 SPEC §14.5 순서 1~4 의 오름차순, 각 단계는 입력을 늘리지 않는다. 버전 값은 닫힌 식별자 형식만 받는다.
      */
     private static void requireLlmCall(AuditEvent event) {
         var call = event.llmCall();
         if (call.inputTokens() < 0 || call.maxTokens() < 1) throw rejected("tokens");
         if (call.promptTokens() != null && call.promptTokens() < 0 || call.completionTokens() != null && call.completionTokens() < 0) throw rejected("usage");
-        if (!call.sent() && (call.promptTokens() != null || call.completionTokens() != null || event.errorCode() != com.nori.ai.gateway.core.result.ErrorCode.INPUT_BUDGET_EXCEEDED)) throw rejected("sent");
+        if (!call.sent() && (call.promptTokens() != null || call.completionTokens() != null
+            || event.errorCode() != com.nori.ai.gateway.core.result.ErrorCode.INPUT_BUDGET_EXCEEDED
+                && event.errorCode() != com.nori.ai.gateway.core.result.ErrorCode.LLM_UNAVAILABLE)) throw rejected("sent");
         if ((event.status() == com.nori.ai.gateway.core.result.ResultStatus.SUCCESS) != (event.errorCode() == null)
             || event.status() != com.nori.ai.gateway.core.result.ResultStatus.SUCCESS && event.status() != com.nori.ai.gateway.core.result.ResultStatus.FAILED) throw rejected("status");
         int previous = 0;

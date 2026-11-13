@@ -69,6 +69,19 @@ class AuditFieldAllowlistTest {
         assertThatThrownBy(() -> new AuditEvent(null, AuditEventType.API_REQUEST, TRACE, null, null, null, null, null, null, null, null, null)).isInstanceOf(NullPointerException.class);
     }
 
+    @Test void interruptedBeforeTransportRemainsAuditableWithoutUsage() {
+        var outcome = new com.nori.ai.gateway.core.port.InferenceClient.CallFailed(
+            com.nori.ai.gateway.core.port.InferenceClient.FailureReason.INTERRUPTED, null, java.time.Duration.ofMillis(5), 500);
+        var attempt = com.nori.ai.gateway.core.llm.LlmCallAudit.attempt(scope, conversation, job,
+            com.nori.ai.gateway.core.budget.CallType.COMPOSER, 5_248, outcome, null, java.util.List.of());
+        assertThat(attempt.sent()).isFalse();
+        assertThat(attempt.errorCode()).isEqualTo(ErrorCode.LLM_UNAVAILABLE);
+        var call = new AuditEvent.LlmCall(attempt.callType(), attempt.sent(), attempt.inputTokens(), attempt.maxTokens(),
+            attempt.promptTokens(), attempt.completionTokens(), attempt.reduction(), "qwen3:4b", "compose-v1");
+        assertThatCode(() -> allowlist.requireGeneral(AuditEvent.llmCall(scope, conversation, job,
+            attempt.status(), attempt.errorCode(), attempt.latencyMs(), call))).doesNotThrowAnyException();
+    }
+
     private static AuditEvent.LlmCall call(boolean sent, Integer prompt, java.util.List<com.nori.ai.gateway.core.budget.PromptReducer.Step> steps, String model) {
         return new AuditEvent.LlmCall(com.nori.ai.gateway.core.budget.CallType.COMPOSER, sent, 2_700, 5_248, prompt, prompt == null ? null : 40, steps, model, "compose-v1");
     }
