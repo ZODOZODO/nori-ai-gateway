@@ -8593,3 +8593,56 @@ AC-32-NEEDS 사례: ⓐ~ⓔ·ⓝ 는 `a=D` 로 무장해 상세 보고 표(Repor
 - `ci/integration-required.txt` 에 `com.nori.ai.gateway.app.job.LlmCallAuditIT` 를 등록했다.
 
 **남은 항목**: 위 "실환경 F2 수용 전 남은 항목" 1~4 는 이 보완으로 닫혔다. 5·6(배포 뒤 실행, DJL native 적재 확인)은 남는다. AC-31 은 배포 Loki 원시 로그가 적어 축소가 일어나지 않으면 `AC31_REDUCTION_NOT_EXERCISED` NOT_RUN 이 된다(배포 첫 회차에서 확인).
+
+## P21 부모 검증·로컬 main 합류 (2026-11-13, root)
+
+사용자 지시: "P21 작업이 정상으로 끝났는지 검증하고 마무리 해야해."
+
+### 판정 범위와 합류
+
+- **CODE/LOCAL_VALIDATED**: P21 브랜치의 구현 `37390a6`·후속 보완 `36f1b14`와 구현 기록 `8d12839`·`c17933f`를 SPEC seq17, Plan P21 및 §6의 코드 선행 순서와 대조했다. 수용 하네스 → Job API/검증 hook/고정 SQL → 분류·Composer/일반 감사 writer의 실제 호출과 명시 빈 등록을 확인했다. 실제 클러스터 수용은 이 판정에 포함하지 않는다.
+- 부모 검증에서 발견한 감사 경계 보정을 `3d04b9a818c7ac99515d5a598abeffd404a8f0bc`로 커밋하고, main `4e909b8`에서 해당 커밋까지 `git merge --ff-only aigw/f2-p21`로 합류했다. 새 제품 결정·SPEC·기준선·migration 변경 0, 원격 push·CI·공유 DB/추론 서버 작업·배포 0이다.
+- Plan의 현재 로컬 상태와 P21 진행 기록을 갱신했다. P21 전체 완료 체크박스·실환경 F2 exit는 미승격이며 다음 phase를 시작하지 않았다.
+
+### 부모가 발견·보정한 실패 경로
+
+- `SpringAiOpenAiInferenceClient.chat`이 생성 슬롯 대기 중 `InterruptedException`을 받으면 전송 없이 `CallFailed(INTERRUPTED)`를 반환한다. `LlmCallAudit.attempt`는 이를 `sent=false`·`FAILED/LLM_UNAVAILABLE`로 바꾸지만, `AuditFieldAllowlist.requireLlmCall`은 미전송 실패를 `INPUT_BUDGET_EXCEEDED`만 허용해 정상적인 중단 시도의 감사를 `sent` 필드 위반으로 거부했다.
+- `AuditFieldAllowlistTest.interruptedBeforeTransportRemainsAuditableWithoutUsage`로 실제 outcome → 시도 → AuditEvent → 허용 목록 경로를 재현했다. 보정 전 해당 클래스 6건 중 이 1건이 실패했다. 원본 XML과 run-binding은 `C:/workspace_nori/.tools/p21-root-validation-20261113/interrupted-audit-before-fix*.{xml,json}`에 보존했다.
+- 제품 보정 파일은 `modules/ai-gateway-core/src/main/java/com/nori/ai/gateway/core/audit/AuditFieldAllowlist.java` 하나다. 미전송·usage 없음 조건을 유지하면서 예산 초과와 전송 전 중단 실패(`LLM_UNAVAILABLE`)를 허용한다. 성공/오류 코드 정합·다른 필드·버전·축소 단계 검사는 유지한다. 회귀 파일은 같은 모듈의 `src/test/java/com/nori/ai/gateway/core/audit/AuditFieldAllowlistTest.java`다.
+- 보정 뒤 core 비한정 전체 175건이 실패·오류·skip 0으로 통과했다(`BUILD SUCCESSFUL in 33s`). 이 보정은 앞 절 P21 후속 감사 기능의 내부 정합 수정이며 계약을 바꾸지 않는다.
+
+### Requirement/AC 대조
+
+| 대상 | 실제 확인 근거 | 판정 범위 |
+|---|---|---|
+| SPEC §27.2 F2 필수 24 leaf | F2Suite 22 leaf + 측정 1개, F2OutageSuite STOPPED/LOADING 각 1 leaf, 설치 JAR 발견 집합과 Plan P21 목록 정확 일치 | 코드/발견 확인, 실환경 leaf NOT_RUN |
+| AC-31·AC-43-CLS/COMP | 서비스 → LlmCallAudit → JobConfiguration/WorkflowExecutionConfiguration → LlmCallAuditRecorder → 기존 AuditRecorder/AuditWriter, 고정 OracleQueries.LLM_CALLS, composer-oversize fixture 및 관련 단위·실제 PG IT | 로컬 계약/빈 조립/저장 확인 |
+| AC-35-EGRESS | 검증 전용 GET 목록은 id·expect만 반환, 기존 POST는 승인 목록의 id만 소비, F2 판정의 양성 제어/차단 구별 및 EgressProbeHookIT | 로컬 계약 확인, 실제 네트워크 차단 NOT_RUN |
+| 자유 서술 RUBRIC | 현재 자동 회차의 (leaf, fixture, answer SHA)별 결속과 AND, 누락/이전 답변 NOT_RUN·한 대상 FAIL 전파·F1 기존 회귀 | eval 단위시험 확인, 수동 실판정 NOT_RUN |
+| AC-32-NEEDS·readiness/outage·수용 출력 | 사례 ⓐ~ⓞ, 실패/관측 불가 구별, outage 단계 태그·레코드 결속, 오염 출력 차단 및 F2 로컬 fixture 시험 | 로컬 판정 계약 확인 |
+
+### 실제 실행과 결과
+
+환경: Windows PowerShell, cwd `C:/workspace_nori/.aigw-worktrees/p21-ai`. `AIGW_SPEC_FILE=<cwd>/docs/ai-rag-gateway-architecture.md`, `AIGW_PG_TEST_IMAGE=pgvector/pgvector:0.8.7-pg18-trixie@sha256:5895949dfcdf308eb0cd31c950c93c14895c77f33fbedfecf1fa511ab1d4bcd2`, `ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy=in-process`. 아래 Gradle 명령은 `./gradlew.bat --offline --no-daemon --console=plain`로 실행했고 verifier에는 `-q`를 붙였다. PowerShell의 Docker 속성 인수는 `'-Paigw.requireDocker=true'`로 따옴표를 붙였다.
+
+| 명령/검사 | exit | 실제 결과 |
+|---|---|---|
+| `:gateway-eval:run --args="spec-guard --spec <cwd>/docs/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md"` | 0 | `BUILD SUCCESSFUL in 21s`, specSha `9a6a04b24d6ccccf46ef0c72f712ea2ae3b2e7364cc7b2ecea35972379e94a5a`, FILE_HASHED/LOCAL_FILE |
+| `:ai-gateway-core:test`(감사 경계 보정 후, 비한정) | 0 | 175건, 실패·오류·skip 0, `BUILD SUCCESSFUL in 33s` |
+| `build :adapter:ai-gateway-db-adapter:compileIntegrationTestJava :adapter:ai-gateway-inference-adapter:compileIntegrationTestJava :apps:ai-gateway-app:compileIntegrationTestJava :apps:ai-gateway-acceptance-app:installDist` | 0 | `BUILD SUCCESSFUL in 3m 41s`, `119 actionable tasks: 53 executed, 66 up-to-date` |
+| `:gateway-eval:run --args="test-evidence verify --tasks <아래 단위 11개 task의 쉼표 연결>"` | 0 | `TEST_EVIDENCE_VERIFIED`, 단위 793건 실패·오류·skip 0 |
+| 설치본 `lib/*`만 classpath로 `P21SuiteDiscovery.java` 실행(JUnit discovery만) | 0 | F2 시험 23/leaf 22, OUTAGE 2, STOPPED 1, LOADING 1, 합집합 leaf 24. JAR 149개 실행 전후 해시 동일, 수용 시험 실행 0 |
+| `--no-parallel '-Paigw.requireDocker=true' :adapter:ai-gateway-db-adapter:integrationTest :adapter:ai-gateway-inference-adapter:integrationTest :apps:ai-gateway-app:integrationTest`(모두 비한정) | 0 | `BUILD SUCCESSFUL in 55m 1s`, db 85·inference 1·app 204, 합 290건 실패·오류·skip 0 |
+| `'-Paigw.requireDocker=true' :gateway-eval:run --args="test-evidence verify --tasks :adapter:ai-gateway-db-adapter:integrationTest,:adapter:ai-gateway-inference-adapter:integrationTest,:apps:ai-gateway-app:integrationTest --require-docker"` | 0 | 현재 입력 지문으로 `TEST_EVIDENCE_VERIFIED` |
+| `docker ps -a --filter label=org.testcontainers=true --format '{{.ID}} {{.Names}}'`, `git diff --check` | 0 | 남은 시험 컨테이너 0, diff 형식 오류 0 |
+
+- 단위 11개 task(모두 실패·오류·skip 0): `:gateway-eval:test` 287, `:ai-gateway-core:test` 175, `:adapter:ai-gateway-db-adapter:test` 12, `:adapter:ai-gateway-inference-adapter:test` 43, `:adapter:ai-gateway-source-support:test` 8, `:adapter:ai-gateway-loki-adapter:test` 38, `:adapter:ai-gateway-tempo-adapter:test` 10, `:adapter:ai-gateway-gitlab-adapter:test` 24, `:adapter:ai-gateway-tc-mock-adapter:test` 49, `:apps:ai-gateway-app:test` 79, `:apps:ai-gateway-acceptance-app:test` 68. 합 793. 같은 입력의 UP-TO-DATE 재사용은 현재 지문 verifier와 함께 확인했다.
+- 새 비한정 IT runId: db `8b42e799-5eda-4199-b6f3-802123b8774b`, inference `74b04ba4-5e95-4ad8-89bc-a4320a3061a6`, app `df3e4263-942d-41be-842d-340a33f7b54e`. 과거 결과를 새 실행으로 재표기하지 않았다.
+- 초기 검증 명령 보정 이력: PowerShell에서 따옴표 없는 `-Paigw.requireDocker=true`가 분리되어 task 조회 실패했고, Docker 속성만 지정한 IT verifier도 `STALE_TEST_EVIDENCE`였다. 이 실패 실행들을 성공으로 세지 않았다. 최종 검증은 위 환경을 명시하고 보정 후 소스로 비한정 IT를 새로 실행한 결과다.
+- main 합류 뒤 P21 검증 커밋과의 tracked diff는 이 Dev report와 Plan 두 문서뿐이다. 기존 미추적 자료 135개의 경로·내용 해시 묶음은 합류 전후 모두 SHA256 `20bf397113d6dd14d8186bf0c7a637a6a7c1233809c995d79a2a2c18846c8820`로 같다. SPEC SHA도 위 값과 같으며 문서 두 개는 UTF-8(BOM 없음)·LF를 확인했다.
+
+### 남은 실환경 확인
+
+- §6에 따라 F4 코드/로컬 완료 뒤 최초 배포·F1→F4 실환경 수용을 수행한다. 현재 F2 24 leaf 실환경 판정·수동 rubric·지연/토큰/GPU 비용 실측·실제 egress 양성/음성 제어·pod DJL native 적재·`evidence/F2/GATE-REPORT.md`는 NOT_RUN이다.
+- AC-31의 실제 축소 입력 확보와 egress 양성 제어 id `inference-endpoint`·`db-main`은 첫 배포에서 확인한다. 전제가 없으면 기존 고정 사유의 NOT_RUN을 유지하며 로컬 fixture 성공으로 대체하지 않는다.
+- 승인 SPEC·기준선과 기존 사용자 미추적 자료를 보존한다. 원격 publish/CI/배포 승인이나 P22 착수로 해석하지 않는다.

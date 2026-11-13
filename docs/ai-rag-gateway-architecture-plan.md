@@ -4,7 +4,9 @@
 
 ## 0. 문서 메타
 
-> **현재 실행 기준(2026-11-11, seq16): P20 진행 중 사용자 지시로 중단.** Spec §28의 근거 기반 조건부 실행·분류 wire v3·F3 Hybrid/Reranking을 반영한다. 재개 절차와 확장 allowed_writes·검증·Gate는 이 문서 §16이 정본이다. 아래 과거 상태와 P20~P30의 이전 계획은 이력/재사용 기준이며 충돌하는 부분은 §16을 적용한다. 이번 작업은 문서 개정뿐이고 P20 구현·검증 완료, P21 착수, 모델/서버 호출·배포 승인이 아니다. 실제 P20 worktree의 미합류 코드를 삭제·자동 합류하지 않는다.
+> **현재 로컬 진행 상태(2026-11-13, root): P21 CODE/LOCAL_VALIDATED.** 검증된 P21 코드와 감사 경계 보정 커밋 `3d04b9a818c7ac99515d5a598abeffd404a8f0bc`를 main에 fast-forward로 반영했다. 단위 793건·통합 290건 실패·오류·skip 0, 각각 현재 지문의 `TEST_EVIDENCE_VERIFIED`를 확인했다. §6의 코드 선행 순서를 유지하며 실제 배포·F2 수용/exit·P21 전체 COMPLETE는 NOT_RUN/미승격이다. 아래 날짜별 상태는 당시 이력이고, P21의 현재 로컬 근거와 남은 실환경 항목은 P21 진행 기록·Dev report의 부모 검증 절을 따른다. 다음 phase는 이번 요청에서 시작하지 않는다.
+
+> **과거 문서 개정 상태(2026-11-11, seq16): P20 진행 중 사용자 지시로 중단.** Spec §28의 근거 기반 조건부 실행·분류 wire v3·F3 Hybrid/Reranking을 반영한다. 재개 절차와 확장 allowed_writes·검증·Gate는 이 문서 §16이 정본이다. 아래 과거 상태와 P20~P30의 이전 계획은 이력/재사용 기준이며 충돌하는 부분은 §16을 적용한다. 이번 작업은 문서 개정뿐이고 P20 구현·검증 완료, P21 착수, 모델/서버 호출·배포 승인이 아니다. 실제 P20 worktree의 미합류 코드를 삭제·자동 합류하지 않는다.
 
 | 항목 | 값 |
 |---|---|
@@ -1262,6 +1264,7 @@ LEFT JOIN gw.message pm ON pm.id=p.request_message_id AND pm.conversation_id=a.c
 ### P21 F2 게이트 실행 (F2)
 
 - [ ] 구현  - [ ] 검증
+- 로컬 진행 기록(2026-11-13, root): **CODE/LOCAL_VALIDATED**. 수용 suite·사전등록 fixture·LLM 호출 감사·egress 목록 hook·다중 대상 RUBRIC AND를 부모가 실제 호출/빈 조립/판정 경로와 대조하고, 전송 전 중단 감사 검사 충돌 1건을 회귀시험으로 재현·보정했다. 검증 코드 `3d04b9a818c7ac99515d5a598abeffd404a8f0bc`를 main에 FF 반영했다. 단위 11개 task 793건·비한정 IT 3개 task 290건 모두 실패·오류·skip 0 및 현재 입력 지문 verifier 통과. 설치 JAR 149개만으로 F2 필수 leaf 24개 발견(실행 0, JAR 해시 불변)을 독립 확인했다. 상세 명령·runId·미실행 범위는 Dev report의 P21 부모 검증 절에 기록한다. §6에 따라 실제 배포·LIVE/STUB 수용·수동 rubric·`evidence/F2/GATE-REPORT.md`는 F4 코드/로컬 완료 뒤이며 NOT_RUN이다. 위 전체 체크박스와 F2 exit를 로컬 시험으로 완료 처리하지 않는다.
 - 목표: 실제 Ollama(서버의 기존 endpoint 직접 호출 — 2026-11-09 임차 원칙, 이력: proxy 경유)와 LLM_STUB 를 분리해 SPEC §27.2 F2 행을 판정하고 추론 비용·지연을 기록한다.
 - 선행: P20, P17 join(P17 산출물). 실측 회차 전 운영자가 P17 runbook (a) 로 두 모델 상주·생성 모델 digest·`context_length` 를 읽기 전용 확인하고 그 요약 필드만 `evidence/F2/` 에 남긴다(미상주면 P17 runbook (b) 적재 뒤 재확인, 서버 변경 0). 2026-11-09 대체(임차 원칙), 이력: P17 join(G-INFER-* 완료 증거).
 - allowed_writes: `evidence/F2/**`, `gateway-acceptance/src/**`(F2 suite). 차트는 쓰지 않는다 — 추론 endpoint 주소·포트·egress 활성은 P15 가 템플릿화한 값을 runconfig(`inference.enabled=true`, `inference.baseUrl`, `inference.port`, 각 `approvalRef`)로만 넘긴다(2026-11-09 대체, 이력: 추론 proxy 주소·포트, `inference.proxyPort`, `approvalRef` = P17 사용자 실행 증거).
