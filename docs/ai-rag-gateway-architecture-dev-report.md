@@ -8448,3 +8448,111 @@ exec 쪽 삭제 commit 은 `nori-tc-exec` `f1d5e0a`(U6 절, push 전)다.
 - app IT 비한정 200건 실패·오류·skip 0 `BUILD SUCCESSFUL in 48m 2s`, verify `--require-docker` `TEST_EVIDENCE_VERIFIED`.
 - 실행 사고(기록): 첫 검증 실행을 멈출 때 bash 스크립트가 살아남아 두 번째 실행과 같은 프로젝트에서 동시에 돌았고, 두 번째의 app IT 가 26초 만에 실패했다. 남은 프로세스 트리를 종료하고 app IT 를 단독으로 다시 실행한 결과가 위 200건이다. 최종 판정은 모두 시험 지문 기반 verifier 결과다.
 - 남은 시험 컨테이너 0.
+
+
+## P21 F2 수용 suite — 시험 코드/로컬 검증 (2026-11-13, 독립 에이전트)
+
+- 범위: Plan "P21 F2 게이트 실행" 중 **시험 코드/로컬 검증** 부분만(Plan §6 순서 `P20 → P21 시험 코드/로컬 검증`). 실제 배포·실제 Ollama 호출·지연/비용 실측·`evidence/F2/GATE-REPORT.md`·수동 rubric 은 최초 배포 뒤 F1→F2→F3→F4 수용 순서에서 수행하며 이번에 하지 않았다. 선례 = P16 "배포 제외 실행 결과(CODE/LOCAL_VALIDATED)".
+- 작업 위치: worktree `C:/workspace_nori/.aigw-worktrees/p21-ai`, 브랜치 `aigw/f2-p21`(main `4e909b8` 에서 분기). main 작업 트리·push·배포·SSH·추론 서버(192.168.0.160)·Loki/Tempo/GitLab 실 endpoint 접촉 0. 시험은 loopback JDK HttpServer·JDBC proxy 대역만 쓴다.
+- 환경: Git Bash, Temurin 21.0.10, `AIGW_SPEC_FILE`=이 worktree SPEC, `AIGW_PG_TEST_IMAGE`=Plan 고정값, Gradle `--offline --no-daemon -p <worktree>`, 명령마다 별도 실행.
+- 경로 대응: Plan 의 `gateway-acceptance/src/**` = `modules/apps/ai-gateway-acceptance-app/src/**`, 사전등록 rubric `gateway-acceptance/src/main/resources/rubric/f2-v1.json` = 같은 모듈 `src/main/resources/rubric/f2-v1.json`(F1 은 rubric 을 코드 상수 `F1Fixture.RUBRIC_IDS` 로만 두었고, F2 는 Plan 이 파일을 지정해 그 경로에 만들었다).
+
+### 변경 파일(모두 allowed_writes 안)
+
+| 파일 | 내용 |
+|---|---|
+| `suite/F2Suite.java`(신규) | suite-F2: 22 leaf + 원시 지연 표본 측정 시험 1(leaf 태그 없음). 순서 = LIVE 4 → 측정 → STUB 14 → AC-35-EGRESS → readiness stub 3 |
+| `suite/F2OutageSuite.java`(신규) | suite-F2-OUTAGE: AC-44(`outage-STOPPED`), AC-33-LOADING(`outage-LOADING`) |
+| `F2Runtime.java`(신규) | 배포 입력(F1 과 같은 env·Secret 파일, `F1Runtime.clients` 재사용)으로 판정기 조립, 측정 기록, pin tokenizer 계수 |
+| `F2JobChecks.java`(신규) | LLM_LIVE·LLM_STUB·egress 판정 |
+| `F2ReadinessChecks.java`(신규) | AC-33-*·AC-44 판정(readiness stub hook 만, 끝에 항상 OFF→READY 확인) |
+| `F2Fixture.java`(신규) | F2 actor(sub `f2-acceptance`, F1 과 같은 권한), Manifest 고정 기대값, rubric fixture 로드 |
+| `F2RubricTargets.java`·`F2LiveSamples.java`(신규) | 회차 한정 rubric 대상(leaf, fixture)·LIVE Job 관찰/원시 표본 |
+| `src/main/resources/rubric/f2-v1.json`(신규) | 자유 서술 fixture 5개(AC-22-LIVE 골든 3, GQ-BYPASS 2)·금지 claim·금지 표현·수동 rubric 항목 |
+| `AcceptanceMain.java` | -OUTAGE 회차는 `AIGW_OUTAGE_PHASE` 필수(없으면 exit 2), launcher 태그식 `suite-F2-OUTAGE & outage-<phase>`, 모든 레코드에 `outagePhase` 추가 후 재봉인, F2 COMPLETED 에 `rubricTargets` |
+| `AcceptanceConfig.java` | `outagePhase()`(STOPPED·LOADING 만) |
+| `RubricViewMode.java` | F2-RUBRIC: 대상 RUN 의 stage/suite 를 rubric suite 접두로 결속, 사전등록 (leaf, fixture) 이 세 자유 서술 leaf 를 모두 덮을 때만 열람, F2 대상은 terminal Job(PARTIAL 포함) 서술 해시로 결속 |
+| `OracleQueries.java` | 고정 SELECT 3개(`TOOL_STATUS`·`JOB_OWNER`·`CLASSIFIED_TASK_TYPE`, 본문 0) |
+| `HookClient.java` | `find`(404 만 관측 없음), `HookFailure.status()` |
+| `GatewayClient.java` | Job 을 만들지 않는 서명 POST(`/v1/conversations`) |
+| 시험(신규) | `F2SuiteTest`·`F2FixtureTest`·`F2JobChecksTest`·`F2NeedsAndReadinessTest`·`F2AcceptanceMainTest`·`F2TokenCountTest`·`F2LocalFixture` |
+
+### leaf → component → suite 대응(24 + rubric)
+
+catalog `leaf-catalog-v2.json` producerIndex: F2 22, F2-OUTAGE 2, F2-RUBRIC 3. 라벨 태그는 catalog `labelsByStage.F2` 를 모두 포함하고 GateEvaluator `labelsMatch` 규칙을 지키는지 `F2SuiteTest` 가 확인한다.
+
+| leaf | component | suite / 태그 | 라벨 태그 | 판정 관측 수단 | 로컬 기대 |
+|---|---|---|---|---|---|
+| AC-22-LIVE | ACC:F2 + RB:F2-RUBRIC | F2 | MOCK_API, LLM_LIVE | 무장 없는 실제 Job 3건(f2-v1 골든), Tool 행 ⊆ IMPLEMENTED·`tc.*`, job owner TC, 금지 표현, rubric 대상 3 | 배포 전 NOT_RUN |
+| AC-29 | ACC:F2 | F2 | MOCK_API, LLM_LIVE | UNSUPPORTED, Tool 0, 참조 TC 만, evidence 0 | NOT_RUN |
+| AC-38-F2 | ACC:F2 | F2 | MOCK_API, LLM_LIVE | Loki 직접 양성 제어(>0 아니면 NOT_RUN) → 감사 taskType=INCIDENT_ANALYSIS, `tc.logs.search` ≥1, UNSUPPORTED 0, WM Tool 0, 실제 송신 window digest = Context 창 | NOT_RUN |
+| AC-31 | ACC:F2 | F2 | MOCK_API, LLM_LIVE | 관측 수단 없음 → `COMPOSER_BUDGET_OBSERVATION_UNAVAILABLE` | NOT_RUN(아래 결정 대기) |
+| (측정) `f2:llm-latency-samples` | MEASUREMENT | F2(leaf 아님) | — | LIVE Job `OracleQueries.jobTimings` → QUEUE·EXECUTION·E2E 밀리초 정수 + 관찰(상태·Tool 수·실패 수·위반 수) | — |
+| AC-22-STUB-TOOL | ACC:F2 | F2 | MOCK_API, LLM_STUB | 고정 분류 2회(미등록 capabilityId), PLAN_INVALID, owner TC, Tool 0, Composer 관찰 0 | — |
+| AC-22-STUB-SYSTEM | ACC:F2 | F2 | MOCK_API, LLM_STUB | 같음(targetSystem=WM·wm.*) | — |
+| AC-22-GQ-HELP | ACC:F2 | F2 | MOCK_API, LLM_STUB | 표 행 = Manifest 고정 7개, PLANNED 0, Tool·업무 Read 0, 감사 GENERAL_QUERY, Composer Prompt 에 Manifest 문구 1·`tc.knowledge.search` 0 | — |
+| AC-22-GQ-BYPASS-DATA | ACC:F2 + RB:F2-RUBRIC | F2 | MOCK_API, LLM_STUB | 업무 Read·Tool 0, claims 없음·evidence 0, 감사 GQ, 금지 표현, rubric 대상 | — |
+| AC-22-GQ-BYPASS-XSYS | ACC:F2 + RB:F2-RUBRIC | F2 | MOCK_API, LLM_STUB | 같음 | — |
+| AC-30-EQ / WM / ABSENT | ACC:F2 | F2 | MOCK_API, LLM_STUB | FAILED/RESOURCE_NOT_FOUND, clarification(RESOURCE_NOT_FOUND,[targetResources]), Mock resolveResource >0, Tool 0, 분류 1·Composer 0 | — |
+| AC-32-SCHEMA / LENGTH | ACC:F2 | F2 | MOCK_API, LLM_STUB | 분류 Prompt 관찰 2, FAILED/PLAN_INVALID, clarification(q), Tool·Composer 0 | — |
+| AC-32-RETRYOK | ACC:F2 | F2 | MOCK_API, LLM_STUB | 분류 2·Composer 1, SUCCEEDED/SUCCESS, snapshot Tool 1·Mock 1, 초회 eqp 토큰이 응답·DB 전체 0 | — |
+| AC-32-NEEDS | IT + ACC:F2 | F2 | MOCK_API, LLM_STUB | ⓐ~ⓞ 사례마다 새 Job(아래) | — |
+| AC-43-CLS | ACC:F2 | F2 | MOCK_API, LLM_STUB | 분류 고정 응답 없이 무장(전송되면 LLM_UNAVAILABLE 로 구별), FAILED/INPUT_BUDGET_EXCEEDED, 분류 관찰 1(예산 assert 도달)·Composer 0, Tool 0 | — |
+| AC-43-COMP | ACC:F2 | F2 | MOCK_API, LLM_STUB | tcmock 시나리오 `composer-oversize` 선택 필요(없으면 `COMPOSER_OVERSIZE_FIXTURE_UNAVAILABLE`) → 분류 1·Composer 0, INPUT_BUDGET_EXCEEDED, 대체 문장 0, 블록 유지 | 배포에서 NOT_RUN(fixture 부재) |
+| AC-35-EGRESS | ACC:F2 | F2 | MOCK_API | `AIGW_EGRESS_PROBE_TARGETS_JSON`(id·expect) → ALLOWED ≥2 전부 connected(아니면 NOT_RUN) 뒤 BLOCKED ≥2 전부 미연결 | 배포에서 NOT_RUN(입력 부재) |
+| AC-33-CTX | ACC:F2 | F2 | MOCK_API, LLM_STUB | stub MODEL_CONTEXT_MISMATCH, 즉시 경보 로그 1줄, 503+errorCode, Job 0 | — |
+| AC-33-DIGEST | ACC:F2 | F2 | MOCK_API, LLM_STUB | stub MODEL_DIGEST_MISMATCH, 즉시 경보 1·ctx 경보 0, 503+Retry-After+errorCode, Job 0 | — |
+| AC-33-PERSIST | ACC:F2 | F2 | MOCK_API, LLM_STUB | FREEZE_AT → stub MODEL_LOADING → ADVANCE 601 → 경보 1 → ADVANCE 3600 → 경보 1·해제 0, 503 유지, Job 0 | — |
+| AC-44 | ACC:F2-OUTAGE(STOPPED) | F2-OUTAGE, `outage-STOPPED` | MOCK_API, LLM_STUB | stub INFERENCE_UNAVAILABLE, 503+Retry-After+errorCode, Job 0, 대화 이력 200 | — |
+| AC-33-LOADING | ACC:F2-OUTAGE(LOADING) | F2-OUTAGE, `outage-LOADING` | MOCK_API, LLM_STUB | stub MODEL_LOADING, 503+Retry-After+errorCode, Job 0, 대화 이력 200 | — |
+
+AC-32-NEEDS 사례: ⓐ~ⓔ·ⓝ 는 `a=D` 로 무장해 상세 보고 표(ReportSections 열 `section..serverAdded`)의 `evidence` 표시·`serverAdded` 로 결속 evidenceNeeds/서버 보완을 보고, 분류 관찰 1(재시도 0)을 본다. ⓝ 은 요청 context·본문에 `evidenceNeeds:["I"]` 를 넣고 결과 [S,H]·git Tool 0. ⓕ~ⓜ 는 분류 관찰 2·재시도 요지 sentinel `오류: <code>)` 관찰 1·PLAN_INVALID·Tool 0. ⓞ 는 pin tokenizer(`HfTokenizerCounter`)로 최대 wire 답변 토큰 ≤256 을 하네스에서 세어 그 값을 completionTokens 로 무장하고, 배포 Job 이 재시도 0·PLAN_INVALID/INPUT_BUDGET_EXCEEDED/LLM_UNAVAILABLE 0 이면 배포 예산 assert(입력+max_tokens ≤ 8192) 통과로 본다(요청 max_tokens 5,120 은 같은 빌드의 `TokenBudgetPolicy` 상수 확인). 실패는 즉시 FAIL, 표가 없고 블록·Evidence 도 0 인 사례(예: F2 의 KQ ⓓ 가능성)나 tokenizer 를 열 수 없는 ⓞ 는 끝에 `NEEDS_CASE_UNOBSERVED_<codes>` NOT_RUN.
+
+### 결정과 근거
+
+1. **호출 수 관측 = prompt-watch.** 배포본에서 Job 별 LLM 호출 수를 주는 수단은 `GET /__test/prompt-watch/{requestKey}` 뿐이다(`docs/contracts/test-hooks-v1.md` 51행, `LlmScriptRegistry.java` 79-82행 — 관찰은 예산 assert 로 막힌 시도 포함, 전송 수 `scriptedCalls` 는 HTTP 로 노출되지 않음). 질문 앞에 무작위 대문자 sentinel(`PW` + 10자)을 붙여 유형별 호출 수로 쓰고, 모든 STUB leaf 에서 CLASSIFY 관찰 ≥1 을 양성 제어로 요구한다. `SENTINEL-` 형태는 `ContentSanitizer.java` 15행 마스킹에 걸려 쓰지 않았다.
+2. **AC-43-CLS "분류 호출 0" 구별.** 관찰만으로는 예산 차단 시도와 전송을 구별할 수 없어(위 1), 분류 고정 응답 없이 COMPOSER 하나만 무장했다. 분류가 전송되면 `LlmScriptRegistry.next` 의 유형 불일치(71-72행)로 전송 실패 → LLM_UNAVAILABLE 이 되므로 INPUT_BUDGET_EXCEEDED 와 구별된다.
+3. **GQ-BYPASS 의 Composer 도 고정 응답.** `ScriptedChatTransport` 는 결속 Job 의 소진·유형 불일치를 전송 실패로 만들고 운영 전송으로 넘기지 않는다(test-hooks-v1.md 50행, `ScriptedChatTransport.java` send). 그래서 "분류만 고정" 이라도 Composer 문장은 f2-v1 `composerScript` 사전등록 문장이며, rubric 은 그 문장이 결과에 그대로 실리는지를 본다(LIVE 서술 판정은 AC-22-LIVE 몫).
+4. **AC-32-NEEDS ⓑ~ⓔ 의 a=D.** SPEC §27.2 사례표는 ⓐ(D)·ⓜ(X) 만 a 를 정하고, 정규화는 a 와 무관하다(`ClassificationNeeds.resolve` 61-77행). 결속값을 배포본에서 볼 수 있는 유일한 출력이 D 의 상세 보고 표(`ReportSections.java` 18·29-39행, `WorkflowExecutor.java` 169행)라 D 로 무장했다. IT(`LlmClassificationNeedsIT`)는 B 로 같은 사례를 본다.
+5. **F2-OUTAGE 단계 선택·표지.** `GateEvaluator.java` 45·84-86행은 ACCEPTANCE RUN·LEAF 레코드의 `outagePhase` 가 component 단계와 같아야 고른다. 기존 하네스는 이 필드를 쓰지 않아 F2-OUTAGE component 가 영원히 COMPONENT_MISSING 이었으므로 AcceptanceMain 이 `AIGW_OUTAGE_PHASE`(차트 `acceptance-job.yaml` 65행이 이미 렌더)로 태그를 고르고 모든 레코드에 단계를 싣게 했다.
+6. **readiness 판정 관측.** 503·Retry-After·errorCode 는 실제 HTTP, "추론 요청 0·대체 문장 0" 은 Job 수 불변(고정 SQL)으로 본다(503 이면 Job·추론 0). 경보는 `InferenceReadinessService.java` 84-85행의 고정 로그 코드(`INFERENCE_ALERT_RAISED_<state>`·`INFERENCE_ALERT_CLEARED`)를 기존 `GatewayLogReadback` 으로 세며(로그 수집 지연 최대 90s 대기), Loki readback 입력이 없으면 NOT_RUN. "모델 로드·pull 요청 0" 은 서버 쪽 관측이 없어 Job 0 으로만 본다(IT `InferenceReadinessAdmissionIT` 가 stub 서버 수신으로 직접 확인).
+7. **LIVE 골든셋 사전등록.** F0 골든(`eval/golden/tc-f0-v*.jsonl`)의 설비 ID 는 TC Mock(`default.json` EQP-001 만)에 없어, f2-v1 에 EQP-001 기준 장애 문항 3개를 사전등록했다. 결과를 본 뒤 바꾸지 않는다.
+8. **GQ-HELP 기대 행.** 배포본 Registry view 를 읽는 수단이 없어 Manifest(`manifests/tc/*.json`)에서 IMPLEMENTED·F2 actor 권한 교집합 7개를 고정하고 `F2FixtureTest` 가 앱 Manifest 와 같음을 결속한다. 배포 runconfig 가 phase 를 비활성화하면 이 고정값과 달라 FAIL 이 날 수 있다(배포 시 확인 항목).
+
+### 실행 명령과 결과
+
+명령 형태: `<worktree>/gradlew -p <worktree> --offline --no-daemon --console=plain <task>`(위 env, Kotlin in-process 속성). 각 명령 별도 실행·exit 확인.
+
+| 순서 | 명령 | exit | 결과 |
+|---|---|---|---|
+| 1 | `:apps:ai-gateway-acceptance-app:test`(비한정) | 0 | 17 클래스 66건, 실패·오류·skip 0(신규 F2 7 클래스 포함) |
+| 2 | `:gateway-eval:run --args="test-evidence verify --tasks :apps:ai-gateway-acceptance-app:test"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| 3 | `:gateway-eval:run --args="spec-guard --spec <worktree>/docs/ai-rag-gateway-architecture.md --baseline docs/gates/spec-baseline.md"` | 0 | specSha `9a6a04b24d6ccccf46ef0c72f712ea2ae3b2e7364cc7b2ecea35972379e94a5a`(FILE_HASHED, LOCAL_FILE) |
+| 4 | `build`(전체 unit) | 0 | test task 11개 782건, 실패·오류·skip 0 — gateway-eval 283, core 171, app 79, acceptance 66, tc-mock 48, inference 43, loki 38, gitlab 24, db-adapter 12, tempo 10, source-support 8(BUILD SUCCESSFUL in 17m 10s) |
+| 5 | `:gateway-eval:run --args="test-evidence verify --tasks <위 11개 test task 쉼표 연결>"` | 0 | `TEST_EVIDENCE_VERIFIED` |
+| 6 | `:apps:ai-gateway-acceptance-app:installDist` 후 설치본 `lib/*`(149 JAR)만 classpath 로 JUnit launcher discovery(실행 0) | 0 | codeSource=`ai-gateway-acceptance-app-0.0.1-SNAPSHOT.jar`; `suite-F2` 23(leaf 22 = catalog producerIndex F2 정확 일치 + 측정 1), `suite-F2-OUTAGE` 2(= catalog F2-OUTAGE), `& outage-STOPPED` → AC-44 1, `& outage-LOADING` → AC-33-LOADING 1. 실행 전후 lib JAR 해시 동일 |
+
+- 중간 실패(보존): 첫 acceptance test 는 `F2LocalFixture` 의 `java.net.Proxy`·`java.lang.reflect.Proxy` 모호 참조로 compileTestJava 실패, 둘째는 `F2AcceptanceMainTest` 1건 실패(Set 순서에 의존한 `subList(0,3)` 가 세 leaf 를 모두 포함할 수 있었음 — 시험 결함, leaf 를 명시적으로 빼도록 수정). 제품·판정 코드 변경 없이 시험만 고쳤다.
+- integrationTest 는 추가·수정하지 않아 실행하지 않았고 `ci/integration-required.txt` 변경도 없다. 실행 뒤 `docker ps -a --filter label=org.testcontainers=true -q` = 0건, 직접 만든 Docker 이미지 0.
+
+### NOT_RUN 항목과 이유
+
+- 로컬에서 F2 24 leaf 실행 0(배포 Gateway·DB·Loki·추론 endpoint 부재). 운영 ACCEPTANCE ingest·`evidence/F2` 변경 0.
+- 배포 뒤에도 현재 코드로는 NOT_RUN 으로 남는 leaf(결정 필요):
+  - **AC-31**: 축소 단계·전후 토큰 수·`usage.prompt_tokens = 호출 직전 계수` 기록이 배포본 밖으로 나오지 않는다. `ComposerService.Result.reductionSteps`(ComposerService.java 63-65행)를 소비하는 코드가 없고, `aigw.llm.*` metric(MetricsCatalog.java 52-55행)은 등록만 되고 생산자가 없으며, `TruncationDetector`(11-14행)는 `usage < count` 만 실패로 본다. G-USAGE 는 Plan 300행 v4.1 대체로 진단 일치이나, 판정 입력이 없어 그 이전 단계에서 멈춘다.
+  - **AC-43-COMP**: 배포 Source 에서 축소 4단계 뒤에도 필수 필드가 2,816 을 넘는 Tool 결과를 만들 fixture 가 없다(tcmock 시나리오 목록 `tcmock/scenarios/index.json` 17개에 해당 없음, IT 는 시험 전용 `WorkflowSourceFixture`).
+  - **AC-35-EGRESS**: 수용 pod 가 egress 대상 id·ALLOWED/BLOCKED 기대를 받는 입력이 없다(`acceptance-job.yaml` env 에 없음, 대상은 Gateway pod 의 ConfigMap 만).
+- 자유 서술 leaf(AC-22-LIVE·GQ-BYPASS-*)는 RB:F2-RUBRIC 수동 판정 없으면 NOT_RUN(Plan P21).
+
+### allowed_writes 밖 변경(보고)
+
+- 없음. 아래는 필요하지만 하지 않은 변경(사용자·root 결정 대상)이다.
+
+### 실환경 F2 수용 전 남은 항목
+
+1. AC-31 관측 수단 결정 — 선택지: (A) verify 전용 hook 으로 Job 별 Composer 호출 예산 기록(단계 번호·전후 토큰·입력 계수·요청 max_tokens·usage.prompt_tokens, 원문 0)을 노출(app/hooks·core 변경, P16 SourceObservationController 선례) (B) `aigw.llm.*` metric 생산 + metrics readback(집계라 Job 결속 약함) (C) NOT_RUN 유지(F2 게이트 미통과).
+2. AC-43-COMP fixture — tcmock 시나리오 `composer-oversize`(INC 경로 Tool 결과의 outputSchema 필수 필드를 축소 4단계 뒤에도 2,816 초과로 키움) 추가. 하네스는 그 id 를 선택만 하고 없으면 NOT_RUN.
+3. AC-35-EGRESS 입력 — 차트 acceptance Job 에 `AIGW_EGRESS_PROBE_TARGETS_JSON`(`egressProbe.targets` 의 `{id, expect}` 만, host·port 제외) 렌더(operations 변경·selftest 필요).
+4. GateEvaluator RUBRIC component 는 leaf 당 최신 1건만 고른다(`GateEvaluator.java` 64·71·74-82행). AC-22-LIVE 골든셋은 fixture 3개라 세 판정의 AND 가 gate 에 반영되지 않는다 — eval 보정 또는 단일 fixture 로 축소 결정 필요(RubricViewMode 는 전 대상 PASS 일 때만 exit 0).
+5. 배포 뒤 실행: Plan P21 실행 순서(① F2 → ⓐ F2-RUBRIC → ⓑ F2-OUTAGE STOPPED → ⓒ LOADING → ⓔ gate), P17 runbook (a) 읽기 전용 확인, 지연 p50/p95 는 `perf report` nearest-rank, GPU/메모리·토큰 사용량 기록.
+6. 수용 pod 의 DJL native 적재(readOnlyRootFilesystem, `/tmp` 64Mi) 가 실패하면 ⓞ 만 NOT_RUN 이 된다 — 배포 첫 회차에서 확인.
